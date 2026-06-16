@@ -16,6 +16,7 @@ import { usePollStore } from '../store/usePollStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { VoteDonutChart, OPTION_COLORS } from '../components/VoteDonutChart';
 import { SnsPreviewCard } from '../components/SnsPreviewCard';
+import { Poll } from '@picky/shared';
 const POLL_AUTHOR_LABELS: {
   mine: string;
   otherMember: string;
@@ -31,11 +32,78 @@ export const PollDetail: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  const { currentPoll, isLoading, fetchPoll, vote } = usePollStore();
+  const { currentPoll, isLoading, fetchPoll, vote, setCurrentPoll } = usePollStore();
   const { user, guestName } = useAuthStore((state) => ({
     user: state.user,
     guestName: state.guestName,
   }));
+
+  const buildShareablePollSnapshot = (poll: Poll): string | null => {
+    try {
+      const encoded = encodeURIComponent(
+        btoa(
+          encodeURIComponent(
+            JSON.stringify({
+              version: 1,
+              poll,
+            }),
+          ),
+        ),
+      );
+      return encoded;
+    } catch {
+      return null;
+    }
+  };
+
+  const resolveShareUrl = (poll?: Poll | null) => {
+    if (!poll) {
+      return `${window.location.origin}/poll/${id}`;
+    }
+
+    const snapshot = buildShareablePollSnapshot(poll);
+    if (!snapshot) {
+      return `${window.location.origin}/poll/${poll.id}`;
+    }
+
+    return `${window.location.origin}/poll/${poll.id}?snapshot=${snapshot}`;
+  };
+
+  const restorePollFromSnapshot = () => {
+    if (!id) {
+      return;
+    }
+
+    const snapshot = searchParams.get('snapshot');
+    if (!snapshot) {
+      return;
+    }
+
+    try {
+      const raw = decodeURIComponent(atob(snapshot));
+      const parsed = JSON.parse(raw);
+      const candidate = parsed?.poll ?? parsed;
+
+      if (
+        candidate &&
+        typeof candidate.id === 'string' &&
+        candidate.id === id &&
+        typeof candidate.question === 'string'
+      ) {
+        setCurrentPoll(candidate as Poll);
+
+        const nextParams = new URLSearchParams(searchParams);
+        nextParams.delete('snapshot');
+        if (nextParams.toString()) {
+          setSearchParams(nextParams);
+        } else {
+          setSearchParams(new URLSearchParams());
+        }
+      }
+    } catch {
+      return;
+    }
+  };
 
   const getCreatorLabel = () => {
     if (!currentPoll) return POLL_AUTHOR_LABELS.guest;
@@ -48,6 +116,7 @@ export const PollDetail: React.FC = () => {
 
   // Modal share check
   const showShareParam = searchParams.get('showShare') === 'true';
+  const snapshotParam = searchParams.get('snapshot');
 
   // Forms
   const [votedOptionId, setVotedOptionId] = useState<number | null>(null);
@@ -76,10 +145,12 @@ export const PollDetail: React.FC = () => {
 
   // Fetch current poll data
   useEffect(() => {
+    restorePollFromSnapshot();
+
     if (id) {
       fetchPoll(id);
     }
-  }, [id, fetchPoll]);
+  }, [id, fetchPoll, snapshotParam]);
 
   // Pre-fill voter name from auth/guest profile
   useEffect(() => {
@@ -111,7 +182,7 @@ export const PollDetail: React.FC = () => {
 
   // Click-to-copy
   const handleCopyLinkClick = (pollId: string) => {
-    const shareUrl = `${window.location.origin}/poll/${pollId}`;
+    const shareUrl = resolveShareUrl(currentPoll);
     navigator.clipboard.writeText(shareUrl).then(() => {
       setCopiedId(pollId);
       setTimeout(() => setCopiedId(null), 2000);
@@ -805,7 +876,7 @@ export const PollDetail: React.FC = () => {
                   textAlign: 'left',
                 }}
               >
-                {`${window.location.origin}/poll/${currentPoll.id}`}
+                {resolveShareUrl(currentPoll)}
               </span>
               <button
                 onClick={() => handleCopyLinkClick(currentPoll.id)}
@@ -837,7 +908,7 @@ export const PollDetail: React.FC = () => {
               }}
             >
               <a
-                href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`[픽플로우 투표] ${currentPoll.question}\n지인분들의 투표와 의견을 들려주세요!`)}&url=${encodeURIComponent(`${window.location.origin}/poll/${currentPoll.id}`)}`}
+                href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`[픽플로우 투표] ${currentPoll.question}\n지인분들의 투표와 의견을 들려주세요!`)}&url=${encodeURIComponent(resolveShareUrl(currentPoll))}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="btn-secondary"
@@ -855,7 +926,7 @@ export const PollDetail: React.FC = () => {
                 <span>🐦 X (Twitter)</span>
               </a>
               <a
-                href={`https://share.kakaocast.daum.net/intent?text=${encodeURIComponent(`[고민 해결 투표] ${currentPoll.question}\n아래 링크를 클릭해 투표해 주세요!\n${window.location.origin}/poll/${currentPoll.id}`)}`}
+                href={`https://share.kakaocast.daum.net/intent?text=${encodeURIComponent(`[고민 해결 투표] ${currentPoll.question}\n아래 링크를 클릭해 투표해 주세요!\n${resolveShareUrl(currentPoll)}`)}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="btn-secondary"

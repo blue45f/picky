@@ -226,7 +226,9 @@ export const usePollStore = create<PollState>((set, get) => ({
       const res = await requestApi('/polls');
       if (!res.ok) {
         const errData = await parseApiPayload(res);
-        throw new Error(resolvePollErrorMessage(errData, '고민 목록을 가져오는데 실패했습니다.'));
+        const fallback = mergePollsWithLocalCache([]);
+        set({ polls: fallback, isLoading: false, error: resolvePollErrorMessage(errData, '고민 목록을 가져오는데 실패했습니다.') });
+        return;
       }
       const data = (await parseApiPayload(res)) as Poll[];
       const merged = mergePollsWithLocalCache(data);

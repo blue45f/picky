@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Trash2, Sparkles } from 'lucide-react';
 import { usePollStore } from '../store/usePollStore';
+import { Poll } from '@picky/shared';
 
 interface PresetOption {
   text: string;
@@ -112,6 +113,24 @@ export const CreatePoll: React.FC = () => {
   ]);
   const [activePresetIndex, setActivePresetIndex] = useState<number | null>(null);
 
+  const buildShareablePollSnapshot = (poll: Poll): string | null => {
+    try {
+      const encoded = encodeURIComponent(
+        btoa(
+          encodeURIComponent(
+            JSON.stringify({
+              version: 1,
+              poll,
+            }),
+          ),
+        ),
+      );
+      return encoded;
+    } catch {
+      return null;
+    }
+  };
+
   const applyPreset = (index: number) => {
     setActivePresetIndex(index);
     const template = PRESET_TEMPLATES[index];
@@ -192,6 +211,12 @@ export const CreatePoll: React.FC = () => {
     });
 
     if (result) {
+      const snapshot = buildShareablePollSnapshot(result);
+      if (snapshot) {
+        navigate(`/poll/${result.id}?showShare=true&snapshot=${snapshot}`);
+        return;
+      }
+
       navigate(`/poll/${result.id}?showShare=true`);
     }
   };
