@@ -178,10 +178,8 @@ const isAuthResultPayload = (payload: any): payload is AuthResult => {
     typeof payload.user === 'object' &&
     typeof payload.user.id === 'string' &&
     payload.user.id.trim() !== '' &&
-    typeof payload.user.email === 'string' &&
     typeof payload.user.nickname === 'string' &&
-    payload.user.nickname.trim() !== '' &&
-    typeof payload.user.createdAt === 'string'
+    payload.user.nickname.trim() !== ''
   );
 };
 
@@ -191,9 +189,14 @@ const hydrate = (set: any, data: AuthResult) => {
   }
 
   localStorage.setItem('picky_token', data.accessToken);
-  persistUser(data.user);
+  const user = {
+    ...data.user,
+    email: data.user.email || '',
+    createdAt: data.user.createdAt || new Date().toISOString(),
+  };
+  persistUser(user);
   set({
-    user: data.user,
+    user,
     token: data.accessToken,
   });
   return true;

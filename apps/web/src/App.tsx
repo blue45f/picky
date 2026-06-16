@@ -7,6 +7,7 @@ import {
   useLocation,
   useNavigate,
   useSearchParams,
+  Link,
 } from 'react-router-dom';
 import { Heart } from 'lucide-react';
 import { Navbar } from './components/Navbar';
@@ -86,13 +87,81 @@ export const App: React.FC = () => {
             marginTop: 'auto',
             padding: '2rem 1.5rem',
             borderTop: '1px solid var(--bg-card-border)',
-            textAlign: 'center',
             fontSize: '0.75rem',
             color: 'var(--text-muted)',
             backgroundColor: 'var(--bg-main)',
           }}
         >
-          <div style={{ maxWidth: '980px', margin: '0 auto', display: 'grid', gap: '6px' }}>
+          <div
+            style={{
+              maxWidth: '980px',
+              margin: '0 auto',
+              display: 'grid',
+              gap: '10px',
+            }}
+          >
+            <section
+              style={{
+                display: 'grid',
+                justifyContent: 'center',
+                gap: '0.7rem',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+              }}
+            >
+              <div
+                style={{
+                  padding: '0.75rem 0.85rem',
+                  border: '1px solid var(--bg-card-border)',
+                  borderRadius: '10px',
+                  background: 'rgba(255,255,255,0.02)',
+                  display: 'grid',
+                  gap: '0.28rem',
+                  textAlign: 'left',
+                }}
+              >
+                <h2
+                  style={{
+                    margin: 0,
+                    fontSize: '0.72rem',
+                    letterSpacing: '0.08em',
+                    color: 'var(--text-secondary)',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  Site Map
+                </h2>
+                <Link
+                  to="/"
+                  style={{
+                    color: 'var(--text-muted)',
+                    textDecoration: 'none',
+                    fontSize: '0.82rem',
+                  }}
+                >
+                  고민 목록
+                </Link>
+                <Link
+                  to="/create"
+                  style={{
+                    color: 'var(--text-muted)',
+                    textDecoration: 'none',
+                    fontSize: '0.82rem',
+                  }}
+                >
+                  새 고민 작성
+                </Link>
+                <Link
+                  to="/design"
+                  style={{
+                    color: 'var(--text-muted)',
+                    textDecoration: 'none',
+                    fontSize: '0.82rem',
+                  }}
+                >
+                  디자인 시스템
+                </Link>
+              </div>
+            </section>
             <p>© {new Date().getFullYear()} pickflow. All rights reserved.</p>
             <p
               style={{
