@@ -340,17 +340,6 @@ export const DesignSystem: React.FC = () => {
               <CircleCheckBig size={15} />
               상태: 실서비스 연동 준비 완료
             </span>
-            <a
-              href="#foundation"
-              style={{
-                textDecoration: 'none',
-                fontSize: '0.8rem',
-                color: 'var(--brand-accent-gold)',
-                borderBottom: '1px solid transparent',
-              }}
-            >
-              빠른 가이드 이동
-            </a>
           </div>
         </div>
       </section>
