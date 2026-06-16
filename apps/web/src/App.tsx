@@ -1,11 +1,12 @@
 import React, { useEffect } from 'react';
-import { HashRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Navigate, Routes, Route } from 'react-router-dom';
 import { Heart } from 'lucide-react';
 import { Navbar } from './components/Navbar';
 import { PollList } from './pages/PollList';
 import { CreatePoll } from './pages/CreatePoll';
 import { PollDetail } from './pages/PollDetail';
 import { DesignSystem } from './pages/DesignSystem';
+import { AuthPage } from './pages/AuthPage';
 import { useAuthStore } from './store/useAuthStore';
 
 export const App: React.FC = () => {
@@ -16,7 +17,7 @@ export const App: React.FC = () => {
   }, [fetchMe]);
 
   return (
-    <Router>
+    <BrowserRouter>
       <div
         style={{
           minHeight: '100vh',
@@ -42,6 +43,9 @@ export const App: React.FC = () => {
             <Route path="/create" element={<CreatePoll />} />
             <Route path="/design" element={<DesignSystem />} />
             <Route path="/poll/:id" element={<PollDetail />} />
+            <Route path="/auth" element={<Navigate to="/auth/login" replace />} />
+            <Route path="/auth/:mode" element={<AuthPage />} />
+            <Route path="*" element={<PollList />} />
           </Routes>
         </main>
 
@@ -76,6 +80,6 @@ export const App: React.FC = () => {
           </div>
         </footer>
       </div>
-    </Router>
+    </BrowserRouter>
   );
 };
