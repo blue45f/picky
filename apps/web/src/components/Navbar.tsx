@@ -290,7 +290,7 @@ export const Navbar: React.FC = () => {
             onClick={() => setMobileOpen((prev) => !prev)}
             aria-label="모바일 메뉴 열기"
             style={{
-              display: 'none',
+              display: 'inline-flex',
               border: '1px solid var(--bg-card-border)',
               borderRadius: '8px',
               width: '36px',
@@ -368,8 +368,8 @@ export const Navbar: React.FC = () => {
       <style>{`
         @media (max-width: 980px) {
           .desktop-nav,
-          .desktop-user-chip,
-          .mobile-menu-trigger { display: none !important; }
+          .desktop-user-chip { display: none !important; }
+          .mobile-menu-trigger { display: inline-flex !important; }
           .topbar-shell { position: sticky; }
         }
         @media (min-width: 981px) {
