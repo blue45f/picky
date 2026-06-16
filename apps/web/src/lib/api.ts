@@ -232,6 +232,8 @@ const isApiDebugEnabled = (): boolean => {
 };
 
 export const requestApi = async (path: string, init: RequestInit = {}): Promise<Response> => {
+  const explicitBase = import.meta.env.VITE_API_BASE_URL?.trim();
+  const hasExplicitBase = Boolean(explicitBase);
   const candidates = getApiCandidates();
   let lastResponse: Response | null = null;
   let lastError: Error | null = null;
