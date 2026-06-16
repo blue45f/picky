@@ -90,7 +90,7 @@ const getApiCandidates = (): string[] => {
   if (explicitBase) {
     const explicitCandidates = addVercelApiFallback(normalizeApiBase(explicitBase));
     const runtimeCandidates = getWindowApiCandidates();
-    return dedupe([...explicitCandidates, ...runtimeCandidates]);
+    return dedupe([...runtimeCandidates, ...explicitCandidates]);
   }
 
   const preferredBase = getPreferredApiBase();

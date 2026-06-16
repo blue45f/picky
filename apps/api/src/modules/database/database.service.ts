@@ -15,7 +15,12 @@ export interface DatabaseUser {
 
 @Injectable()
 export class DatabaseService implements OnModuleInit {
-  private filePath = path.resolve(process.cwd(), 'db.json');
+  private readonly filePath = path.resolve(
+    process.env.PICKY_DB_PATH?.trim() ||
+      (process.env.NODE_ENV === 'production'
+        ? '/tmp/picky-db.json'
+        : path.resolve(process.cwd(), 'db.json')),
+  );
   private data: { polls: Poll[]; users: DatabaseUser[] } = { polls: [], users: [] };
 
   onModuleInit() {
