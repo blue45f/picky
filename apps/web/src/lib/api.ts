@@ -1,7 +1,30 @@
+const normalizeApiBase = (rawBase: string): string => {
+  const trimmed = rawBase.trim().replace(/\/+$/, '');
+  if (!trimmed) {
+    return trimmed;
+  }
+
+  if (trimmed.startsWith('/')) {
+    return trimmed === '/' ? '/api' : trimmed;
+  }
+
+  try {
+    const parsed = new URL(trimmed);
+    const hasRootPath = !parsed.pathname || parsed.pathname === '/';
+    if (hasRootPath) {
+      return `${parsed.origin}/api`;
+    }
+
+    return `${parsed.origin}${parsed.pathname}`;
+  } catch {
+    return trimmed;
+  }
+};
+
 export const getApiBaseUrl = (): string => {
   const explicitBase = import.meta.env.VITE_API_BASE_URL?.trim();
   if (explicitBase) {
-    return explicitBase.replace(/\/$/, '');
+    return normalizeApiBase(explicitBase);
   }
 
   if (typeof window === 'undefined') {
