@@ -119,11 +119,18 @@ const findPollFromLocalCache = (pollId: string): Poll | undefined => {
   return cached.find((poll) => poll.id === pollId);
 };
 
-const applyLocalVote = (poll: Poll, optionId: number, voterName?: string, comment?: string): Poll | null => {
+const applyLocalVote = (
+  poll: Poll,
+  optionId: number,
+  voterName?: string,
+  comment?: string | null,
+): Poll | null => {
   const target = poll.options.find((option) => option.id === optionId);
   if (!target) {
     return null;
   }
+
+  const normalizedComment = (comment || '').trim();
 
   const nextOptions = poll.options.map((option) =>
     option.id === optionId ? { ...option, voteCount: option.voteCount + 1 } : option,
@@ -136,12 +143,12 @@ const applyLocalVote = (poll: Poll, optionId: number, voterName?: string, commen
     comments: [...poll.comments],
   };
 
-  if ((comment || '').trim()) {
+  if (normalizedComment) {
     nextPoll.comments = [
       {
         id: nextPoll.comments.length + 1,
         voterName: (voterName || '익명').trim() || '익명',
-        comment: comment.trim(),
+        comment: normalizedComment,
         createdAt: new Date().toISOString(),
         selectedOptionId: optionId,
         selectedOptionText: target.text,
