@@ -4,12 +4,19 @@ const normalizeApiBase = (rawBase: string): string => {
     return trimmed;
   }
 
+  const needsProtocol =
+    !trimmed.startsWith('/') &&
+    !trimmed.startsWith('http://') &&
+    !trimmed.startsWith('https://') &&
+    !trimmed.startsWith('//');
+  const normalizedRaw = needsProtocol ? `https://${trimmed}` : trimmed;
+
   if (trimmed.startsWith('/')) {
     return trimmed === '/' ? '/api' : trimmed;
   }
 
   try {
-    const parsed = new URL(trimmed);
+    const parsed = new URL(normalizedRaw);
     const hasRootPath = !parsed.pathname || parsed.pathname === '/';
     if (hasRootPath) {
       return `${parsed.origin}/api`;
