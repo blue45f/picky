@@ -1,507 +1,1085 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Box,
-  Paintbrush,
+  CircleCheckBig,
+  Copy,
+  LayoutTemplate,
+  Layers,
   Palette,
+  Paintbrush,
   Ruler,
   SlidersHorizontal,
   Type,
-  View,
   Wand2,
-  BoxSelect,
 } from 'lucide-react';
 
-const foundationTokens = [
+const colorTokens = [
   {
+    name: '배경 Base',
     token: '--bg-main',
     value: 'oklch(14% 0.015 260)',
-    usage: '앱 배경',
+    purpose: '앱 전체 바탕',
     sample: 'var(--bg-main)',
   },
   {
+    name: '카드 패널',
     token: '--bg-card',
     value: 'oklch(18% 0.02 260)',
-    usage: '카드/패널 배경',
+    purpose: '카드 및 팝오버',
     sample: 'var(--bg-card)',
   },
   {
+    name: '메인 액션',
     token: '--brand-primary',
     value: 'oklch(62% 0.18 260)',
-    usage: '메인 CTA',
+    purpose: 'Primary CTA, 강조',
     sample: 'var(--brand-primary)',
   },
   {
+    name: '호버/포커스',
     token: '--brand-primary-light',
     value: 'oklch(75% 0.12 260)',
-    usage: '호버 상태',
+    purpose: '버튼 Hover, Active',
     sample: 'var(--brand-primary-light)',
   },
   {
+    name: '경고/알림',
     token: '--brand-accent-gold',
     value: 'oklch(78% 0.14 85)',
-    usage: '강조/알림',
+    purpose: '헤드라인 포인트, 배지',
     sample: 'var(--brand-accent-gold)',
   },
   {
+    name: '성공',
     token: '--brand-accent-teal',
     value: 'oklch(72% 0.15 170)',
-    usage: '성공/보조 액션',
+    purpose: '성공 상태/제안',
     sample: 'var(--brand-accent-teal)',
   },
   {
+    name: '오류',
     token: '--brand-accent-coral',
     value: 'oklch(64% 0.18 25)',
-    usage: '경고/오류',
+    purpose: '에러/위험 신호',
     sample: 'var(--brand-accent-coral)',
+  },
+  {
+    name: '본문 텍스트',
+    token: '--text-primary',
+    value: 'oklch(98% 0.005 260)',
+    purpose: '일반 본문',
+    sample: 'var(--text-primary)',
+  },
+  {
+    name: '메타 텍스트',
+    token: '--text-muted',
+    value: 'oklch(66% 0.015 260)',
+    purpose: '보조 라벨/캡션',
+    sample: 'var(--text-muted)',
   },
 ];
 
-const typographyTokens = [
+const typographyScale = [
   {
     token: 'Display',
-    size: '2.45rem',
+    size: '2.8rem',
     weight: 900,
-    lh: '1.1',
-    usage: '페이지 메인 헤드라인',
+    lineHeight: 1.06,
+    example: '디자인 시스템 랩',
+    note: 'Hero와 첫 인상 영역',
   },
   {
-    token: 'Heading 1',
+    token: 'H1',
     size: '1.9rem',
     weight: 800,
-    lh: '1.25',
-    usage: '섹션 타이틀',
+    lineHeight: 1.2,
+    example: '섹션 헤더',
+    note: '페이지 내부 큰 제목',
   },
   {
-    token: 'Heading 2',
-    size: '1.3rem',
+    token: 'H2',
+    size: '1.35rem',
     weight: 700,
-    lh: '1.35',
-    usage: '카드 타이틀',
+    lineHeight: 1.34,
+    example: '카드 타이틀',
+    note: '컴포넌트 제목',
   },
   {
     token: 'Body',
     size: '0.95rem',
     weight: 400,
-    lh: '1.6',
-    usage: '기본 본문',
+    lineHeight: 1.65,
+    example: '본문 문장',
+    note: '읽기 편한 가독성',
   },
   {
     token: 'Caption',
-    size: '0.75rem',
+    size: '0.74rem',
     weight: 500,
-    lh: '1.3',
-    usage: '메타/작은 텍스트',
+    lineHeight: 1.35,
+    example: '작은 메타 텍스트',
+    note: '상태 뱃지/타임라인 레이블',
   },
 ];
 
-const spacingTokens = [
-  {
-    token: '--radius-sm',
-    value: '8px',
-    usage: '버튼/칩 기본',
-  },
-  {
-    token: '--radius-md',
-    value: '12px',
-    usage: '카드/폼 요소',
-  },
-  {
-    token: '--radius-lg',
-    value: '18px',
-    usage: '콘텐츠 모달/패널',
-  },
-  {
-    token: '--shadow-sm',
-    value: '0 2px 8px rgba(0, 0, 0, 0.2)',
-    usage: '기본 카드',
-  },
+const shapeTokens = [
+  { token: '--radius-sm', value: '8px', sample: 8, purpose: '입력/칩 기본 모양' },
+  { token: '--radius-md', value: '12px', sample: 12, purpose: '카드/패널 기본 모양' },
+  { token: '--radius-lg', value: '18px', sample: 18, purpose: '모달/시트/대형 박스' },
+  { token: '--shadow-sm', value: '0 2px 8px rgba(0, 0, 0, 0.2)', purpose: '기본 분리감' },
   {
     token: '--shadow-md',
     value: '0 12px 24px -4px rgba(0, 0, 0, 0.4)',
-    usage: '입체 패널',
+    purpose: '패널 레이어',
   },
   {
     token: '--shadow-glow',
     value: '0 0 24px rgba(99, 102, 241, 0.15)',
-    usage: '주요 액션 강조',
+    purpose: '인터랙션 강조',
   },
 ];
 
-const componentSnippets: Array<{ title: string; subtitle: string; code: string }> = [
+const primitiveActions = ['기본', '호버', '활성', '비활성', '로딩'];
+
+const snippetExamples = [
   {
-    title: 'Primary Button',
-    subtitle: '프로덕션 기준 CTA',
-    code: `<button className="btn-primary">투표 시작</button>`,
+    title: 'Primary 버튼',
+    usage: '핵심 작업',
+    code: '<button className="btn-primary">새 폴 선택</button>',
   },
   {
-    title: 'Secondary Button',
-    subtitle: '보조 액션',
-    code: `<button className="btn-secondary">취소</button>`,
+    title: 'Secondary 버튼',
+    usage: '보조 동작',
+    code: '<button className="btn-secondary">취소</button>',
   },
   {
-    title: 'Input',
-    subtitle: '기본 폼 입력',
-    code: `<input className="form-input" placeholder="입력하세요" />`,
+    title: '폼 입력',
+    usage: '텍스트 입력',
+    code: '<input className="form-input" placeholder="이름을 입력하세요" />',
+  },
+  {
+    title: '카드 패턴',
+    usage: '콘텐츠 블록',
+    code: '<article className="content-card"><h4>카드 제목</h4><p>본문...</p></article>',
   },
 ];
 
-const StatusPill = ({
-  label,
-  textColor,
-  bgColor,
-}: {
-  label: string;
-  textColor: string;
-  bgColor: string;
-}) => (
-  <span
-    style={{
-      display: 'inline-flex',
-      alignItems: 'center',
-      gap: '0.4rem',
-      padding: '0.35rem 0.7rem',
-      borderRadius: '999px',
-      border: '1px solid rgba(255,255,255,0.12)',
-      color: textColor,
-      fontSize: '0.78rem',
-      background: bgColor,
-      flexShrink: 0,
-    }}
-  >
-    {label}
-  </span>
-);
+const contrastPairs = [
+  { bg: 'var(--bg-main)', text: 'var(--text-primary)', label: '본문 대비' },
+  { bg: 'var(--brand-primary)', text: 'var(--text-primary)', label: '브랜드 대비' },
+  { bg: 'var(--brand-accent-coral)', text: 'var(--text-primary)', label: '경고 대비' },
+  { bg: 'rgba(0,0,0,0.42)', text: 'var(--text-primary)', label: '다크 카드 대비' },
+];
+
+type DensityMode = 'compact' | 'balanced' | 'spacious';
+
+const densityStyles: Record<DensityMode, React.CSSProperties> = {
+  compact: {
+    gap: '0.55rem',
+    cardPadding: '0.9rem',
+    inputPad: '10px 12px',
+  },
+  balanced: {
+    gap: '0.75rem',
+    cardPadding: '1.12rem',
+    inputPad: '12px 14px',
+  },
+  spacious: {
+    gap: '1rem',
+    cardPadding: '1.35rem',
+    inputPad: '14px 16px',
+  },
+};
 
 export const DesignSystem: React.FC = () => {
+  const [density, setDensity] = useState<DensityMode>('balanced');
+  const [copyKey, setCopyKey] = useState<string>('');
+  const [ctaMode, setCtaMode] = useState<'text' | 'loading'>( 'text');
+
+  const copyCode = (key: string, text: string) => {
+    navigator.clipboard?.writeText(text).finally(() => {
+      setCopyKey(key);
+      setTimeout(() => setCopyKey((current) => (current === key ? '' : current)), 1400);
+    });
+  };
+
+  const currentDensity = useMemo(() => densityStyles[density], [density]);
+
   return (
-    <div style={{ display: 'grid', gap: '1rem' }}>
-      <section className="content-card" style={{ padding: '1.4rem', display: 'grid', gap: '0.9rem' }}>
-        <p
-          style={{
-            color: 'var(--brand-accent-gold)',
-            fontWeight: 700,
-            fontSize: '0.73rem',
-            letterSpacing: '0.16em',
-            textTransform: 'uppercase',
-          }}
-        >
-          pickflow design system
-        </p>
-        <h1
-          style={{
-            margin: 0,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.55rem',
-            fontSize: '2rem',
-            lineHeight: 1.2,
-          }}
-        >
-          <Palette size={22} />
-          디자인 시스템 페이지
-        </h1>
-        <p style={{ color: 'var(--text-secondary)', lineHeight: 1.7 }}>
-          rotifolk 디자인 페이지처럼 토큰, 타이포, 컴포넌트를 한곳에서 확인하고 바로 참고 가능한 형태의 가이드를 제공합니다.
-        </p>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem' }}>
-          <a
-            href="https://rotifolk.vercel.app/design"
-            target="_blank"
-            rel="noreferrer"
-            className="btn-secondary"
-            style={{ textDecoration: 'none', padding: '0.65rem 1rem', fontSize: '0.82rem' }}
-          >
-            <View size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} />
-            rotifolk Design 참고
-          </a>
-          <button type="button" className="btn-primary" style={{ padding: '0.65rem 1rem', fontSize: '0.82rem' }}>
-            <Wand2 size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} />
-            토큰 카탈로그
-          </button>
-        </div>
-      </section>
+    <div
+      style={{
+        position: 'relative',
+        display: 'grid',
+        gap: currentDensity.gap,
+      }}
+    >
+      <style>
+        {`
+          @keyframes ds-float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+          }
+          @keyframes ds-sheen {
+            0% { transform: translateX(-140%); opacity: 0.4; }
+            100% { transform: translateX(140%); opacity: 0; }
+          }
+        `}
+      </style>
 
-      <section className="content-card" style={{ padding: '1.2rem', display: 'grid', gap: '0.9rem' }}>
-        <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <Paintbrush size={18} /> Foundation Tokens
-        </h2>
-        <div style={{ display: 'grid', gap: '0.7rem' }}>
-          {foundationTokens.map((token) => (
-            <div
-              key={token.token}
-              style={{
-                border: '1px solid var(--bg-card-border)',
-                borderRadius: '12px',
-                overflow: 'hidden',
-                background: 'var(--bg-card)',
-              }}
-            >
-              <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr' }}>
-                <div
-                  style={{
-                    width: '100%',
-                    padding: '0.9rem',
-                    backgroundColor: token.sample,
-                  }}
-                />
-                <div style={{ padding: '0.9rem', display: 'grid', gap: '0.3rem' }}>
-                  <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{token.token}</div>
-                  <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{token.value}</div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{token.usage}</div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="content-card" style={{ padding: '1.2rem', display: 'grid', gap: '0.9rem' }}>
-        <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <Type size={18} /> Typography Scale
-        </h2>
-        <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: '0.9rem' }}>
-          실제 크기와 라인하이트를 즉시 비교할 수 있도록 샘플 텍스트를 함께 노출합니다.
-        </p>
-        <div style={{ display: 'grid', gap: '0.55rem' }}>
-          {typographyTokens.map((scale) => (
-            <div
-              key={scale.token}
-              style={{
-                border: '1px solid var(--bg-card-border)',
-                borderRadius: '10px',
-                padding: '0.8rem',
-                background: 'oklch(16% 0.014 260)',
-                display: 'grid',
-                gap: '0.5rem',
-              }}
-            >
-              <div
-                style={{
-                  fontSize: scale.size,
-                  lineHeight: scale.lh,
-                  fontWeight: scale.weight,
-                  color: 'var(--text-primary)',
-                }}
-              >
-                {scale.token} Example
-              </div>
-              <div
-                style={{
-                  fontSize: '0.76rem',
-                  color: 'var(--text-muted)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: '0.5rem',
-                }}
-              >
-                <span>{scale.usage}</span>
-                <span style={{ whiteSpace: 'nowrap' }}>
-                  {scale.size} · {scale.weight} · lh {scale.lh}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="content-card" style={{ padding: '1.2rem', display: 'grid', gap: '0.9rem' }}>
-        <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <Ruler size={18} /> Shape & Shadow
-        </h2>
+      <section
+        className="content-card"
+        style={{
+          position: 'relative',
+          overflow: 'hidden',
+          padding: currentDensity.cardPadding,
+          display: 'grid',
+          gap: '0.85rem',
+          animation: 'slideUp 0.55s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+        }}
+      >
         <div
           style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-            gap: '0.65rem',
+            position: 'absolute',
+            width: '230px',
+            height: '230px',
+            borderRadius: '50%',
+            right: '-70px',
+            top: '-60px',
+            background:
+              'radial-gradient(circle at center, rgba(255,255,255,0.18), rgba(255,255,255,0) 70%)',
+            pointerEvents: 'none',
+            opacity: 0.35,
           }}
-        >
-          {spacingTokens.map((token) => (
-            <div
-              key={token.token}
-              style={{
-                border: '1px solid var(--bg-card-border)',
-                borderRadius: '10px',
-                padding: '0.75rem',
-                background: 'var(--bg-card)',
-              }}
-            >
-              <div style={{ fontWeight: 700, marginBottom: '0.25rem' }}>{token.token}</div>
-              <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginBottom: '0.35rem' }}>
-                {token.value}
-              </div>
-              <div style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>{token.usage}</div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="content-card" style={{ padding: '1.2rem', display: 'grid', gap: '0.9rem' }}>
-        <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <SlidersHorizontal size={18} /> Component Primitives
-        </h2>
-        <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: '0.9rem' }}>
-          디자인 토큰 기반 컴포넌트 샘플을 바로 확인하고 문구/크기 조합을 테스트합니다.
-        </p>
-        <div style={{ display: 'grid', gap: '0.7rem' }}>
-          <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
-            <button type="button" className="btn-primary" style={{ padding: '0.68rem 1rem' }}>
-              Primary
-            </button>
-            <button type="button" className="btn-secondary" style={{ padding: '0.68rem 1rem' }}>
-              Secondary
-            </button>
+        />
+        <div
+          style={{
+            position: 'absolute',
+            width: '260px',
+            height: '260px',
+            borderRadius: '50%',
+            left: '-120px',
+            bottom: '-150px',
+            background: 'radial-gradient(circle at center, rgba(132, 94, 247, 0.32), rgba(132, 94, 247, 0) 72%)',
+            pointerEvents: 'none',
+            filter: 'blur(1px)',
+          }}
+        />
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background:
+              'linear-gradient(120deg, rgba(99,102,241,0.15), transparent 40%, rgba(245,158,11,0.08) 100%)',
+            pointerEvents: 'none',
+            zIndex: 0,
+          }}
+        />
+        <div style={{ position: 'relative', zIndex: 1, display: 'grid', gap: '0.8rem' }}>
+          <span
+            style={{
+              color: 'var(--brand-accent-gold)',
+              fontWeight: 700,
+              fontSize: '0.72rem',
+              letterSpacing: '0.16em',
+              textTransform: 'uppercase',
+            }}
+          >
+            Pickflow Design System
+          </span>
+          <h1
+            style={{
+              margin: 0,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.55rem',
+              fontSize: '2.05rem',
+              lineHeight: 1.1,
+            }}
+          >
+            <Palette size={24} />
+            서비스 전체를 이끄는 디자인 원본
+          </h1>
+          <p style={{ color: 'var(--text-secondary)', lineHeight: 1.75, maxWidth: 780 }}>
+            토큰부터 컴포넌트까지 한 번에 점검할 수 있는 내부 전용 디자인 시스템 뷰입니다.
+            버튼/입력/카드/섹션 레이아웃의 규칙을 같은 문맥에서 확인하고 즉시 UI로 환원할 수 있습니다.
+          </p>
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: '0.65rem',
+              alignItems: 'center',
+            }}
+          >
             <button
               type="button"
               className="btn-primary"
-              style={{ padding: '0.68rem 1rem', opacity: 0.52 }}
-              disabled
-            >
-              Disabled
-            </button>
-          </div>
-          <input className="form-input" placeholder="아이디 또는 닉네임" />
-          <textarea
-            className="form-input"
-            rows={4}
-            placeholder="멀티라인 입력 시 간격과 줄바꿈이 잘 적용되는지 확인해보세요."
-          />
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-            <StatusPill
-              label="Primary"
-              textColor="var(--text-primary)"
-              bgColor="var(--brand-primary)"
-            />
-            <StatusPill
-              label="Success"
-              textColor="var(--text-primary)"
-              bgColor="rgba(64, 201, 177, 0.2)"
-            />
-            <StatusPill
-              label="Warn"
-              textColor="var(--text-primary)"
-              bgColor="rgba(245, 158, 11, 0.22)"
-            />
-          </div>
-        </div>
-      </section>
-
-      <section className="content-card" style={{ padding: '1.2rem', display: 'grid', gap: '0.9rem' }}>
-        <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <Box size={18} /> Token Usage Snippets
-        </h2>
-        <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: '0.9rem' }}>
-          실제 화면에서 복붙 가능한 최소 예시 코드입니다.
-        </p>
-        <div style={{ display: 'grid', gap: '0.75rem' }}>
-          {componentSnippets.map((snippet) => (
-            <div
-              key={snippet.title}
               style={{
-                border: '1px solid var(--bg-card-border)',
-                borderRadius: '10px',
-                padding: '0.75rem',
-                background: 'oklch(16% 0.014 260)',
+                padding: '0.7rem 1.05rem',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                animation: 'ds-float 2.8s ease-in-out infinite',
               }}
             >
-              <div style={{ marginBottom: '0.45rem', display: 'grid', gap: '0.2rem' }}>
-                <div style={{ fontWeight: 700 }}>{snippet.title}</div>
-                <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)' }}>
-                  {snippet.subtitle}
-                </div>
-              </div>
-              <pre
-                style={{
-                  margin: 0,
-                  padding: '0.7rem',
-                  borderRadius: '8px',
-                  backgroundColor: 'rgba(0,0,0,0.28)',
-                  color: 'var(--text-secondary)',
-                  fontSize: '0.75rem',
-                  overflowX: 'auto',
-                }}
-              >
-                <code>{snippet.code}</code>
-              </pre>
-            </div>
-          ))}
+              <Wand2 size={15} />
+              토큰 카탈로그 시작
+            </button>
+            <span
+              style={{
+                fontSize: '0.8rem',
+                color: 'var(--text-muted)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                padding: '0.45rem 0.65rem',
+                borderRadius: '999px',
+                border: '1px solid rgba(255,255,255,0.12)',
+              }}
+            >
+              <CircleCheckBig size={15} />
+              상태: 실서비스 연동 준비 완료
+            </span>
+            <a
+              href="#foundation"
+              style={{
+                textDecoration: 'none',
+                fontSize: '0.8rem',
+                color: 'var(--brand-accent-gold)',
+                borderBottom: '1px solid transparent',
+              }}
+            >
+              빠른 가이드 이동
+            </a>
+          </div>
         </div>
       </section>
 
-      <section className="content-card" style={{ padding: '1.2rem', display: 'grid', gap: '0.75rem' }}>
-        <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <BoxSelect size={18} /> Layout Pattern
-        </h2>
+      <section id="foundation" style={{ display: 'grid', gap: currentDensity.gap }}>
         <div
           style={{
-            border: '1px solid var(--bg-card-border)',
-            borderRadius: '12px',
-            padding: '0.9rem',
-            background: 'oklch(16% 0.014 260)',
+            display: 'grid',
+            gridTemplateColumns: '1fr auto',
+            gap: '0.6rem',
+            alignItems: 'end',
           }}
         >
+          <h2
+            style={{
+              margin: 0,
+              display: 'inline-flex',
+              gap: '0.55rem',
+              alignItems: 'center',
+            }}
+          >
+            <Paintbrush size={18} />
+            Foundation Tokens
+          </h2>
+          <div style={{ display: 'inline-flex', gap: '0.5rem' }}>
+            <button
+              type="button"
+              className={density === 'compact' ? 'btn-primary' : 'btn-secondary'}
+              onClick={() => setDensity('compact')}
+              style={{ padding: '0.45rem 0.74rem', fontSize: '0.73rem' }}
+            >
+              compact
+            </button>
+            <button
+              type="button"
+              className={density === 'balanced' ? 'btn-primary' : 'btn-secondary'}
+              onClick={() => setDensity('balanced')}
+              style={{ padding: '0.45rem 0.74rem', fontSize: '0.73rem' }}
+            >
+              balanced
+            </button>
+            <button
+              type="button"
+              className={density === 'spacious' ? 'btn-primary' : 'btn-secondary'}
+              onClick={() => setDensity('spacious')}
+              style={{ padding: '0.45rem 0.74rem', fontSize: '0.73rem' }}
+            >
+              spacious
+            </button>
+          </div>
+        </div>
+
+        <section className="content-card" style={{ padding: currentDensity.cardPadding }}>
+          <div style={{ display: 'grid', gap: currentDensity.gap }}>
+            {colorTokens.map((token, index) => (
+              <div
+                key={token.token}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '180px 1fr auto',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  border: '1px solid var(--bg-card-border)',
+                  borderRadius: '10px',
+                  padding: '0.7rem',
+                  background: 'linear-gradient(120deg, rgba(255,255,255,0.05), rgba(255,255,255,0.01))',
+                  transform: `translateY(${index * 0.5}px)`,
+                  animation: `slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) ${(index * 45) + 120}ms both`,
+                }}
+              >
+                <div
+                  style={{
+                    fontWeight: 700,
+                    color: 'var(--text-primary)',
+                    minWidth: 0,
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                  }}
+                >
+                  {token.name}
+                </div>
+                <div>
+                  <div
+                    style={{
+                      fontSize: '0.86rem',
+                      color: 'var(--text-secondary)',
+                      marginBottom: '2px',
+                    }}
+                  >
+                    {token.token} · {token.value}
+                  </div>
+                  <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                    {token.purpose}
+                  </div>
+                </div>
+                <div
+                  style={{
+                    width: '64px',
+                    height: '28px',
+                    borderRadius: '10px',
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    background: token.sample,
+                    boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.2)',
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+        </section>
+      </section>
+
+      <section style={{ display: 'grid', gap: currentDensity.gap }}>
+        <h2
+          style={{
+            margin: 0,
+            display: 'inline-flex',
+            gap: '0.55rem',
+            alignItems: 'center',
+          }}
+        >
+          <Type size={18} />
+          Typography System
+        </h2>
+        <section className="content-card" style={{ padding: currentDensity.cardPadding }}>
+          <div style={{ display: 'grid', gap: currentDensity.gap }}>
+            {typographyScale.map((type, index) => (
+              <div
+                key={type.token}
+                className="content-card"
+                style={{
+                  background: 'oklch(16% 0.013 260)',
+                  borderRadius: '10px',
+                  padding: '0.9rem',
+                  display: 'grid',
+                  gap: '0.4rem',
+                  borderLeft: '3px solid var(--brand-primary)',
+                  animation: `slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) ${(index * 55) + 100}ms both`,
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: '0.7rem',
+                    flexWrap: 'wrap',
+                    color: 'var(--text-secondary)',
+                    fontSize: '0.74rem',
+                  }}
+                >
+                  <span>{type.token}</span>
+                  <span>
+                    {type.size} / {type.weight} / lh {type.lineHeight}
+                  </span>
+                </div>
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: type.size,
+                    lineHeight: type.lineHeight,
+                    fontWeight: type.weight,
+                    color: 'var(--text-primary)',
+                  }}
+                >
+                  {type.example}
+                </p>
+                <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)' }}>{type.note}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      </section>
+
+      <section style={{ display: 'grid', gap: currentDensity.gap }}>
+        <h2
+          style={{
+            margin: 0,
+            display: 'inline-flex',
+            gap: '0.55rem',
+            alignItems: 'center',
+          }}
+        >
+          <Ruler size={18} />
+          Spacing, Radius & Depth
+        </h2>
+        <section className="content-card" style={{ padding: currentDensity.cardPadding }}>
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: '220px 1fr',
-              gap: '0.6rem',
-              marginBottom: '0.6rem',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+              gap: currentDensity.gap,
+            }}
+          >
+            {shapeTokens.map((shape, index) => (
+              <div
+                key={shape.token}
+                style={{
+                  border: '1px solid var(--bg-card-border)',
+                  borderRadius: '10px',
+                  padding: '0.8rem',
+                  background: 'var(--bg-card)',
+                  display: 'grid',
+                  gap: '0.4rem',
+                  animation: `slideUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) ${(index * 55) + 160}ms both`,
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>
+                  <strong>{shape.token}</strong>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{shape.value}</span>
+                </div>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                  {shape.purpose}
+                </span>
+                <div
+                  style={{
+                    height: '10px',
+                    borderRadius: '999px',
+                    background: 'linear-gradient(90deg, var(--bg-main), var(--brand-primary), var(--brand-primary-light))',
+                  }}
+                />
+                {shape.sample ? (
+                  <div
+                    style={{
+                      marginTop: '2px',
+                      height: '24px',
+                      background: 'rgba(255,255,255,0.08)',
+                      borderRadius: `${shape.sample}px`,
+                      border: '1px solid rgba(255,255,255,0.2)',
+                    }}
+                  />
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </section>
+      </section>
+
+      <section style={{ display: 'grid', gap: currentDensity.gap }}>
+        <h2
+          style={{
+            margin: 0,
+            display: 'inline-flex',
+            gap: '0.55rem',
+            alignItems: 'center',
+          }}
+        >
+          <SlidersHorizontal size={18} />
+          Component Primitives
+        </h2>
+        <section className="content-card" style={{ padding: currentDensity.cardPadding }}>
+          <div style={{ display: 'grid', gap: '1rem' }}>
+            <div
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: '0.6rem',
+                alignItems: 'center',
+              }}
+            >
+              <button
+                type="button"
+                className={ctaMode === 'text' ? 'btn-primary' : 'btn-secondary'}
+                style={{ padding: '0.68rem 1.02rem' }}
+                onClick={() => setCtaMode('text')}
+              >
+                텍스트 버튼
+              </button>
+              <button
+                type="button"
+                className="btn-secondary"
+                style={{ padding: '0.68rem 1.02rem' }}
+                onClick={() => setCtaMode('loading')}
+              >
+                로딩 상태 보기
+              </button>
+              <div
+                style={{
+                  marginLeft: 'auto',
+                  fontSize: '0.8rem',
+                  color: 'var(--text-secondary)',
+                  display: 'flex',
+                  gap: '0.45rem',
+                  alignItems: 'center',
+                }}
+              >
+                {primitiveActions.map((action) => (
+                  <span
+                    key={action}
+                    style={{
+                      padding: '0.22rem 0.56rem',
+                      borderRadius: '999px',
+                      border: '1px dashed var(--bg-card-border)',
+                      color: 'var(--text-muted)',
+                      fontSize: '0.73rem',
+                    }}
+                  >
+                    {action}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
+                gap: '0.6rem',
+                alignItems: 'center',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.6rem',
+                  flexWrap: 'wrap',
+                  border: '1px solid var(--bg-card-border)',
+                  borderRadius: '10px',
+                  padding: '1rem',
+                }}
+              >
+                <button type="button" className="btn-primary" style={{ padding: '0.68rem 1.1rem' }}>
+                  Primary
+                </button>
+                <button type="button" className="btn-secondary" style={{ padding: '0.68rem 1.1rem' }}>
+                  Secondary
+                </button>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  style={{ padding: '0.68rem 1.1rem', opacity: 0.48 }}
+                  disabled
+                >
+                  Disabled
+                </button>
+                {ctaMode === 'loading' ? (
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    style={{ padding: '0.68rem 1.1rem', position: 'relative' }}
+                  >
+                    
+                    <span style={{ opacity: 0.8 }}>로딩중</span>
+                    <span
+                      style={{
+                        position: 'absolute',
+                        width: '14px',
+                        height: '14px',
+                        border: '2px solid rgba(255,255,255,0.32)',
+                        borderTopColor: 'white',
+                        borderRadius: '50%',
+                        animation: 'ds-float 1s linear infinite',
+                        right: '0.75rem',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                      }}
+                    />
+                  </button>
+                ) : null}
+              </div>
+
+              <div
+                style={{
+                  display: 'grid',
+                  gap: '0.6rem',
+                  border: '1px solid var(--bg-card-border)',
+                  borderRadius: '10px',
+                  padding: '0.8rem',
+                }}
+              >
+                <input className="form-input" placeholder="텍스트 입력" style={{ padding: currentDensity.inputPad }} />
+                <textarea
+                  className="form-input"
+                  rows={4}
+                  placeholder="멀티라인 입력"
+                  style={{ padding: currentDensity.inputPad, resize: 'vertical' }}
+                />
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <span
+                    style={{
+                      borderRadius: '999px',
+                      padding: '0.35rem 0.75rem',
+                      border: '1px solid rgba(255,255,255,0.16)',
+                      fontSize: '0.74rem',
+                      background: 'var(--bg-card-hover)',
+                    }}
+                  >
+                    chip
+                  </span>
+                  <span
+                    style={{
+                      borderRadius: '999px',
+                      padding: '0.35rem 0.75rem',
+                      fontSize: '0.74rem',
+                      background: 'var(--brand-primary)',
+                      color: 'white',
+                    }}
+                  >
+                    filled chip
+                  </span>
+                  <span
+                    style={{
+                      borderRadius: '999px',
+                      padding: '0.35rem 0.75rem',
+                      fontSize: '0.74rem',
+                      background: 'rgba(255,255,255,0.05)',
+                      border: '1px solid rgba(255,255,255,0.2)',
+                    }}
+                  >
+                    outline chip
+                  </span>
+                </div>
+              </div>
+
+              <div
+                style={{
+                  display: 'grid',
+                  gap: '0.65rem',
+                  border: '1px solid var(--bg-card-border)',
+                  borderRadius: '10px',
+                  padding: '0.8rem',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.7rem' }}>
+                  <strong style={{ fontSize: '0.9rem' }}>Action Tokens</strong>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>컴포넌트 규격</span>
+                </div>
+                <div
+                  style={{
+                    display: 'grid',
+                    gap: '0.5rem',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+                  }}
+                >
+                  {[
+                    ['Radius', 'var(--radius-md)'],
+                    ['Height', ctaMode === 'loading' ? '44px' : '40px'],
+                    ['Border', '1px solid var(--bg-card-border)'],
+                    ['Font', '0.9rem / 600'],
+                  ].map((entry) => (
+                    <div
+                      key={entry[0]}
+                      style={{
+                        padding: '0.55rem 0.7rem',
+                        background: 'var(--bg-card-hover)',
+                        borderRadius: '8px',
+                        border: '1px solid rgba(255,255,255,0.12)',
+                        fontSize: '0.74rem',
+                      }}
+                    >
+                      <div style={{ color: 'var(--text-muted)' }}>{entry[0]}</div>
+                      <div style={{ fontWeight: 700, marginTop: '0.24rem' }}>{entry[1]}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <section style={{ display: 'grid', gap: currentDensity.gap }}>
+        <h2
+          style={{
+            margin: 0,
+            display: 'inline-flex',
+            gap: '0.55rem',
+            alignItems: 'center',
+          }}
+        >
+          <LayoutTemplate size={18} />
+          Layout System
+        </h2>
+        <section className="content-card" style={{ padding: currentDensity.cardPadding }}>
+          <div
+            style={{
+              display: 'grid',
+              gap: '0.75rem',
+              border: '1px solid var(--bg-card-border)',
+              borderRadius: '12px',
+              padding: '0.8rem',
+              background: 'oklch(16% 0.014 260)',
+              position: 'relative',
+              overflow: 'hidden',
             }}
           >
             <div
               style={{
-                borderRadius: '10px',
-                border: '1px dashed var(--bg-card-border)',
-                padding: '0.7rem',
+                position: 'absolute',
+                inset: 0,
+                pointerEvents: 'none',
+                background:
+                  'radial-gradient(circle at 30% 0%, rgba(99,102,241,0.18), rgba(99,102,241,0) 45%), radial-gradient(circle at 70% 100%, rgba(16,185,129,0.13), rgba(16,185,129,0) 52%)',
+              }}
+            />
+            <div
+              style={{
+                position: 'relative',
+                zIndex: 1,
+                display: 'grid',
+                gridTemplateColumns: '220px 1fr',
+                gap: '0.65rem',
               }}
             >
-              Sidebar
+              <aside
+                style={{
+                  borderRadius: '10px',
+                  border: '1px dashed var(--bg-card-border)',
+                  padding: '0.8rem',
+                  background: 'rgba(255,255,255,0.03)',
+                }}
+              >
+                네비게이션
+              </aside>
+              <main
+                style={{
+                  borderRadius: '10px',
+                  border: '1px dashed var(--bg-card-border)',
+                  padding: '0.8rem',
+                  background: 'rgba(255,255,255,0.03)',
+                }}
+              >
+                콘텐츠
+              </main>
             </div>
             <div
               style={{
-                borderRadius: '10px',
-                border: '1px dashed var(--bg-card-border)',
-                padding: '0.7rem',
+                position: 'relative',
+                zIndex: 1,
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+                gap: '0.65rem',
               }}
             >
-              Content
+              {[
+                '상태 카드',
+                '통계 카드',
+                '참여자 카드',
+              ].map((cardLabel) => (
+                <div
+                  key={cardLabel}
+                  style={{
+                    borderRadius: '10px',
+                    border: '1px solid var(--bg-card-border)',
+                    padding: '0.75rem',
+                    background: 'rgba(255,255,255,0.03)',
+                    minHeight: '74px',
+                    display: 'grid',
+                    alignContent: 'center',
+                  }}
+                >
+                  {cardLabel}
+                </div>
+              ))}
             </div>
           </div>
+        </section>
+      </section>
+
+      <section style={{ display: 'grid', gap: currentDensity.gap }}>
+        <h2
+          style={{
+            margin: 0,
+            display: 'inline-flex',
+            gap: '0.55rem',
+            alignItems: 'center',
+          }}
+        >
+          <Layers size={18} />
+          코드 스니펫
+        </h2>
+        <section className="content-card" style={{ padding: currentDensity.cardPadding }}>
+          <div style={{ display: 'grid', gap: '0.7rem' }}>
+            {snippetExamples.map((snippet, index) => (
+              <div
+                key={snippet.title}
+                style={{
+                  border: '1px solid var(--bg-card-border)',
+                  borderRadius: '10px',
+                  padding: '0.8rem',
+                  background: 'oklch(16% 0.014 260)',
+                  display: 'grid',
+                  gap: '0.4rem',
+                  animation: `slideUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) ${(index * 70) + 110}ms both`,
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: '0.6rem',
+                  }}
+                >
+                  <div>
+                    <div style={{ fontWeight: 700 }}>{snippet.title}</div>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.74rem' }}>
+                      {snippet.usage}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => copyCode(snippet.title, snippet.code)}
+                    style={{ padding: '0.45rem 0.72rem', display: 'inline-flex', gap: '0.4rem', alignItems: 'center' }}
+                  >
+                    <Copy size={14} />
+                    {copyKey === snippet.title ? '복사됨' : '복사'}
+                  </button>
+                </div>
+                <pre
+                  style={{
+                    margin: 0,
+                    borderRadius: '8px',
+                    padding: '0.75rem',
+                    backgroundColor: 'rgba(0,0,0,0.3)',
+                    color: 'var(--text-secondary)',
+                    fontSize: '0.77rem',
+                    overflowX: 'auto',
+                    position: 'relative',
+                  }}
+                >
+                  <code>{snippet.code}</code>
+                  <span
+                    style={{
+                      position: 'absolute',
+                      right: 0,
+                      bottom: 0,
+                      width: '32px',
+                      height: '100%',
+                      pointerEvents: 'none',
+                      background:
+                        'linear-gradient(90deg, rgba(0,0,0,0), rgba(0,0,0,0.32))',
+                    }}
+                  />
+                </pre>
+              </div>
+            ))}
+          </div>
+        </section>
+      </section>
+
+      <section style={{ display: 'grid', gap: currentDensity.gap }}>
+        <h2
+          style={{
+            margin: 0,
+            display: 'inline-flex',
+            gap: '0.55rem',
+            alignItems: 'center',
+          }}
+        >
+          <Type size={18} />
+          접근성 체크
+        </h2>
+        <section className="content-card" style={{ padding: currentDensity.cardPadding }}>
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
               gap: '0.6rem',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
             }}
           >
-            <div
-              style={{
-                borderRadius: '10px',
-                border: '1px dashed var(--bg-card-border)',
-                padding: '0.7rem',
-              }}
-            >
-              Card A
-            </div>
-            <div
-              style={{
-                borderRadius: '10px',
-                border: '1px dashed var(--bg-card-border)',
-                padding: '0.7rem',
-              }}
-            >
-              Card B
-            </div>
-            <div
-              style={{
-                borderRadius: '10px',
-                border: '1px dashed var(--bg-card-border)',
-                padding: '0.7rem',
-              }}
-            >
-              Card C
-            </div>
+            {contrastPairs.map((pair) => (
+              <div
+                key={pair.label}
+                style={{
+                  borderRadius: '10px',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  overflow: 'hidden',
+                }}
+              >
+                <div
+                  style={{
+                    padding: '0.7rem',
+                    color: pair.text,
+                    background: pair.bg,
+                    fontSize: '0.98rem',
+                    fontWeight: 700,
+                  }}
+                >
+                  {pair.label}
+                </div>
+                <div
+                  style={{
+                    padding: '0.6rem',
+                    fontSize: '0.75rem',
+                    color: 'var(--text-secondary)',
+                    background: 'var(--bg-card)',
+                    borderTop: '1px solid rgba(255,255,255,0.12)',
+                  }}
+                >
+                  기본 대비 샘플<br />
+                  <span style={{ color: 'var(--text-muted)' }}>
+                    배경 대비가 실서비스에서 충분한지 UI 확인용 시나리오입니다.
+                  </span>
+                </div>
+              </div>
+            ))}
           </div>
+        </section>
+      </section>
+
+      <section className="content-card" style={{ padding: '1.1rem', display: 'grid', gap: '0.5rem' }}>
+        <h3 style={{ margin: 0, fontSize: '0.95rem' }}>페이지 요약</h3>
+        <p style={{ margin: 0, color: 'var(--text-secondary)', lineHeight: 1.75, fontSize: '0.84rem' }}>
+          이 페이지는 토큰과 원칙을 기반으로 한 일관된 스타일링으로 구성되며, 실제 서비스 컴포넌트의
+          베이스로 바로 연결되도록 작성되어 있습니다.
+        </p>
+        <div
+          style={{
+            marginTop: '0.4rem',
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '0.5rem',
+            color: 'var(--text-muted)',
+            fontSize: '0.75rem',
+          }}
+        >
+          <span style={{ border: '1px dashed var(--bg-card-border)', padding: '0.35rem 0.65rem', borderRadius: '999px' }}>
+            반응형 레이아웃 대응
+          </span>
+          <span style={{ border: '1px dashed var(--bg-card-border)', padding: '0.35rem 0.65rem', borderRadius: '999px' }}>
+            인터랙션 상태 커버
+          </span>
+          <span style={{ border: '1px dashed var(--bg-card-border)', padding: '0.35rem 0.65rem', borderRadius: '999px' }}>
+            코드 복붙 패턴 제공
+          </span>
         </div>
       </section>
     </div>
