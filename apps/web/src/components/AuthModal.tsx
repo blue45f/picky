@@ -125,7 +125,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     if (mode === 'login') {
       const success = await login({
         email: email.trim(),
-        password,
+        password: password.trim(),
       });
       if (success) {
         handleClose();
@@ -136,7 +136,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     if (mode === 'register') {
       const success = await register({
         email: email.trim(),
-        password,
+        password: password.trim(),
         nickname: nickname.trim(),
       });
       if (success) {
