@@ -180,7 +180,7 @@ export const requestApi = async (path: string, init: RequestInit = {}): Promise<
       }
 
       if (!needRetry) {
-        if (!hasExplicitBase) {
+        if (!hasExplicitBase && res.ok) {
           persistPreferredApiBase(base);
         }
         return res;
