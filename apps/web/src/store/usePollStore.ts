@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { Poll, CreatePollInput, VoteInput } from '@picky/shared';
+import { useAuthStore } from './useAuthStore';
 
 interface PollState {
   polls: Poll[];
@@ -15,6 +16,33 @@ interface PollState {
 
 const API_BASE = '/api';
 
+const resolvePollErrorMessage = (payload: any, fallback: string): string => {
+  if (typeof payload?.message === 'string') {
+    return payload.message;
+  }
+
+  if (Array.isArray(payload?.message)) {
+    return payload.message.join(', ');
+  }
+
+  if (Array.isArray(payload?.errors) && payload.errors.length > 0) {
+    return payload.errors[0]?.message || fallback;
+  }
+
+  return fallback;
+};
+
+const setAuthSessionExpired = async (res: Response, fallback: string) => {
+  const payload = await res.json().catch(() => ({}));
+  const message = resolvePollErrorMessage(payload, fallback);
+  if (res.status === 401) {
+    useAuthStore.getState().invalidateSession(message);
+  }
+  return message;
+};
+
+const getAuthToken = () => useAuthStore.getState().token || localStorage.getItem('picky_token');
+
 export const usePollStore = create<PollState>((set) => ({
   polls: [],
   currentPoll: null,
@@ -25,7 +53,10 @@ export const usePollStore = create<PollState>((set) => ({
     set({ isLoading: true, error: null });
     try {
       const res = await fetch(`${API_BASE}/polls`);
-      if (!res.ok) throw new Error('고민 목록을 가져오는데 실패했습니다.');
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(resolvePollErrorMessage(errData, '고민 목록을 가져오는데 실패했습니다.'));
+      }
       const data = await res.json();
       set({ polls: data, isLoading: false });
     } catch (err: any) {
@@ -37,7 +68,10 @@ export const usePollStore = create<PollState>((set) => ({
     set({ isLoading: true, error: null });
     try {
       const res = await fetch(`${API_BASE}/polls/${id}`);
-      if (!res.ok) throw new Error('해당 고민을 찾을 수 없습니다.');
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(resolvePollErrorMessage(errData, '해당 고민을 찾을 수 없습니다.'));
+      }
       const data = await res.json();
       set({ currentPoll: data, isLoading: false });
       return data;
@@ -50,15 +84,24 @@ export const usePollStore = create<PollState>((set) => ({
   createPoll: async (input) => {
     set({ isLoading: true, error: null });
     try {
+      const token = getAuthToken();
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+
       const res = await fetch(`${API_BASE}/polls`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(input),
       });
       if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.message || '고민을 생성하는데 실패했습니다.');
+        const message = await setAuthSessionExpired(res, '고민을 생성하는데 실패했습니다.');
+        throw new Error(message);
       }
+
       const data = await res.json();
       set((state) => ({ polls: [data, ...state.polls], isLoading: false }));
       return data;
@@ -71,14 +114,22 @@ export const usePollStore = create<PollState>((set) => ({
   vote: async (id, input) => {
     set({ isLoading: true, error: null });
     try {
+      const token = getAuthToken();
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+
       const res = await fetch(`${API_BASE}/polls/${id}/vote`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(input),
       });
       if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.message || '투표 제출에 실패했습니다.');
+        const message = await setAuthSessionExpired(res, '투표 제출에 실패했습니다.');
+        throw new Error(message);
       }
       const data = await res.json();
       set((state) => ({

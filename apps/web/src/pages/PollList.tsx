@@ -2,10 +2,24 @@ import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Calendar, Sparkles, HelpCircle, ArrowRight } from 'lucide-react';
 import { usePollStore } from '../store/usePollStore';
+import { useAuthStore } from '../store/useAuthStore';
 
 export const PollList: React.FC = () => {
   const { polls, isLoading, fetchPolls } = usePollStore();
+  const userId = useAuthStore((state) => state.user?.id);
   const navigate = useNavigate();
+
+  const getCreatorLabel = (creatorId?: string | null, creatorIsGuest?: boolean) => {
+    if (userId && creatorId === userId) {
+      return '내가 작성';
+    }
+
+    if (creatorIsGuest || (creatorId && creatorId.startsWith('guest-'))) {
+      return '비회원 작성';
+    }
+
+    return creatorId ? '회원 작성' : '비회원 작성';
+  };
 
   useEffect(() => {
     fetchPolls();
@@ -78,7 +92,10 @@ export const PollList: React.FC = () => {
       ) : (
         // Poll List Grid
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {polls.map((poll) => (
+          {polls.map((poll) => {
+            const creatorLabel = getCreatorLabel(poll.creatorId, poll.creatorIsGuest);
+
+            return (
             <div
               key={poll.id}
               className="content-card"
@@ -118,13 +135,25 @@ export const PollList: React.FC = () => {
                     style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '4px',
+                      gap: '8px',
                       fontSize: '0.725rem',
                       color: 'var(--text-muted)',
                     }}
                   >
                     <Calendar size={12} />
                     <span>{new Date(poll.createdAt).toLocaleDateString()}</span>
+                    <span
+                      style={{
+                        padding: '2px 7px',
+                        borderRadius: '12px',
+                        fontSize: '0.62rem',
+                        border: '1px solid rgba(148, 163, 184, 0.35)',
+                        color: 'var(--text-muted)',
+                        backgroundColor: 'rgba(255,255,255,0.03)',
+                    }}
+                  >
+                    {creatorLabel}
+                    </span>
                   </div>
                 </div>
 
@@ -199,7 +228,8 @@ export const PollList: React.FC = () => {
                 </span>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

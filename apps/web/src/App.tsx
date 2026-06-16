@@ -1,12 +1,19 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { HashRouter as Router, Routes, Route } from 'react-router-dom';
 import { Heart } from 'lucide-react';
 import { Navbar } from './components/Navbar';
 import { PollList } from './pages/PollList';
 import { CreatePoll } from './pages/CreatePoll';
 import { PollDetail } from './pages/PollDetail';
+import { useAuthStore } from './store/useAuthStore';
 
 export const App: React.FC = () => {
+  const fetchMe = useAuthStore((state) => state.fetchMe);
+
+  useEffect(() => {
+    fetchMe();
+  }, [fetchMe]);
+
   return (
     <Router>
       <div

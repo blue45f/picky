@@ -32,7 +32,11 @@ export class PollService {
     return poll;
   }
 
-  createPoll(input: CreatePollInput): Poll {
+  createPoll(
+    input: CreatePollInput,
+    creatorId: string | null = null,
+    creatorIsGuest = true,
+  ): Poll {
     const pollId = this.generateShortId();
 
     const options: PollOption[] = input.options.map((opt, index) => ({
@@ -50,6 +54,8 @@ export class PollService {
       comments: [],
       createdAt: new Date().toISOString(),
       totalVotes: 0,
+      creatorId,
+      creatorIsGuest,
     };
 
     this.db.createPoll(newPoll);

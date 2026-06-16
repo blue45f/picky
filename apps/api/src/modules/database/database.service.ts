@@ -3,10 +3,20 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { Poll } from '@picky/shared';
 
+export interface DatabaseUser {
+  id: string;
+  email: string;
+  passwordHash: string;
+  salt: string;
+  nickname: string;
+  createdAt: string;
+  isGuest: boolean;
+}
+
 @Injectable()
 export class DatabaseService implements OnModuleInit {
   private filePath = path.resolve(process.cwd(), 'db.json');
-  private data: { polls: Poll[] } = { polls: [] };
+  private data: { polls: Poll[]; users: DatabaseUser[] } = { polls: [], users: [] };
 
   onModuleInit() {
     this.load();
@@ -16,7 +26,14 @@ export class DatabaseService implements OnModuleInit {
     try {
       if (fs.existsSync(this.filePath)) {
         const fileContent = fs.readFileSync(this.filePath, 'utf-8');
-        this.data = JSON.parse(fileContent);
+        const parsed = JSON.parse(fileContent);
+        this.data = {
+          polls: parsed.polls || [],
+          users: (parsed.users || []).map((user: any) => ({
+            ...user,
+            isGuest: user.isGuest ?? false,
+          })),
+        };
       } else {
         // Seed default template question for onboarding
         this.data = {
@@ -80,12 +97,13 @@ export class DatabaseService implements OnModuleInit {
               totalVotes: 54,
             },
           ],
+          users: [],
         };
         this.save();
       }
     } catch (error) {
       console.error('Failed to load JSON database, resetting in memory:', error);
-      this.data = { polls: [] };
+      this.data = { polls: [], users: [] };
     }
   }
 
@@ -116,5 +134,22 @@ export class DatabaseService implements OnModuleInit {
       this.data.polls[idx] = poll;
       this.save();
     }
+  }
+
+  getUsers(): DatabaseUser[] {
+    return this.data.users;
+  }
+
+  getUserByEmail(email: string): DatabaseUser | undefined {
+    return this.data.users.find((u) => u.email.toLowerCase() === email.toLowerCase());
+  }
+
+  getUserById(id: string): DatabaseUser | undefined {
+    return this.data.users.find((u) => u.id === id);
+  }
+
+  createUser(user: DatabaseUser) {
+    this.data.users.push(user);
+    this.save();
   }
 }

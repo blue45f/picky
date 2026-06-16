@@ -1,8 +1,9 @@
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from './modules/database/database.module';
 import { PollModule } from './modules/poll/poll.module';
+import { AuthModule } from './modules/auth/auth.module';
 
 @Module({
-  imports: [DatabaseModule, PollModule],
+  imports: [DatabaseModule, PollModule, AuthModule],
 })
 export class AppModule {}
