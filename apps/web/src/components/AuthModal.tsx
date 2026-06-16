@@ -382,6 +382,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   value={nickname}
                   onChange={(e) => {
                     setNickname(e.target.value);
+                    clearError();
+                    setFormError('');
                     if (Object.keys(validationErrors).length > 0) {
                       clearValidationErrors();
                     }
@@ -430,6 +432,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     value={email}
                     onChange={(e) => {
                       setEmail(e.target.value);
+                      clearError();
+                      setFormError('');
                       if (Object.keys(validationErrors).length > 0) {
                         clearValidationErrors();
                       }
@@ -474,6 +478,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     value={password}
                     onChange={(e) => {
                       setPassword(e.target.value);
+                      clearError();
+                      setFormError('');
                       if (Object.keys(validationErrors).length > 0) {
                         clearValidationErrors();
                       }

@@ -166,6 +166,8 @@ export const AuthPage: React.FC = () => {
 
   const handleEmailInput = (value: string) => {
     setEmail(value);
+    clearError();
+    clearValidationErrors();
     if (formError && /이메일/.test(formError)) {
       setFormError('');
     }
@@ -173,6 +175,8 @@ export const AuthPage: React.FC = () => {
 
   const handlePasswordInput = (value: string) => {
     setPassword(value);
+    clearError();
+    clearValidationErrors();
     if (formError && /비밀번호/.test(formError)) {
       setFormError('');
     }
@@ -180,6 +184,8 @@ export const AuthPage: React.FC = () => {
 
   const handleNicknameInput = (value: string) => {
     setNickname(value);
+    clearError();
+    clearValidationErrors();
     if (formError && /닉네임/.test(formError)) {
       setFormError('');
     }
