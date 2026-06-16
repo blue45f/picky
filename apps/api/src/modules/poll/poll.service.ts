@@ -35,10 +35,11 @@ export class PollService {
   createPoll(input: CreatePollInput): Poll {
     const pollId = this.generateShortId();
 
-    const options: PollOption[] = input.options.map((text, index) => ({
+    const options: PollOption[] = input.options.map((opt, index) => ({
       id: index + 1,
-      text,
+      text: opt.text,
       voteCount: 0,
+      imageUrl: opt.imageUrl || null,
     }));
 
     const newPoll: Poll = {

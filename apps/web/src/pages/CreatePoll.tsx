@@ -3,12 +3,17 @@ import { useNavigate } from 'react-router-dom';
 import { Plus, Trash2, Sparkles } from 'lucide-react';
 import { usePollStore } from '../store/usePollStore';
 
+interface PresetOption {
+  text: string;
+  imageUrl?: string;
+}
+
 interface PresetTemplate {
   name: string;
   icon: string;
   question: string;
   description: string;
-  options: string[];
+  options: PresetOption[];
 }
 
 const PRESET_TEMPLATES: PresetTemplate[] = [
@@ -19,22 +24,46 @@ const PRESET_TEMPLATES: PresetTemplate[] = [
     description:
       '이력서에 등록된 대표 프로젝트 4종 중, 시장 경쟁력과 사업화 잠재력이 가장 뛰어난 서비스를 골라주세요!',
     options: [
-      'PromptMarket (프롬프트·스킬 마켓플레이스)',
-      'proto-live (바이브코딩 실시간 동시 코딩 공유 플랫폼)',
-      'family-care-platform (실버 케어 매칭 서비스 플랫폼)',
-      'orbit-ui (유려한 글라스모피즘 리액트 컴포넌트 라이브러리)',
+      {
+        text: 'PromptMarket (프롬프트·스킬 마켓플레이스)',
+        imageUrl: 'https://images.unsplash.com/photo-1677442136019-21780efad99a?w=400&q=80',
+      },
+      {
+        text: 'proto-live (바이브코딩 실시간 동시 코딩 공유 플랫폼)',
+        imageUrl: 'https://images.unsplash.com/photo-1542831371-29b0f74f9713?w=400&q=80',
+      },
+      {
+        text: 'family-care-platform (실버 케어 매칭 서비스 플랫폼)',
+        imageUrl: 'https://images.unsplash.com/photo-1576765608535-5f04d1e3f289?w=400&q=80',
+      },
+      {
+        text: 'orbit-ui (유려한 글라스모피즘 리액트 컴포넌트 라이브러리)',
+        imageUrl: 'https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?w=400&q=80',
+      },
     ],
   },
   {
-    name: '점심 메뉴 결정',
+    name: '오늘 점심 메뉴 결정',
     icon: '🍔',
     question: '오늘 팀원들과 같이 먹을 점심 메뉴를 골라주세요!',
     description: '매번 오는 결장(결정장애)의 순간... 다수결로 깔끔하게 결정하고 가겠습니다.',
     options: [
-      '매콤하고 깔끔한 마라탕',
-      '겉바속촉 수제 돈카츠',
-      '신선한 모듬 초밥 정식',
-      '든든한 부대찌개와 라면사리',
+      {
+        text: '매콤하고 깔끔한 마라탕',
+        imageUrl: 'https://images.unsplash.com/photo-1563245372-f21724e3856d?w=400&q=80',
+      },
+      {
+        text: '겉바속촉 수제 돈카츠',
+        imageUrl: 'https://images.unsplash.com/photo-1582293427712-40a2a4b89643?w=400&q=80',
+      },
+      {
+        text: '신선한 모듬 초밥 정식',
+        imageUrl: 'https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=400&q=80',
+      },
+      {
+        text: '든든한 부대찌개와 라면사리',
+        imageUrl: 'https://images.unsplash.com/photo-1590577976322-3d231871f9eb?w=400&q=80',
+      },
     ],
   },
   {
@@ -44,13 +73,30 @@ const PRESET_TEMPLATES: PresetTemplate[] = [
     description:
       '새로운 마이크로서비스 설계 중인데, 개발 가이드 표준 제정을 위해 개발자분들의 의견을 듣고 싶습니다.',
     options: [
-      'Zod (nestjs-zod 사용으로 스키마-DTO 일치화)',
-      'Class-Validator (기존 데코레이터 기반 검증)',
-      'Joi (객체 스키마 언어 검증)',
-      'JSON Schema (선언적 JSON 형태 검증)',
+      {
+        text: 'Zod (nestjs-zod 사용으로 스키마-DTO 일치화)',
+        imageUrl: 'https://images.unsplash.com/photo-1516116211223-5c359a36298a?w=400&q=80',
+      },
+      {
+        text: 'Class-Validator (기존 데코레이터 기반 검증)',
+        imageUrl: 'https://images.unsplash.com/photo-1484480974693-6ca0a78fb36b?w=400&q=80',
+      },
+      {
+        text: 'Joi (객체 스키마 언어 검증)',
+        imageUrl: 'https://images.unsplash.com/photo-1457369804613-52c61a468e7d?w=400&q=80',
+      },
+      {
+        text: 'JSON Schema (선언적 JSON 형태 검증)',
+        imageUrl: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=400&q=80',
+      },
     ],
   },
 ];
+
+interface OptionInput {
+  text: string;
+  imageUrl: string;
+}
 
 export const CreatePoll: React.FC = () => {
   const { createPoll, isLoading } = usePollStore();
@@ -58,7 +104,10 @@ export const CreatePoll: React.FC = () => {
 
   const [question, setQuestion] = useState('');
   const [description, setDescription] = useState('');
-  const [options, setOptions] = useState<string[]>(['', '']);
+  const [options, setOptions] = useState<OptionInput[]>([
+    { text: '', imageUrl: '' },
+    { text: '', imageUrl: '' },
+  ]);
   const [activePresetIndex, setActivePresetIndex] = useState<number | null>(null);
 
   const applyPreset = (index: number) => {
@@ -66,13 +115,18 @@ export const CreatePoll: React.FC = () => {
     const template = PRESET_TEMPLATES[index];
     setQuestion(template.question);
     setDescription(template.description);
-    setOptions([...template.options]);
+    setOptions(
+      template.options.map((opt) => ({
+        text: opt.text,
+        imageUrl: opt.imageUrl || '',
+      })),
+    );
     setTimeout(() => setActivePresetIndex(null), 500);
   };
 
   const handleAddOptionInput = () => {
     if (options.length < 10) {
-      setOptions([...options, '']);
+      setOptions([...options, { text: '', imageUrl: '' }]);
     }
   };
 
@@ -84,15 +138,24 @@ export const CreatePoll: React.FC = () => {
     }
   };
 
-  const handleOptionInputChange = (index: number, value: string) => {
+  const handleOptionTextChange = (index: number, text: string) => {
     const nextOptions = [...options];
-    nextOptions[index] = value;
+    nextOptions[index] = { ...nextOptions[index], text };
+    setOptions(nextOptions);
+  };
+
+  const handleOptionImageChange = (index: number, imageUrl: string) => {
+    const nextOptions = [...options];
+    nextOptions[index] = { ...nextOptions[index], imageUrl };
     setOptions(nextOptions);
   };
 
   const handleCreatePollSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const filtered = options.map((o) => o.trim()).filter((o) => o !== '');
+    const filtered = options
+      .map((o) => ({ text: o.text.trim(), imageUrl: o.imageUrl.trim() || null }))
+      .filter((o) => o.text !== '');
+
     if (filtered.length < 2) {
       alert('최소 2개 이상의 선택지 내용을 입력해 주세요.');
       return;
@@ -228,54 +291,82 @@ export const CreatePoll: React.FC = () => {
             </span>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {options.map((option, index) => (
-              <div key={index} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <span
+              <div
+                key={index}
+                className="content-card"
+                style={{
+                  padding: '12px 16px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                  backgroundColor: 'oklch(16% 0.015 260)',
+                  border: '1px solid var(--bg-card-border)',
+                  borderRadius: 'var(--radius-sm)',
+                }}
+              >
+                <div
                   style={{
-                    fontSize: '0.75rem',
-                    color: 'var(--text-muted)',
-                    width: '20px',
-                    fontWeight: 600,
+                    display: 'flex',
+                    gap: '8px',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
                   }}
                 >
-                  {index + 1}
-                </span>
-                <input
-                  type="text"
-                  placeholder={`선택지 ${index + 1}의 내용을 적어주세요.`}
-                  value={option}
-                  onChange={(e) => handleOptionInputChange(index, e.target.value)}
-                  required
-                  maxLength={80}
-                  className="form-input"
-                  style={{ padding: '10px 14px', fontSize: '0.85rem' }}
-                />
-                {options.length > 2 && (
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveOptionInput(index)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: 'var(--text-muted)',
-                      cursor: 'pointer',
-                      padding: '4px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
+                  <span
+                    style={{ fontSize: '0.75rem', color: 'var(--brand-primary)', fontWeight: 700 }}
                   >
-                    <Trash2
-                      size={16}
-                      style={{ transition: 'color 0.2s' }}
-                      onMouseEnter={(e) =>
-                        (e.currentTarget.style.color = 'var(--brand-accent-coral)')
-                      }
-                      onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
-                    />
-                  </button>
-                )}
+                    선택지 {index + 1}
+                  </span>
+                  {options.length > 2 && (
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveOptionInput(index)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--text-muted)',
+                        cursor: 'pointer',
+                        padding: '2px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Trash2
+                        size={15}
+                        style={{ transition: 'color 0.2s' }}
+                        onMouseEnter={(e) =>
+                          (e.currentTarget.style.color = 'var(--brand-accent-coral)')
+                        }
+                        onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
+                      />
+                    </button>
+                  )}
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  <input
+                    type="text"
+                    placeholder="내용 입력 (필수)"
+                    value={option.text}
+                    onChange={(e) => handleOptionTextChange(index, e.target.value)}
+                    required
+                    maxLength={80}
+                    className="form-input"
+                    style={{ padding: '8px 12px', fontSize: '0.8rem' }}
+                  />
+                  <input
+                    type="url"
+                    placeholder="이미지 주소 (선택)"
+                    value={option.imageUrl}
+                    onChange={(e) => handleOptionImageChange(index, e.target.value)}
+                    maxLength={200}
+                    className="form-input"
+                    style={{ padding: '8px 12px', fontSize: '0.8rem' }}
+                  />
+                </div>
               </div>
             ))}
           </div>

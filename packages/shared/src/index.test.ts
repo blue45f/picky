@@ -7,7 +7,10 @@ describe('Shared Schemas', () => {
       const input = {
         question: '어떤 프로젝트를 상용화할까요?',
         description: '설명글입니다.',
-        options: ['PromptMarket', 'proto-live'],
+        options: [
+          { text: 'PromptMarket', imageUrl: 'https://example.com/image.png' },
+          { text: 'proto-live', imageUrl: null },
+        ],
       };
       const result = CreatePollSchema.safeParse(input);
       expect(result.success).toBe(true);
@@ -16,7 +19,10 @@ describe('Shared Schemas', () => {
     it('should reject empty options', () => {
       const input = {
         question: '어떤 프로젝트를 상용화할까요?',
-        options: ['', 'proto-live'],
+        options: [
+          { text: '', imageUrl: null },
+          { text: 'proto-live', imageUrl: null },
+        ],
       };
       const result = CreatePollSchema.safeParse(input);
       expect(result.success).toBe(false);
@@ -25,7 +31,7 @@ describe('Shared Schemas', () => {
     it('should reject less than 2 options', () => {
       const input = {
         question: '어떤 프로젝트를 상용화할까요?',
-        options: ['PromptMarket'],
+        options: [{ text: 'PromptMarket', imageUrl: null }],
       };
       const result = CreatePollSchema.safeParse(input);
       expect(result.success).toBe(false);

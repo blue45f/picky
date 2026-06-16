@@ -329,6 +329,9 @@ export const PollDetail: React.FC = () => {
                           style={{
                             fontWeight: isMyChoice ? 700 : 500,
                             color: isMyChoice ? 'var(--text-primary)' : 'var(--text-secondary)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
                           }}
                         >
                           <span
@@ -338,10 +341,25 @@ export const PollDetail: React.FC = () => {
                               height: '8px',
                               borderRadius: '50%',
                               backgroundColor: barColor,
-                              marginRight: '6px',
+                              marginRight: '2px',
                             }}
                           />
-                          {opt.text}
+                          {opt.imageUrl && (
+                            <img
+                              src={opt.imageUrl}
+                              alt={opt.text}
+                              style={{
+                                width: '24px',
+                                height: '24px',
+                                borderRadius: '4px',
+                                objectFit: 'cover',
+                                border: '1px solid rgba(255, 255, 255, 0.08)',
+                                marginRight: '4px',
+                                flexShrink: 0,
+                              }}
+                            />
+                          )}
+                          <span>{opt.text}</span>
                           {isMyChoice && (
                             <span
                               style={{
@@ -414,53 +432,71 @@ export const PollDetail: React.FC = () => {
                     key={opt.id}
                     onClick={() => setVotedOptionId(opt.id)}
                     className={`choice-card ${isSelected ? 'selected' : ''}`}
+                    style={{ justifyContent: 'space-between' }}
                   >
-                    <div
-                      style={{
-                        width: '16px',
-                        height: '16px',
-                        borderRadius: '50%',
-                        border: `2px solid ${isSelected ? 'var(--brand-primary)' : 'var(--bg-card-border-hover)'}`,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        transition: 'all 0.2s',
-                        flexShrink: 0,
-                      }}
-                    >
-                      {isSelected && (
-                        <div
-                          style={{
-                            width: '8px',
-                            height: '8px',
-                            borderRadius: '50%',
-                            backgroundColor: 'var(--brand-primary)',
-                          }}
-                        />
-                      )}
-                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div
+                        style={{
+                          width: '16px',
+                          height: '16px',
+                          borderRadius: '50%',
+                          border: `2px solid ${isSelected ? 'var(--brand-primary)' : 'var(--bg-card-border-hover)'}`,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transition: 'all 0.2s',
+                          flexShrink: 0,
+                        }}
+                      >
+                        {isSelected && (
+                          <div
+                            style={{
+                              width: '8px',
+                              height: '8px',
+                              borderRadius: '50%',
+                              backgroundColor: 'var(--brand-primary)',
+                            }}
+                          />
+                        )}
+                      </div>
 
-                    <span
-                      style={{
-                        fontSize: '0.85rem',
-                        fontWeight: isSelected ? 700 : 500,
-                        color: isSelected ? 'var(--text-primary)' : 'var(--text-secondary)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                      }}
-                    >
                       <span
                         style={{
-                          display: 'inline-block',
-                          width: '6px',
-                          height: '6px',
-                          borderRadius: '50%',
-                          backgroundColor: bulletColor,
+                          fontSize: '0.85rem',
+                          fontWeight: isSelected ? 700 : 500,
+                          color: isSelected ? 'var(--text-primary)' : 'var(--text-secondary)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                        }}
+                      >
+                        <span
+                          style={{
+                            display: 'inline-block',
+                            width: '6px',
+                            height: '6px',
+                            borderRadius: '50%',
+                            backgroundColor: bulletColor,
+                          }}
+                        />
+                        {opt.text}
+                      </span>
+                    </div>
+
+                    {opt.imageUrl && (
+                      <img
+                        src={opt.imageUrl}
+                        alt={opt.text}
+                        style={{
+                          width: '40px',
+                          height: '40px',
+                          borderRadius: '6px',
+                          objectFit: 'cover',
+                          border: '1px solid rgba(255, 255, 255, 0.08)',
+                          flexShrink: 0,
                         }}
                       />
-                      {opt.text}
-                    </span>
+                    )}
                   </div>
                 );
               })}

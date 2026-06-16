@@ -28,10 +28,33 @@ export class DatabaseService implements OnModuleInit {
               description:
                 '일상에서 고민되는 것들을 지인들에게 쉽게 물어보는 pickflow(피키) 서비스 출시를 축하하며, 다음 개인 프로젝트 중 하나를 상용 런칭하고 싶습니다. 여러분의 선택은?',
               options: [
-                { id: 1, text: 'PromptMarket (프롬프트/에이전트 마켓)', voteCount: 15 },
-                { id: 2, text: 'proto-live (바이브코딩 코드 공유 플랫폼)', voteCount: 12 },
-                { id: 3, text: 'family-care-platform (실버 케어 매칭 서비스)', voteCount: 8 },
-                { id: 4, text: 'orbit-ui (유려한 글라스모피즘 컴포넌트 킷)', voteCount: 19 },
+                {
+                  id: 1,
+                  text: 'PromptMarket (프롬프트/에이전트 마켓)',
+                  voteCount: 15,
+                  imageUrl:
+                    'https://images.unsplash.com/photo-1677442136019-21780efad99a?w=400&q=80',
+                },
+                {
+                  id: 2,
+                  text: 'proto-live (바이브코딩 코드 공유 플랫폼)',
+                  voteCount: 12,
+                  imageUrl: 'https://images.unsplash.com/photo-1542831371-29b0f74f9713?w=400&q=80',
+                },
+                {
+                  id: 3,
+                  text: 'family-care-platform (실버 케어 매칭 서비스)',
+                  voteCount: 8,
+                  imageUrl:
+                    'https://images.unsplash.com/photo-1576765608535-5f04d1e3f289?w=400&q=80',
+                },
+                {
+                  id: 4,
+                  text: 'orbit-ui (유려한 글라스모피즘 컴포넌트 킷)',
+                  voteCount: 19,
+                  imageUrl:
+                    'https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?w=400&q=80',
+                },
               ],
               comments: [
                 {
