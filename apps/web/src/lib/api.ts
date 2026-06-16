@@ -28,18 +28,65 @@ const normalizeApiBase = (rawBase: string): string => {
   }
 };
 
-export const getApiBaseUrl = (): string => {
+const getApiCandidates = (): string[] => {
   const explicitBase = import.meta.env.VITE_API_BASE_URL?.trim();
   if (explicitBase) {
-    return normalizeApiBase(explicitBase);
+    return [normalizeApiBase(explicitBase)];
   }
 
   if (typeof window === 'undefined') {
-    return '/api';
+    return ['/api'];
   }
 
   const { protocol, host } = window.location;
-  return `${protocol}//${host}/api`.replace(/\/$/, '');
+  const base = `${protocol}//${host}/api`.replace(/\/$/, '');
+  const match = host.match(/^(.*)\.vercel\.app$/);
+
+  if (!match || match[1].endsWith('-api')) {
+    return [base];
+  }
+
+  const hostWithApi = `${match[1]}-api.vercel.app`;
+  const fallback = `${protocol}//${hostWithApi}/api`;
+  return [base, fallback];
+};
+
+const isLikelyStaticHtmlResponse = (res: Response): boolean => {
+  const contentType = (res.headers.get('content-type') || '').toLowerCase();
+  return contentType.includes('text/html');
+};
+
+export const requestApi = async (path: string, init: RequestInit = {}): Promise<Response> => {
+  const candidates = getApiCandidates();
+  let lastResponse: Response | null = null;
+  let lastError: Error | null = null;
+
+  for (const base of candidates) {
+    try {
+      const res = await fetch(`${base}${path}`, init);
+      if (!isLikelyStaticHtmlResponse(res) || base === candidates[candidates.length - 1]) {
+        return res;
+      }
+
+      lastResponse = res;
+    } catch (err: any) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+    }
+  }
+
+  if (lastResponse) {
+    return lastResponse;
+  }
+
+  if (lastError) {
+    throw lastError;
+  }
+
+  throw new Error('API 서버를 찾을 수 없습니다. VITE_API_BASE_URL를 확인해 주세요.');
+};
+
+export const getApiBaseUrl = (): string => {
+  return getApiCandidates()[0] || '/api';
 };
 
 export const parseApiPayload = async (res: Response): Promise<any> => {

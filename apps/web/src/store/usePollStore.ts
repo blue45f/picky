@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { Poll, CreatePollInput, VoteInput } from '@picky/shared';
 import { useAuthStore } from './useAuthStore';
-import { getApiBaseUrl, parseApiPayload } from '../lib/api';
+import { parseApiPayload, requestApi } from '../lib/api';
 
 interface PollState {
   polls: Poll[];
@@ -15,8 +15,6 @@ interface PollState {
   createPoll: (input: CreatePollInput) => Promise<Poll | null>;
   vote: (id: string, input: VoteInput) => Promise<boolean>;
 }
-
-const API_BASE = getApiBaseUrl();
 
 const resolvePollErrorMessage = (payload: any, fallback: string): string => {
   if (typeof payload?.message === 'string') {
@@ -72,7 +70,7 @@ export const usePollStore = create<PollState>((set) => ({
   fetchPolls: async () => {
     set({ isLoading: true, error: null });
     try {
-      const res = await fetch(`${API_BASE}/polls`);
+      const res = await requestApi('/polls');
       if (!res.ok) {
         const errData = await parseApiPayload(res);
         throw new Error(resolvePollErrorMessage(errData, '고민 목록을 가져오는데 실패했습니다.'));
@@ -87,7 +85,7 @@ export const usePollStore = create<PollState>((set) => ({
   fetchPoll: async (id) => {
     set({ isLoading: true, error: null });
     try {
-      const res = await fetch(`${API_BASE}/polls/${id}`);
+      const res = await requestApi(`/polls/${id}`);
       if (!res.ok) {
         const errData = await parseApiPayload(res);
         throw new Error(resolvePollErrorMessage(errData, '해당 고민을 찾을 수 없습니다.'));
@@ -112,7 +110,7 @@ export const usePollStore = create<PollState>((set) => ({
         headers.Authorization = `Bearer ${token}`;
       }
 
-      const res = await fetch(`${API_BASE}/polls`, {
+      const res = await requestApi('/polls', {
         method: 'POST',
         headers,
         body: JSON.stringify(input),
@@ -142,7 +140,7 @@ export const usePollStore = create<PollState>((set) => ({
         headers.Authorization = `Bearer ${token}`;
       }
 
-      const res = await fetch(`${API_BASE}/polls/${id}/vote`, {
+      const res = await requestApi(`/polls/${id}/vote`, {
         method: 'POST',
         headers,
         body: JSON.stringify(input),

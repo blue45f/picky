@@ -6,7 +6,7 @@ import {
   GuestRegisterInput,
   AuthResult,
 } from '@picky/shared';
-import { getApiBaseUrl, parseApiPayload } from '../lib/api';
+import { parseApiPayload, requestApi } from '../lib/api';
 
 interface AuthState {
   user: UserProfile | null;
@@ -29,7 +29,6 @@ interface AuthState {
   invalidateSession: (message: string) => void;
 }
 
-const API_BASE = getApiBaseUrl();
 const USER_STORAGE_KEY = 'picky_user';
 
 const loadSavedUser = (): UserProfile | null => {
@@ -161,7 +160,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
           password: input.password,
           nickname: input.nickname.trim(),
         };
-        const res = await fetch(`${API_BASE}/auth/register`, {
+        const res = await requestApi('/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -210,7 +209,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
           email: input.email.trim().toLowerCase(),
           password: input.password,
         };
-        const res = await fetch(`${API_BASE}/auth/login`, {
+        const res = await requestApi('/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -255,7 +254,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
         const payload = {
           nickname: input.nickname.trim(),
         };
-        const res = await fetch(`${API_BASE}/auth/guest`, {
+        const res = await requestApi('/auth/guest', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -318,7 +317,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
 
       set({ isLoading: true, error: null, validationErrors: {} });
       try {
-        const res = await fetch(`${API_BASE}/auth/me`, {
+        const res = await requestApi('/auth/me', {
           headers: {
             Authorization: `Bearer ${token}`,
           },
