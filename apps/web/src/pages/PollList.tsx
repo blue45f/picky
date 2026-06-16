@@ -60,6 +60,7 @@ export const PollList: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
+  const [searchInput, setSearchInput] = useState('');
   const [query, setQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortMode>('latest');
   const [scope, setScope] = useState<ScopeMode>('all');
@@ -71,6 +72,9 @@ export const PollList: React.FC = () => {
 
     if (nextQuery !== query) {
       setQuery(nextQuery);
+    }
+    if (nextQuery !== searchInput) {
+      setSearchInput(nextQuery);
     }
 
     if (isSortMode(nextSort)) {
@@ -90,7 +94,20 @@ export const PollList: React.FC = () => {
     }
 
     setScope('all');
-  }, [searchParams, userId, query, sortBy]);
+  }, [searchParams, userId, query, searchInput, sortBy]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const nextQuery = searchInput.trim();
+      if (nextQuery !== query) {
+        setQuery(nextQuery);
+      }
+    }, 260);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [searchInput, query]);
 
   useEffect(() => {
     const next = new URLSearchParams(searchParams);
@@ -308,17 +325,17 @@ export const PollList: React.FC = () => {
         >
           <Search size={14} style={{ position: 'absolute', left: '11px', color: 'var(--text-muted)' }} />
           <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            value={searchInput}
+            onChange={(event) => setSearchInput(event.target.value)}
             placeholder="고민 제목/설명을 검색하세요"
             className="form-input"
             aria-label="고민 검색"
-            style={{ paddingLeft: '32px', paddingRight: query ? '34px' : '12px', flex: 1 }}
+            style={{ paddingLeft: '32px', paddingRight: searchInput ? '34px' : '12px', flex: 1 }}
           />
-          {query ? (
+          {searchInput ? (
             <button
               type="button"
-              onClick={() => setQuery('')}
+              onClick={() => setSearchInput('')}
               aria-label="검색어 지우기"
               style={{
                 position: 'absolute',
@@ -511,6 +528,7 @@ export const PollList: React.FC = () => {
           </button>
         </div>
       ) : (
+        <>
         <div style={{ display: 'grid', gap: '0.9rem' }}>
           {visiblePolls.map((poll) => {
             const creatorLabel = getCreatorLabel(poll.creatorId, poll.creatorIsGuest);
@@ -695,10 +713,49 @@ export const PollList: React.FC = () => {
             );
           })}
         </div>
+        {query ? (
+          <p
+            style={{
+              margin: '0',
+              fontSize: '0.74rem',
+              color: 'var(--text-muted)',
+              textAlign: 'right',
+            }}
+          >
+            총 {visiblePolls.length}개 결과
+          </p>
+        ) : null}
+        </>
       )}
 
       {error ? (
-        <p style={{ color: 'var(--brand-accent-coral)', fontSize: '0.78rem', textAlign: 'center' }}>{error}</p>
+        <div
+          className="content-card"
+          style={{
+            marginTop: '0.2rem',
+            padding: '0.85rem 1rem',
+            display: 'grid',
+            gap: '0.6rem',
+          }}
+        >
+          <p
+            style={{
+              color: 'var(--brand-accent-coral)',
+              fontSize: '0.78rem',
+              margin: 0,
+            }}
+          >
+            {error}
+          </p>
+          <button
+            type="button"
+            onClick={fetchPolls}
+            className="btn-secondary"
+            style={{ width: 'fit-content', padding: '6px 10px', fontSize: '0.74rem' }}
+          >
+            다시 시도
+          </button>
+        </div>
       ) : null}
     </section>
   );

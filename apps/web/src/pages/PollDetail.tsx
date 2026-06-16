@@ -186,15 +186,19 @@ export const PollDetail: React.FC = () => {
     try {
       await navigator.clipboard.writeText(shareUrl);
       setCopiedId(pollId);
+      setCopyMessage('공유 링크가 클립보드에 복사되었습니다.');
       setTimeout(() => setCopiedId(null), 2000);
+      setTimeout(() => setCopyMessage(''), 2200);
     } catch (err) {
       console.error('copy failed', err);
       setCopyMessage('클립보드 복사에 실패했습니다. 링크를 직접 복사해 주세요.');
+      setTimeout(() => setCopyMessage(''), 2400);
     }
   };
 
   const handleCloseShareModal = () => {
     setShowShareModal(false);
+    setCopyMessage('');
     // Remove query parameter from URL
     if (searchParams.has('showShare')) {
       const nextParams = new URLSearchParams(searchParams);
@@ -271,7 +275,7 @@ export const PollDetail: React.FC = () => {
       className="animate-slide-up"
       style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}
     >
-      {/* Header Back Controls */}
+          {/* Header Back Controls */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <button
           onClick={() => navigate('/')}
@@ -374,6 +378,22 @@ export const PollDetail: React.FC = () => {
             </p>
           )}
         </div>
+        {error ? (
+          <p
+            style={{
+              margin: 0,
+              color: 'var(--brand-accent-coral)',
+              fontSize: '0.78rem',
+              lineHeight: 1.45,
+              background: 'rgba(239, 68, 68, 0.12)',
+              border: '1px solid rgba(239, 68, 68, 0.2)',
+              borderRadius: 'var(--radius-sm)',
+              padding: '8px 10px',
+            }}
+          >
+            {error}
+          </p>
+        ) : null}
 
         {/* Results Screen vs Voting Screen */}
         {hasVoted ? (

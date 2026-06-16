@@ -187,17 +187,17 @@ const createDefaultOptions = (): OptionInput[] => [
 export const CreatePoll: React.FC = () => {
   const { createPoll, isLoading, error, clearError } = usePollStore();
   const navigate = useNavigate();
-  const draft = loadDraftFromStorage();
+  const [cachedDraft, setCachedDraft] = useState<PollDraft | null>(() => loadDraftFromStorage());
 
   const [formError, setFormError] = useState('');
 
-  const [question, setQuestion] = useState(draft?.question || '');
-  const [description, setDescription] = useState(draft?.description || '');
+  const [question, setQuestion] = useState(cachedDraft?.question || '');
+  const [description, setDescription] = useState(cachedDraft?.description || '');
   const [options, setOptions] = useState<OptionInput[]>(
-    draft?.options && draft.options.length >= 2 ? [...draft.options] : createDefaultOptions(),
+    cachedDraft?.options && cachedDraft.options.length >= 2 ? [...cachedDraft.options] : createDefaultOptions(),
   );
   const [activePresetIndex, setActivePresetIndex] = useState<number | null>(null);
-  const [draftSavedAt, setDraftSavedAt] = useState<string | null>(draft?.savedAt || null);
+  const [draftSavedAt, setDraftSavedAt] = useState<string | null>(cachedDraft?.savedAt || null);
 
   const normalizedQuestion = question.trim();
   const normalizedDescription = description.trim();
@@ -251,6 +251,7 @@ export const CreatePoll: React.FC = () => {
       };
 
       saveDraftToStorage(nextDraft);
+      setCachedDraft(nextDraft);
       setDraftSavedAt(nextDraft.savedAt);
     }, AUTO_SAVE_INTERVAL_MS);
 
@@ -260,11 +261,11 @@ export const CreatePoll: React.FC = () => {
   }, [question, description, options, hasDraft]);
 
   const handleRestoreDraft = () => {
-    const nextDraft = loadDraftFromStorage();
-    if (!nextDraft) {
+    if (!cachedDraft) {
       return;
     }
 
+    const nextDraft = cachedDraft;
     setQuestion(nextDraft.question);
     setDescription(nextDraft.description);
     setOptions(
@@ -277,6 +278,7 @@ export const CreatePoll: React.FC = () => {
 
   const handleClearDraft = () => {
     clearDraftStorage();
+    setCachedDraft(null);
     setDraftSavedAt(null);
   };
 
@@ -402,6 +404,7 @@ export const CreatePoll: React.FC = () => {
 
     if (result) {
       clearDraftStorage();
+      setCachedDraft(null);
       setDraftSavedAt(null);
       const snapshot = buildShareablePollSnapshot(result);
       if (snapshot) {
@@ -517,10 +520,10 @@ export const CreatePoll: React.FC = () => {
               type="button"
               onClick={handleRestoreDraft}
               className="ghost-inline"
-              disabled={!loadDraftFromStorage()}
+              disabled={!cachedDraft}
               style={{
-                color: loadDraftFromStorage() ? 'var(--text-secondary)' : 'var(--text-muted)',
-                cursor: loadDraftFromStorage() ? 'pointer' : 'not-allowed',
+                color: cachedDraft ? 'var(--text-secondary)' : 'var(--text-muted)',
+                cursor: cachedDraft ? 'pointer' : 'not-allowed',
               }}
             >
               임시저장 복원
