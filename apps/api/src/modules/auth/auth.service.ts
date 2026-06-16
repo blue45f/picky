@@ -25,7 +25,12 @@ export class AuthService {
     return crypto.randomBytes(16).toString('hex');
   }
 
-  private async signPayload(payload: { sub: string; email: string; nickname: string; isGuest: boolean }) {
+  private async signPayload(payload: {
+    sub: string;
+    email: string;
+    nickname: string;
+    isGuest: boolean;
+  }) {
     return this.jwtService.signAsync(payload);
   }
 

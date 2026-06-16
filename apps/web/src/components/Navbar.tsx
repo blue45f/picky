@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Plus, LogIn, LogOut, User } from 'lucide-react';
+import { Palette, Plus, LogIn, LogOut, User } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 import { AuthModal, type AuthMode } from './AuthModal';
 
@@ -107,6 +107,20 @@ export const Navbar: React.FC = () => {
             고민 둘러보기
           </Link>
           <Link
+            to="/design"
+            style={{
+              textDecoration: 'none',
+              color:
+                location.pathname === '/design' ? 'var(--text-primary)' : 'var(--text-secondary)',
+              fontWeight: location.pathname === '/design' ? 700 : 500,
+              fontSize: '0.85rem',
+              transition: 'color 0.2s',
+            }}
+          >
+            <Palette size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} />
+            디자인 시스템
+          </Link>
+          <Link
             to="/create"
             className="btn-primary"
             style={{
@@ -123,7 +137,9 @@ export const Navbar: React.FC = () => {
           </Link>
 
           {/* User Auth Buttons */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginLeft: '0.25rem' }}>
+          <div
+            style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginLeft: '0.25rem' }}
+          >
             {user ? (
               <>
                 <div

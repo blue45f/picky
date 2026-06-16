@@ -3,6 +3,7 @@
 Use this checklist to verify the member / guest auth and session behavior after changes.
 
 ## 1) 기본 API 시나리오
+
 - `scripts/smoke-auth-poll.sh` 실행
   - 회원가입/로그인
   - /auth/me
@@ -14,6 +15,7 @@ Use this checklist to verify the member / guest auth and session behavior after 
 - 결과가 모두 통과해야 함
 
 ## 2) 새로고침 동기화
+
 1. 브라우저에서 로그인 후 새로고침
    - 헤더에 사용자 닉네임이 유지되는지 확인
 2. 비회원 등록 후 새로고침
@@ -22,12 +24,14 @@ Use this checklist to verify the member / guest auth and session behavior after 
    - 토큰 기반 자동 복원이 되는지 확인
 
 ## 3) 세션 만료 유도
+
 1. 네트워크 탭에서 인증 토큰을 임의로 바꾸고 페이지 새로고침
    - /auth/me 응답이 401이면 재로그인 모달 자동 오픈
    - 헤더 버튼이 "세션 만료, 재로그인" 문구로 변경되는지 확인
 2. 만료 상태에서 로그인 후 사용자 이름이 다시 표시되는지 확인
 
 ## 4) 에러 메시지 확인
+
 - 로그인/회원가입/비회원 입력 오류에서
   - 필드 에러(닉네임, 이메일, 비밀번호)가 정확히 표시되는지 확인
 - 서버 메시지(중복 이메일 등)가 하단 에러로 표시되는지 확인

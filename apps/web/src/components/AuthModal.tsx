@@ -282,7 +282,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               background: 'none',
               border: 'none',
               color: isLoginMode ? 'var(--brand-primary)' : 'var(--text-muted)',
-              borderBottom: isLoginMode ? '2px solid var(--brand-primary)' : '2px solid transparent',
+              borderBottom: isLoginMode
+                ? '2px solid var(--brand-primary)'
+                : '2px solid transparent',
               fontWeight: isLoginMode ? 700 : 500,
               fontSize: '0.875rem',
               cursor: 'pointer',
@@ -299,7 +301,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               background: 'none',
               border: 'none',
               color: isRegisterMode ? 'var(--brand-primary)' : 'var(--text-muted)',
-              borderBottom: isRegisterMode ? '2px solid var(--brand-primary)' : '2px solid transparent',
+              borderBottom: isRegisterMode
+                ? '2px solid var(--brand-primary)'
+                : '2px solid transparent',
               fontWeight: isRegisterMode ? 700 : 500,
               fontSize: '0.875rem',
               cursor: 'pointer',
@@ -316,7 +320,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               background: 'none',
               border: 'none',
               color: isGuestMode ? 'var(--brand-primary)' : 'var(--text-muted)',
-              borderBottom: isGuestMode ? '2px solid var(--brand-primary)' : '2px solid transparent',
+              borderBottom: isGuestMode
+                ? '2px solid var(--brand-primary)'
+                : '2px solid transparent',
               fontWeight: isGuestMode ? 700 : 500,
               fontSize: '0.875rem',
               cursor: 'pointer',
@@ -348,10 +354,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         )}
 
         {/* Form */}
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <form
+          onSubmit={handleSubmit}
+          style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}
+        >
           {!isLoginMode && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
+              <label
+                style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)' }}
+              >
                 닉네임
               </label>
               <div style={{ position: 'relative' }}>
@@ -467,8 +478,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                         clearValidationErrors();
                       }
                     }}
-                  className="form-input"
-                  style={{ paddingLeft: '36px' }}
+                    className="form-input"
+                    style={{ paddingLeft: '36px' }}
                   />
                   {getFieldError('password') ? (
                     <p
