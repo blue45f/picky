@@ -145,7 +145,7 @@ const loadDraftFromStorage = (): PollDraft | null => {
               imageUrl: next.imageUrl,
             } satisfies OptionInput;
           })
-          .filter((item): item is OptionInput => item !== null)
+          .filter((item: OptionInput | null): item is OptionInput => item !== null)
       : [];
 
     if (options.length === 0) {
