@@ -172,27 +172,21 @@ export const AuthPage: React.FC = () => {
     setEmail(value);
     clearError();
     clearValidationErrors();
-    if (formError && /이메일/.test(formError)) {
-      setFormError('');
-    }
+    setFormError('');
   };
 
   const handlePasswordInput = (value: string) => {
     setPassword(value);
     clearError();
     clearValidationErrors();
-    if (formError && /비밀번호/.test(formError)) {
-      setFormError('');
-    }
+    setFormError('');
   };
 
   const handleNicknameInput = (value: string) => {
     setNickname(value);
     clearError();
     clearValidationErrors();
-    if (formError && /닉네임/.test(formError)) {
-      setFormError('');
-    }
+    setFormError('');
   };
 
   const commonInputStyle: React.CSSProperties = {
