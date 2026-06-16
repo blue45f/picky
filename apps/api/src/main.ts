@@ -3,7 +3,7 @@ import { AppModule } from './app.module';
 import helmet from 'helmet';
 import compression from 'compression';
 
-async function bootstrap() {
+export async function createApiServer() {
   const app = await NestFactory.create(AppModule);
 
   // Enable CORS for frontend integration
@@ -28,6 +28,12 @@ async function bootstrap() {
 
   const port = process.env.PORT || 3000;
   console.log(`Picky API starting on http://localhost:${port}/api`);
+  await app.init();
+  return app;
+}
+
+async function bootstrap() {
+  const app = await createApiServer();
   await app.listen(port);
 }
 bootstrap();

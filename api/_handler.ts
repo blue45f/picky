@@ -1,25 +1,9 @@
-import { NestFactory } from '@nestjs/core';
-import helmet from 'helmet';
-import compression from 'compression';
-import { AppModule } from '../apps/api/src/app.module';
+import { createApiServer } from '../apps/api/dist/main';
 
 let cachedHandler: ((req: any, res: any) => Promise<void> | void) | null = null;
 
 const initNestApp = async () => {
-  const app = await NestFactory.create(AppModule);
-
-  app.enableCors({
-    origin: '*',
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-    preflightContinue: false,
-    optionsSuccessStatus: 204,
-  });
-
-  app.use(helmet({ contentSecurityPolicy: false }));
-  app.use(compression());
-  app.setGlobalPrefix('api');
-
-  await app.init();
+  const app = await createApiServer();
 
   const httpAdapter = app.getHttpAdapter();
   const callback = httpAdapter.getInstance();
