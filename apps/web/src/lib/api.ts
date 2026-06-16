@@ -30,12 +30,30 @@ const normalizeApiBase = (rawBase: string): string => {
 
 const PREFERRED_API_BASE_KEY = 'picky_api_base_preferred';
 
+const isVercelApiFallbackHost = (rawBase: string): boolean => {
+  try {
+    const parsed = new URL(normalizeApiBase(rawBase));
+    return parsed.hostname.endsWith('-api.vercel.app');
+  } catch {
+    return false;
+  }
+};
+
 const getPreferredApiBase = (): string | undefined => {
   if (typeof window === 'undefined') {
     return undefined;
   }
 
   const raw = window.localStorage.getItem(PREFERRED_API_BASE_KEY)?.trim();
+  if (!raw) {
+    return undefined;
+  }
+
+  if (isVercelApiFallbackHost(raw)) {
+    window.localStorage.removeItem(PREFERRED_API_BASE_KEY);
+    return undefined;
+  }
+
   return raw ? raw : undefined;
 };
 
@@ -46,6 +64,10 @@ const persistPreferredApiBase = (base: string) => {
 
   const trimmed = base.trim();
   if (!trimmed) {
+    return;
+  }
+
+  if (isVercelApiFallbackHost(trimmed)) {
     return;
   }
 
