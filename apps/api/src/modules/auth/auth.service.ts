@@ -48,7 +48,7 @@ export class AuthService {
     const normalizedEmail = input.email.trim().toLowerCase();
     const normalizedNickname = input.nickname.trim();
 
-    const existing = this.db.getUserByEmail(normalizedEmail);
+    const existing = await this.db.getUserByEmail(normalizedEmail);
     if (existing) {
       throw new BadRequestException('이미 등록된 이메일 주소입니다.');
     }
@@ -67,7 +67,7 @@ export class AuthService {
       isGuest: false,
     };
 
-    this.db.createUser(newUser);
+    await this.db.createUser(newUser);
 
     const accessToken = await this.signPayload({
       sub: newUser.id,
@@ -96,7 +96,7 @@ export class AuthService {
       isGuest: true,
     };
 
-    this.db.createUser(guestUser);
+    await this.db.createUser(guestUser);
 
     const accessToken = await this.signPayload({
       sub: guestUser.id,
@@ -113,7 +113,7 @@ export class AuthService {
 
   async login(input: LoginInput): Promise<AuthResult> {
     const normalizedEmail = input.email.trim().toLowerCase();
-    const user = this.db.getUserByEmail(normalizedEmail);
+    const user = await this.db.getUserByEmail(normalizedEmail);
     if (!user || user.isGuest) {
       throw new UnauthorizedException('이메일 또는 비밀번호가 올바르지 않습니다.');
     }
@@ -142,7 +142,7 @@ export class AuthService {
     }
 
     if (payload.isGuest === undefined || typeof payload.nickname !== 'string' || typeof payload.email !== 'string') {
-      const user = this.db.getUserById(payload.sub);
+      const user = await this.db.getUserById(payload.sub);
       if (!user) {
         throw new UnauthorizedException('유효하지 않은 사용자입니다.');
       }

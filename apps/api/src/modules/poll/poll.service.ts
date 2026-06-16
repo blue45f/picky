@@ -7,33 +7,38 @@ export class PollService {
   constructor(private readonly db: DatabaseService) {}
 
   // Generate 6 character unique short ID
-  private generateShortId(): string {
+  private async generateShortId(): Promise<string> {
     const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let id = '';
     for (let i = 0; i < 6; i++) {
       id += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     // Prevent collision
-    if (this.db.getPollById(id)) {
+    const existed = await this.db.getPollById(id);
+    if (existed) {
       return this.generateShortId();
     }
     return id;
   }
 
-  getPolls(): Poll[] {
+  async getPolls(): Promise<Poll[]> {
     return this.db.getPolls();
   }
 
-  getPoll(id: string): Poll {
-    const poll = this.db.getPollById(id);
+  async getPoll(id: string): Promise<Poll> {
+    const poll = await this.db.getPollById(id);
     if (!poll) {
       throw new NotFoundException(`고민(투표) ID ${id}를 찾을 수 없습니다.`);
     }
     return poll;
   }
 
-  createPoll(input: CreatePollInput, creatorId: string | null = null, creatorIsGuest = true): Poll {
-    const pollId = this.generateShortId();
+  async createPoll(
+    input: CreatePollInput,
+    creatorId: string | null = null,
+    creatorIsGuest = true,
+  ): Promise<Poll> {
+    const pollId = await this.generateShortId();
 
     const options: PollOption[] = input.options.map((opt, index) => ({
       id: index + 1,
@@ -54,12 +59,12 @@ export class PollService {
       creatorIsGuest,
     };
 
-    this.db.createPoll(newPoll);
+    await this.db.createPoll(newPoll);
     return newPoll;
   }
 
-  vote(id: string, input: VoteInput): Poll {
-    const poll = this.db.getPollById(id);
+  async vote(id: string, input: VoteInput): Promise<Poll> {
+    const poll = await this.db.getPollById(id);
     if (!poll) {
       throw new NotFoundException(`고민(투표) ID ${id}를 찾을 수 없습니다.`);
     }
@@ -87,7 +92,7 @@ export class PollService {
       poll.comments.push(newComment);
     }
 
-    this.db.updatePoll(poll);
+    await this.db.updatePoll(poll);
     return poll;
   }
 }
