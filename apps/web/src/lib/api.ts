@@ -27,30 +27,33 @@ export const parseApiPayload = async (res: Response): Promise<any> => {
 
   try {
     const text = await res.text();
-    if (!text) {
+    const trimmedText = (text || '').trim();
+
+    if (!trimmedText) {
       return {
         message: `${res.status} ${res.statusText} (${res.url})`,
       };
     }
 
-    const textValue = text.trim();
-    if (!textValue) {
-      return {
-        message: `${res.status} ${res.statusText} (${res.url})`,
-      };
-    }
-
-    if (textValue.startsWith('{') || textValue.startsWith('[')) {
+    if (trimmedText.startsWith('{') || trimmedText.startsWith('[')) {
       try {
-        return JSON.parse(textValue);
+        return JSON.parse(trimmedText);
       } catch {
         // keep raw message below
       }
     }
 
+    if (trimmedText.startsWith('<!doctype') || trimmedText.startsWith('<html')) {
+      return {
+        message:
+          'API 서버가 아닌 정적 HTML 페이지를 반환했습니다. ' +
+          `VITE_API_BASE_URL이 맞는지 확인해 주세요. (${res.url})`,
+      };
+    }
+
     return {
       message: `${res.status} ${res.statusText} (${res.url})`,
-      error: textValue.slice(0, 180),
+      error: trimmedText.slice(0, 180),
     };
   } catch {
     return {
