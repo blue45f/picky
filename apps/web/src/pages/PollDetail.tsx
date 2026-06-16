@@ -17,6 +17,11 @@ import { useAuthStore } from '../store/useAuthStore';
 import { VoteDonutChart, OPTION_COLORS } from '../components/VoteDonutChart';
 import { SnsPreviewCard } from '../components/SnsPreviewCard';
 import { Poll } from '@picky/shared';
+import {
+  resolvePollShareUrl,
+  resolveShareText,
+  copyText,
+} from '../lib/pollShare';
 const POLL_AUTHOR_LABELS: {
   mine: string;
   otherMember: string;
@@ -40,37 +45,6 @@ export const PollDetail: React.FC = () => {
   const setCurrentPoll = usePollStore((state) => state.setCurrentPoll);
   const user = useAuthStore((state) => state.user);
   const guestName = useAuthStore((state) => state.guestName);
-
-  const buildShareablePollSnapshot = (poll: Poll): string | null => {
-    try {
-      const encoded = encodeURIComponent(
-        btoa(
-          encodeURIComponent(
-            JSON.stringify({
-              version: 1,
-              poll,
-            }),
-          ),
-        ),
-      );
-      return encoded;
-    } catch {
-      return null;
-    }
-  };
-
-  const resolveShareUrl = (poll?: Poll | null) => {
-    if (!poll) {
-      return `${window.location.origin}/poll/${id}`;
-    }
-
-    const snapshot = buildShareablePollSnapshot(poll);
-    if (!snapshot) {
-      return `${window.location.origin}/poll/${poll.id}`;
-    }
-
-    return `${window.location.origin}/poll/${poll.id}?snapshot=${snapshot}`;
-  };
 
   const restorePollFromSnapshot = (snapshot: string | null) => {
     if (!id || !snapshot) {
@@ -182,9 +156,9 @@ export const PollDetail: React.FC = () => {
   // Click-to-copy
   const handleCopyLinkClick = async (pollId: string) => {
     setCopyMessage('');
-    const shareUrl = resolveShareUrl(currentPoll);
+    const shareUrl = resolvePollShareUrl(currentPoll);
     try {
-      await navigator.clipboard.writeText(shareUrl);
+      await copyText(shareUrl);
       setCopiedId(pollId);
       setCopyMessage('공유 링크가 클립보드에 복사되었습니다.');
       setTimeout(() => setCopiedId(null), 2000);
@@ -922,7 +896,7 @@ export const PollDetail: React.FC = () => {
                   textAlign: 'left',
                 }}
                 >
-                  {resolveShareUrl(currentPoll)}
+                  {resolvePollShareUrl(currentPoll)}
                 </span>
                 {copyMessage ? (
                   <p
@@ -965,7 +939,7 @@ export const PollDetail: React.FC = () => {
               }}
             >
               <a
-                href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`[픽플로우 투표] ${currentPoll.question}\n지인분들의 투표와 의견을 들려주세요!`)}&url=${encodeURIComponent(resolveShareUrl(currentPoll))}`}
+                href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(resolveShareText(currentPoll))}&url=${encodeURIComponent(resolvePollShareUrl(currentPoll))}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="btn-secondary"
@@ -983,7 +957,7 @@ export const PollDetail: React.FC = () => {
                 <span>🐦 X (Twitter)</span>
               </a>
               <a
-                href={`https://share.kakaocast.daum.net/intent?text=${encodeURIComponent(`[고민 해결 투표] ${currentPoll.question}\n아래 링크를 클릭해 투표해 주세요!\n${resolveShareUrl(currentPoll)}`)}`}
+                href={`https://share.kakaocast.daum.net/intent?text=${encodeURIComponent(`${resolveShareText(currentPoll)}\n${resolvePollShareUrl(currentPoll)}`)}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="btn-secondary"

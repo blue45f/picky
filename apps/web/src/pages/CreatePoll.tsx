@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Plus, Sparkles, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { usePollStore } from '../store/usePollStore';
-import { Poll } from '@picky/shared';
+import { buildShareablePollSnapshot } from '../lib/pollShare';
 
 interface PresetOption {
   text: string;
@@ -289,24 +289,6 @@ export const CreatePoll: React.FC = () => {
     !hasDuplicateOptions &&
     normalizedDescription.length <= 500 &&
     !isLoading;
-
-  const buildShareablePollSnapshot = (poll: Poll): string | null => {
-    try {
-      const encoded = encodeURIComponent(
-        btoa(
-          encodeURIComponent(
-            JSON.stringify({
-              version: 1,
-              poll,
-            }),
-          ),
-        ),
-      );
-      return encoded;
-    } catch {
-      return null;
-    }
-  };
 
   const applyPreset = (index: number) => {
     setActivePresetIndex(index);

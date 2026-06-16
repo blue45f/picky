@@ -10,9 +10,13 @@ import {
   Vote,
   Plus,
   X,
+  Copy,
+  Check,
+  Link,
 } from 'lucide-react';
 import { usePollStore } from '../store/usePollStore';
 import { useAuthStore } from '../store/useAuthStore';
+import { copyText, resolvePollShareUrl } from '../lib/pollShare';
 
 type SortMode = 'latest' | 'popular' | 'commented';
 type ScopeMode = 'all' | 'mine' | 'guest';
@@ -64,6 +68,7 @@ export const PollList: React.FC = () => {
   const [query, setQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortMode>('latest');
   const [scope, setScope] = useState<ScopeMode>('all');
+  const [copiedPollId, setCopiedPollId] = useState<string | null>(null);
 
   useEffect(() => {
     const nextQuery = (searchParams.get('q') || '').trim();
@@ -223,6 +228,39 @@ export const PollList: React.FC = () => {
   }, [scope, normalizedQuery]);
 
   const hasActiveFilters = activeFilters.length > 0;
+
+  const handleGotoPoll = (event: React.MouseEvent<HTMLButtonElement>, pollId: string) => {
+    event.stopPropagation();
+    const target = visiblePolls.find((poll) => poll.id === pollId);
+    if (!target) {
+      return;
+    }
+
+    setCurrentPoll(target);
+    navigate(`/poll/${pollId}`);
+  };
+
+  const handleCopyPollLink = async (
+    event: React.MouseEvent<HTMLButtonElement>,
+    pollId: string,
+  ) => {
+    event.stopPropagation();
+    const target = visiblePolls.find((poll) => poll.id === pollId);
+    if (!target) {
+      return;
+    }
+
+    try {
+      await copyText(resolvePollShareUrl(target));
+      setCopiedPollId(pollId);
+      setTimeout(() => {
+        setCopiedPollId((current) => (current === pollId ? null : current));
+      }, 2000);
+    } catch (err) {
+      console.error('[picky] failed to copy poll link', err);
+      window.alert('링크 복사에 실패했습니다.');
+    }
+  };
 
   return (
     <section
@@ -540,8 +578,7 @@ export const PollList: React.FC = () => {
               .join(' / ');
 
             return (
-              <button
-                type="button"
+              <article
                 key={poll.id}
                 className="poll-card"
                 onClick={() => {
@@ -695,21 +732,53 @@ export const PollList: React.FC = () => {
                     </span>
                   </div>
 
-                  <span
+                  <button
+                    type="button"
+                    onClick={(event) => handleGotoPoll(event, poll.id)}
+                    className="btn-secondary"
                     style={{
-                      color: 'var(--brand-primary-light)',
-                      fontWeight: 600,
+                      fontSize: '0.7rem',
+                      padding: '6px 11px',
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: '5px',
-                      fontSize: '0.76rem',
+                      gap: '4px',
                     }}
                   >
-                    투표하기
+                    <span>투표하기</span>
                     <ArrowRight size={13} />
-                  </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(event) => handleCopyPollLink(event, poll.id)}
+                    className="ghost-btn"
+                    style={{
+                      fontSize: '0.68rem',
+                      padding: '6px 10px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                    }}
+                    title={`${poll.id} 링크 복사`}
+                  >
+                    {copiedPollId === poll.id ? <Check size={12} /> : <Copy size={12} />}
+                    <span>{copiedPollId === poll.id ? '복사 완료' : '공유 복사'}</span>
+                    <Link size={11} />
+                  </button>
                 </div>
-              </button>
+                {copiedPollId === poll.id ? (
+                  <p
+                    style={{
+                      margin: 0,
+                      marginTop: '6px',
+                      fontSize: '0.64rem',
+                      color: 'var(--brand-accent-teal)',
+                      fontWeight: 700,
+                    }}
+                  >
+                    링크가 복사되었습니다.
+                  </p>
+                ) : null}
+              </article>
             );
           })}
         </div>
