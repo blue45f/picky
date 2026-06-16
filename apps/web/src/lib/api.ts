@@ -53,25 +53,42 @@ const getApiCandidates = (): string[] => {
 
 const isLikelyStaticHtmlResponse = (res: Response): boolean => {
   const contentType = (res.headers.get('content-type') || '').toLowerCase();
-  return contentType.includes('text/html');
+  const isHtmlResponse =
+    contentType.includes('text/html') ||
+    contentType.includes('application/xhtml+xml');
+  if (!isHtmlResponse) {
+    return false;
+  }
+
+  return true;
 };
 
 export const requestApi = async (path: string, init: RequestInit = {}): Promise<Response> => {
   const candidates = getApiCandidates();
   let lastResponse: Response | null = null;
   let lastError: Error | null = null;
+  const trace: Array<{ base: string; ok: boolean; status?: number; error?: string }> = [];
+  const isProdLike = typeof window !== 'undefined' && window.location.hostname.includes('vercel.app');
 
   for (const base of candidates) {
     try {
       const res = await fetch(`${base}${path}`, init);
-      if (!isLikelyStaticHtmlResponse(res) || base === candidates[candidates.length - 1]) {
+      const isStatic = isLikelyStaticHtmlResponse(res);
+      trace.push({ base, ok: !isStatic, status: res.status });
+
+      if (!isStatic || base === candidates[candidates.length - 1]) {
         return res;
       }
 
       lastResponse = res;
     } catch (err: any) {
+      trace.push({ base, ok: false, error: String(err?.message || err) });
       lastError = err instanceof Error ? err : new Error(String(err));
     }
+  }
+
+  if (isProdLike && path === '/auth/guest') {
+    console.info('[picky] requestApi trace', path, trace);
   }
 
   if (lastResponse) {
