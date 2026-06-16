@@ -238,7 +238,9 @@ body {
   opacity: 0;
   transform: scaleX(0.2);
   transform-origin: left;
-  transition: transform 0.2s, opacity 0.2s;
+  transition:
+    transform 0.2s,
+    opacity 0.2s;
 }
 
 .link-underline:hover::after,
@@ -359,7 +361,12 @@ body {
 .skeleton {
   height: 16px;
   border-radius: 8px;
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.06) 25%, rgba(255, 255, 255, 0.14) 50%, rgba(255, 255, 255, 0.06) 75%);
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.06) 25%,
+    rgba(255, 255, 255, 0.14) 50%,
+    rgba(255, 255, 255, 0.06) 75%
+  );
   background-size: 220% 100%;
   animation: skeletonPulse 1.25s ease-in-out infinite;
 }

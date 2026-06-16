@@ -63,7 +63,8 @@ export const App: React.FC = () => {
           minHeight: '100vh',
           display: 'flex',
           flexDirection: 'column',
-          background: 'linear-gradient(to bottom, color-mix(in oklab, var(--bg-main) 82%, transparent), var(--bg-main))',
+          background:
+            'linear-gradient(to bottom, color-mix(in oklab, var(--bg-main) 82%, transparent), var(--bg-main))',
           position: 'relative',
         }}
       >

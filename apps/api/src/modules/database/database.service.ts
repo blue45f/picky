@@ -69,8 +69,7 @@ export class DatabaseService implements OnModuleInit {
               id: 1,
               text: 'PromptMarket (프롬프트/에이전트 마켓)',
               voteCount: 15,
-              imageUrl:
-                'https://images.unsplash.com/photo-1677442136019-21780efad99a?w=400&q=80',
+              imageUrl: 'https://images.unsplash.com/photo-1677442136019-21780efad99a?w=400&q=80',
             },
             {
               id: 2,
@@ -82,23 +81,20 @@ export class DatabaseService implements OnModuleInit {
               id: 3,
               text: 'family-care-platform (실버 케어 매칭 서비스)',
               voteCount: 8,
-              imageUrl:
-                'https://images.unsplash.com/photo-1576765608535-5f04d1e3f289?w=400&q=80',
+              imageUrl: 'https://images.unsplash.com/photo-1576765608535-5f04d1e3f289?w=400&q=80',
             },
             {
               id: 4,
               text: 'orbit-ui (유려한 글라스모피즘 컴포넌트 킷)',
               voteCount: 19,
-              imageUrl:
-                'https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?w=400&q=80',
+              imageUrl: 'https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?w=400&q=80',
             },
           ],
           comments: [
             {
               id: 1,
               voterName: '시니어FE',
-              comment:
-                'PromptMarket이 요즘 AI 트렌드에 가장 정합해서 비즈니스 잠재력이 큽니다!',
+              comment: 'PromptMarket이 요즘 AI 트렌드에 가장 정합해서 비즈니스 잠재력이 큽니다!',
               createdAt: new Date().toISOString(),
               selectedOptionId: 1,
               selectedOptionText: 'PromptMarket (프롬프트/에이전트 마켓)',
@@ -130,7 +126,9 @@ export class DatabaseService implements OnModuleInit {
     const polls = Array.isArray(raw?.polls) ? raw?.polls : [];
     const users = Array.isArray(raw?.users)
       ? raw.users
-          .filter((user: any) => user && typeof user.id === 'string' && typeof user.email === 'string')
+          .filter(
+            (user: any) => user && typeof user.id === 'string' && typeof user.email === 'string',
+          )
           .map((user: any) => ({
             id: String(user.id),
             email: String(user.email || ''),
@@ -144,7 +142,9 @@ export class DatabaseService implements OnModuleInit {
 
     return {
       polls: polls
-        .filter((poll: any) => poll && typeof poll.id === 'string' && typeof poll.question === 'string')
+        .filter(
+          (poll: any) => poll && typeof poll.id === 'string' && typeof poll.question === 'string',
+        )
         .map((poll: any) => ({
           ...poll,
           options: Array.isArray(poll.options) ? poll.options : [],

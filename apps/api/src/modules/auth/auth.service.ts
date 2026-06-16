@@ -141,7 +141,11 @@ export class AuthService {
       throw new UnauthorizedException('유효하지 않은 사용자입니다.');
     }
 
-    if (payload.isGuest === undefined || typeof payload.nickname !== 'string' || typeof payload.email !== 'string') {
+    if (
+      payload.isGuest === undefined ||
+      typeof payload.nickname !== 'string' ||
+      typeof payload.email !== 'string'
+    ) {
       const user = await this.db.getUserById(payload.sub);
       if (!user) {
         throw new UnauthorizedException('유효하지 않은 사용자입니다.');

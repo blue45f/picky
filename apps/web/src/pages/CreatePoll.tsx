@@ -194,7 +194,9 @@ export const CreatePoll: React.FC = () => {
   const [question, setQuestion] = useState(cachedDraft?.question || '');
   const [description, setDescription] = useState(cachedDraft?.description || '');
   const [options, setOptions] = useState<OptionInput[]>(
-    cachedDraft?.options && cachedDraft.options.length >= 2 ? [...cachedDraft.options] : createDefaultOptions(),
+    cachedDraft?.options && cachedDraft.options.length >= 2
+      ? [...cachedDraft.options]
+      : createDefaultOptions(),
   );
   const [activePresetIndex, setActivePresetIndex] = useState<number | null>(null);
   const [draftSavedAt, setDraftSavedAt] = useState<string | null>(cachedDraft?.savedAt || null);
@@ -228,9 +230,9 @@ export const CreatePoll: React.FC = () => {
   const hasDraft = useMemo(() => {
     return Boolean(
       question.trim() ||
-        description.trim() ||
-        nonEmptyOptions.length > 0 ||
-        options.some((option) => option.imageUrl || option.text.trim()),
+      description.trim() ||
+      nonEmptyOptions.length > 0 ||
+      options.some((option) => option.imageUrl || option.text.trim()),
     );
   }, [question, description, options, nonEmptyOptions.length]);
 
@@ -268,9 +270,7 @@ export const CreatePoll: React.FC = () => {
     const nextDraft = cachedDraft;
     setQuestion(nextDraft.question);
     setDescription(nextDraft.description);
-    setOptions(
-      nextDraft.options.length >= 2 ? [...nextDraft.options] : createDefaultOptions(),
-    );
+    setOptions(nextDraft.options.length >= 2 ? [...nextDraft.options] : createDefaultOptions());
     setDraftSavedAt(nextDraft.savedAt);
     setFormError('');
     clearError();
@@ -492,7 +492,10 @@ export const CreatePoll: React.FC = () => {
           {draftSavedAt ? (
             <span>
               마지막 임시저장:{' '}
-              {new Date(draftSavedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              {new Date(draftSavedAt).toLocaleTimeString([], {
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
             </span>
           ) : (
             <span>임시 저장되지 않음</span>

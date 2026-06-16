@@ -17,11 +17,7 @@ import { useAuthStore } from '../store/useAuthStore';
 import { VoteDonutChart, OPTION_COLORS } from '../components/VoteDonutChart';
 import { SnsPreviewCard } from '../components/SnsPreviewCard';
 import { Poll } from '@picky/shared';
-import {
-  resolvePollShareUrl,
-  resolveShareText,
-  copyText,
-} from '../lib/pollShare';
+import { resolvePollShareUrl, resolveShareText, copyText } from '../lib/pollShare';
 const POLL_AUTHOR_LABELS: {
   mine: string;
   otherMember: string;
@@ -198,8 +194,7 @@ export const PollDetail: React.FC = () => {
   }
 
   if (!currentPoll) {
-    const noPollMessage =
-      error || '존재하지 않거나 삭제된 고민 투표 링크입니다.';
+    const noPollMessage = error || '존재하지 않거나 삭제된 고민 투표 링크입니다.';
     return (
       <div
         className="content-card"
@@ -213,14 +208,12 @@ export const PollDetail: React.FC = () => {
         }}
       >
         <AlertCircle size={36} style={{ color: 'var(--brand-accent-coral)' }} />
-          <div>
-            <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '6px' }}>
-              고민 정보를 찾을 수 없습니다
-            </h3>
-            <p style={{ fontSize: '0.825rem', color: 'var(--text-secondary)' }}>
-              {noPollMessage}
-            </p>
-          </div>
+        <div>
+          <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '6px' }}>
+            고민 정보를 찾을 수 없습니다
+          </h3>
+          <p style={{ fontSize: '0.825rem', color: 'var(--text-secondary)' }}>{noPollMessage}</p>
+        </div>
         <button
           onClick={() => navigate('/')}
           className="btn-secondary"
@@ -249,7 +242,7 @@ export const PollDetail: React.FC = () => {
       className="animate-slide-up"
       style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}
     >
-          {/* Header Back Controls */}
+      {/* Header Back Controls */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <button
           onClick={() => navigate('/')}
@@ -664,15 +657,15 @@ export const PollDetail: React.FC = () => {
                     className="form-input"
                   />
                 </div>
-                  <button
-                    onClick={handleVoteSubmit}
-                    disabled={!votedOptionId || isLoading}
-                    className="btn-primary"
-                    style={{ padding: '12px', fontSize: '0.85rem' }}
-                  >
-                    {isLoading ? '투표 처리 중...' : '투표 제출 및 한마디 등록'}
-                  </button>
-                </div>
+                <button
+                  onClick={handleVoteSubmit}
+                  disabled={!votedOptionId || isLoading}
+                  className="btn-primary"
+                  style={{ padding: '12px', fontSize: '0.85rem' }}
+                >
+                  {isLoading ? '투표 처리 중...' : '투표 제출 및 한마디 등록'}
+                </button>
+              </div>
             )}
           </div>
         )}
@@ -873,11 +866,11 @@ export const PollDetail: React.FC = () => {
             </div>
 
             {/* Copy link input */}
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
                 backgroundColor: 'oklch(11% 0.015 260)',
                 border: '1px solid var(--bg-card-border)',
                 padding: '8px 12px',
@@ -895,23 +888,23 @@ export const PollDetail: React.FC = () => {
                   flex: 1,
                   textAlign: 'left',
                 }}
-                >
-                  {resolvePollShareUrl(currentPoll)}
-                </span>
-                {copyMessage ? (
-                  <p
-                    style={{
-                      margin: 0,
-                      fontSize: '0.7rem',
-                      color: 'var(--brand-accent-coral)',
-                    }}
-                  >
-                    {copyMessage}
-                  </p>
-                ) : null}
-                <button
-                  onClick={() => handleCopyLinkClick(currentPoll.id)}
+              >
+                {resolvePollShareUrl(currentPoll)}
+              </span>
+              {copyMessage ? (
+                <p
                   style={{
+                    margin: 0,
+                    fontSize: '0.7rem',
+                    color: 'var(--brand-accent-coral)',
+                  }}
+                >
+                  {copyMessage}
+                </p>
+              ) : null}
+              <button
+                onClick={() => handleCopyLinkClick(currentPoll.id)}
+                style={{
                   background: 'none',
                   border: 'none',
                   color:

@@ -44,7 +44,8 @@ const normalizeUser = (candidate: any): UserProfile | null => {
     id: String(candidate.id),
     email: typeof candidate.email === 'string' ? candidate.email : '',
     nickname: String(candidate.nickname),
-    createdAt: typeof candidate.createdAt === 'string' ? candidate.createdAt : new Date().toISOString(),
+    createdAt:
+      typeof candidate.createdAt === 'string' ? candidate.createdAt : new Date().toISOString(),
     isGuest: Boolean(candidate.isGuest),
   };
 };
@@ -319,7 +320,10 @@ export const useAuthStore = create<AuthState>((set, get) => {
 
         const data = (await parseApiPayload(res)) as AuthResult;
         if (!res.ok) {
-          const { validationErrors, message } = await normalizeAuthFailure(res, '로그인에 실패했습니다.');
+          const { validationErrors, message } = await normalizeAuthFailure(
+            res,
+            '로그인에 실패했습니다.',
+          );
           set({
             error: message,
             validationErrors,

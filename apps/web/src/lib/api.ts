@@ -77,7 +77,10 @@ const getLocalDevApiCandidates = (): string[] => {
     return [];
   }
 
-  return [normalizeApiBase('http://localhost:3000/api'), normalizeApiBase('http://127.0.0.1:3000/api')];
+  return [
+    normalizeApiBase('http://localhost:3000/api'),
+    normalizeApiBase('http://127.0.0.1:3000/api'),
+  ];
 };
 
 const getCustomApiCandidateFromWindow = (): string[] => {
@@ -125,9 +128,9 @@ const getVercelApiCandidates = (): string[] => {
     ...hostGroups.map((value) => `api.${value}.vercel.app`),
   ]);
 
-  return dedupe([
-    ...apiHosts.map((host) => normalizeApiBase(`${protocol}//${host}/api`)),
-  ]).filter((candidate) => candidate && candidate !== '/');
+  return dedupe([...apiHosts.map((host) => normalizeApiBase(`${protocol}//${host}/api`))]).filter(
+    (candidate) => candidate && candidate !== '/',
+  );
 };
 
 const getApiCandidates = (): string[] => {
@@ -158,11 +161,11 @@ const getApiCandidates = (): string[] => {
   }
 
   return dedupe([
-      ...customCandidates,
-      ...localDevCandidates,
-      ...baseCandidates,
-      ...preferred,
-      ...vercelCandidates,
+    ...customCandidates,
+    ...localDevCandidates,
+    ...baseCandidates,
+    ...preferred,
+    ...vercelCandidates,
   ]);
 };
 

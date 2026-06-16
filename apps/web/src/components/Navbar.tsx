@@ -82,7 +82,8 @@ export const Navbar: React.FC = () => {
               fontSize: '1.22rem',
               fontWeight: 900,
               letterSpacing: '-0.03em',
-              background: 'linear-gradient(90deg, var(--brand-primary-light), var(--brand-primary))',
+              background:
+                'linear-gradient(90deg, var(--brand-primary-light), var(--brand-primary))',
               WebkitBackgroundClip: 'text',
               color: 'transparent',
             }}
@@ -105,13 +106,15 @@ export const Navbar: React.FC = () => {
         </Link>
 
         <div
-          style={{
-            display: 'none',
-            alignItems: 'center',
-            gap: '0.95rem',
-            marginLeft: 'auto',
-            [ '::before' as any ]: {},
-          } as React.CSSProperties}
+          style={
+            {
+              display: 'none',
+              alignItems: 'center',
+              gap: '0.95rem',
+              marginLeft: 'auto',
+              ['::before' as any]: {},
+            } as React.CSSProperties
+          }
           className="desktop-nav"
         >
           {navItems.map((item) => {
@@ -126,7 +129,9 @@ export const Navbar: React.FC = () => {
                   padding: '8px 10px',
                   borderRadius: '8px',
                   color: isActive ? 'var(--text-primary)' : 'var(--text-muted)',
-                  border: isActive ? '1px solid var(--bg-card-border-hover)' : '1px solid transparent',
+                  border: isActive
+                    ? '1px solid var(--bg-card-border-hover)'
+                    : '1px solid transparent',
                   fontWeight: isActive ? 700 : 500,
                 }}
               >
@@ -161,7 +166,9 @@ export const Navbar: React.FC = () => {
                 className="desktop-user-chip"
               >
                 <User size={13} />
-                <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{nicknameText}</span>
+                <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                  {nicknameText}
+                </span>
                 {user.isGuest ? (
                   <span
                     style={{
@@ -314,7 +321,8 @@ export const Navbar: React.FC = () => {
               top: 'calc(var(--nav-height) - 2px)',
               left: 0,
               right: 0,
-              background: 'linear-gradient(180deg, color-mix(in oklab, var(--bg-main) 90%, transparent), var(--bg-main))',
+              background:
+                'linear-gradient(180deg, color-mix(in oklab, var(--bg-main) 90%, transparent), var(--bg-main))',
               borderBottom: '1px solid var(--bg-card-border)',
               borderTop: '1px solid var(--bg-card-border)',
               padding: '0.55rem 1rem 0.85rem',

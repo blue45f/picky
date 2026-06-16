@@ -149,7 +149,9 @@ export const PollList: React.FC = () => {
 
   const scopedCounts = useMemo(() => {
     const mine = userId ? polls.filter((poll) => poll.creatorId === userId).length : 0;
-    const guest = polls.filter((poll) => isGuestCreator(poll.creatorId, poll.creatorIsGuest)).length;
+    const guest = polls.filter((poll) =>
+      isGuestCreator(poll.creatorId, poll.creatorIsGuest),
+    ).length;
 
     return {
       all: polls.length,
@@ -245,10 +247,7 @@ export const PollList: React.FC = () => {
     navigate(`/poll/${pollId}`);
   };
 
-  const handleCopyPollLink = async (
-    event: React.MouseEvent<HTMLButtonElement>,
-    pollId: string,
-  ) => {
+  const handleCopyPollLink = async (event: React.MouseEvent<HTMLButtonElement>, pollId: string) => {
     event.stopPropagation();
     const target = visiblePolls.find((poll) => poll.id === pollId);
     if (!target) {
@@ -267,10 +266,7 @@ export const PollList: React.FC = () => {
     }
   };
 
-  const handlePollCardActivate = (
-    event: React.KeyboardEvent<HTMLDivElement>,
-    pollId: string,
-  ) => {
+  const handlePollCardActivate = (event: React.KeyboardEvent<HTMLDivElement>, pollId: string) => {
     if (event.key !== 'Enter' && event.key !== ' ') {
       return;
     }
@@ -334,8 +330,8 @@ export const PollList: React.FC = () => {
               lineHeight: 1.65,
             }}
           >
-            일상이나 팀 회의에서 결정이 어려운 항목을 카드로 등록하고, 지인/동료에게 링크를
-            전달하면 바로 의견을 수집할 수 있습니다.
+            일상이나 팀 회의에서 결정이 어려운 항목을 카드로 등록하고, 지인/동료에게 링크를 전달하면
+            바로 의견을 수집할 수 있습니다.
           </p>
 
           <div className="kpi-grid" style={{ marginTop: '0.4rem' }}>
@@ -372,7 +368,13 @@ export const PollList: React.FC = () => {
 
       <div
         className="content-card"
-        style={{ padding: '0.95rem', display: 'flex', gap: '0.85rem', flexWrap: 'wrap', alignItems: 'center' }}
+        style={{
+          padding: '0.95rem',
+          display: 'flex',
+          gap: '0.85rem',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+        }}
       >
         <label
           style={{
@@ -384,7 +386,10 @@ export const PollList: React.FC = () => {
             minWidth: 180,
           }}
         >
-          <Search size={14} style={{ position: 'absolute', left: '11px', color: 'var(--text-muted)' }} />
+          <Search
+            size={14}
+            style={{ position: 'absolute', left: '11px', color: 'var(--text-muted)' }}
+          />
           <input
             value={searchInput}
             onChange={(event) => setSearchInput(event.target.value)}
@@ -458,34 +463,36 @@ export const PollList: React.FC = () => {
             justifyContent: 'flex-end',
             flexWrap: 'wrap',
           }}
+        >
+          <button
+            type="button"
+            className="ghost-btn"
+            onClick={() => setViewMode((current) => (current === 'stack' ? 'compact' : 'stack'))}
+            title="목록/컴팩트 뷰 전환"
+            style={{
+              padding: '6px 9px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+            }}
           >
+            {viewMode === 'stack' ? <LayoutList size={12} /> : <LayoutGrid size={12} />}
+            <span style={{ fontSize: '0.7rem' }}>{viewMode === 'stack' ? '넓게' : '요약'}</span>
+          </button>
+          {displayScopeOptions.map((option) => (
             <button
-              type="button"
-              className="ghost-btn"
-              onClick={() => setViewMode((current) => (current === 'stack' ? 'compact' : 'stack'))}
-              title="목록/컴팩트 뷰 전환"
-              style={{
-                padding: '6px 9px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '4px',
-              }}
-            >
-              {viewMode === 'stack' ? <LayoutList size={12} /> : <LayoutGrid size={12} />}
-              <span style={{ fontSize: '0.7rem' }}>{viewMode === 'stack' ? '넓게' : '요약'}</span>
-            </button>
-            {displayScopeOptions.map((option) => (
-              <button
-                key={option.value}
+              key={option.value}
               onClick={() => setScope(option.value)}
               className="ghost-btn"
               disabled={option.value === 'mine' && !userId}
-              title={option.value === 'mine' && !userId ? '로그인/비회원 닉네임 시작 후 내 항목을 확인할 수 있어요' : ''}
+              title={
+                option.value === 'mine' && !userId
+                  ? '로그인/비회원 닉네임 시작 후 내 항목을 확인할 수 있어요'
+                  : ''
+              }
               style={{
                 borderColor:
-                  scope === option.value
-                    ? 'rgba(99, 102, 241, 0.52)'
-                    : 'var(--bg-card-border)',
+                  scope === option.value ? 'rgba(99, 102, 241, 0.52)' : 'var(--bg-card-border)',
                 color: scope === option.value ? 'var(--brand-primary-light)' : 'var(--text-muted)',
                 backgroundColor:
                   scope === option.value ? 'rgba(99, 102, 241, 0.12)' : 'transparent',
@@ -508,8 +515,7 @@ export const PollList: React.FC = () => {
               fontSize: '0.75rem',
             }}
           >
-            <Plus size={14} />
-            새 투표 만들기
+            <Plus size={14} />새 투표 만들기
           </button>
         </div>
       </div>
@@ -587,7 +593,10 @@ export const PollList: React.FC = () => {
       ) : null}
 
       {isLoading && visiblePolls.length === 0 ? (
-        <div className="content-card" style={{ padding: '1.75rem', display: 'grid', gap: '0.75rem' }}>
+        <div
+          className="content-card"
+          style={{ padding: '1.75rem', display: 'grid', gap: '0.75rem' }}
+        >
           {Array.from({ length: 3 }).map((_, index) => (
             <div key={index} style={{ display: 'grid', gap: '0.55rem' }}>
               <div className="skeleton" style={{ height: '0.8rem', width: '42%' }} />
@@ -637,242 +646,247 @@ export const PollList: React.FC = () => {
         </div>
       ) : (
         <>
-        <div style={{ display: 'grid', gap: '0.9rem' }}>
-          {visiblePolls.map((poll) => {
-            const creatorLabel = getCreatorLabel(poll.creatorId, poll.creatorIsGuest);
-            const isMine = userId && poll.creatorId === userId;
-            const isCompact = viewMode === 'compact';
-            const topOptions = [...poll.options]
-              .sort((a, b) => b.voteCount - a.voteCount)
-              .slice(0, 2)
-              .map((option) => option.text)
-              .join(' / ');
-            const compactDescription =
-              poll.description && poll.description.length > 84
-                ? `${poll.description.slice(0, 81)}...`
-                : poll.description || '';
+          <div style={{ display: 'grid', gap: '0.9rem' }}>
+            {visiblePolls.map((poll) => {
+              const creatorLabel = getCreatorLabel(poll.creatorId, poll.creatorIsGuest);
+              const isMine = userId && poll.creatorId === userId;
+              const isCompact = viewMode === 'compact';
+              const topOptions = [...poll.options]
+                .sort((a, b) => b.voteCount - a.voteCount)
+                .slice(0, 2)
+                .map((option) => option.text)
+                .join(' / ');
+              const compactDescription =
+                poll.description && poll.description.length > 84
+                  ? `${poll.description.slice(0, 81)}...`
+                  : poll.description || '';
 
-            return (
-              <article
-                key={poll.id}
-                className="poll-card"
-                role="button"
-                tabIndex={0}
-                aria-label={`${poll.question} 투표 페이지로 이동`}
-                onClick={() => {
-                  setCurrentPoll(poll);
-                  navigate(`/poll/${poll.id}`);
-                }}
-                onKeyDown={(event) => handlePollCardActivate(event, poll.id)}
-                style={{
-                  textAlign: 'left',
-                  textDecoration: 'none',
-                  padding: isCompact ? '1.05rem' : '1.25rem',
-                  width: '100%',
-                  border: isMine ? '1px solid rgba(99, 102, 241, 0.45)' : undefined,
-                }}
-              >
-                <div
+              return (
+                <article
+                  key={poll.id}
+                  className="poll-card"
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`${poll.question} 투표 페이지로 이동`}
+                  onClick={() => {
+                    setCurrentPoll(poll);
+                    navigate(`/poll/${poll.id}`);
+                  }}
+                  onKeyDown={(event) => handlePollCardActivate(event, poll.id)}
                   style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    gap: '0.8rem',
-                    flexWrap: 'wrap',
-                    marginBottom: '0.7rem',
+                    textAlign: 'left',
+                    textDecoration: 'none',
+                    padding: isCompact ? '1.05rem' : '1.25rem',
+                    width: '100%',
+                    border: isMine ? '1px solid rgba(99, 102, 241, 0.45)' : undefined,
                   }}
                 >
                   <div
                     style={{
                       display: 'flex',
-                      gap: '0.35rem',
+                      justifyContent: 'space-between',
                       alignItems: 'center',
+                      gap: '0.8rem',
                       flexWrap: 'wrap',
+                      marginBottom: '0.7rem',
                     }}
                   >
-                    <span className="floating-tag">POLL #{poll.id}</span>
-                    <span
+                    <div
                       style={{
-                        fontSize: '0.62rem',
+                        display: 'flex',
+                        gap: '0.35rem',
+                        alignItems: 'center',
+                        flexWrap: 'wrap',
+                      }}
+                    >
+                      <span className="floating-tag">POLL #{poll.id}</span>
+                      <span
+                        style={{
+                          fontSize: '0.62rem',
+                          color: 'var(--text-muted)',
+                          border: '1px solid var(--bg-card-border)',
+                          padding: '2px 8px',
+                          borderRadius: '999px',
+                          fontWeight: 600,
+                        }}
+                      >
+                        {creatorLabel}
+                      </span>
+                    </div>
+
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        fontSize: '0.64rem',
                         color: 'var(--text-muted)',
-                        border: '1px solid var(--bg-card-border)',
-                        padding: '2px 8px',
-                        borderRadius: '999px',
-                        fontWeight: 600,
                       }}
                     >
-                      {creatorLabel}
-                    </span>
+                      <Calendar size={12} />
+                      <span>
+                        {new Date(poll.createdAt).toLocaleDateString([], {
+                          year: '2-digit',
+                          month: 'short',
+                          day: 'numeric',
+                        })}
+                      </span>
+                    </div>
                   </div>
+
+                  <h3
+                    style={{
+                      color: 'var(--text-primary)',
+                      fontSize: isCompact ? '1rem' : '1.06rem',
+                      fontWeight: 800,
+                      letterSpacing: '-0.015em',
+                      lineHeight: 1.45,
+                      marginBottom: '0.4rem',
+                    }}
+                  >
+                    {poll.question}
+                  </h3>
+
+                  {poll.description ? (
+                    <p
+                      style={{
+                        color: 'var(--text-secondary)',
+                        fontSize: isCompact ? '0.74rem' : '0.825rem',
+                        marginBottom: '0.6rem',
+                        display: isCompact ? 'block' : '-webkit-box',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        WebkitLineClamp: isCompact ? 1 : 2,
+                        WebkitBoxOrient: 'vertical',
+                        lineHeight: 1.56,
+                      }}
+                    >
+                      {isCompact ? compactDescription : poll.description}
+                    </p>
+                  ) : null}
 
                   <div
                     style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      fontSize: '0.64rem',
-                      color: 'var(--text-muted)',
-                    }}
-                  >
-                    <Calendar size={12} />
-                    <span>
-                      {new Date(poll.createdAt).toLocaleDateString([], {
-                        year: '2-digit',
-                        month: 'short',
-                        day: 'numeric',
-                      })}
-                    </span>
-                  </div>
-                </div>
-
-                <h3
-                  style={{
-                    color: 'var(--text-primary)',
-                    fontSize: isCompact ? '1rem' : '1.06rem',
-                    fontWeight: 800,
-                    letterSpacing: '-0.015em',
-                    lineHeight: 1.45,
-                    marginBottom: '0.4rem',
-                  }}
-                >
-                  {poll.question}
-                </h3>
-
-                {poll.description ? (
-                  <p
-                    style={{
+                      fontSize: isCompact ? '0.68rem' : '0.72rem',
                       color: 'var(--text-secondary)',
-                      fontSize: isCompact ? '0.74rem' : '0.825rem',
-                      marginBottom: '0.6rem',
-                      display: isCompact ? 'block' : '-webkit-box',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      WebkitLineClamp: isCompact ? 1 : 2,
-                      WebkitBoxOrient: 'vertical',
-                      lineHeight: 1.56,
+                      marginBottom: '0.66rem',
                     }}
                   >
-                    {isCompact ? compactDescription : poll.description}
-                  </p>
-                ) : null}
+                    <strong style={{ color: 'var(--text-primary)' }}>현재 상위 선택지:</strong>{' '}
+                    {topOptions || '아직 등록된 선택지가 없습니다'}
+                  </div>
 
-                <div
-                  style={{
-                    fontSize: isCompact ? '0.68rem' : '0.72rem',
-                    color: 'var(--text-secondary)',
-                    marginBottom: '0.66rem',
-                  }}
-                >
-                  <strong style={{ color: 'var(--text-primary)' }}>현재 상위 선택지:</strong>{' '}
-                  {topOptions || '아직 등록된 선택지가 없습니다'}
-                </div>
-
-                <div
-                  style={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    borderTop: '1px solid rgba(255, 255, 255, 0.06)',
-                    paddingTop: '0.75rem',
-                  }}
-                >
                   <div
                     style={{
                       display: 'flex',
-                      gap: '0.9rem',
-                      fontSize: '0.74rem',
-                      color: 'var(--text-muted)',
-                    }}
-                  >
-                    <span
-                      style={{
-                        display: 'inline-flex',
-                        gap: '5px',
-                        alignItems: 'center',
-                        color: 'var(--text-secondary)',
-                      }}
-                    >
-                      <Vote size={12} />
-                      <strong style={{ color: 'var(--text-primary)' }}>{poll.totalVotes}</strong> 투표
-                    </span>
-                    <span
-                      style={{
-                        display: 'inline-flex',
-                        gap: '5px',
-                        alignItems: 'center',
-                        color: 'var(--text-secondary)',
-                      }}
-                    >
-                      <MessageSquare size={12} />
-                      <strong style={{ color: 'var(--text-primary)' }}>{poll.comments.length}</strong>{' '}
-                      의견
-                    </span>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={(event) => handleGotoPoll(event, poll.id)}
-                    className="btn-secondary"
-                    style={{
-                      fontSize: isCompact ? '0.66rem' : '0.7rem',
-                    padding: '6px 11px',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                  }}
-                  >
-                    <span>투표하기</span>
-                    <ArrowRight size={13} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(event) => handleCopyPollLink(event, poll.id)}
-                    className="ghost-btn"
-                    style={{
-                      fontSize: isCompact ? '0.64rem' : '0.68rem',
-                      padding: isCompact ? '5px 9px' : '6px 10px',
-                      display: 'inline-flex',
+                      flexWrap: 'wrap',
+                      justifyContent: 'space-between',
                       alignItems: 'center',
-                      gap: '4px',
-                    }}
-                    title={`${poll.id} 링크 복사`}
-                  >
-                    {copiedPollId === poll.id ? <Check size={12} /> : <Copy size={12} />}
-                    <span>{copiedPollId === poll.id ? '복사 완료' : '공유 복사'}</span>
-                    <Link size={11} />
-                  </button>
-                </div>
-                {copiedPollId === poll.id ? (
-                  <p
-                    style={{
-                      margin: 0,
-                      marginTop: '6px',
-                      fontSize: '0.64rem',
-                      color: 'var(--brand-accent-teal)',
-                      fontWeight: 700,
+                      gap: '0.5rem',
+                      borderTop: '1px solid rgba(255, 255, 255, 0.06)',
+                      paddingTop: '0.75rem',
                     }}
                   >
-                    링크가 복사되었습니다.
-                  </p>
-                ) : null}
-              </article>
-            );
-          })}
-        </div>
-        {query ? (
-          <p
-            style={{
-              margin: '0',
-              fontSize: '0.74rem',
-              color: 'var(--text-muted)',
-              textAlign: 'right',
-            }}
-          >
-            총 {visiblePolls.length}개 결과
-          </p>
-        ) : null}
+                    <div
+                      style={{
+                        display: 'flex',
+                        gap: '0.9rem',
+                        fontSize: '0.74rem',
+                        color: 'var(--text-muted)',
+                      }}
+                    >
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          gap: '5px',
+                          alignItems: 'center',
+                          color: 'var(--text-secondary)',
+                        }}
+                      >
+                        <Vote size={12} />
+                        <strong style={{ color: 'var(--text-primary)' }}>
+                          {poll.totalVotes}
+                        </strong>{' '}
+                        투표
+                      </span>
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          gap: '5px',
+                          alignItems: 'center',
+                          color: 'var(--text-secondary)',
+                        }}
+                      >
+                        <MessageSquare size={12} />
+                        <strong style={{ color: 'var(--text-primary)' }}>
+                          {poll.comments.length}
+                        </strong>{' '}
+                        의견
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={(event) => handleGotoPoll(event, poll.id)}
+                      className="btn-secondary"
+                      style={{
+                        fontSize: isCompact ? '0.66rem' : '0.7rem',
+                        padding: '6px 11px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                      }}
+                    >
+                      <span>투표하기</span>
+                      <ArrowRight size={13} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(event) => handleCopyPollLink(event, poll.id)}
+                      className="ghost-btn"
+                      style={{
+                        fontSize: isCompact ? '0.64rem' : '0.68rem',
+                        padding: isCompact ? '5px 9px' : '6px 10px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                      }}
+                      title={`${poll.id} 링크 복사`}
+                    >
+                      {copiedPollId === poll.id ? <Check size={12} /> : <Copy size={12} />}
+                      <span>{copiedPollId === poll.id ? '복사 완료' : '공유 복사'}</span>
+                      <Link size={11} />
+                    </button>
+                  </div>
+                  {copiedPollId === poll.id ? (
+                    <p
+                      style={{
+                        margin: 0,
+                        marginTop: '6px',
+                        fontSize: '0.64rem',
+                        color: 'var(--brand-accent-teal)',
+                        fontWeight: 700,
+                      }}
+                    >
+                      링크가 복사되었습니다.
+                    </p>
+                  ) : null}
+                </article>
+              );
+            })}
+          </div>
+          {query ? (
+            <p
+              style={{
+                margin: '0',
+                fontSize: '0.74rem',
+                color: 'var(--text-muted)',
+                textAlign: 'right',
+              }}
+            >
+              총 {visiblePolls.length}개 결과
+            </p>
+          ) : null}
         </>
       )}
 

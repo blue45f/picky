@@ -45,7 +45,10 @@ const loadCachedPolls = (): Poll[] => {
         description: typeof item.description === 'string' ? item.description : null,
         options: Array.isArray(item.options)
           ? item.options
-              .filter((option: any) => option && typeof option.id === 'number' && typeof option.text === 'string')
+              .filter(
+                (option: any) =>
+                  option && typeof option.id === 'number' && typeof option.text === 'string',
+              )
               .map((option: any) => ({
                 id: option.id,
                 text: option.text,
@@ -55,15 +58,29 @@ const loadCachedPolls = (): Poll[] => {
           : [],
         comments: Array.isArray(item.comments)
           ? item.comments
-              .filter((comment: any) => comment && typeof comment.id === 'number' && typeof comment.voterName === 'string' && typeof comment.comment === 'string')
+              .filter(
+                (comment: any) =>
+                  comment &&
+                  typeof comment.id === 'number' &&
+                  typeof comment.voterName === 'string' &&
+                  typeof comment.comment === 'string',
+              )
               .map((comment: any) => ({
                 id: comment.id,
                 voterName: comment.voterName,
                 comment: comment.comment,
-                createdAt: typeof comment.createdAt === 'string' ? comment.createdAt : new Date().toISOString(),
-                selectedOptionId: typeof comment.selectedOptionId === 'number' ? comment.selectedOptionId : undefined,
+                createdAt:
+                  typeof comment.createdAt === 'string'
+                    ? comment.createdAt
+                    : new Date().toISOString(),
+                selectedOptionId:
+                  typeof comment.selectedOptionId === 'number'
+                    ? comment.selectedOptionId
+                    : undefined,
                 selectedOptionText:
-                  typeof comment.selectedOptionText === 'string' ? comment.selectedOptionText : undefined,
+                  typeof comment.selectedOptionText === 'string'
+                    ? comment.selectedOptionText
+                    : undefined,
               }))
           : [],
         createdAt: typeof item.createdAt === 'string' ? item.createdAt : new Date().toISOString(),
@@ -91,10 +108,9 @@ const persistCachedPolls = (polls: Poll[]) => {
 
 const upsertPollToCache = (poll: Poll, source?: Poll[]) => {
   const sourcePolls = source ?? loadCachedPolls();
-  const next = [
-    poll,
-    ...sourcePolls.filter((item) => item.id !== poll.id),
-  ].filter((item) => item.id);
+  const next = [poll, ...sourcePolls.filter((item) => item.id !== poll.id)].filter(
+    (item) => item.id,
+  );
   persistCachedPolls(next);
   return next;
 };
@@ -167,7 +183,9 @@ const isPollPayload = (payload: any): payload is Poll => {
     payload.id.trim() !== '' &&
     typeof payload.question === 'string' &&
     Array.isArray(payload.options) &&
-    payload.options.every((option: any) => option && typeof option.id === 'number' && typeof option.text === 'string') &&
+    payload.options.every(
+      (option: any) => option && typeof option.id === 'number' && typeof option.text === 'string',
+    ) &&
     Array.isArray(payload.comments) &&
     typeof payload.totalVotes === 'number' &&
     typeof payload.createdAt === 'string'
@@ -249,11 +267,17 @@ export const usePollStore = create<PollState>((set, get) => ({
       if (!res.ok) {
         const errData = await parseApiPayload(res);
         const fallback = mergePollsWithLocalCache([]);
-        set({ polls: fallback, isLoading: false, error: resolvePollErrorMessage(errData, '고민 목록을 가져오는데 실패했습니다.') });
+        set({
+          polls: fallback,
+          isLoading: false,
+          error: resolvePollErrorMessage(errData, '고민 목록을 가져오는데 실패했습니다.'),
+        });
         return;
       }
       const data = await parseApiPayload(res);
-      const parsed = Array.isArray(data) ? data.filter((item): item is Poll => isPollPayload(item)) : [];
+      const parsed = Array.isArray(data)
+        ? data.filter((item): item is Poll => isPollPayload(item))
+        : [];
 
       const merged = mergePollsWithLocalCache(parsed);
       set({ polls: merged, isLoading: false });
@@ -267,9 +291,7 @@ export const usePollStore = create<PollState>((set, get) => ({
     try {
       const res = await requestApi(`/polls/${id}`);
       if (!res.ok) {
-        const cached =
-          get().polls.find((poll) => poll.id === id) ||
-          findPollFromLocalCache(id);
+        const cached = get().polls.find((poll) => poll.id === id) || findPollFromLocalCache(id);
 
         if (cached && res.status === 404) {
           set({ currentPoll: cached, error: null, isLoading: false });
@@ -344,15 +366,17 @@ export const usePollStore = create<PollState>((set, get) => ({
           get().currentPoll;
 
         if (fallbackPoll && res.status === 404) {
-          const nextPoll = applyLocalVote(fallbackPoll, input.optionId, input.voterName, input.comment);
+          const nextPoll = applyLocalVote(
+            fallbackPoll,
+            input.optionId,
+            input.voterName,
+            input.comment,
+          );
           if (nextPoll) {
             upsertPollToCache(nextPoll, get().polls);
             set((state) => ({
               currentPoll: nextPoll,
-              polls: [
-                nextPoll,
-                ...state.polls.filter((poll) => poll.id !== nextPoll.id),
-              ],
+              polls: [nextPoll, ...state.polls.filter((poll) => poll.id !== nextPoll.id)],
               isLoading: false,
             }));
             return true;
