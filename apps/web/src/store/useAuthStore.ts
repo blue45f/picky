@@ -226,7 +226,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
         }
 
         if (!hydrate(set, data)) {
-          throw new Error('인증 응답이 올바르지 않습니다.');
+          throw new Error(resolveAuthErrorMessage(data, '인증 응답이 올바르지 않습니다.'));
         }
 
         localStorage.removeItem('picky_guest_name');
@@ -272,7 +272,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
         }
 
         if (!hydrate(set, data)) {
-          throw new Error('인증 응답이 올바르지 않습니다.');
+          throw new Error(resolveAuthErrorMessage(data, '인증 응답이 올바르지 않습니다.'));
         }
 
         localStorage.removeItem('picky_guest_name');
@@ -320,7 +320,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
         }
 
         if (!hydrate(set, data)) {
-          throw new Error('인증 응답이 올바르지 않습니다.');
+          throw new Error(resolveAuthErrorMessage(data, '인증 응답이 올바르지 않습니다.'));
         }
 
         const trimmedNickname = payload.nickname;

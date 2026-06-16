@@ -105,7 +105,7 @@ const getApiCandidates = (): string[] => {
   }
 
   const baseCandidates = getWindowApiCandidates();
-  return dedupe([...preferred, ...baseCandidates, ...vercelCandidates]);
+  return dedupe([...preferred, ...vercelCandidates, ...baseCandidates]);
 };
 
 const isLikelyStaticHtmlResponse = (res: Response): boolean => {
@@ -119,7 +119,12 @@ const isLikelyStaticHtmlResponse = (res: Response): boolean => {
   return true;
 };
 
-const shouldRetryOnFailure = (res: Response, index: number, total: number): boolean => {
+const shouldRetryOnFailure = (
+  res: Response,
+  index: number,
+  total: number,
+  base: string,
+): boolean => {
   if (index >= total - 1) {
     return false;
   }
@@ -129,6 +134,16 @@ const shouldRetryOnFailure = (res: Response, index: number, total: number): bool
   }
 
   if (res.status >= 500) {
+    return true;
+  }
+
+  const isVercelFallbackProbe =
+    typeof window !== 'undefined' &&
+    window.location.hostname.endsWith('.vercel.app') &&
+    base.includes(`${window.location.host}/api`) &&
+    !base.includes('-api.vercel.app');
+
+  if (isVercelFallbackProbe && res.status === 404) {
     return true;
   }
 
@@ -168,7 +183,7 @@ export const requestApi = async (path: string, init: RequestInit = {}): Promise<
     const base = candidates[i];
     try {
       const res = await fetch(`${base}${path}`, init);
-      const needRetry = shouldRetryOnFailure(res, i, candidates.length);
+      const needRetry = shouldRetryOnFailure(res, i, candidates.length, base);
       trace.push({ base, ok: !needRetry, status: res.status });
       if (debug) {
         console.info('[picky] requestApi attempt', {
