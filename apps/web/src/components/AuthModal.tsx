@@ -1,0 +1,526 @@
+import React, { useEffect, useState } from 'react';
+import { X, Mail, Lock, User, LogIn, UserPlus, UserCog, AlertCircle } from 'lucide-react';
+import { useAuthStore } from '../store/useAuthStore';
+
+interface AuthModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  initialMode?: AuthMode;
+  subTitle?: string;
+}
+
+export type AuthMode = 'login' | 'register' | 'guest';
+
+export const AuthModal: React.FC<AuthModalProps> = ({
+  isOpen,
+  onClose,
+  initialMode = 'login',
+  subTitle,
+}) => {
+  const {
+    login,
+    register,
+    registerGuest,
+    isLoading,
+    error,
+    clearError,
+    clearValidationErrors,
+    validationErrors,
+    guestName,
+  } = useAuthStore();
+  const [mode, setMode] = useState<AuthMode>(initialMode);
+
+  // Form Fields
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [nickname, setNickname] = useState('');
+  const [formError, setFormError] = useState('');
+
+  const isLoginMode = mode === 'login';
+  const isRegisterMode = mode === 'register';
+  const isGuestMode = mode === 'guest';
+
+  const getFieldError = (field: 'email' | 'password' | 'nickname') => {
+    return validationErrors[field];
+  };
+
+  const resolveFormError = () => {
+    const trimmedEmail = email.trim();
+    const trimmedPassword = password.trim();
+    const trimmedNickname = nickname.trim();
+
+    if (isGuestMode) {
+      if (!trimmedNickname) {
+        return '닉네임은 필수입니다.';
+      }
+      if (trimmedNickname.length < 2 || trimmedNickname.length > 20) {
+        return '닉네임은 2자 이상 20자 이하로 입력해 주세요.';
+      }
+      return null;
+    }
+
+    if (isRegisterMode) {
+      if (!trimmedEmail) {
+        return '이메일은 필수입니다.';
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+        return '올바른 이메일 형식을 입력해 주세요.';
+      }
+      if (trimmedPassword.length < 6) {
+        return '비밀번호는 6자 이상이어야 합니다.';
+      }
+      if (!trimmedNickname) {
+        return '닉네임은 필수입니다.';
+      }
+      if (trimmedNickname.length < 2 || trimmedNickname.length > 20) {
+        return '닉네임은 2자 이상 20자 이하로 입력해 주세요.';
+      }
+      return null;
+    }
+
+    if (!trimmedEmail) {
+      return '이메일은 필수입니다.';
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      return '올바른 이메일 형식을 입력해 주세요.';
+    }
+    if (trimmedPassword.length < 6) {
+      return '비밀번호는 6자 이상이어야 합니다.';
+    }
+
+    return null;
+  };
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    setMode(initialMode);
+    setEmail('');
+    setPassword('');
+    setNickname(initialMode === 'guest' ? guestName : '');
+    setFormError('');
+    clearError();
+    clearValidationErrors();
+  }, [isOpen, initialMode, guestName, clearError, clearValidationErrors]);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isLoading) {
+      return;
+    }
+
+    clearError();
+    clearValidationErrors();
+    const nextError = resolveFormError();
+    if (nextError) {
+      setFormError(nextError);
+      return;
+    }
+    setFormError('');
+
+    if (mode === 'login') {
+      const success = await login({
+        email: email.trim(),
+        password,
+      });
+      if (success) {
+        handleClose();
+      }
+      return;
+    }
+
+    if (mode === 'register') {
+      const success = await register({
+        email: email.trim(),
+        password,
+        nickname: nickname.trim(),
+      });
+      if (success) {
+        handleClose();
+      }
+      return;
+    }
+
+    const success = await registerGuest({ nickname: nickname.trim() });
+    if (success) {
+      handleClose();
+    }
+  };
+
+  const resetForm = () => {
+    setEmail('');
+    setPassword('');
+    setNickname('');
+    setFormError('');
+    clearError();
+    clearValidationErrors();
+  };
+
+  const switchMode = (nextMode: AuthMode) => {
+    setMode(nextMode);
+    if (nextMode === 'guest' && !nickname && guestName) {
+      setNickname(guestName);
+    }
+    setFormError('');
+    clearError();
+    clearValidationErrors();
+  };
+
+  const authError = error || formError;
+
+  const handleClose = () => {
+    setMode('login');
+    resetForm();
+    onClose();
+  };
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.75)',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000,
+        padding: '1rem',
+      }}
+      onClick={handleClose}
+    >
+      <div
+        className="content-card"
+        style={{
+          width: '100%',
+          maxWidth: '400px',
+          padding: '2rem',
+          position: 'relative',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '1.5rem',
+          animation: 'scale-up 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+          cursor: 'default',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Close Button */}
+        <button
+          type="button"
+          onClick={handleClose}
+          style={{
+            position: 'absolute',
+            top: '1.25rem',
+            right: '1.25rem',
+            background: 'none',
+            border: 'none',
+            color: 'var(--text-muted)',
+            cursor: 'pointer',
+            padding: '4px',
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'background-color 0.2s, color 0.2s',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+            e.currentTarget.style.color = 'var(--text-primary)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = 'transparent';
+            e.currentTarget.style.color = 'var(--text-muted)';
+          }}
+        >
+          <X size={18} />
+        </button>
+
+        {/* Header Title */}
+        <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <h2
+            style={{
+              fontSize: '1.35rem',
+              fontWeight: 800,
+              color: 'var(--text-primary)',
+              letterSpacing: '-0.02em',
+            }}
+          >
+            {isLoginMode ? '웰컴 투 피키!' : isRegisterMode ? '피키 회원가입' : '비회원 빠른 시작'}
+          </h2>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+            {subTitle ??
+              (isLoginMode
+                ? '고민을 올리고 SNS 투표 링크를 발급받으세요'
+                : isRegisterMode
+                  ? '가입하고 더 완벽한 이력서/포트폴리오 투표를 시작하세요'
+                  : '닉네임만으로 바로 이용을 시작하세요')}
+          </p>
+        </div>
+
+        {/* Tab Headers */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr 1fr',
+            borderBottom: '1px solid var(--bg-card-border)',
+            paddingBottom: '2px',
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => switchMode('login')}
+            style={{
+              padding: '8px',
+              background: 'none',
+              border: 'none',
+              color: isLoginMode ? 'var(--brand-primary)' : 'var(--text-muted)',
+              borderBottom: isLoginMode ? '2px solid var(--brand-primary)' : '2px solid transparent',
+              fontWeight: isLoginMode ? 700 : 500,
+              fontSize: '0.875rem',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+            }}
+          >
+            로그인
+          </button>
+          <button
+            type="button"
+            onClick={() => switchMode('register')}
+            style={{
+              padding: '8px',
+              background: 'none',
+              border: 'none',
+              color: isRegisterMode ? 'var(--brand-primary)' : 'var(--text-muted)',
+              borderBottom: isRegisterMode ? '2px solid var(--brand-primary)' : '2px solid transparent',
+              fontWeight: isRegisterMode ? 700 : 500,
+              fontSize: '0.875rem',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+            }}
+          >
+            회원가입
+          </button>
+          <button
+            type="button"
+            onClick={() => switchMode('guest')}
+            style={{
+              padding: '8px',
+              background: 'none',
+              border: 'none',
+              color: isGuestMode ? 'var(--brand-primary)' : 'var(--text-muted)',
+              borderBottom: isGuestMode ? '2px solid var(--brand-primary)' : '2px solid transparent',
+              fontWeight: isGuestMode ? 700 : 500,
+              fontSize: '0.875rem',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+            }}
+          >
+            비회원
+          </button>
+        </div>
+
+        {/* Error Alert */}
+        {authError && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '8px',
+              padding: '10px 12px',
+              backgroundColor: 'rgba(239, 68, 68, 0.1)',
+              border: '1px solid rgba(239, 68, 68, 0.2)',
+              borderRadius: 'var(--radius-sm)',
+              color: 'var(--brand-accent-coral)',
+              fontSize: '0.75rem',
+            }}
+          >
+            <AlertCircle size={15} style={{ flexShrink: 0, marginTop: '1px' }} />
+            <span>{authError}</span>
+          </div>
+        )}
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {!isLoginMode && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
+                닉네임
+              </label>
+              <div style={{ position: 'relative' }}>
+                <User
+                  size={16}
+                  style={{
+                    position: 'absolute',
+                    left: '12px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    color: 'var(--text-muted)',
+                  }}
+                />
+                <input
+                  type="text"
+                  placeholder="2자 이상 20자 이하"
+                  value={nickname}
+                  onChange={(e) => {
+                    setNickname(e.target.value);
+                    if (Object.keys(validationErrors).length > 0) {
+                      clearValidationErrors();
+                    }
+                  }}
+                  maxLength={20}
+                  className="form-input"
+                  style={{ paddingLeft: '36px' }}
+                />
+                {getFieldError('nickname') ? (
+                  <p
+                    style={{
+                      color: 'var(--brand-accent-coral)',
+                      margin: '0.25rem 0 0',
+                      fontSize: '0.72rem',
+                    }}
+                  >
+                    {getFieldError('nickname')}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          )}
+
+          {!isGuestMode && (
+            <>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label
+                  style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)' }}
+                >
+                  이메일 주소
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <Mail
+                    size={16}
+                    style={{
+                      position: 'absolute',
+                      left: '12px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      color: 'var(--text-muted)',
+                    }}
+                  />
+                  <input
+                    type="email"
+                    placeholder="example@email.com"
+                    value={email}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      if (Object.keys(validationErrors).length > 0) {
+                        clearValidationErrors();
+                      }
+                    }}
+                    className="form-input"
+                    style={{ paddingLeft: '36px' }}
+                  />
+                  {getFieldError('email') ? (
+                    <p
+                      style={{
+                        color: 'var(--brand-accent-coral)',
+                        margin: '0.25rem 0 0',
+                        fontSize: '0.72rem',
+                      }}
+                    >
+                      {getFieldError('email')}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label
+                  style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)' }}
+                >
+                  비밀번호
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <Lock
+                    size={16}
+                    style={{
+                      position: 'absolute',
+                      left: '12px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      color: 'var(--text-muted)',
+                    }}
+                  />
+                  <input
+                    type="password"
+                    placeholder="6자 이상 입력"
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      if (Object.keys(validationErrors).length > 0) {
+                        clearValidationErrors();
+                      }
+                    }}
+                  className="form-input"
+                  style={{ paddingLeft: '36px' }}
+                  />
+                  {getFieldError('password') ? (
+                    <p
+                      style={{
+                        color: 'var(--brand-accent-coral)',
+                        margin: '0.25rem 0 0',
+                        fontSize: '0.72rem',
+                      }}
+                    >
+                      {getFieldError('password')}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+            </>
+          )}
+
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="btn-primary"
+            style={{
+              padding: '12px',
+              fontSize: '0.85rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              marginTop: '0.5rem',
+            }}
+          >
+            {isLoading ? (
+              '처리 중...'
+            ) : isLoginMode ? (
+              <>
+                <LogIn size={16} />
+                <span>로그인하기</span>
+              </>
+            ) : isRegisterMode ? (
+              <>
+                <UserPlus size={16} />
+                <span>회원가입 완료</span>
+              </>
+            ) : (
+              <>
+                <UserCog size={16} />
+                <span>비회원으로 시작</span>
+              </>
+            )}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+};

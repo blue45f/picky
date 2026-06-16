@@ -13,8 +13,18 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { usePollStore } from '../store/usePollStore';
+import { useAuthStore } from '../store/useAuthStore';
 import { VoteDonutChart, OPTION_COLORS } from '../components/VoteDonutChart';
 import { SnsPreviewCard } from '../components/SnsPreviewCard';
+const POLL_AUTHOR_LABELS: {
+  mine: string;
+  otherMember: string;
+  guest: string;
+} = {
+  mine: '내가 작성',
+  otherMember: '회원 작성',
+  guest: '비회원 작성',
+};
 
 export const PollDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -22,6 +32,19 @@ export const PollDetail: React.FC = () => {
   const navigate = useNavigate();
 
   const { currentPoll, isLoading, fetchPoll, vote } = usePollStore();
+  const { user, guestName } = useAuthStore((state) => ({
+    user: state.user,
+    guestName: state.guestName,
+  }));
+
+  const getCreatorLabel = () => {
+    if (!currentPoll) return POLL_AUTHOR_LABELS.guest;
+    if (currentPoll.creatorId === user?.id) return POLL_AUTHOR_LABELS.mine;
+    if (currentPoll.creatorIsGuest || currentPoll.creatorId?.startsWith('guest-')) {
+      return POLL_AUTHOR_LABELS.guest;
+    }
+    return currentPoll.creatorId ? POLL_AUTHOR_LABELS.otherMember : POLL_AUTHOR_LABELS.guest;
+  };
 
   // Modal share check
   const showShareParam = searchParams.get('showShare') === 'true';
@@ -57,6 +80,12 @@ export const PollDetail: React.FC = () => {
       fetchPoll(id);
     }
   }, [id, fetchPoll]);
+
+  // Pre-fill voter name from auth/guest profile
+  useEffect(() => {
+    const nextName = (user?.nickname || guestName || '').trim();
+    setVoterName(nextName);
+  }, [user?.id, guestName, id]);
 
   // Submit Vote
   const handleVoteSubmit = async () => {
@@ -215,6 +244,20 @@ export const PollDetail: React.FC = () => {
             }}
           >
             POLL #{currentPoll.id}
+          </span>
+          <span
+            style={{
+              fontSize: '0.62rem',
+              fontWeight: 700,
+              color: 'var(--text-muted)',
+              border: '1px solid rgba(148, 163, 184, 0.35)',
+              backgroundColor: 'rgba(255,255,255,0.03)',
+              padding: '2px 8px',
+              borderRadius: '4px',
+              letterSpacing: '0.02em',
+            }}
+          >
+            {getCreatorLabel()}
           </span>
 
           <h2
