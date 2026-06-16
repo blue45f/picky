@@ -52,7 +52,7 @@ const persistPreferredApiBase = (base: string) => {
   localStorage.setItem(PREFERRED_API_BASE_KEY, trimmed);
 };
 
-const dedupe = <T,>(items: T[]): T[] => Array.from(new Set(items));
+const dedupe = <T>(items: T[]): T[] => Array.from(new Set(items));
 
 const addVercelApiFallback = (normalizedBase: string): string[] => {
   if (!normalizedBase || normalizedBase.startsWith('/')) {
@@ -107,8 +107,7 @@ const getApiCandidates = (): string[] => {
 const isLikelyStaticHtmlResponse = (res: Response): boolean => {
   const contentType = (res.headers.get('content-type') || '').toLowerCase();
   const isHtmlResponse =
-    contentType.includes('text/html') ||
-    contentType.includes('application/xhtml+xml');
+    contentType.includes('text/html') || contentType.includes('application/xhtml+xml');
   if (!isHtmlResponse) {
     return false;
   }
@@ -160,7 +159,8 @@ export const requestApi = async (path: string, init: RequestInit = {}): Promise<
   let lastError: Error | null = null;
   const trace: Array<{ base: string; ok: boolean; status?: number; error?: string }> = [];
   const debug = isApiDebugEnabled();
-  const isProdLike = typeof window !== 'undefined' && window.location.hostname.includes('vercel.app');
+  const isProdLike =
+    typeof window !== 'undefined' && window.location.hostname.includes('vercel.app');
 
   for (let i = 0; i < candidates.length; i += 1) {
     const base = candidates[i];
