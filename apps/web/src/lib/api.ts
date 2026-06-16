@@ -75,10 +75,22 @@ const addVercelApiFallback = (normalizedBase: string): string[] => {
   }
 };
 
+const getWindowApiCandidates = (): string[] => {
+  if (typeof window === 'undefined') {
+    return [];
+  }
+
+  const { protocol, host } = window.location;
+  const sameOriginBase = `${protocol}//${host}/api`;
+  return addVercelApiFallback(normalizeApiBase(sameOriginBase));
+};
+
 const getApiCandidates = (): string[] => {
   const explicitBase = import.meta.env.VITE_API_BASE_URL?.trim();
   if (explicitBase) {
-    return addVercelApiFallback(normalizeApiBase(explicitBase));
+    const explicitCandidates = addVercelApiFallback(normalizeApiBase(explicitBase));
+    const runtimeCandidates = getWindowApiCandidates();
+    return dedupe([...explicitCandidates, ...runtimeCandidates]);
   }
 
   const preferredBase = getPreferredApiBase();
@@ -88,9 +100,8 @@ const getApiCandidates = (): string[] => {
     return ['/api'];
   }
 
-  const { protocol, host } = window.location;
-  const base = `${protocol}//${host}/api`.replace(/\/$/, '');
-  return dedupe([...preferred, ...addVercelApiFallback(base)]);
+  const baseCandidates = getWindowApiCandidates();
+  return dedupe([...preferred, ...baseCandidates]);
 };
 
 const isLikelyStaticHtmlResponse = (res: Response): boolean => {
@@ -116,6 +127,10 @@ const shouldRetryOnFailure = (res: Response, index: number, total: number): bool
 
   // API 호스트가 잘못 잡혀 route 자체가 존재하지 않는 경우(404/405)를 발견하면
   // 다른 후보(base)로 한 번 더 시도해보는 게 안전합니다.
+  if (res.status >= 500) {
+    return true;
+  }
+
   return res.status === 404 || res.status === 405;
 };
 
@@ -218,6 +233,9 @@ export const parseApiPayload = async (res: Response): Promise<any> => {
   try {
     const text = await res.text();
     const trimmedText = (text || '').trim();
+    const isDeploymentNotFound =
+      trimmedText.includes('DEPLOYMENT_NOT_FOUND') ||
+      trimmedText.includes('Deployment could not be found');
 
     if (!trimmedText) {
       return {
@@ -238,6 +256,14 @@ export const parseApiPayload = async (res: Response): Promise<any> => {
         message:
           'API 서버가 아닌 정적 HTML 페이지를 반환했습니다. ' +
           `VITE_API_BASE_URL이 맞는지 확인해 주세요. (${res.url})`,
+      };
+    }
+
+    if (isDeploymentNotFound) {
+      return {
+        message:
+          'Vercel API 배포를 찾을 수 없습니다. ' +
+          '백엔드 배포 주소(VITE_API_BASE_URL) 또는 도메인 연결 상태를 확인해 주세요.',
       };
     }
 
