@@ -5,6 +5,7 @@ import { Navbar } from './components/Navbar';
 import { PollList } from './pages/PollList';
 import { CreatePoll } from './pages/CreatePoll';
 import { PollDetail } from './pages/PollDetail';
+import { DesignSystem } from './pages/DesignSystem';
 import { useAuthStore } from './store/useAuthStore';
 
 export const App: React.FC = () => {
@@ -39,6 +40,7 @@ export const App: React.FC = () => {
           <Routes>
             <Route path="/" element={<PollList />} />
             <Route path="/create" element={<CreatePoll />} />
+            <Route path="/design" element={<DesignSystem />} />
             <Route path="/poll/:id" element={<PollDetail />} />
           </Routes>
         </main>

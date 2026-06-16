@@ -1,5 +1,11 @@
 import { create } from 'zustand';
-import { UserProfile, RegisterInput, LoginInput, GuestRegisterInput, AuthResult } from '@picky/shared';
+import {
+  UserProfile,
+  RegisterInput,
+  LoginInput,
+  GuestRegisterInput,
+  AuthResult,
+} from '@picky/shared';
 
 interface AuthState {
   user: UserProfile | null;

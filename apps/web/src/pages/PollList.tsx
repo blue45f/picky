@@ -96,138 +96,138 @@ export const PollList: React.FC = () => {
             const creatorLabel = getCreatorLabel(poll.creatorId, poll.creatorIsGuest);
 
             return (
-            <div
-              key={poll.id}
-              className="content-card"
-              style={{
-                padding: '1.5rem',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '1rem',
-                cursor: 'pointer',
-              }}
-              onClick={() => navigate(`/poll/${poll.id}`)}
-            >
-              <div>
-                {/* Card Info Eyebrow */}
+              <div
+                key={poll.id}
+                className="content-card"
+                style={{
+                  padding: '1.5rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '1rem',
+                  cursor: 'pointer',
+                }}
+                onClick={() => navigate(`/poll/${poll.id}`)}
+              >
+                <div>
+                  {/* Card Info Eyebrow */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginBottom: '8px',
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: '0.65rem',
+                        fontWeight: 700,
+                        color: 'var(--brand-primary)',
+                        backgroundColor: 'rgba(99, 102, 241, 0.08)',
+                        padding: '2px 8px',
+                        borderRadius: '4px',
+                        letterSpacing: '0.02em',
+                      }}
+                    >
+                      POLL #{poll.id}
+                    </span>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        fontSize: '0.725rem',
+                        color: 'var(--text-muted)',
+                      }}
+                    >
+                      <Calendar size={12} />
+                      <span>{new Date(poll.createdAt).toLocaleDateString()}</span>
+                      <span
+                        style={{
+                          padding: '2px 7px',
+                          borderRadius: '12px',
+                          fontSize: '0.62rem',
+                          border: '1px solid rgba(148, 163, 184, 0.35)',
+                          color: 'var(--text-muted)',
+                          backgroundColor: 'rgba(255,255,255,0.03)',
+                        }}
+                      >
+                        {creatorLabel}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Question */}
+                  <h3
+                    style={{
+                      fontSize: '1.075rem',
+                      fontWeight: 800,
+                      color: 'var(--text-primary)',
+                      letterSpacing: '-0.02em',
+                      lineHeight: 1.45,
+                    }}
+                  >
+                    {poll.question}
+                  </h3>
+                  {poll.description && (
+                    <p
+                      style={{
+                        fontSize: '0.825rem',
+                        color: 'var(--text-secondary)',
+                        marginTop: '6px',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      {poll.description}
+                    </p>
+                  )}
+                </div>
+
+                {/* Stats summary */}
                 <div
                   style={{
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
-                    marginBottom: '8px',
+                    borderTop: '1px solid rgba(255, 255, 255, 0.05)',
+                    paddingTop: '0.85rem',
+                    fontSize: '0.775rem',
                   }}
                 >
-                  <span
-                    style={{
-                      fontSize: '0.65rem',
-                      fontWeight: 700,
-                      color: 'var(--brand-primary)',
-                      backgroundColor: 'rgba(99, 102, 241, 0.08)',
-                      padding: '2px 8px',
-                      borderRadius: '4px',
-                      letterSpacing: '0.02em',
-                    }}
-                  >
-                    POLL #{poll.id}
-                  </span>
                   <div
                     style={{
                       display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      fontSize: '0.725rem',
-                      color: 'var(--text-muted)',
+                      gap: '12px',
+                      color: 'var(--text-secondary)',
+                      fontWeight: 500,
                     }}
                   >
-                    <Calendar size={12} />
-                    <span>{new Date(poll.createdAt).toLocaleDateString()}</span>
-                    <span
-                      style={{
-                        padding: '2px 7px',
-                        borderRadius: '12px',
-                        fontSize: '0.62rem',
-                        border: '1px solid rgba(148, 163, 184, 0.35)',
-                        color: 'var(--text-muted)',
-                        backgroundColor: 'rgba(255,255,255,0.03)',
-                    }}
-                  >
-                    {creatorLabel}
+                    <span>
+                      🗳️ <strong>{poll.totalVotes}</strong>명 투표함
+                    </span>
+                    <span>
+                      💬 <strong>{poll.comments.length}</strong>개 한마디
                     </span>
                   </div>
-                </div>
-
-                {/* Question */}
-                <h3
-                  style={{
-                    fontSize: '1.075rem',
-                    fontWeight: 800,
-                    color: 'var(--text-primary)',
-                    letterSpacing: '-0.02em',
-                    lineHeight: 1.45,
-                  }}
-                >
-                  {poll.question}
-                </h3>
-                {poll.description && (
-                  <p
+                  <span
                     style={{
-                      fontSize: '0.825rem',
-                      color: 'var(--text-secondary)',
-                      marginTop: '6px',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      display: '-webkit-box',
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical',
-                      lineHeight: 1.5,
+                      color: 'var(--brand-primary-light)',
+                      fontWeight: 600,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '2px',
                     }}
                   >
-                    {poll.description}
-                  </p>
-                )}
-              </div>
-
-              {/* Stats summary */}
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  borderTop: '1px solid rgba(255, 255, 255, 0.05)',
-                  paddingTop: '0.85rem',
-                  fontSize: '0.775rem',
-                }}
-              >
-                <div
-                  style={{
-                    display: 'flex',
-                    gap: '12px',
-                    color: 'var(--text-secondary)',
-                    fontWeight: 500,
-                  }}
-                >
-                  <span>
-                    🗳️ <strong>{poll.totalVotes}</strong>명 투표함
-                  </span>
-                  <span>
-                    💬 <strong>{poll.comments.length}</strong>개 한마디
+                    <span>투표하기</span>
+                    <ArrowRight size={12} />
                   </span>
                 </div>
-                <span
-                  style={{
-                    color: 'var(--brand-primary-light)',
-                    fontWeight: 600,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '2px',
-                  }}
-                >
-                  <span>투표하기</span>
-                  <ArrowRight size={12} />
-                </span>
               </div>
-            </div>
             );
           })}
         </div>
