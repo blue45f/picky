@@ -267,6 +267,24 @@ export const PollList: React.FC = () => {
     }
   };
 
+  const handlePollCardActivate = (
+    event: React.KeyboardEvent<HTMLDivElement>,
+    pollId: string,
+  ) => {
+    if (event.key !== 'Enter' && event.key !== ' ') {
+      return;
+    }
+
+    event.preventDefault();
+    const target = visiblePolls.find((poll) => poll.id === pollId);
+    if (!target) {
+      return;
+    }
+
+    setCurrentPoll(target);
+    navigate(`/poll/${pollId}`);
+  };
+
   return (
     <section
       className="animate-slide-up"
@@ -638,10 +656,14 @@ export const PollList: React.FC = () => {
               <article
                 key={poll.id}
                 className="poll-card"
+                role="button"
+                tabIndex={0}
+                aria-label={`${poll.question} 투표 페이지로 이동`}
                 onClick={() => {
                   setCurrentPoll(poll);
                   navigate(`/poll/${poll.id}`);
                 }}
+                onKeyDown={(event) => handlePollCardActivate(event, poll.id)}
                 style={{
                   textAlign: 'left',
                   textDecoration: 'none',
@@ -804,25 +826,23 @@ export const PollList: React.FC = () => {
                     <span>투표하기</span>
                     <ArrowRight size={13} />
                   </button>
-                  {!isCompact ? (
-                    <button
-                      type="button"
-                      onClick={(event) => handleCopyPollLink(event, poll.id)}
-                      className="ghost-btn"
-                      style={{
-                        fontSize: '0.68rem',
-                        padding: '6px 10px',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                      }}
-                      title={`${poll.id} 링크 복사`}
-                    >
-                      {copiedPollId === poll.id ? <Check size={12} /> : <Copy size={12} />}
-                      <span>{copiedPollId === poll.id ? '복사 완료' : '공유 복사'}</span>
-                      <Link size={11} />
-                    </button>
-                  ) : null}
+                  <button
+                    type="button"
+                    onClick={(event) => handleCopyPollLink(event, poll.id)}
+                    className="ghost-btn"
+                    style={{
+                      fontSize: isCompact ? '0.64rem' : '0.68rem',
+                      padding: isCompact ? '5px 9px' : '6px 10px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                    }}
+                    title={`${poll.id} 링크 복사`}
+                  >
+                    {copiedPollId === poll.id ? <Check size={12} /> : <Copy size={12} />}
+                    <span>{copiedPollId === poll.id ? '복사 완료' : '공유 복사'}</span>
+                    <Link size={11} />
+                  </button>
                 </div>
                 {copiedPollId === poll.id ? (
                   <p
