@@ -122,7 +122,7 @@ const findPollFromLocalCache = (pollId: string): Poll | undefined => {
 const applyLocalVote = (
   poll: Poll,
   optionId: number,
-  voterName?: string,
+  voterName?: string | null,
   comment?: string | null,
 ): Poll | null => {
   const target = poll.options.find((option) => option.id === optionId);
