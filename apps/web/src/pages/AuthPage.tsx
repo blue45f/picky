@@ -113,6 +113,10 @@ export const AuthPage: React.FC = () => {
 
   const handleModeChange = (nextMode: string) => {
     const normalized = resolveMode(nextMode);
+    setFormError('');
+    clearError();
+    clearValidationErrors();
+
     if (nextPath !== '/') {
       const next = new URLSearchParams(searchParams);
       next.set('next', nextPath);
