@@ -63,11 +63,31 @@ const isLikelyStaticHtmlResponse = (res: Response): boolean => {
   return true;
 };
 
+const isApiDebugEnabled = (): boolean => {
+  if (import.meta.env.DEV) {
+    return true;
+  }
+
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  const raw = window.localStorage.getItem('picky_api_debug');
+  if (raw === '1' || raw?.toLowerCase() === 'true') {
+    return true;
+  }
+
+  const query = new URLSearchParams(window.location.search);
+  const debugParam = query.get('api_debug');
+  return debugParam === '1' || debugParam?.toLowerCase() === 'true';
+};
+
 export const requestApi = async (path: string, init: RequestInit = {}): Promise<Response> => {
   const candidates = getApiCandidates();
   let lastResponse: Response | null = null;
   let lastError: Error | null = null;
   const trace: Array<{ base: string; ok: boolean; status?: number; error?: string }> = [];
+  const debug = isApiDebugEnabled();
   const isProdLike = typeof window !== 'undefined' && window.location.hostname.includes('vercel.app');
 
   for (const base of candidates) {
@@ -75,6 +95,14 @@ export const requestApi = async (path: string, init: RequestInit = {}): Promise<
       const res = await fetch(`${base}${path}`, init);
       const isStatic = isLikelyStaticHtmlResponse(res);
       trace.push({ base, ok: !isStatic, status: res.status });
+      if (debug) {
+        console.info('[picky] requestApi attempt', {
+          path,
+          base,
+          status: res.status,
+          static: isStatic,
+        });
+      }
 
       if (!isStatic || base === candidates[candidates.length - 1]) {
         return res;
@@ -83,11 +111,18 @@ export const requestApi = async (path: string, init: RequestInit = {}): Promise<
       lastResponse = res;
     } catch (err: any) {
       trace.push({ base, ok: false, error: String(err?.message || err) });
+      if (debug) {
+        console.error('[picky] requestApi error', {
+          path,
+          base,
+          error: String(err?.message || err),
+        });
+      }
       lastError = err instanceof Error ? err : new Error(String(err));
     }
   }
 
-  if (isProdLike && path === '/auth/guest') {
+  if ((isProdLike || debug) && path === '/auth/guest') {
     console.info('[picky] requestApi trace', path, trace);
   }
 
