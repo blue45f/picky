@@ -7,6 +7,7 @@ interface PollState {
   currentPoll: Poll | null;
   isLoading: boolean;
   error: string | null;
+  clearError: () => void;
 
   fetchPolls: () => Promise<void>;
   fetchPoll: (id: string) => Promise<Poll | null>;
@@ -65,6 +66,7 @@ export const usePollStore = create<PollState>((set) => ({
   currentPoll: null,
   isLoading: false,
   error: null,
+  clearError: () => set({ error: null }),
 
   fetchPolls: async () => {
     set({ isLoading: true, error: null });

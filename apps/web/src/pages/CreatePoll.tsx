@@ -99,7 +99,7 @@ interface OptionInput {
 }
 
 export const CreatePoll: React.FC = () => {
-  const { createPoll, isLoading, error } = usePollStore();
+  const { createPoll, isLoading, error, clearError } = usePollStore();
   const navigate = useNavigate();
 
   const [formError, setFormError] = useState('');
@@ -115,6 +115,8 @@ export const CreatePoll: React.FC = () => {
   const applyPreset = (index: number) => {
     setActivePresetIndex(index);
     const template = PRESET_TEMPLATES[index];
+    clearError();
+    setFormError('');
     setQuestion(template.question);
     setDescription(template.description);
     setOptions(
@@ -155,6 +157,7 @@ export const CreatePoll: React.FC = () => {
   const handleCreatePollSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError('');
+    clearError();
 
     const trimmedQuestion = question.trim();
     if (!trimmedQuestion) {
@@ -308,7 +311,11 @@ export const CreatePoll: React.FC = () => {
             type="text"
             placeholder="예: 어떤 사이드 프로젝트를 가장 먼저 상용화할까요?"
             value={question}
-            onChange={(e) => setQuestion(e.target.value)}
+            onChange={(e) => {
+              clearError();
+              setFormError('');
+              setQuestion(e.target.value);
+            }}
             required
             maxLength={100}
             className="form-input"
@@ -323,7 +330,11 @@ export const CreatePoll: React.FC = () => {
           <textarea
             placeholder="결정을 내리기 힘든 맥락이나 프로젝트의 간략한 소개 등을 작성해주세요."
             value={description}
-            onChange={(e) => setDescription(e.target.value)}
+            onChange={(e) => {
+              clearError();
+              setFormError('');
+              setDescription(e.target.value);
+            }}
             rows={4}
             maxLength={500}
             className="form-input"
@@ -402,7 +413,11 @@ export const CreatePoll: React.FC = () => {
                     type="text"
                     placeholder="내용 입력 (필수)"
                     value={option.text}
-                    onChange={(e) => handleOptionTextChange(index, e.target.value)}
+                    onChange={(e) => {
+                      clearError();
+                      setFormError('');
+                      handleOptionTextChange(index, e.target.value);
+                    }}
                     required
                     maxLength={80}
                     className="form-input"
@@ -412,7 +427,11 @@ export const CreatePoll: React.FC = () => {
                     type="url"
                     placeholder="이미지 주소 (선택)"
                     value={option.imageUrl}
-                    onChange={(e) => handleOptionImageChange(index, e.target.value)}
+                    onChange={(e) => {
+                      clearError();
+                      setFormError('');
+                      handleOptionImageChange(index, e.target.value);
+                    }}
                     maxLength={200}
                     className="form-input"
                     style={{ padding: '8px 12px', fontSize: '0.8rem' }}
