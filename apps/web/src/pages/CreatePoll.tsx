@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Plus, Sparkles, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { usePollStore } from '../store/usePollStore';
@@ -100,20 +100,104 @@ interface OptionInput {
 }
 
 const MAX_OPTIONS = 10;
+const POLL_DRAFT_STORAGE_KEY = 'picky_create_poll_draft_v1';
+const AUTO_SAVE_INTERVAL_MS = 700;
+
+interface PollDraft {
+  question: string;
+  description: string;
+  options: OptionInput[];
+  savedAt: string;
+}
+
+const loadDraftFromStorage = (): PollDraft | null => {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  const raw = localStorage.getItem(POLL_DRAFT_STORAGE_KEY);
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') {
+      return null;
+    }
+
+    const question = typeof parsed.question === 'string' ? parsed.question : '';
+    const description = typeof parsed.description === 'string' ? parsed.description : '';
+    const options = Array.isArray(parsed.options)
+      ? parsed.options
+          .map((item: unknown) => {
+            if (!item || typeof item !== 'object') {
+              return null;
+            }
+
+            const next = item as { text?: unknown; imageUrl?: unknown };
+            if (typeof next.text !== 'string' || typeof next.imageUrl !== 'string') {
+              return null;
+            }
+
+            return {
+              text: next.text,
+              imageUrl: next.imageUrl,
+            } satisfies OptionInput;
+          })
+          .filter((item): item is OptionInput => item !== null)
+      : [];
+
+    if (options.length === 0) {
+      return null;
+    }
+
+    return {
+      question,
+      description,
+      options,
+      savedAt: typeof parsed.savedAt === 'string' ? parsed.savedAt : new Date().toISOString(),
+    };
+  } catch {
+    return null;
+  }
+};
+
+const clearDraftStorage = () => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  localStorage.removeItem(POLL_DRAFT_STORAGE_KEY);
+};
+
+const saveDraftToStorage = (draft: PollDraft) => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  localStorage.setItem(POLL_DRAFT_STORAGE_KEY, JSON.stringify(draft));
+};
+
+const createDefaultOptions = (): OptionInput[] => [
+  { text: '', imageUrl: '' },
+  { text: '', imageUrl: '' },
+];
 
 export const CreatePoll: React.FC = () => {
   const { createPoll, isLoading, error, clearError } = usePollStore();
   const navigate = useNavigate();
+  const draft = loadDraftFromStorage();
 
   const [formError, setFormError] = useState('');
 
-  const [question, setQuestion] = useState('');
-  const [description, setDescription] = useState('');
-  const [options, setOptions] = useState<OptionInput[]>([
-    { text: '', imageUrl: '' },
-    { text: '', imageUrl: '' },
-  ]);
+  const [question, setQuestion] = useState(draft?.question || '');
+  const [description, setDescription] = useState(draft?.description || '');
+  const [options, setOptions] = useState<OptionInput[]>(
+    draft?.options && draft.options.length >= 2 ? [...draft.options] : createDefaultOptions(),
+  );
   const [activePresetIndex, setActivePresetIndex] = useState<number | null>(null);
+  const [draftSavedAt, setDraftSavedAt] = useState<string | null>(draft?.savedAt || null);
 
   const normalizedQuestion = question.trim();
   const normalizedDescription = description.trim();
@@ -140,6 +224,61 @@ export const CreatePoll: React.FC = () => {
     }
     return false;
   }, [nonEmptyOptions]);
+
+  const hasDraft = useMemo(() => {
+    return Boolean(
+      question.trim() ||
+        description.trim() ||
+        nonEmptyOptions.length > 0 ||
+        options.some((option) => option.imageUrl || option.text.trim()),
+    );
+  }, [question, description, options, nonEmptyOptions.length]);
+
+  useEffect(() => {
+    if (!hasDraft) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      const nextDraft: PollDraft = {
+        question: question.trim(),
+        description: description.trim(),
+        options: options.map((option) => ({
+          text: option.text.trim(),
+          imageUrl: option.imageUrl.trim(),
+        })),
+        savedAt: new Date().toISOString(),
+      };
+
+      saveDraftToStorage(nextDraft);
+      setDraftSavedAt(nextDraft.savedAt);
+    }, AUTO_SAVE_INTERVAL_MS);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [question, description, options, hasDraft]);
+
+  const handleRestoreDraft = () => {
+    const nextDraft = loadDraftFromStorage();
+    if (!nextDraft) {
+      return;
+    }
+
+    setQuestion(nextDraft.question);
+    setDescription(nextDraft.description);
+    setOptions(
+      nextDraft.options.length >= 2 ? [...nextDraft.options] : createDefaultOptions(),
+    );
+    setDraftSavedAt(nextDraft.savedAt);
+    setFormError('');
+    clearError();
+  };
+
+  const handleClearDraft = () => {
+    clearDraftStorage();
+    setDraftSavedAt(null);
+  };
 
   const canSubmit =
     normalizedQuestion.length >= 2 &&
@@ -186,13 +325,12 @@ export const CreatePoll: React.FC = () => {
   const handleReset = () => {
     setQuestion('');
     setDescription('');
-    setOptions([
-      { text: '', imageUrl: '' },
-      { text: '', imageUrl: '' },
-    ]);
+    setOptions(createDefaultOptions());
     setActivePresetIndex(null);
     setFormError('');
     clearError();
+    clearDraftStorage();
+    setDraftSavedAt(null);
   };
 
   const handleAddOptionInput = () => {
@@ -263,6 +401,8 @@ export const CreatePoll: React.FC = () => {
     });
 
     if (result) {
+      clearDraftStorage();
+      setDraftSavedAt(null);
       const snapshot = buildShareablePollSnapshot(result);
       if (snapshot) {
         navigate(`/poll/${result.id}?showShare=true&snapshot=${snapshot}`);
@@ -350,6 +490,54 @@ export const CreatePoll: React.FC = () => {
               <span>{tmpl.name}</span>
             </button>
           ))}
+        </div>
+
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            gap: '8px',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            color: 'var(--text-muted)',
+            fontSize: '0.68rem',
+            paddingTop: '6px',
+          }}
+        >
+          {draftSavedAt ? (
+            <span>
+              마지막 임시저장:{' '}
+              {new Date(draftSavedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          ) : (
+            <span>임시 저장되지 않음</span>
+          )}
+          <div style={{ display: 'inline-flex', gap: '6px', marginLeft: 'auto' }}>
+            <button
+              type="button"
+              onClick={handleRestoreDraft}
+              className="ghost-inline"
+              disabled={!loadDraftFromStorage()}
+              style={{
+                color: loadDraftFromStorage() ? 'var(--text-secondary)' : 'var(--text-muted)',
+                cursor: loadDraftFromStorage() ? 'pointer' : 'not-allowed',
+              }}
+            >
+              임시저장 복원
+            </button>
+            <button
+              type="button"
+              onClick={handleClearDraft}
+              className="ghost-inline"
+              disabled={!draftSavedAt}
+              style={{
+                color: draftSavedAt ? 'var(--text-secondary)' : 'var(--text-muted)',
+                cursor: draftSavedAt ? 'pointer' : 'not-allowed',
+              }}
+            >
+              임시저장 삭제
+            </button>
+          </div>
         </div>
       </div>
 

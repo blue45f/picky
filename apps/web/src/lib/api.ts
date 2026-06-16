@@ -67,6 +67,19 @@ const getWindowApiCandidates = (): string[] => {
   return [normalizeApiBase(`${protocol}//${host}/api`)];
 };
 
+const getLocalDevApiCandidates = (): string[] => {
+  if (typeof window === 'undefined') {
+    return [];
+  }
+
+  const { hostname } = window.location;
+  if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+    return [];
+  }
+
+  return [normalizeApiBase('http://localhost:3000/api'), normalizeApiBase('http://127.0.0.1:3000/api')];
+};
+
 const getCustomApiCandidateFromWindow = (): string[] => {
   if (typeof window === 'undefined') {
     return [];
@@ -123,25 +136,34 @@ const getApiCandidates = (): string[] => {
     const explicitCandidates = [normalizeApiBase(explicitBase)];
     const runtimeCandidates = getWindowApiCandidates();
     const customCandidate = getCustomApiCandidateFromWindow();
+    const vercelCandidates = getVercelApiCandidates();
     return dedupe([
       ...explicitCandidates,
+      ...getLocalDevApiCandidates(),
       ...customCandidate,
       ...runtimeCandidates,
-      ...getVercelApiCandidates(),
+      ...vercelCandidates,
     ]);
   }
 
   const preferredBase = getPreferredApiBase();
   const preferred = preferredBase ? [normalizeApiBase(preferredBase)] : [];
-  const vercelCandidates = getVercelApiCandidates();
   const customCandidates = getCustomApiCandidateFromWindow();
+  const vercelCandidates = getVercelApiCandidates();
+  const baseCandidates = getWindowApiCandidates();
+  const localDevCandidates = getLocalDevApiCandidates();
 
   if (typeof window === 'undefined') {
     return ['/api', ...preferred];
   }
 
-  const baseCandidates = getWindowApiCandidates();
-  return dedupe([...preferred, ...customCandidates, ...vercelCandidates, ...baseCandidates]);
+  return dedupe([
+      ...customCandidates,
+      ...localDevCandidates,
+      ...baseCandidates,
+      ...preferred,
+      ...vercelCandidates,
+  ]);
 };
 
 const isLikelyStaticHtmlResponse = (res: Response): boolean => {
@@ -183,6 +205,10 @@ const shouldRetryOnFailure = (
     return true;
   }
 
+  if (res.status === 404 && base.includes('/api')) {
+    return true;
+  }
+
   return res.status === 405;
 };
 
@@ -207,7 +233,6 @@ const isApiDebugEnabled = (): boolean => {
 
 export const requestApi = async (path: string, init: RequestInit = {}): Promise<Response> => {
   const candidates = getApiCandidates();
-  const hasExplicitBase = Boolean(import.meta.env.VITE_API_BASE_URL?.trim());
   let lastResponse: Response | null = null;
   let lastError: Error | null = null;
   const trace: Array<{ base: string; ok: boolean; status?: number; error?: string }> = [];

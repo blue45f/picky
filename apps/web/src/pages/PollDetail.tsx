@@ -128,6 +128,7 @@ export const PollDetail: React.FC = () => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [showShareModal, setShowShareModal] = useState(showShareParam);
   const [snsPreviewPlatform, setSnsPreviewPlatform] = useState<'x' | 'kakao'>('x');
+  const [copyMessage, setCopyMessage] = useState('');
 
   // Load local vote history
   useEffect(() => {
@@ -158,7 +159,7 @@ export const PollDetail: React.FC = () => {
 
   // Submit Vote
   const handleVoteSubmit = async () => {
-    if (!id || votedOptionId === null) return;
+    if (!id || votedOptionId === null || isLoading) return;
 
     const success = await vote(id, {
       optionId: votedOptionId,
@@ -179,12 +180,17 @@ export const PollDetail: React.FC = () => {
   };
 
   // Click-to-copy
-  const handleCopyLinkClick = (pollId: string) => {
+  const handleCopyLinkClick = async (pollId: string) => {
+    setCopyMessage('');
     const shareUrl = resolveShareUrl(currentPoll);
-    navigator.clipboard.writeText(shareUrl).then(() => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
       setCopiedId(pollId);
       setTimeout(() => setCopiedId(null), 2000);
-    });
+    } catch (err) {
+      console.error('copy failed', err);
+      setCopyMessage('클립보드 복사에 실패했습니다. 링크를 직접 복사해 주세요.');
+    }
   };
 
   const handleCloseShareModal = () => {
@@ -244,6 +250,16 @@ export const PollDetail: React.FC = () => {
         >
           목록으로 돌아가기
         </button>
+        {id ? (
+          <button
+            type="button"
+            onClick={() => fetchPoll(id)}
+            className="btn-primary"
+            style={{ padding: '8px 16px', fontSize: '0.85rem' }}
+          >
+            다시 불러오기
+          </button>
+        ) : null}
       </div>
     );
   }
@@ -543,11 +559,19 @@ export const PollDetail: React.FC = () => {
                 const bulletColor = OPTION_COLORS[idx % OPTION_COLORS.length];
 
                 return (
-                  <div
+                  <button
                     key={opt.id}
                     onClick={() => setVotedOptionId(opt.id)}
+                    type="button"
+                    aria-pressed={isSelected}
                     className={`choice-card ${isSelected ? 'selected' : ''}`}
-                    style={{ justifyContent: 'space-between' }}
+                    style={{
+                      justifyContent: 'space-between',
+                      width: '100%',
+                      textAlign: 'left',
+                      border: 'none',
+                      cursor: 'pointer',
+                    }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <div
@@ -612,7 +636,7 @@ export const PollDetail: React.FC = () => {
                         }}
                       />
                     )}
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -646,14 +670,15 @@ export const PollDetail: React.FC = () => {
                     className="form-input"
                   />
                 </div>
-                <button
-                  onClick={handleVoteSubmit}
-                  className="btn-primary"
-                  style={{ padding: '12px', fontSize: '0.85rem' }}
-                >
-                  투표 제출 및 한마디 등록
-                </button>
-              </div>
+                  <button
+                    onClick={handleVoteSubmit}
+                    disabled={!votedOptionId || isLoading}
+                    className="btn-primary"
+                    style={{ padding: '12px', fontSize: '0.85rem' }}
+                  >
+                    {isLoading ? '투표 처리 중...' : '투표 제출 및 한마디 등록'}
+                  </button>
+                </div>
             )}
           </div>
         )}
@@ -854,11 +879,11 @@ export const PollDetail: React.FC = () => {
             </div>
 
             {/* Copy link input */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
                 backgroundColor: 'oklch(11% 0.015 260)',
                 border: '1px solid var(--bg-card-border)',
                 padding: '8px 12px',
@@ -876,12 +901,23 @@ export const PollDetail: React.FC = () => {
                   flex: 1,
                   textAlign: 'left',
                 }}
-              >
-                {resolveShareUrl(currentPoll)}
-              </span>
-              <button
-                onClick={() => handleCopyLinkClick(currentPoll.id)}
-                style={{
+                >
+                  {resolveShareUrl(currentPoll)}
+                </span>
+                {copyMessage ? (
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: '0.7rem',
+                      color: 'var(--brand-accent-coral)',
+                    }}
+                  >
+                    {copyMessage}
+                  </p>
+                ) : null}
+                <button
+                  onClick={() => handleCopyLinkClick(currentPoll.id)}
+                  style={{
                   background: 'none',
                   border: 'none',
                   color:
