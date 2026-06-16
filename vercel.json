@@ -9,7 +9,7 @@
       "destination": "/api?path=:path*"
     },
     { "source": "/sitemap.xml", "destination": "/sitemap.xml" },
-    { "source": "/:path*", "destination": "/index.html" }
+    { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [
     {
