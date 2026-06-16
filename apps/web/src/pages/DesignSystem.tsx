@@ -1,9 +1,6 @@
 import React from 'react';
 import {
   Box,
-  BoxSelect,
-  CircleHelp,
-  CircleSlash2,
   Paintbrush,
   Palette,
   Ruler,
@@ -11,152 +8,225 @@ import {
   Type,
   View,
   Wand2,
+  BoxSelect,
 } from 'lucide-react';
 
-const colorTokens = [
+const foundationTokens = [
   {
-    name: 'bg-main',
     token: '--bg-main',
     value: 'oklch(14% 0.015 260)',
-    role: '페이지 배경',
+    usage: '앱 배경',
     sample: 'var(--bg-main)',
   },
   {
-    name: 'bg-card',
     token: '--bg-card',
     value: 'oklch(18% 0.02 260)',
-    role: '기본 카드 배경',
+    usage: '카드/패널 배경',
     sample: 'var(--bg-card)',
   },
   {
-    name: 'brand-primary',
     token: '--brand-primary',
     value: 'oklch(62% 0.18 260)',
-    role: '주요 액션',
+    usage: '메인 CTA',
     sample: 'var(--brand-primary)',
   },
   {
-    name: 'brand-primary-light',
     token: '--brand-primary-light',
     value: 'oklch(75% 0.12 260)',
-    role: '호버/강조',
+    usage: '호버 상태',
     sample: 'var(--brand-primary-light)',
   },
   {
-    name: 'brand-accent-gold',
     token: '--brand-accent-gold',
     value: 'oklch(78% 0.14 85)',
-    role: '알림/하이라이트',
+    usage: '강조/알림',
     sample: 'var(--brand-accent-gold)',
   },
   {
-    name: 'brand-accent-teal',
     token: '--brand-accent-teal',
     value: 'oklch(72% 0.15 170)',
-    role: '성공/정보',
+    usage: '성공/보조 액션',
     sample: 'var(--brand-accent-teal)',
   },
   {
-    name: 'brand-accent-coral',
     token: '--brand-accent-coral',
     value: 'oklch(64% 0.18 25)',
-    role: '경고/오류',
+    usage: '경고/오류',
     sample: 'var(--brand-accent-coral)',
   },
 ];
 
 const typographyTokens = [
-  { name: 'Display', size: '2.5rem', weight: 900, lineHeight: '1.1', desc: '전면 타이틀' },
-  { name: 'Heading 1', size: '1.9rem', weight: 800, lineHeight: '1.25', desc: '섹션 타이틀' },
-  { name: 'Heading 2', size: '1.3rem', weight: 700, lineHeight: '1.35', desc: '카드 헤더' },
-  { name: 'Body', size: '0.95rem', weight: 400, lineHeight: '1.6', desc: '본문 기본 텍스트' },
-  { name: 'Caption', size: '0.75rem', weight: 500, lineHeight: '1.3', desc: '메타/캡션' },
+  {
+    token: 'Display',
+    size: '2.45rem',
+    weight: 900,
+    lh: '1.1',
+    usage: '페이지 메인 헤드라인',
+  },
+  {
+    token: 'Heading 1',
+    size: '1.9rem',
+    weight: 800,
+    lh: '1.25',
+    usage: '섹션 타이틀',
+  },
+  {
+    token: 'Heading 2',
+    size: '1.3rem',
+    weight: 700,
+    lh: '1.35',
+    usage: '카드 타이틀',
+  },
+  {
+    token: 'Body',
+    size: '0.95rem',
+    weight: 400,
+    lh: '1.6',
+    usage: '기본 본문',
+  },
+  {
+    token: 'Caption',
+    size: '0.75rem',
+    weight: 500,
+    lh: '1.3',
+    usage: '메타/작은 텍스트',
+  },
 ];
 
-const spacingScale = [
-  { label: 'x0', px: '2px', usage: '보더/세부 간격' },
-  { label: 'x1', px: '4px', usage: '버튼 내부 패딩' },
-  { label: 'x2', px: '8px', usage: '작은 칩/배지' },
-  { label: 'x3', px: '12px', usage: '입력폼 간격' },
-  { label: 'x4', px: '16px', usage: '카드 패딩 기준' },
-  { label: 'x6', px: '24px', usage: '섹션 간 마진' },
-  { label: 'x8', px: '32px', usage: '타이포/카드 간 여백' },
+const spacingTokens = [
+  {
+    token: '--radius-sm',
+    value: '8px',
+    usage: '버튼/칩 기본',
+  },
+  {
+    token: '--radius-md',
+    value: '12px',
+    usage: '카드/폼 요소',
+  },
+  {
+    token: '--radius-lg',
+    value: '18px',
+    usage: '콘텐츠 모달/패널',
+  },
+  {
+    token: '--shadow-sm',
+    value: '0 2px 8px rgba(0, 0, 0, 0.2)',
+    usage: '기본 카드',
+  },
+  {
+    token: '--shadow-md',
+    value: '0 12px 24px -4px rgba(0, 0, 0, 0.4)',
+    usage: '입체 패널',
+  },
+  {
+    token: '--shadow-glow',
+    value: '0 0 24px rgba(99, 102, 241, 0.15)',
+    usage: '주요 액션 강조',
+  },
 ];
+
+const componentSnippets: Array<{ title: string; subtitle: string; code: string }> = [
+  {
+    title: 'Primary Button',
+    subtitle: '프로덕션 기준 CTA',
+    code: `<button className="btn-primary">투표 시작</button>`,
+  },
+  {
+    title: 'Secondary Button',
+    subtitle: '보조 액션',
+    code: `<button className="btn-secondary">취소</button>`,
+  },
+  {
+    title: 'Input',
+    subtitle: '기본 폼 입력',
+    code: `<input className="form-input" placeholder="입력하세요" />`,
+  },
+];
+
+const StatusPill = ({
+  label,
+  textColor,
+  bgColor,
+}: {
+  label: string;
+  textColor: string;
+  bgColor: string;
+}) => (
+  <span
+    style={{
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '0.4rem',
+      padding: '0.35rem 0.7rem',
+      borderRadius: '999px',
+      border: '1px solid rgba(255,255,255,0.12)',
+      color: textColor,
+      fontSize: '0.78rem',
+      background: bgColor,
+      flexShrink: 0,
+    }}
+  >
+    {label}
+  </span>
+);
 
 export const DesignSystem: React.FC = () => {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-      <section style={{ display: 'grid', gap: '1rem' }}>
+    <div style={{ display: 'grid', gap: '1rem' }}>
+      <section className="content-card" style={{ padding: '1.4rem', display: 'grid', gap: '0.9rem' }}>
         <p
           style={{
             color: 'var(--brand-accent-gold)',
             fontWeight: 700,
-            fontSize: '0.75rem',
+            fontSize: '0.73rem',
             letterSpacing: '0.16em',
             textTransform: 'uppercase',
           }}
         >
           pickflow design system
         </p>
-        <div
-          className="content-card"
-          style={{ padding: '1.4rem', display: 'grid', gap: '0.85rem' }}
+        <h1
+          style={{
+            margin: 0,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.55rem',
+            fontSize: '2rem',
+            lineHeight: 1.2,
+          }}
         >
-          <h1
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.55rem',
-              color: 'var(--text-primary)',
-              fontSize: '2rem',
-              margin: 0,
-            }}
+          <Palette size={22} />
+          디자인 시스템 페이지
+        </h1>
+        <p style={{ color: 'var(--text-secondary)', lineHeight: 1.7 }}>
+          rotifolk 디자인 페이지처럼 토큰, 타이포, 컴포넌트를 한곳에서 확인하고 바로 참고 가능한 형태의 가이드를 제공합니다.
+        </p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem' }}>
+          <a
+            href="https://rotifolk.vercel.app/design"
+            target="_blank"
+            rel="noreferrer"
+            className="btn-secondary"
+            style={{ textDecoration: 'none', padding: '0.65rem 1rem', fontSize: '0.82rem' }}
           >
-            <Palette size={22} /> 디자인 시스템 실험실
-          </h1>
-          <p style={{ color: 'var(--text-secondary)', lineHeight: 1.7 }}>
-            색상·타이포·간격·컴포넌트를 한 곳에서 점검하고, 실제 서비스 스타일 토큰과 바로 비교할 수
-            있는 페이지입니다.
-          </p>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem' }}>
-            <a
-              href="https://rotifolk.vercel.app/design"
-              target="_blank"
-              rel="noreferrer"
-              className="btn-secondary"
-              style={{ textDecoration: 'none', padding: '0.65rem 1rem', fontSize: '0.82rem' }}
-            >
-              <View size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} />
-              레퍼런스: rotifolk.design
-            </a>
-            <button
-              type="button"
-              className="btn-primary"
-              style={{ padding: '0.65rem 1rem', fontSize: '0.82rem' }}
-            >
-              <Wand2 size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} />
-              토큰 카탈로그 시작
-            </button>
-          </div>
+            <View size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} />
+            rotifolk Design 참고
+          </a>
+          <button type="button" className="btn-primary" style={{ padding: '0.65rem 1rem', fontSize: '0.82rem' }}>
+            <Wand2 size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} />
+            토큰 카탈로그
+          </button>
         </div>
       </section>
 
-      <section className="content-card" style={{ padding: '1.2rem', display: 'grid', gap: '1rem' }}>
+      <section className="content-card" style={{ padding: '1.2rem', display: 'grid', gap: '0.9rem' }}>
         <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <Paintbrush size={18} /> Color Tokens
+          <Paintbrush size={18} /> Foundation Tokens
         </h2>
-        <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: '0.9rem' }}>
-          CSS 변수 기반 팔레트로 UI 전체 스타일을 통제합니다. 컬러칩 색상은 실제 변수값으로
-          노출됩니다.
-        </p>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))',
-            gap: '0.9rem',
-          }}
-        >
-          {colorTokens.map((token) => (
+        <div style={{ display: 'grid', gap: '0.7rem' }}>
+          {foundationTokens.map((token) => (
             <div
               key={token.token}
               style={{
@@ -166,23 +236,18 @@ export const DesignSystem: React.FC = () => {
                 background: 'var(--bg-card)',
               }}
             >
-              <div style={{ height: '64px', backgroundColor: token.sample }} />
-              <div style={{ padding: '0.75rem' }}>
-                <div style={{ fontWeight: 700, marginBottom: '4px', color: 'var(--text-primary)' }}>
-                  {token.name}
-                </div>
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                  CSS: {token.token}
-                </div>
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{token.value}</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr' }}>
                 <div
                   style={{
-                    marginTop: '0.45rem',
-                    fontSize: '0.74rem',
-                    color: 'var(--text-secondary)',
+                    width: '100%',
+                    padding: '0.9rem',
+                    backgroundColor: token.sample,
                   }}
-                >
-                  {token.role}
+                />
+                <div style={{ padding: '0.9rem', display: 'grid', gap: '0.3rem' }}>
+                  <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{token.token}</div>
+                  <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{token.value}</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{token.usage}</div>
                 </div>
               </div>
             </div>
@@ -190,225 +255,182 @@ export const DesignSystem: React.FC = () => {
         </div>
       </section>
 
-      <section className="content-card" style={{ padding: '1.2rem', display: 'grid', gap: '1rem' }}>
+      <section className="content-card" style={{ padding: '1.2rem', display: 'grid', gap: '0.9rem' }}>
         <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <Type size={18} /> Typography
+          <Type size={18} /> Typography Scale
         </h2>
-        <div style={{ display: 'grid', gap: '0.9rem' }}>
-          {typographyTokens.map((typography) => (
+        <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: '0.9rem' }}>
+          실제 크기와 라인하이트를 즉시 비교할 수 있도록 샘플 텍스트를 함께 노출합니다.
+        </p>
+        <div style={{ display: 'grid', gap: '0.55rem' }}>
+          {typographyTokens.map((scale) => (
             <div
-              key={typography.name}
+              key={scale.token}
               style={{
                 border: '1px solid var(--bg-card-border)',
                 borderRadius: '10px',
                 padding: '0.8rem',
                 background: 'oklch(16% 0.014 260)',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                gap: '1rem',
-                flexWrap: 'wrap',
+                display: 'grid',
+                gap: '0.5rem',
               }}
             >
-              <div style={{ minWidth: 0 }}>
-                <div
-                  style={{
-                    fontSize: typography.size,
-                    lineHeight: typography.lineHeight,
-                    fontWeight: typography.weight,
-                  }}
-                >
-                  {typography.name} Token
-                </div>
-                <div
-                  style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.35rem' }}
-                >
-                  {typography.desc}
-                </div>
+              <div
+                style={{
+                  fontSize: scale.size,
+                  lineHeight: scale.lh,
+                  fontWeight: scale.weight,
+                  color: 'var(--text-primary)',
+                }}
+              >
+                {scale.token} Example
               </div>
               <div
                 style={{
-                  fontSize: '0.78rem',
+                  fontSize: '0.76rem',
                   color: 'var(--text-muted)',
-                  border: '1px dashed var(--bg-card-border)',
-                  padding: '6px 10px',
-                  borderRadius: '8px',
-                  whiteSpace: 'nowrap',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '0.5rem',
                 }}
               >
-                size {typography.size} / weight {typography.weight} / lh {typography.lineHeight}
+                <span>{scale.usage}</span>
+                <span style={{ whiteSpace: 'nowrap' }}>
+                  {scale.size} · {scale.weight} · lh {scale.lh}
+                </span>
               </div>
             </div>
           ))}
         </div>
       </section>
 
-      <section className="content-card" style={{ padding: '1.2rem', display: 'grid', gap: '1rem' }}>
+      <section className="content-card" style={{ padding: '1.2rem', display: 'grid', gap: '0.9rem' }}>
         <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <SlidersHorizontal size={18} /> Spacing & Radii
+          <Ruler size={18} /> Shape & Shadow
         </h2>
         <div
           style={{
             display: 'grid',
-            gap: '0.9rem',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            gap: '0.65rem',
           }}
         >
-          {spacingScale.map((spacing) => (
+          {spacingTokens.map((token) => (
             <div
-              key={spacing.label}
+              key={token.token}
               style={{
                 border: '1px solid var(--bg-card-border)',
                 borderRadius: '10px',
-                padding: '0.8rem',
+                padding: '0.75rem',
+                background: 'var(--bg-card)',
               }}
             >
-              <div style={{ fontWeight: 700 }}>{spacing.label}</div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: '0.2rem 0' }}>
-                {spacing.px}
+              <div style={{ fontWeight: 700, marginBottom: '0.25rem' }}>{token.token}</div>
+              <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginBottom: '0.35rem' }}>
+                {token.value}
               </div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                {spacing.usage}
-              </div>
-              <div style={{ marginTop: '0.55rem' }}>
-                <div
-                  style={{
-                    width: '100%',
-                    height: '6px',
-                    borderRadius: Number.parseInt(spacing.px) / 2,
-                    backgroundColor: 'var(--brand-primary)',
-                    opacity: 0.72,
-                  }}
-                />
-              </div>
+              <div style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>{token.usage}</div>
             </div>
           ))}
-          <div
-            style={{
-              gridColumn: '1 / -1',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.7rem',
-              flexWrap: 'wrap',
-            }}
-          >
-            <span
-              style={{
-                fontSize: '0.88rem',
-                color: 'var(--text-secondary)',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.4rem',
-              }}
-            >
-              <Ruler size={14} /> radius
-            </span>
-            <span
-              style={{
-                background: 'var(--bg-card-hover)',
-                borderRadius: 'var(--radius-sm)',
-                padding: '0.4rem 0.65rem',
-                fontSize: '0.76rem',
-              }}
-            >
-              sm
-            </span>
-            <span
-              style={{
-                background: 'var(--bg-card-hover)',
-                borderRadius: 'var(--radius-md)',
-                padding: '0.4rem 0.65rem',
-                fontSize: '0.76rem',
-              }}
-            >
-              md
-            </span>
-            <span
-              style={{
-                background: 'var(--bg-card-hover)',
-                borderRadius: 'var(--radius-lg)',
-                padding: '0.4rem 0.65rem',
-                fontSize: '0.76rem',
-              }}
-            >
-              lg
-            </span>
-          </div>
         </div>
       </section>
 
-      <section className="content-card" style={{ padding: '1.2rem', display: 'grid', gap: '1rem' }}>
+      <section className="content-card" style={{ padding: '1.2rem', display: 'grid', gap: '0.9rem' }}>
         <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <Box size={18} /> Component Primitives
+          <SlidersHorizontal size={18} /> Component Primitives
         </h2>
         <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: '0.9rem' }}>
-          페이지에서 자주 쓰이는 기본 컴포넌트들의 실제 스타일을 즉시 확인합니다.
+          디자인 토큰 기반 컴포넌트 샘플을 바로 확인하고 문구/크기 조합을 테스트합니다.
         </p>
-        <div style={{ display: 'grid', gap: '0.8rem' }}>
+        <div style={{ display: 'grid', gap: '0.7rem' }}>
           <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
             <button type="button" className="btn-primary" style={{ padding: '0.68rem 1rem' }}>
-              Primary Button
+              Primary
             </button>
             <button type="button" className="btn-secondary" style={{ padding: '0.68rem 1rem' }}>
-              Secondary Button
+              Secondary
             </button>
             <button
               type="button"
               className="btn-primary"
-              style={{ padding: '0.68rem 1rem', opacity: 0.55 }}
+              style={{ padding: '0.68rem 1rem', opacity: 0.52 }}
               disabled
             >
               Disabled
             </button>
           </div>
-          <input className="form-input" placeholder="폼 입력 샘플" />
+          <input className="form-input" placeholder="아이디 또는 닉네임" />
           <textarea
             className="form-input"
             rows={4}
-            placeholder="멀티라인 샘플. 텍스트가 길어질 때 높이와 여백 변화를 확인하세요."
+            placeholder="멀티라인 입력 시 간격과 줄바꿈이 잘 적용되는지 확인해보세요."
           />
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <span
-              style={{
-                fontSize: '0.72rem',
-                border: '1px solid rgba(255,255,255,0.15)',
-                borderRadius: '999px',
-                padding: '0.35rem 0.75rem',
-              }}
-            >
-              chip
-            </span>
-            <span
-              style={{
-                fontSize: '0.72rem',
-                borderRadius: '999px',
-                padding: '0.35rem 0.75rem',
-                backgroundColor: 'var(--brand-primary)',
-                color: 'white',
-              }}
-            >
-              filled chip
-            </span>
-            <span
-              style={{
-                fontSize: '0.72rem',
-                borderRadius: '999px',
-                padding: '0.35rem 0.75rem',
-                border: '1px solid var(--bg-card-border-hover)',
-              }}
-            >
-              outline chip
-            </span>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <StatusPill
+              label="Primary"
+              textColor="var(--text-primary)"
+              bgColor="var(--brand-primary)"
+            />
+            <StatusPill
+              label="Success"
+              textColor="var(--text-primary)"
+              bgColor="rgba(64, 201, 177, 0.2)"
+            />
+            <StatusPill
+              label="Warn"
+              textColor="var(--text-primary)"
+              bgColor="rgba(245, 158, 11, 0.22)"
+            />
           </div>
         </div>
       </section>
 
-      <section
-        className="content-card"
-        style={{ padding: '1.2rem', display: 'grid', gap: '0.75rem' }}
-      >
+      <section className="content-card" style={{ padding: '1.2rem', display: 'grid', gap: '0.9rem' }}>
         <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <BoxSelect size={18} /> Layout Patterns
+          <Box size={18} /> Token Usage Snippets
+        </h2>
+        <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: '0.9rem' }}>
+          실제 화면에서 복붙 가능한 최소 예시 코드입니다.
+        </p>
+        <div style={{ display: 'grid', gap: '0.75rem' }}>
+          {componentSnippets.map((snippet) => (
+            <div
+              key={snippet.title}
+              style={{
+                border: '1px solid var(--bg-card-border)',
+                borderRadius: '10px',
+                padding: '0.75rem',
+                background: 'oklch(16% 0.014 260)',
+              }}
+            >
+              <div style={{ marginBottom: '0.45rem', display: 'grid', gap: '0.2rem' }}>
+                <div style={{ fontWeight: 700 }}>{snippet.title}</div>
+                <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)' }}>
+                  {snippet.subtitle}
+                </div>
+              </div>
+              <pre
+                style={{
+                  margin: 0,
+                  padding: '0.7rem',
+                  borderRadius: '8px',
+                  backgroundColor: 'rgba(0,0,0,0.28)',
+                  color: 'var(--text-secondary)',
+                  fontSize: '0.75rem',
+                  overflowX: 'auto',
+                }}
+              >
+                <code>{snippet.code}</code>
+              </pre>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="content-card" style={{ padding: '1.2rem', display: 'grid', gap: '0.75rem' }}>
+        <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <BoxSelect size={18} /> Layout Pattern
         </h2>
         <div
           style={{
@@ -418,112 +440,68 @@ export const DesignSystem: React.FC = () => {
             background: 'oklch(16% 0.014 260)',
           }}
         >
-          <div style={{ display: 'grid', gap: '0.6rem' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '0.6rem' }}>
-              <div
-                style={{
-                  padding: '0.7rem',
-                  borderRadius: '10px',
-                  border: '1px dashed var(--bg-card-border)',
-                }}
-              >
-                sidebar
-              </div>
-              <div
-                style={{
-                  padding: '0.7rem',
-                  borderRadius: '10px',
-                  border: '1px dashed var(--bg-card-border)',
-                }}
-              >
-                content
-              </div>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '220px 1fr',
+              gap: '0.6rem',
+              marginBottom: '0.6rem',
+            }}
+          >
+            <div
+              style={{
+                borderRadius: '10px',
+                border: '1px dashed var(--bg-card-border)',
+                padding: '0.7rem',
+              }}
+            >
+              Sidebar
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.6rem' }}>
-              <div
-                style={{
-                  padding: '0.7rem',
-                  borderRadius: '10px',
-                  border: '1px dashed var(--bg-card-border)',
-                }}
-              >
-                card
-              </div>
-              <div
-                style={{
-                  padding: '0.7rem',
-                  borderRadius: '10px',
-                  border: '1px dashed var(--bg-card-border)',
-                }}
-              >
-                card
-              </div>
-              <div
-                style={{
-                  padding: '0.7rem',
-                  borderRadius: '10px',
-                  border: '1px dashed var(--bg-card-border)',
-                }}
-              >
-                card
-              </div>
+            <div
+              style={{
+                borderRadius: '10px',
+                border: '1px dashed var(--bg-card-border)',
+                padding: '0.7rem',
+              }}
+            >
+              Content
             </div>
           </div>
-        </div>
-        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-          <CircleHelp size={14} style={{ marginRight: '0.35rem', verticalAlign: 'middle' }} />
-          그리드, gap, radius, padding이 실제 화면에서 어떻게 누적되는지 확인할 수 있는 최소
-          예시입니다.
-        </div>
-      </section>
-
-      <section
-        className="content-card"
-        style={{ padding: '1.2rem', display: 'grid', gap: '0.75rem' }}
-      >
-        <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <CircleSlash2 size={18} /> 상태 표기
-        </h2>
-        <div
-          style={{
-            display: 'grid',
-            gap: '0.6rem',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-          }}
-        >
-          <p
+          <div
             style={{
-              margin: 0,
-              padding: '0.7rem',
-              borderRadius: '10px',
-              background: 'rgba(99,102,241,0.1)',
-              border: '1px solid rgba(99,102,241,0.2)',
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+              gap: '0.6rem',
             }}
           >
-            ✅ Success
-          </p>
-          <p
-            style={{
-              margin: 0,
-              padding: '0.7rem',
-              borderRadius: '10px',
-              background: 'rgba(255,165,0,0.08)',
-              border: '1px solid rgba(255,165,0,0.25)',
-            }}
-          >
-            ⚠ Warning
-          </p>
-          <p
-            style={{
-              margin: 0,
-              padding: '0.7rem',
-              borderRadius: '10px',
-              background: 'rgba(255,84,84,0.08)',
-              border: '1px solid rgba(255,84,84,0.25)',
-            }}
-          >
-            🚫 Error
-          </p>
+            <div
+              style={{
+                borderRadius: '10px',
+                border: '1px dashed var(--bg-card-border)',
+                padding: '0.7rem',
+              }}
+            >
+              Card A
+            </div>
+            <div
+              style={{
+                borderRadius: '10px',
+                border: '1px dashed var(--bg-card-border)',
+                padding: '0.7rem',
+              }}
+            >
+              Card B
+            </div>
+            <div
+              style={{
+                borderRadius: '10px',
+                border: '1px dashed var(--bg-card-border)',
+                padding: '0.7rem',
+              }}
+            >
+              Card C
+            </div>
+          </div>
         </div>
       </section>
     </div>
