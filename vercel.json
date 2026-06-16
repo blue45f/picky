@@ -9,12 +9,7 @@
       "destination": "/api?path=:path*"
     },
     { "source": "/sitemap.xml", "destination": "/sitemap.xml" },
-    { "source": "/design", "destination": "/index.html" },
-    { "source": "/create", "destination": "/index.html" },
-    { "source": "/auth/:path*", "destination": "/index.html" },
-    { "source": "/poll/:id", "destination": "/index.html" },
-    { "source": "/poll/:id/:path*", "destination": "/index.html" },
-    { "source": "/:path*", "destination": "/index.html" }
+    { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [
     {
