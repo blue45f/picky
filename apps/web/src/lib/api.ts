@@ -28,10 +28,33 @@ const normalizeApiBase = (rawBase: string): string => {
   }
 };
 
+const dedupe = <T,>(items: T[]): T[] => Array.from(new Set(items));
+
+const addVercelApiFallback = (normalizedBase: string): string[] => {
+  if (!normalizedBase || normalizedBase.startsWith('/')) {
+    return [normalizedBase];
+  }
+
+  try {
+    const parsed = new URL(normalizedBase);
+    const match = parsed.hostname.match(/^(.*)\.vercel\.app$/);
+
+    if (!match || match[1].endsWith('-api')) {
+      return [normalizedBase];
+    }
+
+    const apiHost = `${match[1]}-api.vercel.app`;
+    const fallback = `${parsed.protocol}//${apiHost}/api`;
+    return dedupe([normalizedBase, fallback]);
+  } catch {
+    return [normalizedBase];
+  }
+};
+
 const getApiCandidates = (): string[] => {
   const explicitBase = import.meta.env.VITE_API_BASE_URL?.trim();
   if (explicitBase) {
-    return [normalizeApiBase(explicitBase)];
+    return addVercelApiFallback(normalizeApiBase(explicitBase));
   }
 
   if (typeof window === 'undefined') {
@@ -40,15 +63,7 @@ const getApiCandidates = (): string[] => {
 
   const { protocol, host } = window.location;
   const base = `${protocol}//${host}/api`.replace(/\/$/, '');
-  const match = host.match(/^(.*)\.vercel\.app$/);
-
-  if (!match || match[1].endsWith('-api')) {
-    return [base];
-  }
-
-  const hostWithApi = `${match[1]}-api.vercel.app`;
-  const fallback = `${protocol}//${hostWithApi}/api`;
-  return [base, fallback];
+  return addVercelApiFallback(base);
 };
 
 const isLikelyStaticHtmlResponse = (res: Response): boolean => {
