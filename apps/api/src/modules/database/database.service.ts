@@ -11,7 +11,7 @@ interface DatabaseState {
 
 interface DatabaseStorageClient {
   get<T = unknown>(key: string): Promise<T | null>;
-  set(key: string, value: DatabaseState): Promise<void>;
+  set(key: string, value: DatabaseState): Promise<unknown>;
 }
 
 export interface DatabaseUser {
