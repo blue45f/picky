@@ -28,6 +28,30 @@ const normalizeApiBase = (rawBase: string): string => {
   }
 };
 
+const PREFERRED_API_BASE_KEY = 'picky_api_base_preferred';
+
+const getPreferredApiBase = (): string | undefined => {
+  if (typeof window === 'undefined') {
+    return undefined;
+  }
+
+  const raw = window.localStorage.getItem(PREFERRED_API_BASE_KEY)?.trim();
+  return raw ? raw : undefined;
+};
+
+const persistPreferredApiBase = (base: string) => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  const trimmed = base.trim();
+  if (!trimmed) {
+    return;
+  }
+
+  localStorage.setItem(PREFERRED_API_BASE_KEY, trimmed);
+};
+
 const dedupe = <T,>(items: T[]): T[] => Array.from(new Set(items));
 
 const addVercelApiFallback = (normalizedBase: string): string[] => {
@@ -57,13 +81,16 @@ const getApiCandidates = (): string[] => {
     return addVercelApiFallback(normalizeApiBase(explicitBase));
   }
 
+  const preferredBase = getPreferredApiBase();
+  const preferred = preferredBase ? addVercelApiFallback(normalizeApiBase(preferredBase)) : [];
+
   if (typeof window === 'undefined') {
     return ['/api'];
   }
 
   const { protocol, host } = window.location;
   const base = `${protocol}//${host}/api`.replace(/\/$/, '');
-  return addVercelApiFallback(base);
+  return dedupe([...preferred, ...addVercelApiFallback(base)]);
 };
 
 const isLikelyStaticHtmlResponse = (res: Response): boolean => {
@@ -113,6 +140,7 @@ const isApiDebugEnabled = (): boolean => {
 
 export const requestApi = async (path: string, init: RequestInit = {}): Promise<Response> => {
   const candidates = getApiCandidates();
+  const hasExplicitBase = Boolean(import.meta.env.VITE_API_BASE_URL?.trim());
   let lastResponse: Response | null = null;
   let lastError: Error | null = null;
   const trace: Array<{ base: string; ok: boolean; status?: number; error?: string }> = [];
@@ -135,6 +163,9 @@ export const requestApi = async (path: string, init: RequestInit = {}): Promise<
       }
 
       if (!needRetry) {
+        if (!hasExplicitBase) {
+          persistPreferredApiBase(base);
+        }
         return res;
       }
 
