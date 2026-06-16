@@ -78,6 +78,20 @@ const isLikelyStaticHtmlResponse = (res: Response): boolean => {
   return true;
 };
 
+const shouldRetryOnFailure = (res: Response, index: number, total: number): boolean => {
+  if (index >= total - 1) {
+    return false;
+  }
+
+  if (isLikelyStaticHtmlResponse(res)) {
+    return true;
+  }
+
+  // API 호스트가 잘못 잡혀 route 자체가 존재하지 않는 경우(404/405)를 발견하면
+  // 다른 후보(base)로 한 번 더 시도해보는 게 안전합니다.
+  return res.status === 404 || res.status === 405;
+};
+
 const isApiDebugEnabled = (): boolean => {
   if (import.meta.env.DEV) {
     return true;
@@ -105,21 +119,22 @@ export const requestApi = async (path: string, init: RequestInit = {}): Promise<
   const debug = isApiDebugEnabled();
   const isProdLike = typeof window !== 'undefined' && window.location.hostname.includes('vercel.app');
 
-  for (const base of candidates) {
+  for (let i = 0; i < candidates.length; i += 1) {
+    const base = candidates[i];
     try {
       const res = await fetch(`${base}${path}`, init);
-      const isStatic = isLikelyStaticHtmlResponse(res);
-      trace.push({ base, ok: !isStatic, status: res.status });
+      const needRetry = shouldRetryOnFailure(res, i, candidates.length);
+      trace.push({ base, ok: !needRetry, status: res.status });
       if (debug) {
         console.info('[picky] requestApi attempt', {
           path,
           base,
           status: res.status,
-          static: isStatic,
+          retry: needRetry,
         });
       }
 
-      if (!isStatic || base === candidates[candidates.length - 1]) {
+      if (!needRetry) {
         return res;
       }
 
