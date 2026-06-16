@@ -137,7 +137,7 @@ export const requestApi = async (path: string, init: RequestInit = {}): Promise<
     }
   }
 
-  if ((isProdLike || debug) && path === '/auth/guest') {
+  if ((isProdLike || debug) && path.startsWith('/auth/')) {
     console.info('[picky] requestApi trace', path, trace);
   }
 
