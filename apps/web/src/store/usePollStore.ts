@@ -160,6 +160,28 @@ const applyLocalVote = (
   return nextPoll;
 };
 
+const isPollPayload = (payload: any): payload is Poll => {
+  return (
+    Boolean(payload) &&
+    typeof payload.id === 'string' &&
+    payload.id.trim() !== '' &&
+    typeof payload.question === 'string' &&
+    Array.isArray(payload.options) &&
+    payload.options.every((option: any) => option && typeof option.id === 'number' && typeof option.text === 'string') &&
+    Array.isArray(payload.comments) &&
+    typeof payload.totalVotes === 'number' &&
+    typeof payload.createdAt === 'string'
+  );
+};
+
+const ensurePollPayload = (payload: any): Poll => {
+  if (!isPollPayload(payload)) {
+    throw new Error('응답 데이터가 유효한 고민 형식이 아닙니다.');
+  }
+
+  return payload;
+};
+
 const resolvePollErrorMessage = (payload: any, fallback: string): string => {
   if (typeof payload?.message === 'string') {
     return payload.message;
@@ -230,8 +252,10 @@ export const usePollStore = create<PollState>((set, get) => ({
         set({ polls: fallback, isLoading: false, error: resolvePollErrorMessage(errData, '고민 목록을 가져오는데 실패했습니다.') });
         return;
       }
-      const data = (await parseApiPayload(res)) as Poll[];
-      const merged = mergePollsWithLocalCache(data);
+      const data = await parseApiPayload(res);
+      const parsed = Array.isArray(data) ? data.filter((item): item is Poll => isPollPayload(item)) : [];
+
+      const merged = mergePollsWithLocalCache(parsed);
       set({ polls: merged, isLoading: false });
     } catch (err: any) {
       set({ error: err.message || '에러가 발생했습니다.', isLoading: false });
@@ -255,7 +279,7 @@ export const usePollStore = create<PollState>((set, get) => ({
         const errData = await parseApiPayload(res);
         throw new Error(resolvePollErrorMessage(errData, '해당 고민을 찾을 수 없습니다.'));
       }
-      const data = (await parseApiPayload(res)) as Poll;
+      const data = ensurePollPayload(await parseApiPayload(res));
       upsertPollToCache(data, get().polls);
       set({ currentPoll: data, isLoading: false });
       return data;
@@ -286,7 +310,7 @@ export const usePollStore = create<PollState>((set, get) => ({
         throw new Error(message);
       }
 
-      const data = (await parseApiPayload(res)) as Poll;
+      const data = ensurePollPayload(await parseApiPayload(res));
       const nextPolls = [data, ...get().polls.filter((poll) => poll.id !== data.id)];
       upsertPollToCache(data, nextPolls);
       set({ polls: nextPolls, currentPoll: data, isLoading: false });
@@ -338,7 +362,7 @@ export const usePollStore = create<PollState>((set, get) => ({
         const message = await setAuthSessionExpired(res, '투표 제출에 실패했습니다.');
         throw new Error(message);
       }
-      const data = (await parseApiPayload(res)) as Poll;
+      const data = ensurePollPayload(await parseApiPayload(res));
       set((state) => ({
         currentPoll: data,
         polls: state.polls.map((p) => (p.id === id ? data : p)),

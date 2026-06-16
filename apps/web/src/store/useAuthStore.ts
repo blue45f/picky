@@ -169,6 +169,22 @@ const resolveAuthFieldErrors = (payload: any): Record<string, string> => {
   }, {});
 };
 
+const isAuthResultPayload = (payload: any): payload is AuthResult => {
+  return (
+    Boolean(payload) &&
+    typeof payload.accessToken === 'string' &&
+    payload.accessToken.trim() !== '' &&
+    payload.user &&
+    typeof payload.user === 'object' &&
+    typeof payload.user.id === 'string' &&
+    payload.user.id.trim() !== '' &&
+    typeof payload.user.email === 'string' &&
+    typeof payload.user.nickname === 'string' &&
+    payload.user.nickname.trim() !== '' &&
+    typeof payload.user.createdAt === 'string'
+  );
+};
+
 const hydrate = (set: any, data: AuthResult) => {
   if (!data?.accessToken || !data?.user) {
     return false;
@@ -220,10 +236,14 @@ export const useAuthStore = create<AuthState>((set, get) => {
               validationErrors.root || '회원가입에 실패했습니다.',
             ),
             validationErrors,
-            isLoading: false,
-          });
-          return false;
-        }
+          isLoading: false,
+        });
+        return false;
+      }
+
+      if (!isAuthResultPayload(data)) {
+        throw new Error(resolveAuthErrorMessage(data, '인증 응답 형식이 올바르지 않습니다.'));
+      }
 
         if (!hydrate(set, data)) {
           throw new Error(resolveAuthErrorMessage(data, '인증 응답이 올바르지 않습니다.'));
@@ -266,10 +286,14 @@ export const useAuthStore = create<AuthState>((set, get) => {
           set({
             error: resolveAuthErrorMessage(data, validationErrors.root || '로그인에 실패했습니다.'),
             validationErrors,
-            isLoading: false,
-          });
-          return false;
-        }
+          isLoading: false,
+        });
+        return false;
+      }
+
+      if (!isAuthResultPayload(data)) {
+        throw new Error(resolveAuthErrorMessage(data, '인증 응답 형식이 올바르지 않습니다.'));
+      }
 
         if (!hydrate(set, data)) {
           throw new Error(resolveAuthErrorMessage(data, '인증 응답이 올바르지 않습니다.'));
@@ -314,10 +338,14 @@ export const useAuthStore = create<AuthState>((set, get) => {
               validationErrors.root || '비회원 등록에 실패했습니다.',
             ),
             validationErrors,
-            isLoading: false,
-          });
-          return false;
-        }
+          isLoading: false,
+        });
+        return false;
+      }
+
+      if (!isAuthResultPayload(data)) {
+        throw new Error(resolveAuthErrorMessage(data, '인증 응답 형식이 올바르지 않습니다.'));
+      }
 
         if (!hydrate(set, data)) {
           throw new Error(resolveAuthErrorMessage(data, '인증 응답이 올바르지 않습니다.'));

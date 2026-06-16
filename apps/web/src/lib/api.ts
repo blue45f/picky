@@ -283,6 +283,11 @@ export const requestApi = async (path: string, init: RequestInit = {}): Promise<
   }
 
   if (lastResponse) {
+    if (isLikelyStaticHtmlResponse(lastResponse)) {
+      throw new Error(
+        `API 응답이 정적 HTML 페이지입니다. ${path} 요청 대상이 맞는지 확인해 주세요. (${lastResponse.url})`,
+      );
+    }
     return lastResponse;
   }
 
