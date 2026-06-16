@@ -99,8 +99,10 @@ interface OptionInput {
 }
 
 export const CreatePoll: React.FC = () => {
-  const { createPoll, isLoading } = usePollStore();
+  const { createPoll, isLoading, error } = usePollStore();
   const navigate = useNavigate();
+
+  const [formError, setFormError] = React.useState('');
 
   const [question, setQuestion] = useState('');
   const [description, setDescription] = useState('');
@@ -152,6 +154,25 @@ export const CreatePoll: React.FC = () => {
 
   const handleCreatePollSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError('');
+
+    const trimmedQuestion = question.trim();
+    if (!trimmedQuestion) {
+      setFormError('고민 제목은 필수로 입력해야 합니다.');
+      return;
+    }
+
+    if (trimmedQuestion.length < 2) {
+      setFormError('고민 제목은 최소 2글자 이상 입력해야 합니다.');
+      return;
+    }
+
+    const trimmedDescription = description.trim();
+    if (trimmedDescription.length > 500) {
+      setFormError('상세 내용은 최대 500자까지만 허용됩니다.');
+      return;
+    }
+
     const filtered = options
       .map((o) => ({ text: o.text.trim(), imageUrl: o.imageUrl.trim() || null }))
       .filter((o) => o.text !== '');
@@ -162,8 +183,8 @@ export const CreatePoll: React.FC = () => {
     }
 
     const result = await createPoll({
-      question: question.trim(),
-      description: description.trim() || null,
+      question: trimmedQuestion,
+      description: trimmedDescription || null,
       options: filtered,
     });
 
@@ -253,6 +274,36 @@ export const CreatePoll: React.FC = () => {
           <label style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>
             고민 주제 (질문)
           </label>
+          {formError ? (
+            <p
+              style={{
+                margin: 0,
+                fontSize: '0.78rem',
+                color: 'var(--brand-accent-coral)',
+                padding: '7px 10px',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid rgba(239, 68, 68, 0.2)',
+                background: 'rgba(239, 68, 68, 0.12)',
+              }}
+            >
+              {formError}
+            </p>
+          ) : null}
+          {error ? (
+            <p
+              style={{
+                margin: 0,
+                fontSize: '0.78rem',
+                color: 'var(--brand-accent-coral)',
+                padding: '7px 10px',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid rgba(239, 68, 68, 0.2)',
+                background: 'rgba(239, 68, 68, 0.12)',
+              }}
+            >
+              {error}
+            </p>
+          ) : null}
           <input
             type="text"
             placeholder="예: 어떤 사이드 프로젝트를 가장 먼저 상용화할까요?"

@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from 'react';
 import {
-  Box,
   CircleCheckBig,
   Copy,
   LayoutTemplate,
@@ -173,7 +172,13 @@ const contrastPairs = [
 
 type DensityMode = 'compact' | 'balanced' | 'spacious';
 
-const densityStyles: Record<DensityMode, React.CSSProperties> = {
+type DensityStyle = {
+  gap: string;
+  cardPadding: string;
+  inputPad: string;
+};
+
+const densityStyles: Record<DensityMode, DensityStyle> = {
   compact: {
     gap: '0.55rem',
     cardPadding: '0.9rem',

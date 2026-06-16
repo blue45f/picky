@@ -22,7 +22,24 @@ const resolvePollErrorMessage = (payload: any, fallback: string): string => {
   }
 
   if (Array.isArray(payload?.message)) {
-    return payload.message.join(', ');
+    const message = payload.message
+      .map((item: any) => {
+        if (typeof item === 'string') {
+          return item;
+        }
+
+        if (item && typeof item.message === 'string') {
+          return item.message;
+        }
+
+        return null;
+      })
+      .filter((item: any) => typeof item === 'string')
+      .join(', ');
+
+    if (message) {
+      return message;
+    }
   }
 
   if (Array.isArray(payload?.errors) && payload.errors.length > 0) {
