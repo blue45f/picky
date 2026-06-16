@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { BrowserRouter, Navigate, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Heart } from 'lucide-react';
 import { Navbar } from './components/Navbar';
 import { PollList } from './pages/PollList';
@@ -8,6 +8,41 @@ import { PollDetail } from './pages/PollDetail';
 import { DesignSystem } from './pages/DesignSystem';
 import { AuthPage } from './pages/AuthPage';
 import { useAuthStore } from './store/useAuthStore';
+
+const FALLBACK_QUERY_KEY = '__fallback';
+
+const FallbackRouteBridge: React.FC = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  useEffect(() => {
+    const raw = searchParams.get(FALLBACK_QUERY_KEY);
+    if (!raw) {
+      return;
+    }
+
+    try {
+      const nextPath = decodeURIComponent(raw);
+      if (
+        nextPath.startsWith('//') ||
+        !nextPath.startsWith('/') ||
+        nextPath.length > 2048
+      ) {
+        setSearchParams({}, { replace: true });
+        return;
+      }
+
+      setSearchParams({}, { replace: true });
+      navigate(nextPath, { replace: true });
+    } catch (err) {
+      console.error('[picky] failed to restore fallback path', err);
+      setSearchParams({}, { replace: true });
+    }
+  }, [location.pathname, location.search, location.hash, searchParams, navigate, setSearchParams]);
+
+  return null;
+};
 
 export const App: React.FC = () => {
   const fetchMe = useAuthStore((state) => state.fetchMe);
@@ -27,6 +62,7 @@ export const App: React.FC = () => {
         }}
       >
         <Navbar />
+        <FallbackRouteBridge />
 
         {/* Main Layout Area */}
         <main

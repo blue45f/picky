@@ -7,7 +7,7 @@
     { "source": "/auth/:path*", "destination": "/index.html" },
     { "source": "/poll/:id", "destination": "/index.html" },
     { "source": "/poll/:id/:path*", "destination": "/index.html" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/:path*", "destination": "/index.html" }
   ],
   "headers": [
     {

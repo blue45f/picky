@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>pickflow</title>
+    <script>
+      (function () {
+        var fallbackPath = window.location.pathname + window.location.search + window.location.hash;
+
+        if (!fallbackPath || fallbackPath === '/404.html') {
+          return;
+        }
+
+        var encoded = encodeURIComponent(fallbackPath);
+        var target = '/?__fallback=' + encoded;
+        window.location.replace(target);
+      })();
+    </script>
+  </head>
+  <body>
+    <noscript>자바스크립트를 허용해 주세요. 페이지를 불러오지 못했습니다.</noscript>
+  </body>
+</html>
