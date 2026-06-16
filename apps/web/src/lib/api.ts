@@ -67,6 +67,19 @@ const getWindowApiCandidates = (): string[] => {
   return [normalizeApiBase(`${protocol}//${host}/api`)];
 };
 
+const getCustomApiCandidateFromWindow = (): string[] => {
+  if (typeof window === 'undefined') {
+    return [];
+  }
+
+  const rawCandidate = new URLSearchParams(window.location.search).get('api_base')?.trim();
+  if (!rawCandidate) {
+    return [];
+  }
+
+  return [normalizeApiBase(rawCandidate)];
+};
+
 const getVercelApiCandidates = (): string[] => {
   if (typeof window === 'undefined') {
     return [];
@@ -82,9 +95,25 @@ const getVercelApiCandidates = (): string[] => {
     return [];
   }
 
+  const withoutGitSuffix = baseHost.replace(/-git-[a-z0-9-]+$/i, '');
+
+  const hostGroups = dedupe([
+    baseHost,
+    withoutGitSuffix,
+    baseHost.replace(/-web$/, ''),
+    baseHost.replace(/-app$/, ''),
+    baseHost.replace(/-api$/, ''),
+  ]).filter((value) => Boolean(value));
+
+  const apiHosts = dedupe([
+    `${baseHost}-api.vercel.app`,
+    ...hostGroups.map((value) => `${value}-api.vercel.app`),
+    ...hostGroups.map((value) => `api-${value}.vercel.app`),
+    ...hostGroups.map((value) => `api.${value}.vercel.app`),
+  ]);
+
   return dedupe([
-    normalizeApiBase(`${protocol}//${baseHost}-api.vercel.app/api`),
-    normalizeApiBase(`${protocol}//${hostname.replace('.vercel.app', '-api.vercel.app')}/api`),
+    ...apiHosts.map((host) => normalizeApiBase(`${protocol}//${host}/api`)),
   ]).filter((candidate) => candidate && candidate !== '/');
 };
 
@@ -93,19 +122,26 @@ const getApiCandidates = (): string[] => {
   if (explicitBase) {
     const explicitCandidates = [normalizeApiBase(explicitBase)];
     const runtimeCandidates = getWindowApiCandidates();
-    return dedupe([...explicitCandidates, ...runtimeCandidates, ...getVercelApiCandidates()]);
+    const customCandidate = getCustomApiCandidateFromWindow();
+    return dedupe([
+      ...explicitCandidates,
+      ...customCandidate,
+      ...runtimeCandidates,
+      ...getVercelApiCandidates(),
+    ]);
   }
 
   const preferredBase = getPreferredApiBase();
   const preferred = preferredBase ? [normalizeApiBase(preferredBase)] : [];
   const vercelCandidates = getVercelApiCandidates();
+  const customCandidates = getCustomApiCandidateFromWindow();
 
   if (typeof window === 'undefined') {
     return ['/api', ...preferred];
   }
 
   const baseCandidates = getWindowApiCandidates();
-  return dedupe([...preferred, ...vercelCandidates, ...baseCandidates]);
+  return dedupe([...preferred, ...customCandidates, ...vercelCandidates, ...baseCandidates]);
 };
 
 const isLikelyStaticHtmlResponse = (res: Response): boolean => {

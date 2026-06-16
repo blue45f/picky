@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Calendar,
   Search,
@@ -16,6 +16,14 @@ import { useAuthStore } from '../store/useAuthStore';
 
 type SortMode = 'latest' | 'popular' | 'commented';
 type ScopeMode = 'all' | 'mine' | 'guest';
+
+const isSortMode = (value: string | null): value is SortMode => {
+  return value === 'latest' || value === 'popular' || value === 'commented';
+};
+
+const isScopeMode = (value: string | null): value is ScopeMode => {
+  return value === 'all' || value === 'mine' || value === 'guest';
+};
 
 const isGuestCreator = (creatorId?: string | null, creatorIsGuest?: boolean) => {
   return creatorIsGuest || Boolean(creatorId?.startsWith('guest-'));
@@ -50,10 +58,62 @@ export const PollList: React.FC = () => {
   const userId = useAuthStore((state) => state.user?.id);
   const isGuest = useAuthStore((state) => state.user?.isGuest);
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [query, setQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortMode>('latest');
   const [scope, setScope] = useState<ScopeMode>('all');
+
+  useEffect(() => {
+    const nextQuery = (searchParams.get('q') || '').trim();
+    const nextSort = searchParams.get('sort');
+    const nextScope = searchParams.get('scope');
+
+    if (nextQuery !== query) {
+      setQuery(nextQuery);
+    }
+
+    if (isSortMode(nextSort)) {
+      setSortBy((current) => (current === nextSort ? current : nextSort));
+    } else if (sortBy !== 'latest') {
+      setSortBy('latest');
+    }
+
+    if (isScopeMode(nextScope)) {
+      if (nextScope === 'mine' && !userId) {
+        setScope('all');
+        return;
+      }
+
+      setScope((current) => (current === nextScope ? current : nextScope));
+      return;
+    }
+
+    setScope('all');
+  }, [searchParams, userId, query, sortBy]);
+
+  useEffect(() => {
+    const next = new URLSearchParams(searchParams);
+    const normalizedQuery = query.trim();
+
+    if (normalizedQuery) {
+      next.set('q', normalizedQuery);
+    } else {
+      next.delete('q');
+    }
+
+    next.set('sort', sortBy);
+
+    if (scope === 'all' || (scope === 'mine' && !userId)) {
+      next.delete('scope');
+    } else {
+      next.set('scope', scope);
+    }
+
+    if (next.toString() !== searchParams.toString()) {
+      setSearchParams(next, { replace: true });
+    }
+  }, [query, sortBy, scope, userId, searchParams, setSearchParams]);
 
   useEffect(() => {
     fetchPolls();
