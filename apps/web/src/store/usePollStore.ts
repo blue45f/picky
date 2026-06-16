@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { Poll, CreatePollInput, VoteInput } from '@picky/shared';
 import { useAuthStore } from './useAuthStore';
+import { getApiBaseUrl, parseApiPayload } from '../lib/api';
 
 interface PollState {
   polls: Poll[];
@@ -15,7 +16,7 @@ interface PollState {
   vote: (id: string, input: VoteInput) => Promise<boolean>;
 }
 
-const API_BASE = '/api';
+const API_BASE = getApiBaseUrl();
 
 const resolvePollErrorMessage = (payload: any, fallback: string): string => {
   if (typeof payload?.message === 'string') {
@@ -51,7 +52,7 @@ const resolvePollErrorMessage = (payload: any, fallback: string): string => {
 };
 
 const setAuthSessionExpired = async (res: Response, fallback: string) => {
-  const payload = await res.json().catch(() => ({}));
+  const payload = await parseApiPayload(res);
   const message = resolvePollErrorMessage(payload, fallback);
   if (res.status === 401) {
     useAuthStore.getState().invalidateSession(message);
@@ -73,10 +74,10 @@ export const usePollStore = create<PollState>((set) => ({
     try {
       const res = await fetch(`${API_BASE}/polls`);
       if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
+        const errData = await parseApiPayload(res);
         throw new Error(resolvePollErrorMessage(errData, '고민 목록을 가져오는데 실패했습니다.'));
       }
-      const data = await res.json();
+      const data = (await parseApiPayload(res)) as Poll[];
       set({ polls: data, isLoading: false });
     } catch (err: any) {
       set({ error: err.message || '에러가 발생했습니다.', isLoading: false });
@@ -88,10 +89,10 @@ export const usePollStore = create<PollState>((set) => ({
     try {
       const res = await fetch(`${API_BASE}/polls/${id}`);
       if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
+        const errData = await parseApiPayload(res);
         throw new Error(resolvePollErrorMessage(errData, '해당 고민을 찾을 수 없습니다.'));
       }
-      const data = await res.json();
+      const data = (await parseApiPayload(res)) as Poll;
       set({ currentPoll: data, isLoading: false });
       return data;
     } catch (err: any) {
@@ -121,7 +122,7 @@ export const usePollStore = create<PollState>((set) => ({
         throw new Error(message);
       }
 
-      const data = await res.json();
+      const data = (await parseApiPayload(res)) as Poll;
       set((state) => ({ polls: [data, ...state.polls], isLoading: false }));
       return data;
     } catch (err: any) {
@@ -150,7 +151,7 @@ export const usePollStore = create<PollState>((set) => ({
         const message = await setAuthSessionExpired(res, '투표 제출에 실패했습니다.');
         throw new Error(message);
       }
-      const data = await res.json();
+      const data = (await parseApiPayload(res)) as Poll;
       set((state) => ({
         currentPoll: data,
         polls: state.polls.map((p) => (p.id === id ? data : p)),

@@ -6,6 +6,7 @@ import {
   GuestRegisterInput,
   AuthResult,
 } from '@picky/shared';
+import { getApiBaseUrl, parseApiPayload } from '../lib/api';
 
 interface AuthState {
   user: UserProfile | null;
@@ -28,7 +29,7 @@ interface AuthState {
   invalidateSession: (message: string) => void;
 }
 
-const API_BASE = '/api';
+const API_BASE = getApiBaseUrl();
 const USER_STORAGE_KEY = 'picky_user';
 
 const loadSavedUser = (): UserProfile | null => {
@@ -166,7 +167,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
           body: JSON.stringify(payload),
         });
 
-        const data = (await res.json().catch(() => ({}))) as AuthResult;
+        const data = (await parseApiPayload(res)) as AuthResult;
         if (!res.ok) {
           const validationErrors = resolveAuthFieldErrors(data);
           set({
@@ -215,7 +216,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
           body: JSON.stringify(payload),
         });
 
-        const data = (await res.json().catch(() => ({}))) as AuthResult;
+        const data = (await parseApiPayload(res)) as AuthResult;
         if (!res.ok) {
           const validationErrors = resolveAuthFieldErrors(data);
           set({
@@ -260,7 +261,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
           body: JSON.stringify(payload),
         });
 
-        const data = (await res.json().catch(() => ({}))) as AuthResult;
+        const data = (await parseApiPayload(res)) as AuthResult;
         if (!res.ok) {
           const validationErrors = resolveAuthFieldErrors(data);
           set({
@@ -342,7 +343,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
           return;
         }
 
-        const user = (await res.json()) as UserProfile | null;
+        const user = (await parseApiPayload(res)) as UserProfile | null;
         if (!user || !user.id) {
           localStorage.removeItem('picky_token');
           persistUser(null);
