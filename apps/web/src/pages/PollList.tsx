@@ -12,6 +12,8 @@ import {
   X,
   Copy,
   Check,
+  LayoutList,
+  LayoutGrid,
   Link,
 } from 'lucide-react';
 import { usePollStore } from '../store/usePollStore';
@@ -56,6 +58,7 @@ const scopeOptions: { value: ScopeMode; label: string }[] = [
   { value: 'mine', label: '내가 작성' },
   { value: 'guest', label: '비회원 작성' },
 ];
+type ViewMode = 'stack' | 'compact';
 
 export const PollList: React.FC = () => {
   const { polls, isLoading, fetchPolls, error, setCurrentPoll } = usePollStore();
@@ -68,6 +71,7 @@ export const PollList: React.FC = () => {
   const [query, setQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortMode>('latest');
   const [scope, setScope] = useState<ScopeMode>('all');
+  const [viewMode, setViewMode] = useState<ViewMode>('stack');
   const [copiedPollId, setCopiedPollId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -228,6 +232,7 @@ export const PollList: React.FC = () => {
   }, [scope, normalizedQuery]);
 
   const hasActiveFilters = activeFilters.length > 0;
+  const quickSeeds = ['점심 메뉴', '회의 안건', '주말 일정', '프로젝트 선택'];
 
   const handleGotoPoll = (event: React.MouseEvent<HTMLButtonElement>, pollId: string) => {
     event.stopPropagation();
@@ -435,10 +440,25 @@ export const PollList: React.FC = () => {
             justifyContent: 'flex-end',
             flexWrap: 'wrap',
           }}
-        >
-          {displayScopeOptions.map((option) => (
+          >
             <button
-              key={option.value}
+              type="button"
+              className="ghost-btn"
+              onClick={() => setViewMode((current) => (current === 'stack' ? 'compact' : 'stack'))}
+              title="목록/컴팩트 뷰 전환"
+              style={{
+                padding: '6px 9px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+              }}
+            >
+              {viewMode === 'stack' ? <LayoutList size={12} /> : <LayoutGrid size={12} />}
+              <span style={{ fontSize: '0.7rem' }}>{viewMode === 'stack' ? '넓게' : '요약'}</span>
+            </button>
+            {displayScopeOptions.map((option) => (
+              <button
+                key={option.value}
               onClick={() => setScope(option.value)}
               className="ghost-btn"
               disabled={option.value === 'mine' && !userId}
@@ -475,6 +495,38 @@ export const PollList: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {!normalizedQuery && scope === 'all' ? (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.45rem' }}>
+          <span
+            style={{
+              fontSize: '0.68rem',
+              color: 'var(--text-muted)',
+              display: 'inline-flex',
+              alignItems: 'center',
+            }}
+          >
+            빠른 검색:
+          </span>
+          {quickSeeds.map((seed) => (
+            <button
+              key={seed}
+              type="button"
+              onClick={() => setSearchInput(seed)}
+              className="ghost-inline"
+              style={{
+                padding: '4px 8px',
+                borderRadius: '999px',
+                border: '1px solid var(--bg-card-border)',
+                color: 'var(--text-muted)',
+                fontSize: '0.68rem',
+              }}
+            >
+              {seed}
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       {hasActiveFilters ? (
         <div className="content-card" style={{ padding: '0.65rem 0.9rem' }}>
@@ -571,11 +623,16 @@ export const PollList: React.FC = () => {
           {visiblePolls.map((poll) => {
             const creatorLabel = getCreatorLabel(poll.creatorId, poll.creatorIsGuest);
             const isMine = userId && poll.creatorId === userId;
+            const isCompact = viewMode === 'compact';
             const topOptions = [...poll.options]
               .sort((a, b) => b.voteCount - a.voteCount)
               .slice(0, 2)
               .map((option) => option.text)
               .join(' / ');
+            const compactDescription =
+              poll.description && poll.description.length > 84
+                ? `${poll.description.slice(0, 81)}...`
+                : poll.description || '';
 
             return (
               <article
@@ -588,7 +645,7 @@ export const PollList: React.FC = () => {
                 style={{
                   textAlign: 'left',
                   textDecoration: 'none',
-                  padding: '1.25rem',
+                  padding: isCompact ? '1.05rem' : '1.25rem',
                   width: '100%',
                   border: isMine ? '1px solid rgba(99, 102, 241, 0.45)' : undefined,
                 }}
@@ -649,7 +706,7 @@ export const PollList: React.FC = () => {
                 <h3
                   style={{
                     color: 'var(--text-primary)',
-                    fontSize: '1.06rem',
+                    fontSize: isCompact ? '1rem' : '1.06rem',
                     fontWeight: 800,
                     letterSpacing: '-0.015em',
                     lineHeight: 1.45,
@@ -663,23 +720,23 @@ export const PollList: React.FC = () => {
                   <p
                     style={{
                       color: 'var(--text-secondary)',
-                      fontSize: '0.825rem',
+                      fontSize: isCompact ? '0.74rem' : '0.825rem',
                       marginBottom: '0.6rem',
+                      display: isCompact ? 'block' : '-webkit-box',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
-                      display: '-webkit-box',
-                      WebkitLineClamp: 2,
+                      WebkitLineClamp: isCompact ? 1 : 2,
                       WebkitBoxOrient: 'vertical',
                       lineHeight: 1.56,
                     }}
                   >
-                    {poll.description}
+                    {isCompact ? compactDescription : poll.description}
                   </p>
                 ) : null}
 
                 <div
                   style={{
-                    fontSize: '0.72rem',
+                    fontSize: isCompact ? '0.68rem' : '0.72rem',
                     color: 'var(--text-secondary)',
                     marginBottom: '0.66rem',
                   }}
@@ -737,33 +794,35 @@ export const PollList: React.FC = () => {
                     onClick={(event) => handleGotoPoll(event, poll.id)}
                     className="btn-secondary"
                     style={{
-                      fontSize: '0.7rem',
-                      padding: '6px 11px',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                    }}
+                      fontSize: isCompact ? '0.66rem' : '0.7rem',
+                    padding: '6px 11px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}
                   >
                     <span>투표하기</span>
                     <ArrowRight size={13} />
                   </button>
-                  <button
-                    type="button"
-                    onClick={(event) => handleCopyPollLink(event, poll.id)}
-                    className="ghost-btn"
-                    style={{
-                      fontSize: '0.68rem',
-                      padding: '6px 10px',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                    }}
-                    title={`${poll.id} 링크 복사`}
-                  >
-                    {copiedPollId === poll.id ? <Check size={12} /> : <Copy size={12} />}
-                    <span>{copiedPollId === poll.id ? '복사 완료' : '공유 복사'}</span>
-                    <Link size={11} />
-                  </button>
+                  {!isCompact ? (
+                    <button
+                      type="button"
+                      onClick={(event) => handleCopyPollLink(event, poll.id)}
+                      className="ghost-btn"
+                      style={{
+                        fontSize: '0.68rem',
+                        padding: '6px 10px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                      }}
+                      title={`${poll.id} 링크 복사`}
+                    >
+                      {copiedPollId === poll.id ? <Check size={12} /> : <Copy size={12} />}
+                      <span>{copiedPollId === poll.id ? '복사 완료' : '공유 복사'}</span>
+                      <Link size={11} />
+                    </button>
+                  ) : null}
                 </div>
                 {copiedPollId === poll.id ? (
                   <p

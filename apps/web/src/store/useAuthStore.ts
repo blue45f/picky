@@ -31,25 +31,36 @@ interface AuthState {
 
 const USER_STORAGE_KEY = 'picky_user';
 
+const normalizeUser = (candidate: any): UserProfile | null => {
+  if (!candidate || typeof candidate !== 'object') {
+    return null;
+  }
+
+  if (!candidate.id || !candidate.nickname) {
+    return null;
+  }
+
+  return {
+    id: String(candidate.id),
+    email: typeof candidate.email === 'string' ? candidate.email : '',
+    nickname: String(candidate.nickname),
+    createdAt: typeof candidate.createdAt === 'string' ? candidate.createdAt : new Date().toISOString(),
+    isGuest: Boolean(candidate.isGuest),
+  };
+};
+
 const loadSavedUser = (): UserProfile | null => {
+  if (typeof localStorage === 'undefined') {
+    return null;
+  }
+
   const raw = localStorage.getItem(USER_STORAGE_KEY);
   if (!raw) {
     return null;
   }
 
   try {
-    const parsed = JSON.parse(raw) as UserProfile;
-    if (!parsed?.id || !parsed?.nickname) {
-      return null;
-    }
-
-    return {
-      id: parsed.id,
-      email: typeof parsed.email === 'string' ? parsed.email : '',
-      nickname: parsed.nickname,
-      createdAt: typeof parsed.createdAt === 'string' ? parsed.createdAt : new Date().toISOString(),
-      isGuest: parsed.isGuest,
-    };
+    return normalizeUser(JSON.parse(raw));
   } catch {
     localStorage.removeItem(USER_STORAGE_KEY);
     return null;
@@ -117,17 +128,13 @@ const decodeAuthToken = (token: string | null): UserProfile | null => {
     );
 
     const decoded = JSON.parse(decodedPayload);
-    if (
-      typeof decoded?.sub !== 'string' ||
-      typeof decoded?.email !== 'string' ||
-      typeof decoded?.nickname !== 'string'
-    ) {
+    if (typeof decoded?.sub !== 'string' || typeof decoded?.nickname !== 'string') {
       return null;
     }
 
     return {
       id: decoded.sub,
-      email: decoded.email || '',
+      email: typeof decoded.email === 'string' ? decoded.email : '',
       nickname: decoded.nickname || '',
       createdAt: new Date().toISOString(),
       isGuest: Boolean(decoded.isGuest),
@@ -157,6 +164,7 @@ const resolveAuthFieldErrors = (payload: any): Record<string, string> => {
         : typeof item.path === 'string'
           ? item.path
           : undefined;
+
     const rawKey =
       typeof leafField === 'string' || typeof leafField === 'number' ? String(leafField) : 'root';
 
@@ -165,6 +173,7 @@ const resolveAuthFieldErrors = (payload: any): Record<string, string> => {
     if (!next[key]) {
       next[key] = item.message;
     }
+
     return next;
   }, {});
 };
@@ -178,8 +187,7 @@ const isAuthResultPayload = (payload: any): payload is AuthResult => {
     typeof payload.user === 'object' &&
     typeof payload.user.id === 'string' &&
     payload.user.id.trim() !== '' &&
-    typeof payload.user.nickname === 'string' &&
-    payload.user.nickname.trim() !== ''
+    typeof payload.user.nickname === 'string'
   );
 };
 
@@ -188,17 +196,47 @@ const hydrate = (set: any, data: AuthResult) => {
     return false;
   }
 
+  const user = normalizeUser(data.user);
+  if (!user) {
+    return false;
+  }
+
   localStorage.setItem('picky_token', data.accessToken);
-  const user = {
-    ...data.user,
-    email: data.user.email || '',
-    createdAt: data.user.createdAt || new Date().toISOString(),
-  };
-  persistUser(user);
+  localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
   set({
     user,
     token: data.accessToken,
   });
+  return true;
+};
+
+const normalizeAuthFailure = async (res: Response, fallback: string) => {
+  const payload = await parseApiPayload(res);
+  const validationErrors = resolveAuthFieldErrors(payload);
+  const message = resolveAuthErrorMessage(payload, validationErrors.root || fallback);
+
+  return { payload, validationErrors, message };
+};
+
+const commitAuthSuccess = (set: any, data: AuthResult) => {
+  hydrate(set, data);
+
+  const resolvedUser = normalizeUser(data.user);
+  if (!resolvedUser) {
+    return false;
+  }
+
+  localStorage.setItem('picky_token', data.accessToken);
+  persistUser(resolvedUser);
+
+  set({
+    user: resolvedUser,
+    token: data.accessToken,
+    needsReauth: false,
+    isLoading: false,
+    validationErrors: {},
+  });
+
   return true;
 };
 
@@ -224,6 +262,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
           password: input.password,
           nickname: input.nickname.trim(),
         };
+
         const res = await requestApi('/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -232,32 +271,27 @@ export const useAuthStore = create<AuthState>((set, get) => {
 
         const data = (await parseApiPayload(res)) as AuthResult;
         if (!res.ok) {
-          const validationErrors = resolveAuthFieldErrors(data);
+          const { validationErrors, message } = await normalizeAuthFailure(
+            res,
+            '회원가입에 실패했습니다.',
+          );
           set({
-            error: resolveAuthErrorMessage(
-              data,
-              validationErrors.root || '회원가입에 실패했습니다.',
-            ),
+            error: message,
             validationErrors,
-          isLoading: false,
-        });
-        return false;
-      }
+            isLoading: false,
+          });
+          return false;
+        }
 
-      if (!isAuthResultPayload(data)) {
-        throw new Error(resolveAuthErrorMessage(data, '인증 응답 형식이 올바르지 않습니다.'));
-      }
-
-        if (!hydrate(set, data)) {
-          throw new Error(resolveAuthErrorMessage(data, '인증 응답이 올바르지 않습니다.'));
+        if (!isAuthResultPayload(data) || !commitAuthSuccess(set, data)) {
+          throw new Error(resolveAuthErrorMessage(data, '인증 응답 형식이 올바르지 않습니다.'));
         }
 
         localStorage.removeItem('picky_guest_name');
         set({
-          needsReauth: false,
           guestName: '',
-          validationErrors: {},
           isLoading: false,
+          validationErrors: {},
         });
         return true;
       } catch (err: any) {
@@ -285,29 +319,24 @@ export const useAuthStore = create<AuthState>((set, get) => {
 
         const data = (await parseApiPayload(res)) as AuthResult;
         if (!res.ok) {
-          const validationErrors = resolveAuthFieldErrors(data);
+          const { validationErrors, message } = await normalizeAuthFailure(res, '로그인에 실패했습니다.');
           set({
-            error: resolveAuthErrorMessage(data, validationErrors.root || '로그인에 실패했습니다.'),
+            error: message,
             validationErrors,
-          isLoading: false,
-        });
-        return false;
-      }
+            isLoading: false,
+          });
+          return false;
+        }
 
-      if (!isAuthResultPayload(data)) {
-        throw new Error(resolveAuthErrorMessage(data, '인증 응답 형식이 올바르지 않습니다.'));
-      }
-
-        if (!hydrate(set, data)) {
-          throw new Error(resolveAuthErrorMessage(data, '인증 응답이 올바르지 않습니다.'));
+        if (!isAuthResultPayload(data) || !commitAuthSuccess(set, data)) {
+          throw new Error(resolveAuthErrorMessage(data, '인증 응답 형식이 올바르지 않습니다.'));
         }
 
         localStorage.removeItem('picky_guest_name');
         set({
-          needsReauth: false,
           guestName: '',
-          validationErrors: {},
           isLoading: false,
+          validationErrors: {},
         });
         return true;
       } catch (err: any) {
@@ -334,33 +363,27 @@ export const useAuthStore = create<AuthState>((set, get) => {
 
         const data = (await parseApiPayload(res)) as AuthResult;
         if (!res.ok) {
-          const validationErrors = resolveAuthFieldErrors(data);
+          const { validationErrors, message } = await normalizeAuthFailure(
+            res,
+            '비회원 등록에 실패했습니다.',
+          );
           set({
-            error: resolveAuthErrorMessage(
-              data,
-              validationErrors.root || '비회원 등록에 실패했습니다.',
-            ),
+            error: message,
             validationErrors,
-          isLoading: false,
-        });
-        return false;
-      }
-
-      if (!isAuthResultPayload(data)) {
-        throw new Error(resolveAuthErrorMessage(data, '인증 응답 형식이 올바르지 않습니다.'));
-      }
-
-        if (!hydrate(set, data)) {
-          throw new Error(resolveAuthErrorMessage(data, '인증 응답이 올바르지 않습니다.'));
+            isLoading: false,
+          });
+          return false;
         }
 
-        const trimmedNickname = payload.nickname;
-        localStorage.setItem('picky_guest_name', trimmedNickname);
+        if (!isAuthResultPayload(data) || !commitAuthSuccess(set, data)) {
+          throw new Error(resolveAuthErrorMessage(data, '인증 응답 형식이 올바르지 않습니다.'));
+        }
+
+        localStorage.setItem('picky_guest_name', payload.nickname);
         set({
-          needsReauth: false,
-          guestName: trimmedNickname,
-          validationErrors: {},
+          guestName: payload.nickname,
           isLoading: false,
+          validationErrors: {},
         });
         return true;
       } catch (err: any) {
@@ -444,6 +467,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
           });
           return;
         }
+
         persistUser(user);
         set({ user, isLoading: false, needsReauth: false, validationErrors: {} });
       } catch (err: any) {
