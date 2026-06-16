@@ -32,11 +32,14 @@ export const PollDetail: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  const { currentPoll, isLoading, error, fetchPoll, vote, setCurrentPoll } = usePollStore();
-  const { user, guestName } = useAuthStore((state) => ({
-    user: state.user,
-    guestName: state.guestName,
-  }));
+  const currentPoll = usePollStore((state) => state.currentPoll);
+  const isLoading = usePollStore((state) => state.isLoading);
+  const error = usePollStore((state) => state.error);
+  const fetchPoll = usePollStore((state) => state.fetchPoll);
+  const vote = usePollStore((state) => state.vote);
+  const setCurrentPoll = usePollStore((state) => state.setCurrentPoll);
+  const user = useAuthStore((state) => state.user);
+  const guestName = useAuthStore((state) => state.guestName);
 
   const buildShareablePollSnapshot = (poll: Poll): string | null => {
     try {
@@ -69,13 +72,8 @@ export const PollDetail: React.FC = () => {
     return `${window.location.origin}/poll/${poll.id}?snapshot=${snapshot}`;
   };
 
-  const restorePollFromSnapshot = () => {
-    if (!id) {
-      return;
-    }
-
-    const snapshot = searchParams.get('snapshot');
-    if (!snapshot) {
+  const restorePollFromSnapshot = (snapshot: string | null) => {
+    if (!id || !snapshot) {
       return;
     }
 
@@ -145,7 +143,7 @@ export const PollDetail: React.FC = () => {
 
   // Fetch current poll data
   useEffect(() => {
-    restorePollFromSnapshot();
+    restorePollFromSnapshot(snapshotParam);
 
     if (id) {
       fetchPoll(id);
@@ -193,8 +191,9 @@ export const PollDetail: React.FC = () => {
     setShowShareModal(false);
     // Remove query parameter from URL
     if (searchParams.has('showShare')) {
-      searchParams.delete('showShare');
-      setSearchParams(searchParams);
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete('showShare');
+      setSearchParams(nextParams);
     }
   };
 
