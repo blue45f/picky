@@ -199,7 +199,7 @@ const densityStyles: Record<DensityMode, DensityStyle> = {
 export const DesignSystem: React.FC = () => {
   const [density, setDensity] = useState<DensityMode>('balanced');
   const [copyKey, setCopyKey] = useState<string>('');
-  const [ctaMode, setCtaMode] = useState<'text' | 'loading'>( 'text');
+  const [ctaMode, setCtaMode] = useState<'text' | 'loading'>('text');
 
   const copyCode = (key: string, text: string) => {
     navigator.clipboard?.writeText(text).finally(() => {
@@ -264,7 +264,8 @@ export const DesignSystem: React.FC = () => {
             borderRadius: '50%',
             left: '-120px',
             bottom: '-150px',
-            background: 'radial-gradient(circle at center, rgba(132, 94, 247, 0.32), rgba(132, 94, 247, 0) 72%)',
+            background:
+              'radial-gradient(circle at center, rgba(132, 94, 247, 0.32), rgba(132, 94, 247, 0) 72%)',
             pointerEvents: 'none',
             filter: 'blur(1px)',
           }}
@@ -306,7 +307,8 @@ export const DesignSystem: React.FC = () => {
           </h1>
           <p style={{ color: 'var(--text-secondary)', lineHeight: 1.75, maxWidth: 780 }}>
             토큰부터 컴포넌트까지 한 번에 점검할 수 있는 내부 전용 디자인 시스템 뷰입니다.
-            버튼/입력/카드/섹션 레이아웃의 규칙을 같은 문맥에서 확인하고 즉시 UI로 환원할 수 있습니다.
+            버튼/입력/카드/섹션 레이아웃의 규칙을 같은 문맥에서 확인하고 즉시 UI로 환원할 수
+            있습니다.
           </p>
           <div
             style={{
@@ -410,9 +412,10 @@ export const DesignSystem: React.FC = () => {
                   border: '1px solid var(--bg-card-border)',
                   borderRadius: '10px',
                   padding: '0.7rem',
-                  background: 'linear-gradient(120deg, rgba(255,255,255,0.05), rgba(255,255,255,0.01))',
+                  background:
+                    'linear-gradient(120deg, rgba(255,255,255,0.05), rgba(255,255,255,0.01))',
                   transform: `translateY(${index * 0.5}px)`,
-                  animation: `slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) ${(index * 45) + 120}ms both`,
+                  animation: `slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) ${index * 45 + 120}ms both`,
                 }}
               >
                 <div
@@ -482,7 +485,7 @@ export const DesignSystem: React.FC = () => {
                   display: 'grid',
                   gap: '0.4rem',
                   borderLeft: '3px solid var(--brand-primary)',
-                  animation: `slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) ${(index * 55) + 100}ms both`,
+                  animation: `slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) ${index * 55 + 100}ms both`,
                 }}
               >
                 <div
@@ -512,7 +515,9 @@ export const DesignSystem: React.FC = () => {
                 >
                   {type.example}
                 </p>
-                <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)' }}>{type.note}</p>
+                <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                  {type.note}
+                </p>
               </div>
             ))}
           </div>
@@ -549,12 +554,14 @@ export const DesignSystem: React.FC = () => {
                   background: 'var(--bg-card)',
                   display: 'grid',
                   gap: '0.4rem',
-                  animation: `slideUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) ${(index * 55) + 160}ms both`,
+                  animation: `slideUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) ${index * 55 + 160}ms both`,
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>
                   <strong>{shape.token}</strong>
-                  <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{shape.value}</span>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+                    {shape.value}
+                  </span>
                 </div>
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
                   {shape.purpose}
@@ -563,7 +570,8 @@ export const DesignSystem: React.FC = () => {
                   style={{
                     height: '10px',
                     borderRadius: '999px',
-                    background: 'linear-gradient(90deg, var(--bg-main), var(--brand-primary), var(--brand-primary-light))',
+                    background:
+                      'linear-gradient(90deg, var(--bg-main), var(--brand-primary), var(--brand-primary-light))',
                   }}
                 />
                 {shape.sample ? (
@@ -671,7 +679,11 @@ export const DesignSystem: React.FC = () => {
                 <button type="button" className="btn-primary" style={{ padding: '0.68rem 1.1rem' }}>
                   Primary
                 </button>
-                <button type="button" className="btn-secondary" style={{ padding: '0.68rem 1.1rem' }}>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  style={{ padding: '0.68rem 1.1rem' }}
+                >
                   Secondary
                 </button>
                 <button
@@ -688,7 +700,6 @@ export const DesignSystem: React.FC = () => {
                     className="btn-primary"
                     style={{ padding: '0.68rem 1.1rem', position: 'relative' }}
                   >
-                    
                     <span style={{ opacity: 0.8 }}>로딩중</span>
                     <span
                       style={{
@@ -717,7 +728,11 @@ export const DesignSystem: React.FC = () => {
                   padding: '0.8rem',
                 }}
               >
-                <input className="form-input" placeholder="텍스트 입력" style={{ padding: currentDensity.inputPad }} />
+                <input
+                  className="form-input"
+                  placeholder="텍스트 입력"
+                  style={{ padding: currentDensity.inputPad }}
+                />
                 <textarea
                   className="form-input"
                   rows={4}
@@ -770,9 +785,18 @@ export const DesignSystem: React.FC = () => {
                   padding: '0.8rem',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.7rem' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '0.7rem',
+                  }}
+                >
                   <strong style={{ fontSize: '0.9rem' }}>Action Tokens</strong>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>컴포넌트 규격</span>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                    컴포넌트 규격
+                  </span>
                 </div>
                 <div
                   style={{
@@ -881,11 +905,7 @@ export const DesignSystem: React.FC = () => {
                 gap: '0.65rem',
               }}
             >
-              {[
-                '상태 카드',
-                '통계 카드',
-                '참여자 카드',
-              ].map((cardLabel) => (
+              {['상태 카드', '통계 카드', '참여자 카드'].map((cardLabel) => (
                 <div
                   key={cardLabel}
                   style={{
@@ -930,7 +950,7 @@ export const DesignSystem: React.FC = () => {
                   background: 'oklch(16% 0.014 260)',
                   display: 'grid',
                   gap: '0.4rem',
-                  animation: `slideUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) ${(index * 70) + 110}ms both`,
+                  animation: `slideUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) ${index * 70 + 110}ms both`,
                 }}
               >
                 <div
@@ -951,7 +971,12 @@ export const DesignSystem: React.FC = () => {
                     type="button"
                     className="btn-secondary"
                     onClick={() => copyCode(snippet.title, snippet.code)}
-                    style={{ padding: '0.45rem 0.72rem', display: 'inline-flex', gap: '0.4rem', alignItems: 'center' }}
+                    style={{
+                      padding: '0.45rem 0.72rem',
+                      display: 'inline-flex',
+                      gap: '0.4rem',
+                      alignItems: 'center',
+                    }}
                   >
                     <Copy size={14} />
                     {copyKey === snippet.title ? '복사됨' : '복사'}
@@ -978,8 +1003,7 @@ export const DesignSystem: React.FC = () => {
                       width: '32px',
                       height: '100%',
                       pointerEvents: 'none',
-                      background:
-                        'linear-gradient(90deg, rgba(0,0,0,0), rgba(0,0,0,0.32))',
+                      background: 'linear-gradient(90deg, rgba(0,0,0,0), rgba(0,0,0,0.32))',
                     }}
                   />
                 </pre>
@@ -1038,7 +1062,8 @@ export const DesignSystem: React.FC = () => {
                     borderTop: '1px solid rgba(255,255,255,0.12)',
                   }}
                 >
-                  기본 대비 샘플<br />
+                  기본 대비 샘플
+                  <br />
                   <span style={{ color: 'var(--text-muted)' }}>
                     배경 대비가 실서비스에서 충분한지 UI 확인용 시나리오입니다.
                   </span>
@@ -1049,9 +1074,19 @@ export const DesignSystem: React.FC = () => {
         </section>
       </section>
 
-      <section className="content-card" style={{ padding: '1.1rem', display: 'grid', gap: '0.5rem' }}>
+      <section
+        className="content-card"
+        style={{ padding: '1.1rem', display: 'grid', gap: '0.5rem' }}
+      >
         <h3 style={{ margin: 0, fontSize: '0.95rem' }}>페이지 요약</h3>
-        <p style={{ margin: 0, color: 'var(--text-secondary)', lineHeight: 1.75, fontSize: '0.84rem' }}>
+        <p
+          style={{
+            margin: 0,
+            color: 'var(--text-secondary)',
+            lineHeight: 1.75,
+            fontSize: '0.84rem',
+          }}
+        >
           이 페이지는 토큰과 원칙을 기반으로 한 일관된 스타일링으로 구성되며, 실제 서비스 컴포넌트의
           베이스로 바로 연결되도록 작성되어 있습니다.
         </p>
@@ -1065,13 +1100,31 @@ export const DesignSystem: React.FC = () => {
             fontSize: '0.75rem',
           }}
         >
-          <span style={{ border: '1px dashed var(--bg-card-border)', padding: '0.35rem 0.65rem', borderRadius: '999px' }}>
+          <span
+            style={{
+              border: '1px dashed var(--bg-card-border)',
+              padding: '0.35rem 0.65rem',
+              borderRadius: '999px',
+            }}
+          >
             반응형 레이아웃 대응
           </span>
-          <span style={{ border: '1px dashed var(--bg-card-border)', padding: '0.35rem 0.65rem', borderRadius: '999px' }}>
+          <span
+            style={{
+              border: '1px dashed var(--bg-card-border)',
+              padding: '0.35rem 0.65rem',
+              borderRadius: '999px',
+            }}
+          >
             인터랙션 상태 커버
           </span>
-          <span style={{ border: '1px dashed var(--bg-card-border)', padding: '0.35rem 0.65rem', borderRadius: '999px' }}>
+          <span
+            style={{
+              border: '1px dashed var(--bg-card-border)',
+              padding: '0.35rem 0.65rem',
+              borderRadius: '999px',
+            }}
+          >
             코드 복붙 패턴 제공
           </span>
         </div>
