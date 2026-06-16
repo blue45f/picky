@@ -1,5 +1,5 @@
 import React, { FormEvent, useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams, useSearchParams, Link } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, CircleHelp } from 'lucide-react';
 import { Mail, Lock, User, Play, Sparkles } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
@@ -571,36 +571,15 @@ export const AuthPage: React.FC = () => {
                     <p style={{ margin: 0, color: 'var(--text-secondary)', lineHeight: 1.7 }}>
                       로그인 후에는 투표 이력/생성 이력이 닉네임 대신 계정 기반으로 관리됩니다.
                     </p>
-                    <div
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        marginTop: '0.25rem',
-                        gap: '0.5rem',
-                        flexWrap: 'wrap',
-                      }}
-                    >
-                      <Link
-                        to="/design"
-                        style={{
-                          color: 'var(--brand-primary)',
-                          fontSize: '0.8rem',
-                          textDecoration: 'none',
-                        }}
+                    <Dialog.Close asChild>
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        style={{ padding: '0.45rem 0.85rem', fontSize: '0.78rem' }}
                       >
-                        스타일 가이드 보기
-                      </Link>
-                      <Dialog.Close asChild>
-                        <button
-                          type="button"
-                          className="btn-secondary"
-                          style={{ padding: '0.45rem 0.85rem', fontSize: '0.78rem' }}
-                        >
-                          닫기
-                        </button>
-                      </Dialog.Close>
-                    </div>
+                        닫기
+                      </button>
+                    </Dialog.Close>
                   </div>
                 </Dialog.Content>
               </Dialog.Portal>
