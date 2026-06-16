@@ -32,7 +32,7 @@ export const PollDetail: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  const { currentPoll, isLoading, fetchPoll, vote, setCurrentPoll } = usePollStore();
+  const { currentPoll, isLoading, error, fetchPoll, vote, setCurrentPoll } = usePollStore();
   const { user, guestName } = useAuthStore((state) => ({
     user: state.user,
     guestName: state.guestName,
@@ -215,6 +215,8 @@ export const PollDetail: React.FC = () => {
   }
 
   if (!currentPoll) {
+    const noPollMessage =
+      error || '존재하지 않거나 삭제된 고민 투표 링크입니다.';
     return (
       <div
         className="content-card"
@@ -228,14 +230,14 @@ export const PollDetail: React.FC = () => {
         }}
       >
         <AlertCircle size={36} style={{ color: 'var(--brand-accent-coral)' }} />
-        <div>
-          <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '6px' }}>
-            고민 정보를 찾을 수 없습니다
-          </h3>
-          <p style={{ fontSize: '0.825rem', color: 'var(--text-secondary)' }}>
-            존재하지 않거나 삭제된 고민 투표 링크입니다.
-          </p>
-        </div>
+          <div>
+            <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '6px' }}>
+              고민 정보를 찾을 수 없습니다
+            </h3>
+            <p style={{ fontSize: '0.825rem', color: 'var(--text-secondary)' }}>
+              {noPollMessage}
+            </p>
+          </div>
         <button
           onClick={() => navigate('/')}
           className="btn-secondary"

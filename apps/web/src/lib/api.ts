@@ -54,47 +54,25 @@ const persistPreferredApiBase = (base: string) => {
 
 const dedupe = <T>(items: T[]): T[] => Array.from(new Set(items));
 
-const addVercelApiFallback = (normalizedBase: string): string[] => {
-  if (!normalizedBase || normalizedBase.startsWith('/')) {
-    return [normalizedBase];
-  }
-
-  try {
-    const parsed = new URL(normalizedBase);
-    const match = parsed.hostname.match(/^(.*)\.vercel\.app$/);
-
-    if (!match || match[1].endsWith('-api')) {
-      return [normalizedBase];
-    }
-
-    const apiHost = `${match[1]}-api.vercel.app`;
-    const fallback = `${parsed.protocol}//${apiHost}/api`;
-    return dedupe([normalizedBase, fallback]);
-  } catch {
-    return [normalizedBase];
-  }
-};
-
 const getWindowApiCandidates = (): string[] => {
   if (typeof window === 'undefined') {
     return [];
   }
 
   const { protocol, host } = window.location;
-  const sameOriginBase = `${protocol}//${host}/api`;
-  return addVercelApiFallback(normalizeApiBase(sameOriginBase));
+  return [normalizeApiBase(`${protocol}//${host}/api`)];
 };
 
 const getApiCandidates = (): string[] => {
   const explicitBase = import.meta.env.VITE_API_BASE_URL?.trim();
   if (explicitBase) {
-    const explicitCandidates = addVercelApiFallback(normalizeApiBase(explicitBase));
+    const explicitCandidates = [normalizeApiBase(explicitBase)];
     const runtimeCandidates = getWindowApiCandidates();
     return dedupe([...runtimeCandidates, ...explicitCandidates]);
   }
 
   const preferredBase = getPreferredApiBase();
-  const preferred = preferredBase ? addVercelApiFallback(normalizeApiBase(preferredBase)) : [];
+  const preferred = preferredBase ? [normalizeApiBase(preferredBase)] : [];
 
   if (typeof window === 'undefined') {
     return ['/api'];
@@ -124,13 +102,11 @@ const shouldRetryOnFailure = (res: Response, index: number, total: number): bool
     return true;
   }
 
-  // API 호스트가 잘못 잡혀 route 자체가 존재하지 않는 경우(404/405)를 발견하면
-  // 다른 후보(base)로 한 번 더 시도해보는 게 안전합니다.
   if (res.status >= 500) {
     return true;
   }
 
-  return res.status === 404 || res.status === 405;
+  return res.status === 405;
 };
 
 const isApiDebugEnabled = (): boolean => {

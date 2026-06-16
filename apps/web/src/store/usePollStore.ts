@@ -239,7 +239,7 @@ export const usePollStore = create<PollState>((set, get) => ({
   },
 
   fetchPoll: async (id) => {
-    set({ isLoading: true, error: null });
+    set({ isLoading: true, error: null, currentPoll: null });
     try {
       const res = await requestApi(`/polls/${id}`);
       if (!res.ok) {
