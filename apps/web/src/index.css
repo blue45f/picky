@@ -1,0 +1,211 @@
+:root {
+  --font-sans:
+    'Pretendard Variable', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+
+  /* OKLCH Color Tokens */
+  --bg-main: oklch(14% 0.015 260); /* Deep rich dark indigo-slate */
+  --bg-card: oklch(18% 0.02 260); /* Sleek card background */
+  --bg-card-hover: oklch(21% 0.025 260); /* Card hover background */
+  --bg-card-border: rgba(255, 255, 255, 0.06);
+  --bg-card-border-hover: rgba(255, 255, 255, 0.12);
+
+  /* Brand Accents */
+  --brand-primary: oklch(62% 0.18 260); /* Saturated Indigo-Violet */
+  --brand-primary-light: oklch(75% 0.12 260);
+  --brand-accent-gold: oklch(78% 0.14 85); /* Warm Amber/Gold */
+  --brand-accent-teal: oklch(72% 0.15 170); /* Soft Mint/Teal */
+  --brand-accent-coral: oklch(64% 0.18 25); /* Vibrant Coral/Red */
+
+  /* Typography Ink */
+  --text-primary: oklch(98% 0.005 260); /* High contrast off-white */
+  --text-secondary: oklch(84% 0.015 260); /* Easy to read mid-gray */
+  --text-muted: oklch(66% 0.015 260); /* Accessible captions */
+
+  /* Corners & Shapes */
+  --radius-lg: 18px;
+  --radius-md: 12px;
+  --radius-sm: 8px;
+
+  /* Shadows */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 12px 24px -4px rgba(0, 0, 0, 0.4);
+  --shadow-glow: 0 0 24px rgba(99, 102, 241, 0.15);
+  --shadow-glow-active: 0 0 32px rgba(99, 102, 241, 0.3);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--bg-main);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  min-height: 100vh;
+  overflow-x: hidden;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Base Card & Container Elements */
+.content-card {
+  background: var(--bg-card);
+  border: 1px solid var(--bg-card-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.content-card:hover {
+  border-color: var(--bg-card-border-hover);
+  background: var(--bg-card-hover);
+}
+
+/* Interactive Choices Card (Twitter Poll / Slido style) */
+.choice-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--bg-card-border);
+  background: oklch(16% 0.015 260);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.choice-card:hover {
+  border-color: var(--brand-primary);
+  background: oklch(19% 0.02 260);
+  transform: translateY(-1px);
+}
+
+.choice-card.selected {
+  border-color: var(--brand-primary);
+  background: oklch(20% 0.04 260);
+  box-shadow: 0 0 16px rgba(99, 102, 241, 0.12);
+}
+
+/* Premium Buttons */
+.btn-primary {
+  background: var(--brand-primary);
+  color: oklch(100% 0 0);
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: var(--shadow-glow);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--brand-primary-light);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-glow-active);
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--bg-card-border);
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-primary);
+  border-color: var(--bg-card-border-hover);
+}
+
+/* Animations */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Form Styling */
+.form-input {
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  background-color: oklch(11% 0.015 260);
+  border: 1px solid var(--bg-card-border);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  font-family: inherit;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.form-input:focus {
+  border-color: var(--brand-primary);
+  box-shadow: 0 0 12px rgba(99, 102, 241, 0.1);
+}
+
+.form-input::placeholder {
+  color: var(--text-muted);
+}
+
+/* Scrollbar customization */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-main);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+/* Modal Backdrops & Overlays (intentional glassmorphism) */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(6, 8, 12, 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 1rem;
+}
+
+.modal-content {
+  background: var(--bg-card);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  width: 100%;
+  max-width: 480px;
+  padding: 24px;
+}

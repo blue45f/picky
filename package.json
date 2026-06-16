@@ -1,0 +1,29 @@
+{
+  "name": "picky",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Picky - 까다로운 고민을 지인들에게 투표 링크로 빠르게 물어보는 투표 SNS 플랫폼",
+  "packageManager": "pnpm@11.4.0",
+  "engines": {
+    "node": ">=24.16.0",
+    "pnpm": ">=11.0.0"
+  },
+  "scripts": {
+    "dev": "pnpm -r --parallel --filter=./apps/* run dev",
+    "dev:web": "pnpm --filter @picky/web run dev",
+    "dev:api": "pnpm --filter @picky/api run dev",
+    "build": "pnpm -r run build",
+    "lint": "eslint .",
+    "format": "prettier --write \"**/*.{ts,tsx,js,json,md,css,yml,yaml}\"",
+    "typecheck": "pnpm -r run typecheck"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.4.0",
+    "eslint-plugin-react": "^7.37.5",
+    "globals": "^17.6.0",
+    "prettier": "^3.8.3",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.61.0"
+  }
+}
