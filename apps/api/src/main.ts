@@ -9,7 +9,8 @@ export async function createApiServer() {
   // Enable CORS for frontend integration
   app.enableCors({
     origin: '*',
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With'],
     preflightContinue: false,
     optionsSuccessStatus: 204,
   });
