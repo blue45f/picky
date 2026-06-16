@@ -2,12 +2,12 @@
   "cleanUrls": true,
   "trailingSlash": false,
   "rewrites": [
-    { "source": "/create", "destination": "/index.html" },
-    { "source": "/design", "destination": "/index.html" },
-    { "source": "/auth/:path*", "destination": "/index.html" },
-    { "source": "/poll/:id", "destination": "/index.html" },
-    { "source": "/poll/:id/:path*", "destination": "/index.html" },
-    { "source": "/:path*", "destination": "/index.html" }
+    { "source": "/create", "destination": "/" },
+    { "source": "/design", "destination": "/" },
+    { "source": "/auth/:path*", "destination": "/" },
+    { "source": "/poll/:id", "destination": "/" },
+    { "source": "/poll/:id/:path*", "destination": "/" },
+    { "source": "/:path*", "destination": "/" }
   ],
   "headers": [
     {
