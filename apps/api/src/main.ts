@@ -34,6 +34,7 @@ export async function createApiServer() {
 
 async function bootstrap() {
   const app = await createApiServer();
+  const port = process.env.PORT || 3000;
   await app.listen(port);
 }
 bootstrap();
