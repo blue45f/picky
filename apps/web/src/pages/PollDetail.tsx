@@ -111,7 +111,7 @@ export const PollDetail: React.FC = () => {
 
   // Click-to-copy
   const handleCopyLinkClick = (pollId: string) => {
-    const shareUrl = `${window.location.origin}/#poll/${pollId}`;
+    const shareUrl = `${window.location.origin}/poll/${pollId}`;
     navigator.clipboard.writeText(shareUrl).then(() => {
       setCopiedId(pollId);
       setTimeout(() => setCopiedId(null), 2000);
@@ -805,7 +805,7 @@ export const PollDetail: React.FC = () => {
                   textAlign: 'left',
                 }}
               >
-                {`${window.location.origin}/#poll/${currentPoll.id}`}
+                {`${window.location.origin}/poll/${currentPoll.id}`}
               </span>
               <button
                 onClick={() => handleCopyLinkClick(currentPoll.id)}
@@ -837,7 +837,7 @@ export const PollDetail: React.FC = () => {
               }}
             >
               <a
-                href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`[픽플로우 투표] ${currentPoll.question}\n지인분들의 투표와 의견을 들려주세요!`)}&url=${encodeURIComponent(`${window.location.origin}/#poll/${currentPoll.id}`)}`}
+                href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`[픽플로우 투표] ${currentPoll.question}\n지인분들의 투표와 의견을 들려주세요!`)}&url=${encodeURIComponent(`${window.location.origin}/poll/${currentPoll.id}`)}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="btn-secondary"
@@ -855,7 +855,7 @@ export const PollDetail: React.FC = () => {
                 <span>🐦 X (Twitter)</span>
               </a>
               <a
-                href={`https://share.kakaocast.daum.net/intent?text=${encodeURIComponent(`[고민 해결 투표] ${currentPoll.question}\n아래 링크를 클릭해 투표해 주세요!\n${window.location.origin}/#poll/${currentPoll.id}`)}`}
+                href={`https://share.kakaocast.daum.net/intent?text=${encodeURIComponent(`[고민 해결 투표] ${currentPoll.question}\n아래 링크를 클릭해 투표해 주세요!\n${window.location.origin}/poll/${currentPoll.id}`)}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="btn-secondary"

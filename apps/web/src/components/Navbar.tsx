@@ -194,25 +194,66 @@ export const Navbar: React.FC = () => {
                 </button>
               </>
             ) : (
-              <button
-                onClick={() =>
-                  showAuthErrorHint
-                    ? handleAuthModalOpen('login', SESSION_REAUTH_SUBTITLE)
-                    : handleAuthModalOpen()
-                }
-                className="btn-secondary"
-                style={{
-                  padding: '8px 14px',
-                  fontSize: showAuthErrorHint ? '0.675rem' : '0.8rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  cursor: 'pointer',
-                }}
-              >
-                <LogIn size={14} />
-                <span>{showAuthErrorHint ? '세션 만료, 재로그인' : '로그인 / 가입'}</span>
-              </button>
+              <>
+                {showAuthErrorHint && (
+                  <button
+                    onClick={() => handleAuthModalOpen('login', SESSION_REAUTH_SUBTITLE)}
+                    className="btn-secondary"
+                    style={{
+                      padding: '8px 14px',
+                      fontSize: '0.75rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <LogIn size={14} />
+                    <span>세션 만료, 재로그인</span>
+                  </button>
+                )}
+                <Link
+                  to="/auth/login"
+                  className="btn-secondary"
+                  style={{
+                    padding: '8px 14px',
+                    fontSize: '0.75rem',
+                    textDecoration: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <LogIn size={14} />
+                  <span>로그인</span>
+                </Link>
+                <Link
+                  to="/auth/register"
+                  className="btn-secondary"
+                  style={{
+                    padding: '8px 14px',
+                    fontSize: '0.75rem',
+                    textDecoration: 'none',
+                  }}
+                >
+                  회원가입
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => handleAuthModalOpen('guest', '비회원으로 바로 시작해요')}
+                  className="btn-secondary"
+                  style={{
+                    padding: '8px 14px',
+                    fontSize: '0.75rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  비회원시작
+                </button>
+              </>
             )}
           </div>
         </div>

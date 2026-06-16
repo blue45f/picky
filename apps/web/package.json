@@ -10,6 +10,8 @@
   },
   "dependencies": {
     "@picky/shared": "workspace:*",
+    "@radix-ui/react-dialog": "^1.1.16",
+    "@radix-ui/react-tabs": "^1.1.11",
     "lucide-react": "^0.475.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
