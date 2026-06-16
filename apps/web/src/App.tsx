@@ -1,5 +1,13 @@
 import React, { useEffect } from 'react';
-import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import {
+  BrowserRouter,
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+  useSearchParams,
+} from 'react-router-dom';
 import { Heart } from 'lucide-react';
 import { Navbar } from './components/Navbar';
 import { PollList } from './pages/PollList';
@@ -24,11 +32,7 @@ const FallbackRouteBridge: React.FC = () => {
 
     try {
       const nextPath = decodeURIComponent(raw);
-      if (
-        nextPath.startsWith('//') ||
-        !nextPath.startsWith('/') ||
-        nextPath.length > 2048
-      ) {
+      if (nextPath.startsWith('//') || !nextPath.startsWith('/') || nextPath.length > 2048) {
         setSearchParams({}, { replace: true });
         return;
       }
@@ -58,22 +62,14 @@ export const App: React.FC = () => {
           minHeight: '100vh',
           display: 'flex',
           flexDirection: 'column',
+          background: 'linear-gradient(to bottom, color-mix(in oklab, var(--bg-main) 82%, transparent), var(--bg-main))',
           position: 'relative',
         }}
       >
         <Navbar />
         <FallbackRouteBridge />
 
-        {/* Main Layout Area */}
-        <main
-          style={{
-            flexGrow: 1,
-            width: '100%',
-            maxWidth: '680px',
-            margin: '0 auto',
-            padding: '2.5rem 1.25rem 5rem 1.25rem',
-          }}
-        >
+        <main className="page-shell" style={{ flexGrow: 1 }}>
           <Routes>
             <Route path="/" element={<PollList />} />
             <Route path="/create" element={<CreatePoll />} />
@@ -85,7 +81,6 @@ export const App: React.FC = () => {
           </Routes>
         </main>
 
-        {/* Footer Area */}
         <footer
           style={{
             marginTop: 'auto',
@@ -94,24 +89,23 @@ export const App: React.FC = () => {
             textAlign: 'center',
             fontSize: '0.75rem',
             color: 'var(--text-muted)',
-            backgroundColor: 'oklch(12% 0.015 260)',
+            backgroundColor: 'var(--bg-main)',
           }}
         >
-          <div
-            style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'center' }}
-          >
+          <div style={{ maxWidth: '980px', margin: '0 auto', display: 'grid', gap: '6px' }}>
             <p>© {new Date().getFullYear()} pickflow. All rights reserved.</p>
             <p
               style={{
-                display: 'flex',
+                display: 'inline-flex',
                 alignItems: 'center',
+                justifyContent: 'center',
                 gap: '4px',
                 color: 'var(--text-muted)',
               }}
             >
-              <span>Built with Premium UI & Monorepo Architecture for</span>
+              <span>Built with Premium UI for</span>
               <Heart size={10} style={{ color: 'var(--brand-accent-coral)' }} />
-              <span>Standardized Developer Portfolio</span>
+              <span>Decision-Flow Product Experiences</span>
             </p>
           </div>
         </footer>
