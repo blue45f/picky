@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
+import { ArrowLeft, Plus, Sparkles, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Trash2, Sparkles } from 'lucide-react';
 import { usePollStore } from '../store/usePollStore';
 import { Poll } from '@picky/shared';
 
@@ -99,6 +99,8 @@ interface OptionInput {
   imageUrl: string;
 }
 
+const MAX_OPTIONS = 10;
+
 export const CreatePoll: React.FC = () => {
   const { createPoll, isLoading, error, clearError } = usePollStore();
   const navigate = useNavigate();
@@ -112,6 +114,40 @@ export const CreatePoll: React.FC = () => {
     { text: '', imageUrl: '' },
   ]);
   const [activePresetIndex, setActivePresetIndex] = useState<number | null>(null);
+
+  const normalizedQuestion = question.trim();
+  const normalizedDescription = description.trim();
+  const normalizedOptions = useMemo(
+    () =>
+      options.map((option) => ({
+        text: option.text.trim(),
+        imageUrl: option.imageUrl.trim() || null,
+      })),
+    [options],
+  );
+  const nonEmptyOptions = useMemo(
+    () => normalizedOptions.filter((option) => option.text.length > 0),
+    [normalizedOptions],
+  );
+  const hasDuplicateOptions = useMemo(() => {
+    const seen = new Set<string>();
+    for (const option of nonEmptyOptions) {
+      const token = option.text.toLowerCase();
+      if (seen.has(token)) {
+        return true;
+      }
+      seen.add(token);
+    }
+    return false;
+  }, [nonEmptyOptions]);
+
+  const canSubmit =
+    normalizedQuestion.length >= 2 &&
+    normalizedQuestion.length <= 100 &&
+    nonEmptyOptions.length >= 2 &&
+    !hasDuplicateOptions &&
+    normalizedDescription.length <= 500 &&
+    !isLoading;
 
   const buildShareablePollSnapshot = (poll: Poll): string | null => {
     try {
@@ -147,8 +183,20 @@ export const CreatePoll: React.FC = () => {
     setTimeout(() => setActivePresetIndex(null), 500);
   };
 
+  const handleReset = () => {
+    setQuestion('');
+    setDescription('');
+    setOptions([
+      { text: '', imageUrl: '' },
+      { text: '', imageUrl: '' },
+    ]);
+    setActivePresetIndex(null);
+    setFormError('');
+    clearError();
+  };
+
   const handleAddOptionInput = () => {
-    if (options.length < 10) {
+    if (options.length < MAX_OPTIONS) {
       setOptions([...options, { text: '', imageUrl: '' }]);
     }
   };
@@ -178,36 +226,40 @@ export const CreatePoll: React.FC = () => {
     setFormError('');
     clearError();
 
-    const trimmedQuestion = question.trim();
-    if (!trimmedQuestion) {
+    if (!normalizedQuestion) {
       setFormError('고민 제목은 필수로 입력해야 합니다.');
       return;
     }
 
-    if (trimmedQuestion.length < 2) {
+    if (normalizedQuestion.length < 2) {
       setFormError('고민 제목은 최소 2글자 이상 입력해야 합니다.');
       return;
     }
 
-    const trimmedDescription = description.trim();
-    if (trimmedDescription.length > 500) {
+    if (normalizedQuestion.length > 100) {
+      setFormError('고민 제목은 최대 100자까지 입력할 수 있습니다.');
+      return;
+    }
+
+    if (normalizedDescription.length > 500) {
       setFormError('상세 내용은 최대 500자까지만 허용됩니다.');
       return;
     }
 
-    const filtered = options
-      .map((o) => ({ text: o.text.trim(), imageUrl: o.imageUrl.trim() || null }))
-      .filter((o) => o.text !== '');
-
-    if (filtered.length < 2) {
+    if (nonEmptyOptions.length < 2) {
       setFormError('최소 2개 이상의 선택지 내용을 입력해 주세요.');
       return;
     }
 
+    if (hasDuplicateOptions) {
+      setFormError('중복된 선택지 텍스트가 존재합니다.');
+      return;
+    }
+
     const result = await createPoll({
-      question: trimmedQuestion,
-      description: trimmedDescription || null,
-      options: filtered,
+      question: normalizedQuestion,
+      description: normalizedDescription || null,
+      options: nonEmptyOptions,
     });
 
     if (result) {
@@ -226,43 +278,59 @@ export const CreatePoll: React.FC = () => {
       className="animate-slide-up"
       style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}
     >
-      {/* Header */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-        <h1
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <h1
+            style={{
+              fontSize: '1.5rem',
+              fontWeight: 800,
+              color: 'var(--text-primary)',
+              letterSpacing: '-0.02em',
+            }}
+          >
+            새로운 고민 올리기
+          </h1>
+          <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+            질문과 선택지들을 등록해보세요. SNS 공유에 최적화된 단축 링크가 발급됩니다.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => navigate('/')}
+          className="ghost-btn"
           style={{
-            fontSize: '1.5rem',
-            fontWeight: 800,
-            color: 'var(--text-primary)',
-            letterSpacing: '-0.02em',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '8px 12px',
+            fontSize: '0.76rem',
           }}
         >
-          새로운 고민 올리기
-        </h1>
-        <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-          질문과 선택지들을 등록해보세요. SNS 공유에 최적화된 단축 링크가 발급됩니다.
-        </p>
+          <ArrowLeft size={14} />
+          목록으로
+        </button>
       </div>
 
-      {/* Template Selector pills */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
         <span
           style={{
             fontSize: '0.75rem',
             fontWeight: 700,
             color: 'var(--text-secondary)',
-            display: 'flex',
+            display: 'inline-flex',
             alignItems: 'center',
             gap: '4px',
           }}
         >
           <Sparkles size={13} style={{ color: 'var(--brand-accent-gold)' }} />
-          <span>빠른 작성을 위한 템플릿 프리셋:</span>
+          빠른 작성을 위한 템플릿 프리셋:
         </span>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           {PRESET_TEMPLATES.map((tmpl, idx) => (
             <button
-              key={idx}
               type="button"
+              key={idx}
               onClick={() => applyPreset(idx)}
               className="btn-secondary"
               style={{
@@ -285,7 +353,6 @@ export const CreatePoll: React.FC = () => {
         </div>
       </div>
 
-      {/* Main Form */}
       <form
         onSubmit={handleCreatePollSubmit}
         className="content-card"
@@ -297,7 +364,6 @@ export const CreatePoll: React.FC = () => {
           cursor: 'default',
         }}
       >
-        {/* Question */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
           <label style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>
             고민 주제 (질문)
@@ -332,6 +398,7 @@ export const CreatePoll: React.FC = () => {
               {error}
             </p>
           ) : null}
+
           <input
             type="text"
             placeholder="예: 어떤 사이드 프로젝트를 가장 먼저 상용화할까요?"
@@ -345,9 +412,11 @@ export const CreatePoll: React.FC = () => {
             maxLength={100}
             className="form-input"
           />
+          <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+            {normalizedQuestion.length} / 100
+          </span>
         </div>
 
-        {/* Description */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
           <label style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>
             상세 내용 / 고민 배경 (선택)
@@ -365,9 +434,11 @@ export const CreatePoll: React.FC = () => {
             className="form-input"
             style={{ resize: 'none' }}
           />
+          <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+            {normalizedDescription.length} / 500
+          </span>
         </div>
 
-        {/* Options */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <label style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>
@@ -377,6 +448,22 @@ export const CreatePoll: React.FC = () => {
               {options.length} / 10
             </span>
           </div>
+
+          {hasDuplicateOptions ? (
+            <p
+              style={{
+                margin: 0,
+                color: 'var(--brand-accent-coral)',
+                fontSize: '0.74rem',
+                border: '1px solid rgba(239, 68, 68, 0.2)',
+                background: 'rgba(239, 68, 68, 0.12)',
+                borderRadius: 'var(--radius-sm)',
+                padding: '8px 10px',
+              }}
+            >
+              동일한 텍스트의 선택지가 있습니다. 각 선택지는 고유해야 합니다.
+            </p>
+          ) : null}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {options.map((option, index) => (
@@ -406,7 +493,7 @@ export const CreatePoll: React.FC = () => {
                   >
                     선택지 {index + 1}
                   </span>
-                  {options.length > 2 && (
+                  {options.length > 2 ? (
                     <button
                       type="button"
                       onClick={() => handleRemoveOptionInput(index)}
@@ -416,7 +503,7 @@ export const CreatePoll: React.FC = () => {
                         color: 'var(--text-muted)',
                         cursor: 'pointer',
                         padding: '2px',
-                        display: 'flex',
+                        display: 'inline-flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                       }}
@@ -430,7 +517,7 @@ export const CreatePoll: React.FC = () => {
                         onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
                       />
                     </button>
-                  )}
+                  ) : null}
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
@@ -448,25 +535,34 @@ export const CreatePoll: React.FC = () => {
                     className="form-input"
                     style={{ padding: '8px 12px', fontSize: '0.8rem' }}
                   />
-                  <input
-                    type="url"
-                    placeholder="이미지 주소 (선택)"
-                    value={option.imageUrl}
-                    onChange={(e) => {
-                      clearError();
-                      setFormError('');
-                      handleOptionImageChange(index, e.target.value);
-                    }}
-                    maxLength={200}
-                    className="form-input"
-                    style={{ padding: '8px 12px', fontSize: '0.8rem' }}
-                  />
+                  <div style={{ display: 'grid', gap: '4px' }}>
+                    <input
+                      type="url"
+                      placeholder="이미지 주소 (선택)"
+                      value={option.imageUrl}
+                      onChange={(e) => {
+                        clearError();
+                        setFormError('');
+                        handleOptionImageChange(index, e.target.value);
+                      }}
+                      maxLength={240}
+                      className="form-input"
+                      style={{ padding: '8px 12px', fontSize: '0.8rem' }}
+                    />
+                    <span style={{ fontSize: '0.66rem', color: 'var(--text-muted)' }}>
+                      {option.imageUrl.length} / 240
+                    </span>
+                  </div>
                 </div>
+
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.68rem' }}>
+                  현재 글자 수: {option.text.trim().length} / 80
+                </span>
               </div>
             ))}
           </div>
 
-          {options.length < 10 && (
+          {options.length < MAX_OPTIONS && (
             <button
               type="button"
               onClick={handleAddOptionInput}
@@ -500,11 +596,62 @@ export const CreatePoll: React.FC = () => {
           )}
         </div>
 
-        {/* Action Buttons */}
+        <div
+          style={{
+            border: '1px solid var(--bg-card-border)',
+            borderRadius: 'var(--radius-sm)',
+            padding: '0.95rem',
+            background: 'rgba(255,255,255,0.02)',
+          }}
+        >
+          <h3
+            style={{
+              margin: 0,
+              fontSize: '0.84rem',
+              color: 'var(--text-primary)',
+              marginBottom: '0.6rem',
+            }}
+          >
+            실시간 미리보기
+          </h3>
+          <p
+            style={{
+              margin: 0,
+              marginBottom: '0.5rem',
+              color: 'var(--text-primary)',
+              fontSize: '1rem',
+              fontWeight: 700,
+            }}
+          >
+            {normalizedQuestion || '질문을 입력하면 미리보기가 표시됩니다.'}
+          </p>
+          {nonEmptyOptions.length > 0 ? (
+            <div style={{ display: 'grid', gap: '0.45rem' }}>
+              {nonEmptyOptions.slice(0, 4).map((option, index) => (
+                <p
+                  key={`${option.text}-${index}`}
+                  style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.78rem' }}
+                >
+                  · {option.text}
+                </p>
+              ))}
+              {nonEmptyOptions.length > 4 ? (
+                <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.74rem' }}>
+                  ...그 외 {nonEmptyOptions.length - 4}개 선택지
+                </p>
+              ) : null}
+            </div>
+          ) : (
+            <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+              선택지를 입력하면 미리보기가 생성됩니다.
+            </p>
+          )}
+        </div>
+
         <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
           <button
             type="button"
-            onClick={() => navigate('/')}
+            onClick={handleReset}
             className="btn-secondary"
             style={{
               flex: 1,
@@ -512,11 +659,11 @@ export const CreatePoll: React.FC = () => {
               fontSize: '0.85rem',
             }}
           >
-            취소
+            초기화
           </button>
           <button
             type="submit"
-            disabled={isLoading}
+            disabled={!canSubmit}
             className="btn-primary"
             style={{
               flex: 2,

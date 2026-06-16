@@ -9,6 +9,7 @@ import {
   MessageSquare,
   Vote,
   Plus,
+  X,
 } from 'lucide-react';
 import { usePollStore } from '../store/usePollStore';
 import { useAuthStore } from '../store/useAuthStore';
@@ -16,8 +17,12 @@ import { useAuthStore } from '../store/useAuthStore';
 type SortMode = 'latest' | 'popular' | 'commented';
 type ScopeMode = 'all' | 'mine' | 'guest';
 
+const isGuestCreator = (creatorId?: string | null, creatorIsGuest?: boolean) => {
+  return creatorIsGuest || Boolean(creatorId?.startsWith('guest-'));
+};
+
 const getCreatorLabel = (creatorId?: string | null, creatorIsGuest?: boolean) => {
-  if (creatorIsGuest || (creatorId && creatorId.startsWith('guest-'))) {
+  if (isGuestCreator(creatorId, creatorIsGuest)) {
     return '비회원 작성';
   }
 
@@ -56,6 +61,31 @@ export const PollList: React.FC = () => {
 
   const normalizedQuery = query.trim().toLowerCase();
 
+  const scopedCounts = useMemo(() => {
+    const mine = userId ? polls.filter((poll) => poll.creatorId === userId).length : 0;
+    const guest = polls.filter((poll) => isGuestCreator(poll.creatorId, poll.creatorIsGuest)).length;
+
+    return {
+      all: polls.length,
+      mine,
+      guest,
+    };
+  }, [polls, userId]);
+
+  const displayScopeOptions = useMemo(
+    () =>
+      scopeOptions.map((option) => ({
+        ...option,
+        count:
+          option.value === 'all'
+            ? scopedCounts.all
+            : option.value === 'mine'
+              ? scopedCounts.mine
+              : scopedCounts.guest,
+      })),
+    [scopedCounts],
+  );
+
   const visiblePolls = useMemo(() => {
     let next = [...polls];
 
@@ -64,7 +94,7 @@ export const PollList: React.FC = () => {
     }
 
     if (scope === 'guest') {
-      next = next.filter((poll) => poll.creatorIsGuest || (poll.creatorId || '').startsWith('guest-'));
+      next = next.filter((poll) => isGuestCreator(poll.creatorId, poll.creatorIsGuest));
     }
 
     if (normalizedQuery) {
@@ -97,6 +127,25 @@ export const PollList: React.FC = () => {
     () => polls.reduce((acc, poll) => acc + poll.comments.length, 0),
     [polls],
   );
+
+  const activeFilters = useMemo(() => {
+    const labels: string[] = [];
+
+    if (scope !== 'all') {
+      const matchedScope = scopeOptions.find((option) => option.value === scope);
+      if (matchedScope) {
+        labels.push(matchedScope.label);
+      }
+    }
+
+    if (normalizedQuery) {
+      labels.push(`검색: ${normalizedQuery}`);
+    }
+
+    return labels;
+  }, [scope, normalizedQuery]);
+
+  const hasActiveFilters = activeFilters.length > 0;
 
   return (
     <section
@@ -203,8 +252,33 @@ export const PollList: React.FC = () => {
             onChange={(event) => setQuery(event.target.value)}
             placeholder="고민 제목/설명을 검색하세요"
             className="form-input"
-            style={{ paddingLeft: '32px', flex: 1 }}
+            aria-label="고민 검색"
+            style={{ paddingLeft: '32px', paddingRight: query ? '34px' : '12px', flex: 1 }}
           />
+          {query ? (
+            <button
+              type="button"
+              onClick={() => setQuery('')}
+              aria-label="검색어 지우기"
+              style={{
+                position: 'absolute',
+                right: '9px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                border: 'none',
+                background: 'rgba(255,255,255,0.07)',
+                borderRadius: '999px',
+                padding: '3px',
+                color: 'var(--text-muted)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+              }}
+            >
+              <X size={13} />
+            </button>
+          ) : null}
         </label>
 
         <label
@@ -219,6 +293,7 @@ export const PollList: React.FC = () => {
           <select
             value={sortBy}
             onChange={(event) => setSortBy(event.target.value as SortMode)}
+            aria-label="정렬 방식 선택"
             style={{
               borderRadius: '10px',
               border: '1px solid var(--bg-card-border)',
@@ -246,11 +321,13 @@ export const PollList: React.FC = () => {
             flexWrap: 'wrap',
           }}
         >
-          {scopeOptions.map((option) => (
+          {displayScopeOptions.map((option) => (
             <button
               key={option.value}
               onClick={() => setScope(option.value)}
               className="ghost-btn"
+              disabled={option.value === 'mine' && !userId}
+              title={option.value === 'mine' && !userId ? '로그인/비회원 닉네임 시작 후 내 항목을 확인할 수 있어요' : ''}
               style={{
                 borderColor:
                   scope === option.value
@@ -260,9 +337,10 @@ export const PollList: React.FC = () => {
                 backgroundColor:
                   scope === option.value ? 'rgba(99, 102, 241, 0.12)' : 'transparent',
                 padding: '6px 10px',
+                opacity: option.value === 'mine' && !userId ? 0.5 : 1,
               }}
             >
-              {option.label}
+              {option.label} ({option.count})
             </button>
           ))}
 
@@ -282,6 +360,46 @@ export const PollList: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {hasActiveFilters ? (
+        <div className="content-card" style={{ padding: '0.65rem 0.9rem' }}>
+          <p
+            style={{
+              margin: 0,
+              fontSize: '0.72rem',
+              color: 'var(--text-secondary)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              flexWrap: 'wrap',
+            }}
+          >
+            <SlidersHorizontal size={12} />
+            <strong style={{ color: 'var(--text-primary)' }}>활성 필터:</strong>
+            {activeFilters.join(' / ')}
+            <button
+              type="button"
+              onClick={() => {
+                setScope('all');
+                setQuery('');
+                setSortBy('latest');
+              }}
+              style={{
+                marginLeft: 'auto',
+                border: '1px solid var(--bg-card-border)',
+                background: 'transparent',
+                color: 'var(--text-muted)',
+                borderRadius: '999px',
+                fontSize: '0.66rem',
+                padding: '4px 8px',
+                cursor: 'pointer',
+              }}
+            >
+              초기화
+            </button>
+          </p>
+        </div>
+      ) : null}
 
       {isLoading && visiblePolls.length === 0 ? (
         <div className="content-card" style={{ padding: '1.75rem', display: 'grid', gap: '0.75rem' }}>
@@ -337,6 +455,11 @@ export const PollList: React.FC = () => {
           {visiblePolls.map((poll) => {
             const creatorLabel = getCreatorLabel(poll.creatorId, poll.creatorIsGuest);
             const isMine = userId && poll.creatorId === userId;
+            const topOptions = [...poll.options]
+              .sort((a, b) => b.voteCount - a.voteCount)
+              .slice(0, 2)
+              .map((option) => option.text)
+              .join(' / ');
 
             return (
               <button
@@ -365,7 +488,14 @@ export const PollList: React.FC = () => {
                     marginBottom: '0.7rem',
                   }}
                 >
-                  <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: '0.35rem',
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                    }}
+                  >
                     <span className="floating-tag">POLL #{poll.id}</span>
                     <span
                       style={{
@@ -434,6 +564,17 @@ export const PollList: React.FC = () => {
 
                 <div
                   style={{
+                    fontSize: '0.72rem',
+                    color: 'var(--text-secondary)',
+                    marginBottom: '0.66rem',
+                  }}
+                >
+                  <strong style={{ color: 'var(--text-primary)' }}>현재 상위 선택지:</strong>{' '}
+                  {topOptions || '아직 등록된 선택지가 없습니다'}
+                </div>
+
+                <div
+                  style={{
                     display: 'flex',
                     flexWrap: 'wrap',
                     justifyContent: 'space-between',
@@ -471,7 +612,8 @@ export const PollList: React.FC = () => {
                       }}
                     >
                       <MessageSquare size={12} />
-                      <strong style={{ color: 'var(--text-primary)' }}>{poll.comments.length}</strong> 의견
+                      <strong style={{ color: 'var(--text-primary)' }}>{poll.comments.length}</strong>{' '}
+                      의견
                     </span>
                   </div>
 
