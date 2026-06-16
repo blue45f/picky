@@ -92,6 +92,51 @@ const resolveAuthErrorMessage = (payload: any, fallback: string): string => {
   return fallback;
 };
 
+const decodeAuthToken = (token: string | null): UserProfile | null => {
+  if (!token) {
+    return null;
+  }
+
+  try {
+    const base64Payload = token.split('.')[1];
+    if (!base64Payload) {
+      return null;
+    }
+
+    const normalizedPayload = base64Payload.replace(/-/g, '+').replace(/_/g, '/');
+    const paddedPayload = `${normalizedPayload}${'='.repeat((4 - (normalizedPayload.length % 4)) % 4)}`;
+
+    const decodedPayload = decodeURIComponent(
+      atob(paddedPayload)
+        .split('')
+        .map((character) => {
+          const hex = character.charCodeAt(0).toString(16).padStart(2, '0');
+          return `%${hex}`;
+        })
+        .join(''),
+    );
+
+    const decoded = JSON.parse(decodedPayload);
+    if (
+      typeof decoded?.sub !== 'string' ||
+      typeof decoded?.email !== 'string' ||
+      typeof decoded?.nickname !== 'string'
+    ) {
+      return null;
+    }
+
+    return {
+      id: decoded.sub,
+      email: decoded.email || '',
+      nickname: decoded.nickname || '',
+      createdAt: new Date().toISOString(),
+      isGuest: Boolean(decoded.isGuest),
+    };
+  } catch {
+    return null;
+  }
+};
+
 const resolveAuthFieldErrors = (payload: any): Record<string, string> => {
   if (!Array.isArray(payload?.errors)) {
     return {};
@@ -324,6 +369,18 @@ export const useAuthStore = create<AuthState>((set, get) => {
         });
 
         if (!res.ok) {
+          const fallbackUser = decodeAuthToken(token);
+          if (fallbackUser && res.status === 401) {
+            persistUser(fallbackUser);
+            set({
+              user: fallbackUser,
+              isLoading: false,
+              needsReauth: false,
+              validationErrors: {},
+            });
+            return;
+          }
+
           localStorage.removeItem('picky_token');
           persistUser(null);
           const nextError =

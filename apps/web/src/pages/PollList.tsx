@@ -106,7 +106,10 @@ export const PollList: React.FC = () => {
                   gap: '1rem',
                   cursor: 'pointer',
                 }}
-                onClick={() => navigate(`/poll/${poll.id}`)}
+                onClick={() => {
+                  usePollStore.setState({ currentPoll: poll });
+                  navigate(`/poll/${poll.id}`);
+                }}
               >
                 <div>
                   {/* Card Info Eyebrow */}

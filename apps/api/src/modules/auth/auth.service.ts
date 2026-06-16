@@ -137,10 +137,24 @@ export class AuthService {
   }
 
   async validateUser(payload: any): Promise<UserProfile> {
-    const user = this.db.getUserById(payload.sub);
-    if (!user) {
+    if (!payload?.sub || typeof payload?.sub !== 'string') {
       throw new UnauthorizedException('유효하지 않은 사용자입니다.');
     }
-    return this.toProfile(user);
+
+    if (payload.isGuest === undefined || typeof payload.nickname !== 'string' || typeof payload.email !== 'string') {
+      const user = this.db.getUserById(payload.sub);
+      if (!user) {
+        throw new UnauthorizedException('유효하지 않은 사용자입니다.');
+      }
+      return this.toProfile(user);
+    }
+
+    return {
+      id: payload.sub,
+      email: payload.email,
+      nickname: payload.nickname,
+      createdAt: new Date().toISOString(),
+      isGuest: payload.isGuest,
+    };
   }
 }
