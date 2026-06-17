@@ -77,6 +77,8 @@ export const App: React.FC = () => {
             <Route path="/create" element={<CreatePoll />} />
             <Route path="/design" element={<DesignSystem />} />
             <Route path="/poll/:id" element={<PollDetail />} />
+            <Route path="/embed/:id" element={<PollDetail />} />
+            <Route path="/present/:id" element={<PollDetail />} />
             <Route path="/auth" element={<Navigate to="/auth/login" replace />} />
             <Route path="/auth/:mode" element={<AuthPage />} />
             <Route path="*" element={<PollList />} />

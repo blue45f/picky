@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
+import { useParams, useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   ChevronLeft,
   Share2,
@@ -8,16 +8,49 @@ import {
   MessageSquare,
   Copy,
   Check,
+  FileText,
   Sparkles,
   Info,
   AlertCircle,
+  Gauge,
+  Trophy,
+  Users,
+  CheckCircle2,
+  ClipboardList,
+  Send,
+  Eye,
+  Code2,
+  ExternalLink,
+  Download,
+  RefreshCw,
+  Pause,
+  Play,
+  QrCode,
+  CalendarPlus,
+  Plus,
 } from 'lucide-react';
 import { usePollStore } from '../store/usePollStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { VoteDonutChart, OPTION_COLORS } from '../components/VoteDonutChart';
 import { SnsPreviewCard } from '../components/SnsPreviewCard';
-import { Poll } from '@picky/shared';
-import { resolvePollShareUrl, resolveShareText, copyText } from '../lib/pollShare';
+import { AudienceLaunchKit } from '../components/AudienceLaunchKit';
+import { DecisionFollowUpPanel } from '../components/DecisionFollowUpPanel';
+import { LiveFacilitationConsole } from '../components/LiveFacilitationConsole';
+import { OpinionTopicCloud } from '../components/OpinionTopicCloud';
+import { ActionItemPlanner } from '../components/ActionItemPlanner';
+import { StakeholderReportBuilder } from '../components/StakeholderReportBuilder';
+import { Poll, PollResultsVisibility } from '@picky/shared';
+import {
+  resolvePollShareUrl,
+  buildPollEmbedCode,
+  resolveShareText,
+  copyText,
+  sharePollToKakao,
+  getKakaoShareDiagnostics,
+  updatePollMetaTags,
+} from '../lib/pollShare';
+import { buildQrSvgDataUri } from '../lib/qrCode';
+import { rememberRecentPoll } from '../lib/pollHistory';
 const POLL_AUTHOR_LABELS: {
   mine: string;
   otherMember: string;
@@ -28,10 +61,651 @@ const POLL_AUTHOR_LABELS: {
   guest: '비회원 작성',
 };
 
+const RESULTS_VISIBILITY_LABELS: Record<PollResultsVisibility, string> = {
+  afterVote: '투표 후 결과 공개',
+  always: '실시간 결과 공개',
+};
+
+type ResultSummaryMode = 'brief' | 'detailed';
+type CommentViewMode = 'latest' | 'byOption' | 'highlights';
+type ResultImageTheme = 'classic' | 'light' | 'presentation';
+type ResultImageContentKey = 'comment' | 'joinCode' | 'shareUrl';
+type OperationChecklistAction = 'share' | 'copyLink' | 'resultImage' | 'present';
+type InviteMessageTone = 'default' | 'deadline' | 'reason';
+
+type ResultImageContentOptions = Record<ResultImageContentKey, boolean>;
+
+const RESULT_SUMMARY_OPTIONS: Array<{ value: ResultSummaryMode; label: string }> = [
+  { value: 'brief', label: '짧게' },
+  { value: 'detailed', label: '자세히' },
+];
+
+const COMMENT_VIEW_OPTIONS: Array<{ value: CommentViewMode; label: string }> = [
+  { value: 'latest', label: '최신순' },
+  { value: 'byOption', label: '선택지별' },
+  { value: 'highlights', label: '핵심 의견' },
+];
+
+const RESULT_IMAGE_THEME_OPTIONS: Array<{
+  value: ResultImageTheme;
+  label: string;
+  description: string;
+}> = [
+  { value: 'classic', label: '클래식', description: 'pickflow 기본 다크 카드' },
+  { value: 'light', label: '라이트', description: '문서와 회의록에 적합' },
+  { value: 'presentation', label: '프레젠트', description: '발표 화면용 고대비' },
+];
+
+const RESULT_IMAGE_CONTENT_OPTIONS: Array<{
+  value: ResultImageContentKey;
+  label: string;
+  description: string;
+}> = [
+  { value: 'comment', label: '대표 의견', description: '최신 의견을 카드에 포함' },
+  { value: 'joinCode', label: '참여 코드', description: '회의실 화면용 큰 코드' },
+  { value: 'shareUrl', label: '참여 링크', description: '하단에 공유 URL 포함' },
+];
+
+const INVITE_MESSAGE_TONE_OPTIONS: Array<{
+  value: InviteMessageTone;
+  label: string;
+  description: string;
+}> = [
+  { value: 'default', label: '기본 초대', description: '처음 공유할 때' },
+  { value: 'deadline', label: '마감 리마인드', description: '응답을 한 번 더 모을 때' },
+  { value: 'reason', label: '이유 요청', description: '결정 근거가 필요할 때' },
+];
+
+const DEFAULT_RESULT_IMAGE_CONTENT: ResultImageContentOptions = {
+  comment: true,
+  joinCode: true,
+  shareUrl: true,
+};
+
+const PRESENT_REFRESH_INTERVAL_SECONDS = 15;
+const CREATE_POLL_DRAFT_STORAGE_KEY = 'picky_create_poll_draft_v1';
+const VOTE_DRAFT_STORAGE_PREFIX = 'picky_vote_draft_v1';
+
+const getVoteDraftStorageKey = (pollId: string) => `${VOTE_DRAFT_STORAGE_PREFIX}:${pollId}`;
+
+const buildPollInviteMessage = (
+  poll: Poll,
+  shareUrl: string,
+  tone: InviteMessageTone = 'default',
+) => {
+  const visibleOptions = poll.options.slice(0, 4);
+  const optionLines = visibleOptions
+    .map((option, index) => `${index + 1}. ${option.text}`)
+    .join('\n');
+  const hiddenOptionCount = Math.max(poll.options.length - visibleOptions.length, 0);
+  const endsAtDate = poll.endsAt ? new Date(poll.endsAt) : null;
+  const endsAtLabel =
+    endsAtDate && Number.isFinite(endsAtDate.getTime())
+      ? endsAtDate.toLocaleString('ko-KR', {
+          dateStyle: 'medium',
+          timeStyle: 'short',
+        })
+      : '';
+  const attachmentCount = poll.attachments?.length || 0;
+  const openingLine =
+    tone === 'deadline'
+      ? '마감 전에 고민 투표 한 번만 더 참여해 주세요.'
+      : tone === 'reason'
+        ? '선택 이유까지 짧게 남겨주면 결정에 큰 도움이 됩니다.'
+        : '고민 투표에 참여해 주세요.';
+  const closingLine =
+    tone === 'deadline'
+      ? '아직 못 봤다면 30초만 투자해서 골라주세요.'
+      : tone === 'reason'
+        ? '한 줄 이유를 남겨주면 결과를 해석하기 훨씬 좋아요.'
+        : '선택 이유도 짧게 남겨주면 결정에 도움이 됩니다.';
+
+  return [
+    openingLine,
+    '',
+    poll.question,
+    poll.description ? `설명: ${poll.description}` : '',
+    optionLines
+      ? `선택지:\n${optionLines}${hiddenOptionCount > 0 ? `\n+ ${hiddenOptionCount}개 더` : ''}`
+      : '',
+    `참여 코드: ${poll.id}`,
+    endsAtLabel ? `마감: ${endsAtLabel}` : '',
+    attachmentCount > 0 ? `참고 파일: ${attachmentCount}개 첨부됨` : '',
+    poll.resultsVisibility === 'always'
+      ? '결과는 참여 전에도 실시간으로 확인할 수 있어요.'
+      : '결과는 투표한 뒤 확인할 수 있어요.',
+    closingLine,
+    '',
+    shareUrl,
+  ]
+    .filter(Boolean)
+    .join('\n');
+};
+
+const escapeIcsText = (value: string) =>
+  value.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+
+const formatIcsDate = (date: Date) =>
+  date
+    .toISOString()
+    .replace(/[-:]/g, '')
+    .replace(/\.\d{3}Z$/, 'Z');
+
+const buildPollDeadlineReminder = (poll: Poll, shareUrl: string) => {
+  if (!poll.endsAt) {
+    return null;
+  }
+
+  const deadline = new Date(poll.endsAt);
+  const now = Date.now();
+  const timeUntilDeadline = deadline.getTime() - now;
+  if (!Number.isFinite(deadline.getTime()) || timeUntilDeadline < 2 * 60 * 1000) {
+    return null;
+  }
+
+  const triggerMinutes =
+    timeUntilDeadline >= 35 * 60 * 1000 ? 30 : timeUntilDeadline >= 10 * 60 * 1000 ? 5 : 1;
+  const reminderEnd = new Date(deadline.getTime() + 15 * 60 * 1000);
+  const description = [
+    poll.description ? `맥락: ${poll.description}` : '',
+    `참여 코드: ${poll.id}`,
+    `참여 링크: ${shareUrl}`,
+    poll.totalVotes > 0
+      ? `현재 ${poll.totalVotes}명이 응답했습니다.`
+      : '아직 첫 응답을 기다리고 있습니다.',
+    `캘린더 알림은 마감 ${triggerMinutes}분 전에 울리도록 설정했습니다.`,
+  ]
+    .filter(Boolean)
+    .join('\n');
+  const ics = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Picky//Poll Deadline Reminder//KO',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    'BEGIN:VEVENT',
+    `UID:picky-poll-${escapeIcsText(poll.id)}-${formatIcsDate(deadline)}`,
+    `DTSTAMP:${formatIcsDate(new Date())}`,
+    `DTSTART:${formatIcsDate(deadline)}`,
+    `DTEND:${formatIcsDate(reminderEnd)}`,
+    `SUMMARY:${escapeIcsText(`투표 마감 리마인드: ${poll.question}`)}`,
+    `DESCRIPTION:${escapeIcsText(description)}`,
+    `URL:${escapeIcsText(shareUrl)}`,
+    'BEGIN:VALARM',
+    'ACTION:DISPLAY',
+    `DESCRIPTION:${escapeIcsText(`투표 마감 ${triggerMinutes}분 전입니다: ${poll.question}`)}`,
+    `TRIGGER:-PT${triggerMinutes}M`,
+    'END:VALARM',
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ].join('\r\n');
+
+  return {
+    dataUri: `data:text/calendar;charset=utf-8,${encodeURIComponent(ics)}`,
+    alertLabel: `마감 ${triggerMinutes}분 전`,
+  };
+};
+
+const escapeCsvCell = (value: unknown) => {
+  const text = value === null || value === undefined ? '' : String(value);
+  return `"${text.replace(/"/g, '""')}"`;
+};
+
+const buildPollCsvExport = (poll: Poll, shareUrl: string) => {
+  const createdAt = new Date(poll.createdAt).toISOString();
+  const endsAt = poll.endsAt ? new Date(poll.endsAt).toISOString() : '';
+  const resultRows = poll.options.map((option, index) => {
+    const percentage =
+      poll.totalVotes > 0 ? Math.round((option.voteCount / poll.totalVotes) * 100) : 0;
+
+    return [
+      'option_result',
+      index + 1,
+      option.id,
+      option.text,
+      option.voteCount,
+      `${percentage}%`,
+      '',
+      '',
+      '',
+      '',
+    ];
+  });
+  const commentRows = poll.comments.map((commentItem, index) => [
+    'comment',
+    index + 1,
+    commentItem.selectedOptionId ?? '',
+    commentItem.selectedOptionText || '',
+    '',
+    '',
+    commentItem.voterName || '익명',
+    commentItem.comment,
+    commentItem.createdAt,
+    '',
+  ]);
+  const metaRows = [
+    [
+      'meta',
+      'question',
+      '',
+      poll.question,
+      '',
+      '',
+      '',
+      poll.description || '',
+      createdAt,
+      shareUrl,
+    ],
+    ['meta', 'total_votes', '', poll.totalVotes, '', '', '', '', createdAt, shareUrl],
+    [
+      'meta',
+      'results_visibility',
+      '',
+      poll.resultsVisibility || 'afterVote',
+      '',
+      '',
+      '',
+      '',
+      createdAt,
+      shareUrl,
+    ],
+    ['meta', 'ends_at', '', endsAt || 'none', '', '', '', '', createdAt, shareUrl],
+  ];
+  const rows = [
+    [
+      'row_type',
+      'index',
+      'option_id',
+      'option_or_selected_text',
+      'vote_count',
+      'percentage',
+      'voter_name',
+      'comment',
+      'created_at',
+      'share_url',
+    ],
+    ...metaRows,
+    ...resultRows,
+    ...commentRows,
+  ];
+
+  return rows.map((row) => row.map(escapeCsvCell).join(',')).join('\n');
+};
+
+const buildPollMarkdownReport = (poll: Poll, shareUrl: string) => {
+  const sortedOptions = [...poll.options].sort((a, b) => b.voteCount - a.voteCount);
+  const optionLines = sortedOptions.map((option, index) => {
+    const percentage =
+      poll.totalVotes > 0 ? Math.round((option.voteCount / poll.totalVotes) * 100) : 0;
+
+    return `${index + 1}. ${option.text} - ${option.voteCount}표 (${percentage}%)`;
+  });
+  const commentLines = [...poll.comments]
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, 5)
+    .map(
+      (commentItem, index) =>
+        `${index + 1}. ${commentItem.comment} - ${commentItem.voterName || '익명'}${
+          commentItem.selectedOptionText ? ` (${commentItem.selectedOptionText})` : ''
+        }`,
+    );
+  const endsAt = poll.endsAt
+    ? new Date(poll.endsAt).toLocaleString('ko-KR', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      })
+    : '마감 없음';
+
+  return [
+    `# ${poll.question}`,
+    '',
+    poll.description ? `> ${poll.description}` : '',
+    '',
+    `- 총 투표: ${poll.totalVotes}표`,
+    `- 의견: ${poll.comments.length}개`,
+    `- 결과 공개: ${poll.resultsVisibility === 'always' ? '실시간 결과 공개' : '투표 후 결과 공개'}`,
+    `- 마감: ${endsAt}`,
+    `- 공유 링크: ${shareUrl}`,
+    '',
+    '## 선택지별 결과',
+    optionLines.length > 0 ? optionLines.join('\n') : '아직 선택지가 없습니다.',
+    '',
+    '## 대표 의견',
+    commentLines.length > 0 ? commentLines.join('\n') : '아직 남겨진 의견이 없습니다.',
+    '',
+    '---',
+    'pickflow 결과 리포트',
+  ].join('\n');
+};
+
+const RESULT_IMAGE_THEMES: Record<
+  ResultImageTheme,
+  {
+    bgStart: string;
+    bgMid: string;
+    bgEnd: string;
+    primary: string;
+    accent: string;
+    coral: string;
+    title: string;
+    text: string;
+    muted: string;
+    line: string;
+    panel: string;
+    barTrack: string;
+  }
+> = {
+  classic: {
+    bgStart: '#061411',
+    bgMid: '#0d2a25',
+    bgEnd: '#08100f',
+    primary: '#20d6b2',
+    accent: '#e8c84d',
+    coral: '#ff6b70',
+    title: '#f4fffc',
+    text: '#b8d6cf',
+    muted: '#7ca59b',
+    line: 'rgba(255,255,255,0.08)',
+    panel: 'rgba(255,255,255,0.07)',
+    barTrack: 'rgba(255,255,255,0.12)',
+  },
+  light: {
+    bgStart: '#f6fffc',
+    bgMid: '#e9f8f3',
+    bgEnd: '#fff7dc',
+    primary: '#0f8d78',
+    accent: '#b58b00',
+    coral: '#cf4d54',
+    title: '#061411',
+    text: '#22443d',
+    muted: '#5d7771',
+    line: 'rgba(6,20,17,0.14)',
+    panel: 'rgba(6,20,17,0.06)',
+    barTrack: 'rgba(6,20,17,0.12)',
+  },
+  presentation: {
+    bgStart: '#111827',
+    bgMid: '#0f2f3a',
+    bgEnd: '#19142c',
+    primary: '#5eead4',
+    accent: '#fde047',
+    coral: '#fb7185',
+    title: '#ffffff',
+    text: '#d8fbf3',
+    muted: '#9fb8c6',
+    line: 'rgba(255,255,255,0.16)',
+    panel: 'rgba(255,255,255,0.1)',
+    barTrack: 'rgba(255,255,255,0.16)',
+  },
+};
+
+const isPollClosed = (poll: Poll | null | undefined) => {
+  if (!poll?.endsAt) {
+    return false;
+  }
+
+  const endsAtTime = new Date(poll.endsAt).getTime();
+  return Number.isFinite(endsAtTime) && Date.now() >= endsAtTime;
+};
+
+const formatEndAt = (value: string | null | undefined) => {
+  if (!value) {
+    return '마감 없음';
+  }
+
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) {
+    return '마감 시간 확인 필요';
+  }
+
+  return date.toLocaleString('ko-KR', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};
+
+const buildPollResultSummary = (poll: Poll, shareUrl: string, mode: ResultSummaryMode) => {
+  const sortedOptions = [...poll.options].sort((a, b) => b.voteCount - a.voteCount);
+  const leader = sortedOptions[0] || null;
+  const leaderPercentage =
+    leader && poll.totalVotes > 0 ? Math.round((leader.voteCount / poll.totalVotes) * 100) : 0;
+  const optionLines = sortedOptions.map((option, index) => {
+    const percentage =
+      poll.totalVotes > 0 ? Math.round((option.voteCount / poll.totalVotes) * 100) : 0;
+    return `${index + 1}. ${option.text}: ${option.voteCount}표 (${percentage}%)`;
+  });
+  const latestComments = [...poll.comments]
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, 3)
+    .map(
+      (comment, index) =>
+        `${index + 1}. ${comment.voterName}: ${comment.comment}${
+          comment.selectedOptionText ? ` (${comment.selectedOptionText})` : ''
+        }`,
+    );
+
+  if (mode === 'brief') {
+    return [
+      `[pickflow 요약] ${poll.question}`,
+      leader
+        ? `현재 1위: ${leader.text} · ${leader.voteCount}표 (${leaderPercentage}%)`
+        : '현재 1위: 아직 없음',
+      `총 ${poll.totalVotes}표 · 의견 ${poll.comments.length}개`,
+      latestComments[0] ? `대표 의견: ${latestComments[0]}` : '대표 의견: 아직 의견이 없습니다.',
+      `참여 링크: ${shareUrl}`,
+    ].join('\n');
+  }
+
+  return [
+    `[pickflow 결과 요약] ${poll.question}`,
+    poll.description ? `맥락: ${poll.description}` : null,
+    `총 ${poll.totalVotes}표 · 의견 ${poll.comments.length}개`,
+    '',
+    '선택지별 결과',
+    optionLines.length > 0 ? optionLines.join('\n') : '아직 선택지가 없습니다.',
+    '',
+    '최근 의견',
+    latestComments.length > 0 ? latestComments.join('\n') : '아직 의견이 없습니다.',
+    '',
+    `참여 링크: ${shareUrl}`,
+  ]
+    .filter((line): line is string => line !== null)
+    .join('\n');
+};
+
+const drawWrappedText = (
+  context: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  maxWidth: number,
+  lineHeight: number,
+  maxLines = Number.POSITIVE_INFINITY,
+) => {
+  const words = text.split(/\s+/);
+  const lines: string[] = [];
+  let line = '';
+
+  words.forEach((word) => {
+    const nextLine = line ? `${line} ${word}` : word;
+    if (context.measureText(nextLine).width <= maxWidth) {
+      line = nextLine;
+      return;
+    }
+
+    if (line) {
+      lines.push(line);
+    }
+    line = word;
+  });
+
+  if (line) {
+    lines.push(line);
+  }
+
+  const visibleLines = lines.slice(0, maxLines);
+  visibleLines.forEach((visibleLine, index) => {
+    const suffix = index === maxLines - 1 && lines.length > maxLines ? '...' : '';
+    context.fillText(`${visibleLine}${suffix}`, x, y + index * lineHeight);
+  });
+
+  return y + visibleLines.length * lineHeight;
+};
+
+const buildPollResultImageDataUrl = (
+  poll: Poll,
+  shareUrl: string,
+  theme: ResultImageTheme,
+  contentOptions: ResultImageContentOptions,
+) => {
+  const themeConfig = RESULT_IMAGE_THEMES[theme];
+  const width = 1200;
+  const height = 630;
+  const canvas = document.createElement('canvas');
+  const scale = 2;
+  canvas.width = width * scale;
+  canvas.height = height * scale;
+  const context = canvas.getContext('2d');
+
+  if (!context) {
+    throw new Error('이미지 생성을 지원하지 않는 브라우저입니다.');
+  }
+
+  context.scale(scale, scale);
+  const background = context.createLinearGradient(0, 0, width, height);
+  background.addColorStop(0, themeConfig.bgStart);
+  background.addColorStop(0.55, themeConfig.bgMid);
+  background.addColorStop(1, themeConfig.bgEnd);
+  context.fillStyle = background;
+  context.fillRect(0, 0, width, height);
+
+  const accent = context.createLinearGradient(80, 0, 520, 0);
+  accent.addColorStop(0, themeConfig.primary);
+  accent.addColorStop(0.62, themeConfig.accent);
+  accent.addColorStop(1, themeConfig.coral);
+  context.fillStyle = accent;
+  context.fillRect(80, 520, 430, 12);
+
+  context.fillStyle = themeConfig.line;
+  context.fillRect(80, 74, 1040, 1);
+  context.fillRect(80, 558, 1040, 1);
+
+  context.fillStyle = themeConfig.primary;
+  context.font = '800 24px "Pretendard Variable", Arial, sans-serif';
+  context.fillText('PICKFLOW RESULT', 80, 124);
+
+  context.fillStyle = themeConfig.title;
+  context.font = '900 48px "Pretendard Variable", Arial, sans-serif';
+  const titleBottom = drawWrappedText(context, poll.question, 80, 188, 690, 58, 2);
+
+  context.fillStyle = themeConfig.text;
+  context.font = '700 22px "Pretendard Variable", Arial, sans-serif';
+  context.fillText(
+    `총 ${poll.totalVotes}표 · 의견 ${poll.comments.length}개`,
+    80,
+    titleBottom + 24,
+  );
+
+  const sortedOptions = [...poll.options].sort((a, b) => b.voteCount - a.voteCount).slice(0, 4);
+  let barY = 318;
+  sortedOptions.forEach((option, index) => {
+    const percentage =
+      poll.totalVotes > 0 ? Math.round((option.voteCount / poll.totalVotes) * 100) : 0;
+    context.fillStyle = themeConfig.title;
+    context.font = '800 22px "Pretendard Variable", Arial, sans-serif';
+    drawWrappedText(context, `${index + 1}. ${option.text}`, 80, barY, 560, 26, 1);
+    context.fillStyle = themeConfig.barTrack;
+    context.fillRect(80, barY + 18, 520, 12);
+    context.fillStyle =
+      index === 0 ? themeConfig.primary : index === 1 ? themeConfig.accent : themeConfig.muted;
+    context.fillRect(80, barY + 18, Math.max(8, (520 * percentage) / 100), 12);
+    context.fillStyle = themeConfig.text;
+    context.font = '700 20px "Pretendard Variable", Arial, sans-serif';
+    context.fillText(`${option.voteCount}표 · ${percentage}%`, 620, barY + 26);
+    barY += 52;
+  });
+
+  const latestComment =
+    [...poll.comments].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    )[0] || null;
+  if (contentOptions.comment) {
+    context.fillStyle = themeConfig.panel;
+    context.fillRect(780, 150, 340, 260);
+    context.fillStyle = themeConfig.accent;
+    context.font = '900 22px "Pretendard Variable", Arial, sans-serif';
+    context.fillText('대표 의견', 810, 200);
+    context.fillStyle = themeConfig.title;
+    context.font = '800 28px "Pretendard Variable", Arial, sans-serif';
+    drawWrappedText(
+      context,
+      latestComment?.comment ||
+        '아직 의견이 없습니다. 링크를 공유해 첫 번째 선택 이유를 받아보세요.',
+      810,
+      250,
+      270,
+      36,
+      4,
+    );
+    context.fillStyle = themeConfig.muted;
+    context.font = '700 18px "Pretendard Variable", Arial, sans-serif';
+    drawWrappedText(
+      context,
+      latestComment
+        ? `${latestComment.voterName} · ${latestComment.selectedOptionText || '선택지 정보 없음'}`
+        : 'pickflow',
+      810,
+      394,
+      270,
+      24,
+      1,
+    );
+  }
+
+  if (contentOptions.joinCode) {
+    const joinCodeY = contentOptions.comment ? 430 : 170;
+    const joinCodeHeight = contentOptions.comment ? 92 : 210;
+    context.fillStyle = themeConfig.panel;
+    context.fillRect(780, joinCodeY, 340, joinCodeHeight);
+    context.fillStyle = themeConfig.primary;
+    context.font = '900 18px "Pretendard Variable", Arial, sans-serif';
+    context.fillText('JOIN CODE', 810, joinCodeY + 34);
+    context.fillStyle = themeConfig.accent;
+    context.font = contentOptions.comment
+      ? '900 42px "Pretendard Variable", Arial, sans-serif'
+      : '900 60px "Pretendard Variable", Arial, sans-serif';
+    drawWrappedText(
+      context,
+      poll.id,
+      810,
+      joinCodeY + (contentOptions.comment ? 80 : 126),
+      260,
+      contentOptions.comment ? 46 : 64,
+      1,
+    );
+  }
+
+  if (contentOptions.shareUrl) {
+    context.fillStyle = themeConfig.muted;
+    context.font = '700 18px "Pretendard Variable", Arial, sans-serif';
+    drawWrappedText(context, shareUrl, 80, 594, 760, 22, 1);
+  }
+  context.fillStyle = themeConfig.title;
+  context.font = '900 26px "Pretendard Variable", Arial, sans-serif';
+  context.fillText('pickflow', 1010, 594);
+
+  return canvas.toDataURL('image/png');
+};
+
 export const PollDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const isEmbedMode = location.pathname.startsWith('/embed/');
+  const isPresentationMode = location.pathname.startsWith('/present/');
 
   const currentPoll = usePollStore((state) => state.currentPoll);
   const isLoading = usePollStore((state) => state.isLoading);
@@ -83,13 +757,16 @@ export const PollDetail: React.FC = () => {
   };
 
   // Modal share check
-  const showShareParam = searchParams.get('showShare') === 'true';
+  const showShareParam =
+    !isEmbedMode && !isPresentationMode && searchParams.get('showShare') === 'true';
   const snapshotParam = searchParams.get('snapshot');
 
   // Forms
   const [votedOptionId, setVotedOptionId] = useState<number | null>(null);
   const [voterName, setVoterName] = useState('');
   const [comment, setComment] = useState('');
+  const [voteDraftSavedAt, setVoteDraftSavedAt] = useState<string | null>(null);
+  const [voteDraftLoadedPollId, setVoteDraftLoadedPollId] = useState<string | null>(null);
 
   // User Local History
   const [votedHistory, setVotedHistory] = useState<Record<string, number>>({});
@@ -98,7 +775,22 @@ export const PollDetail: React.FC = () => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [showShareModal, setShowShareModal] = useState(showShareParam);
   const [snsPreviewPlatform, setSnsPreviewPlatform] = useState<'x' | 'kakao'>('x');
+  const [embedCodeMode, setEmbedCodeMode] = useState<'standard' | 'compact' | 'popup'>('standard');
+  const [inviteMessageTone, setInviteMessageTone] = useState<InviteMessageTone>('default');
   const [copyMessage, setCopyMessage] = useState('');
+  const [voteMessage, setVoteMessage] = useState('');
+  const [commentFilter, setCommentFilter] = useState<'all' | number>('all');
+  const [resultSummaryMode, setResultSummaryMode] = useState<ResultSummaryMode>('brief');
+  const [commentViewMode, setCommentViewMode] = useState<CommentViewMode>('latest');
+  const [resultImagePreviewUrl, setResultImagePreviewUrl] = useState('');
+  const [resultImageTheme, setResultImageTheme] = useState<ResultImageTheme>('classic');
+  const [resultImageContentOptions, setResultImageContentOptions] =
+    useState<ResultImageContentOptions>(DEFAULT_RESULT_IMAGE_CONTENT);
+  const [presentRefreshCountdown, setPresentRefreshCountdown] = useState(
+    PRESENT_REFRESH_INTERVAL_SECONDS,
+  );
+  const [isPresentAutoRefreshPaused, setIsPresentAutoRefreshPaused] = useState(false);
+  const hasVoted = currentPoll ? votedHistory[currentPoll.id] !== undefined : false;
 
   // Load local vote history
   useEffect(() => {
@@ -121,15 +813,212 @@ export const PollDetail: React.FC = () => {
     }
   }, [id, fetchPoll, snapshotParam]);
 
+  useEffect(() => {
+    if (showShareParam) {
+      setShowShareModal(true);
+    }
+  }, [showShareParam]);
+
   // Pre-fill voter name from auth/guest profile
   useEffect(() => {
     const nextName = (user?.nickname || guestName || '').trim();
     setVoterName(nextName);
   }, [user?.id, guestName, id]);
 
+  useEffect(() => {
+    if (!currentPoll || !id || typeof window === 'undefined') {
+      return;
+    }
+
+    if (isPollClosed(currentPoll) || votedHistory[id] !== undefined) {
+      localStorage.removeItem(getVoteDraftStorageKey(id));
+      setVoteDraftSavedAt(null);
+      setVoteDraftLoadedPollId(id);
+      return;
+    }
+
+    try {
+      const raw = localStorage.getItem(getVoteDraftStorageKey(id));
+      if (!raw) {
+        setVoteDraftLoadedPollId(id);
+        return;
+      }
+
+      const parsed = JSON.parse(raw) as {
+        votedOptionId?: unknown;
+        voterName?: unknown;
+        comment?: unknown;
+        savedAt?: unknown;
+      };
+      const draftOptionId = typeof parsed.votedOptionId === 'number' ? parsed.votedOptionId : null;
+
+      if (
+        draftOptionId !== null &&
+        currentPoll.options.some((option) => option.id === draftOptionId)
+      ) {
+        setVotedOptionId(draftOptionId);
+      }
+
+      if (typeof parsed.voterName === 'string') {
+        setVoterName(parsed.voterName);
+      }
+
+      if (typeof parsed.comment === 'string') {
+        setComment(parsed.comment);
+      }
+
+      setVoteDraftSavedAt(typeof parsed.savedAt === 'string' ? parsed.savedAt : null);
+      setVoteDraftLoadedPollId(id);
+    } catch {
+      localStorage.removeItem(getVoteDraftStorageKey(id));
+      setVoteDraftSavedAt(null);
+      setVoteDraftLoadedPollId(id);
+    }
+  }, [currentPoll?.id, id, votedHistory]);
+
+  useEffect(() => {
+    if (!currentPoll || !id || typeof window === 'undefined') {
+      return;
+    }
+
+    if (voteDraftLoadedPollId !== id) {
+      return;
+    }
+
+    if (isPollClosed(currentPoll) || votedHistory[id] !== undefined) {
+      localStorage.removeItem(getVoteDraftStorageKey(id));
+      setVoteDraftSavedAt(null);
+      return;
+    }
+
+    const defaultVoterName = (user?.nickname || guestName || '').trim();
+    const hasDraftContent =
+      votedOptionId !== null ||
+      comment.trim().length > 0 ||
+      (voterName.trim().length > 0 && voterName.trim() !== defaultVoterName);
+
+    if (!hasDraftContent) {
+      localStorage.removeItem(getVoteDraftStorageKey(id));
+      setVoteDraftSavedAt(null);
+      return;
+    }
+
+    try {
+      const savedAt = new Date().toISOString();
+      localStorage.setItem(
+        getVoteDraftStorageKey(id),
+        JSON.stringify({
+          votedOptionId,
+          voterName,
+          comment,
+          savedAt,
+        }),
+      );
+      setVoteDraftSavedAt(savedAt);
+    } catch {
+      setVoteDraftSavedAt(null);
+    }
+  }, [
+    currentPoll?.id,
+    id,
+    votedOptionId,
+    voterName,
+    comment,
+    user?.nickname,
+    guestName,
+    votedHistory,
+    voteDraftLoadedPollId,
+  ]);
+
+  useEffect(() => {
+    if (currentPoll) {
+      updatePollMetaTags(currentPoll);
+    }
+  }, [currentPoll]);
+
+  useEffect(() => {
+    if (!currentPoll || isEmbedMode || isPresentationMode) {
+      return;
+    }
+
+    rememberRecentPoll(currentPoll, {
+      hasVoted: hasVoted || Boolean(votedHistory[currentPoll.id]),
+    });
+  }, [currentPoll, hasVoted, isEmbedMode, isPresentationMode, votedHistory]);
+
+  useEffect(() => {
+    if (!isEmbedMode && !isPresentationMode) {
+      return;
+    }
+
+    document.body.classList.add(isPresentationMode ? 'present-mode' : 'embed-mode');
+    const emitEmbedHeight = () => {
+      if (!isEmbedMode) {
+        return;
+      }
+
+      window.parent?.postMessage(
+        {
+          type: 'pickflow:embed-resize',
+          height: document.documentElement.scrollHeight,
+        },
+        '*',
+      );
+    };
+
+    emitEmbedHeight();
+    window.setTimeout(emitEmbedHeight, 120);
+    window.setTimeout(emitEmbedHeight, 420);
+    window.addEventListener('resize', emitEmbedHeight);
+
+    return () => {
+      document.body.classList.remove('embed-mode');
+      document.body.classList.remove('present-mode');
+      window.removeEventListener('resize', emitEmbedHeight);
+    };
+  }, [
+    isEmbedMode,
+    isPresentationMode,
+    currentPoll?.id,
+    currentPoll?.totalVotes,
+    currentPoll?.comments.length,
+  ]);
+
+  useEffect(() => {
+    if (!isPresentationMode || !id) {
+      return;
+    }
+
+    if (isPresentAutoRefreshPaused) {
+      setPresentRefreshCountdown(PRESENT_REFRESH_INTERVAL_SECONDS);
+      return;
+    }
+
+    setPresentRefreshCountdown(PRESENT_REFRESH_INTERVAL_SECONDS);
+    const countdownTimer = window.setInterval(() => {
+      setPresentRefreshCountdown((current) =>
+        current <= 1 ? PRESENT_REFRESH_INTERVAL_SECONDS : current - 1,
+      );
+    }, 1000);
+    const refreshTimer = window.setInterval(() => {
+      fetchPoll(id);
+      setPresentRefreshCountdown(PRESENT_REFRESH_INTERVAL_SECONDS);
+    }, PRESENT_REFRESH_INTERVAL_SECONDS * 1000);
+
+    return () => {
+      window.clearInterval(countdownTimer);
+      window.clearInterval(refreshTimer);
+    };
+  }, [fetchPoll, id, isPresentationMode, isPresentAutoRefreshPaused]);
+
   // Submit Vote
   const handleVoteSubmit = async () => {
     if (!id || votedOptionId === null || isLoading) return;
+
+    if (isPollClosed(currentPoll)) {
+      setVoteMessage('마감된 투표에는 더 이상 참여할 수 없습니다.');
+      return;
+    }
 
     const success = await vote(id, {
       optionId: votedOptionId,
@@ -141,13 +1030,80 @@ export const PollDetail: React.FC = () => {
       const nextHistory = { ...votedHistory, [id]: votedOptionId };
       setVotedHistory(nextHistory);
       localStorage.setItem('picky_voted_history', JSON.stringify(nextHistory));
+      localStorage.removeItem(getVoteDraftStorageKey(id));
+      if (currentPoll) {
+        rememberRecentPoll(currentPoll, { hasVoted: true });
+      }
 
       // Reset inputs
       setVoterName('');
       setComment('');
       setVotedOptionId(null);
+      setVoteDraftSavedAt(null);
+      setVoteMessage('');
     }
   };
+
+  useEffect(() => {
+    if (!currentPoll || !id || isPresentationMode || isPollClosed(currentPoll)) {
+      return;
+    }
+
+    const handleVoteShortcut = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const tagName = target?.tagName?.toLowerCase();
+      const isTyping =
+        target?.isContentEditable ||
+        tagName === 'input' ||
+        tagName === 'textarea' ||
+        tagName === 'select';
+
+      if (isTyping || event.metaKey || event.ctrlKey || event.altKey) {
+        return;
+      }
+
+      if (/^[1-9]$/.test(event.key)) {
+        const optionIndex = Number(event.key) - 1;
+        const option = currentPoll.options[optionIndex];
+
+        if (option) {
+          event.preventDefault();
+          setVotedOptionId(option.id);
+        }
+        return;
+      }
+
+      if (event.key === '0') {
+        const option = currentPoll.options[9];
+
+        if (option) {
+          event.preventDefault();
+          setVotedOptionId(option.id);
+        }
+        return;
+      }
+
+      if (event.key === 'Enter' && votedOptionId !== null && !isLoading) {
+        event.preventDefault();
+        void handleVoteSubmit();
+      }
+    };
+
+    window.addEventListener('keydown', handleVoteShortcut);
+
+    return () => {
+      window.removeEventListener('keydown', handleVoteShortcut);
+    };
+  }, [
+    comment,
+    currentPoll,
+    id,
+    isLoading,
+    isPresentationMode,
+    votedHistory,
+    votedOptionId,
+    voterName,
+  ]);
 
   // Click-to-copy
   const handleCopyLinkClick = async (pollId: string) => {
@@ -163,6 +1119,312 @@ export const PollDetail: React.FC = () => {
       console.error('copy failed', err);
       setCopyMessage('클립보드 복사에 실패했습니다. 링크를 직접 복사해 주세요.');
       setTimeout(() => setCopyMessage(''), 2400);
+    }
+  };
+
+  const handleCopyJoinCodeClick = async () => {
+    if (!currentPoll) {
+      return;
+    }
+
+    setCopyMessage('');
+    try {
+      await copyText(currentPoll.id);
+      setCopiedId(`code-${currentPoll.id}`);
+      setCopyMessage('참여 코드가 클립보드에 복사되었습니다.');
+      setTimeout(() => setCopiedId(null), 2000);
+      setTimeout(() => setCopyMessage(''), 2200);
+    } catch (err) {
+      console.error('join code copy failed', err);
+      setCopyMessage('참여 코드 복사에 실패했습니다.');
+      setTimeout(() => setCopyMessage(''), 2400);
+    }
+  };
+
+  const handleCopyInviteMessageClick = async () => {
+    if (!currentPoll) {
+      return;
+    }
+
+    setCopyMessage('');
+    try {
+      await copyText(
+        buildPollInviteMessage(currentPoll, resolvePollShareUrl(currentPoll), inviteMessageTone),
+      );
+      setCopiedId(`invite-${currentPoll.id}`);
+      setCopyMessage('초대 메시지가 클립보드에 복사되었습니다.');
+      setTimeout(() => setCopiedId(null), 2000);
+      setTimeout(() => setCopyMessage(''), 2400);
+    } catch (err) {
+      console.error('invite message copy failed', err);
+      setCopyMessage('초대 메시지 복사에 실패했습니다.');
+      setTimeout(() => setCopyMessage(''), 2600);
+    }
+  };
+
+  const handleCopyEmbedClick = async () => {
+    if (!currentPoll) {
+      return;
+    }
+
+    setCopyMessage('');
+    try {
+      await copyText(buildPollEmbedCode(currentPoll, embedCodeMode));
+      setCopiedId(`embed-${currentPoll.id}`);
+      setCopyMessage('웹사이트용 임베드 코드가 클립보드에 복사되었습니다.');
+      setTimeout(() => setCopiedId(null), 2000);
+      setTimeout(() => setCopyMessage(''), 2400);
+    } catch (err) {
+      console.error('embed copy failed', err);
+      setCopyMessage('임베드 코드 복사에 실패했습니다. 공유 링크를 대신 복사해 주세요.');
+      setTimeout(() => setCopyMessage(''), 2600);
+    }
+  };
+
+  const handleCopyResultSummaryClick = async () => {
+    if (!currentPoll) {
+      return;
+    }
+
+    setCopyMessage('');
+    try {
+      await copyText(
+        buildPollResultSummary(currentPoll, resolvePollShareUrl(currentPoll), resultSummaryMode),
+      );
+      setCopiedId(`summary-${resultSummaryMode}-${currentPoll.id}`);
+      setCopyMessage('결과 요약이 클립보드에 복사되었습니다.');
+      setTimeout(() => setCopiedId(null), 2200);
+      setTimeout(() => setCopyMessage(''), 2600);
+    } catch (err) {
+      console.error('result summary copy failed', err);
+      setCopyMessage('결과 요약 복사에 실패했습니다.');
+      setTimeout(() => setCopyMessage(''), 2600);
+    }
+  };
+
+  const handleCopyMarkdownReportClick = async () => {
+    if (!currentPoll) {
+      return;
+    }
+
+    setCopyMessage('');
+    try {
+      await copyText(buildPollMarkdownReport(currentPoll, resolvePollShareUrl(currentPoll)));
+      setCopiedId(`markdown-${currentPoll.id}`);
+      setCopyMessage('회의록용 리포트가 클립보드에 복사되었습니다.');
+      setTimeout(() => setCopiedId(null), 2200);
+      setTimeout(() => setCopyMessage(''), 2600);
+    } catch (err) {
+      console.error('markdown report copy failed', err);
+      setCopyMessage('회의록용 리포트 복사에 실패했습니다.');
+      setTimeout(() => setCopyMessage(''), 2600);
+    }
+  };
+
+  const handleDownloadResultCsvClick = () => {
+    if (!currentPoll) {
+      return;
+    }
+
+    try {
+      setCopyMessage('');
+      const csv = buildPollCsvExport(currentPoll, resolvePollShareUrl(currentPoll));
+      const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `pickflow-poll-${currentPoll.id}-results.csv`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+      setCopiedId(`csv-${currentPoll.id}`);
+      setCopyMessage('CSV 결과 파일이 저장되었습니다.');
+      setTimeout(() => setCopiedId(null), 2200);
+      setTimeout(() => setCopyMessage(''), 2600);
+    } catch (err) {
+      console.error('result csv download failed', err);
+      setCopyMessage('CSV 결과 파일 저장에 실패했습니다.');
+      setTimeout(() => setCopyMessage(''), 2600);
+    }
+  };
+
+  const downloadResultImage = (dataUrl: string) => {
+    if (!currentPoll) {
+      return;
+    }
+
+    const link = document.createElement('a');
+    link.href = dataUrl;
+    link.download = `pickflow-${currentPoll.id}-result.png`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  };
+
+  const handlePreviewResultImageClick = () => {
+    if (!currentPoll) {
+      return;
+    }
+
+    setCopyMessage('');
+    try {
+      const dataUrl = buildPollResultImageDataUrl(
+        currentPoll,
+        resolvePollShareUrl(currentPoll),
+        resultImageTheme,
+        resultImageContentOptions,
+      );
+      setResultImagePreviewUrl(dataUrl);
+      setCopyMessage('');
+    } catch (err) {
+      console.error('result image preview failed', err);
+      setCopyMessage('결과 이미지 미리보기를 만들지 못했습니다.');
+      setTimeout(() => setCopyMessage(''), 2600);
+    }
+  };
+
+  const handleDownloadPreviewImageClick = () => {
+    if (!currentPoll || !resultImagePreviewUrl) {
+      return;
+    }
+
+    try {
+      downloadResultImage(resultImagePreviewUrl);
+      setCopiedId(`image-${currentPoll.id}`);
+      setCopyMessage('결과 이미지가 저장되었습니다.');
+      setTimeout(() => setCopiedId(null), 2200);
+      setTimeout(() => setCopyMessage(''), 2600);
+    } catch (err) {
+      console.error('result image download failed', err);
+      setCopyMessage('결과 이미지 저장에 실패했습니다.');
+      setTimeout(() => setCopyMessage(''), 2600);
+    }
+  };
+
+  const handleResultImageThemeChange = (nextTheme: ResultImageTheme) => {
+    setResultImageTheme(nextTheme);
+
+    if (!currentPoll || !resultImagePreviewUrl) {
+      return;
+    }
+
+    try {
+      const dataUrl = buildPollResultImageDataUrl(
+        currentPoll,
+        resolvePollShareUrl(currentPoll),
+        nextTheme,
+        resultImageContentOptions,
+      );
+      setResultImagePreviewUrl(dataUrl);
+    } catch (err) {
+      console.error('result image theme update failed', err);
+      setCopyMessage('결과 이미지 미리보기를 만들지 못했습니다.');
+      setTimeout(() => setCopyMessage(''), 2600);
+    }
+  };
+
+  const handleResultImageContentToggle = (targetOption: ResultImageContentKey) => {
+    const nextOptions = {
+      ...resultImageContentOptions,
+      [targetOption]: !resultImageContentOptions[targetOption],
+    };
+    setResultImageContentOptions(nextOptions);
+
+    if (!currentPoll || !resultImagePreviewUrl) {
+      return;
+    }
+
+    try {
+      const dataUrl = buildPollResultImageDataUrl(
+        currentPoll,
+        resolvePollShareUrl(currentPoll),
+        resultImageTheme,
+        nextOptions,
+      );
+      setResultImagePreviewUrl(dataUrl);
+    } catch (err) {
+      console.error('result image content update failed', err);
+      setCopyMessage('결과 이미지 미리보기를 만들지 못했습니다.');
+      setTimeout(() => setCopyMessage(''), 2600);
+    }
+  };
+
+  const handleKakaoShareClick = async () => {
+    if (!currentPoll) {
+      return;
+    }
+
+    setCopyMessage('');
+    try {
+      const mode = await sharePollToKakao(currentPoll);
+      if (mode === 'clipboard') {
+        setCopiedId(currentPoll.id);
+        setCopyMessage('카카오 SDK 키가 없어 공유 문구와 링크를 복사했습니다.');
+      } else if (mode === 'web-share') {
+        setCopyMessage('공유 시트를 열었습니다. 카카오톡을 선택해 전송해 주세요.');
+      } else {
+        setCopyMessage('카카오톡 공유 창을 열었습니다.');
+      }
+      setTimeout(() => setCopyMessage(''), 2600);
+      setTimeout(() => setCopiedId(null), 2200);
+    } catch (err) {
+      console.error('kakao share failed', err);
+      try {
+        await copyText(`${resolveShareText(currentPoll)}\n${resolvePollShareUrl(currentPoll)}`);
+        setCopiedId(currentPoll.id);
+        setCopyMessage('카카오 공유를 열지 못해 링크를 복사했습니다.');
+      } catch {
+        setCopyMessage('카카오 공유에 실패했습니다. 링크를 직접 복사해 주세요.');
+      }
+      setTimeout(() => setCopyMessage(''), 2800);
+      setTimeout(() => setCopiedId(null), 2200);
+    }
+  };
+
+  const handleUseAsTemplateClick = () => {
+    if (!currentPoll) {
+      return;
+    }
+
+    try {
+      const draftAttachments = (currentPoll.attachments || [])
+        .filter((attachment) => attachment.dataUrl?.startsWith('data:'))
+        .slice(0, 3)
+        .map((attachment) => ({
+          name: attachment.name,
+          type: attachment.type,
+          size: attachment.size,
+          dataUrl: attachment.dataUrl,
+        }));
+      const draftOptions = currentPoll.options.slice(0, 10).map((option) => ({
+        text: option.text,
+        imageUrl: option.imageUrl?.startsWith('data:') ? option.imageUrl : '',
+      }));
+
+      localStorage.setItem(
+        CREATE_POLL_DRAFT_STORAGE_KEY,
+        JSON.stringify({
+          question: `${currentPoll.question} (복사본)`,
+          description: currentPoll.description || '',
+          endsAtLocal: '',
+          resultsVisibility: currentPoll.resultsVisibility === 'always' ? 'always' : 'afterVote',
+          options:
+            draftOptions.length >= 2
+              ? draftOptions
+              : [
+                  { text: '', imageUrl: '' },
+                  { text: '', imageUrl: '' },
+                ],
+          attachments: draftAttachments,
+          savedAt: new Date().toISOString(),
+        }),
+      );
+      navigate('/create');
+    } catch (err) {
+      console.error('failed to create template draft', err);
+      setCopyMessage('템플릿 복제에 실패했습니다.');
+      setTimeout(() => setCopyMessage(''), 2600);
     }
   };
 
@@ -235,48 +1497,773 @@ export const PollDetail: React.FC = () => {
     );
   }
 
-  const hasVoted = votedHistory[currentPoll.id] !== undefined;
+  const pollClosed = isPollClosed(currentPoll);
+  const endAtLabel = formatEndAt(currentPoll.endsAt);
+  const resultsVisibility = currentPoll.resultsVisibility === 'always' ? 'always' : 'afterVote';
+  const canViewResults = hasVoted || pollClosed || resultsVisibility === 'always';
+  const sortedOptionsByVotes = [...currentPoll.options].sort((a, b) => b.voteCount - a.voteCount);
+  const leadingOption = sortedOptionsByVotes[0] || null;
+  const runnerUpOption = sortedOptionsByVotes[1] || null;
+  const leadingShare =
+    currentPoll.totalVotes > 0 && leadingOption
+      ? Math.round((leadingOption.voteCount / currentPoll.totalVotes) * 100)
+      : 0;
+  const voteGap = leadingOption ? leadingOption.voteCount - (runnerUpOption?.voteCount || 0) : 0;
+  const voteGapShare =
+    currentPoll.totalVotes > 0 ? Math.round((voteGap / currentPoll.totalVotes) * 100) : 0;
+  const feedbackRate =
+    currentPoll.totalVotes > 0
+      ? Math.round((currentPoll.comments.length / currentPoll.totalVotes) * 100)
+      : 0;
+  const attachments = currentPoll.attachments || [];
+  const selectedOption = currentPoll.options.find((option) => option.id === votedOptionId);
+  const selectedOptionIndex = currentPoll.options.findIndex(
+    (option) => option.id === votedOptionId,
+  );
+  const quickReasonChips = selectedOption
+    ? [
+        {
+          id: 'practical',
+          label: '현실적',
+          text: '현실적으로 가장 맞는 선택 같아요.',
+        },
+        {
+          id: 'simple',
+          label: '부담 적음',
+          text: '시간과 비용 부담이 적어 보여요.',
+        },
+        {
+          id: 'confidence',
+          label: '확신',
+          text: '지금 상황에서는 이 선택이 가장 납득돼요.',
+        },
+        {
+          id: 'long-term',
+          label: '후회 적음',
+          text: '장기적으로 후회가 적을 것 같아요.',
+        },
+        ...(attachments.length > 0
+          ? [
+              {
+                id: 'based-on-file',
+                label: '자료 참고',
+                text: '첨부자료를 보고 이 선택이 더 설득력 있다고 느꼈어요.',
+              },
+            ]
+          : []),
+      ]
+    : [];
+  const voterDisplayName = voterName.trim() || '익명';
+  const trimmedCommentLength = comment.trim().length;
+  const voteSubmitReady = votedOptionId !== null && !isLoading && !pollClosed;
+  const voteSubmitHint = pollClosed
+    ? '마감된 투표입니다.'
+    : votedOptionId
+      ? '제출하면 선택과 한마디가 함께 반영됩니다.'
+      : '먼저 선택지를 고르면 제출 버튼이 활성화됩니다.';
+  const commentFilterOptions = currentPoll.options.map((option) => ({
+    id: option.id,
+    label: option.text,
+    count: currentPoll.comments.filter(
+      (commentItem) =>
+        commentItem.selectedOptionId === option.id ||
+        commentItem.selectedOptionText === option.text,
+    ).length,
+  }));
+  const targetCommentOption =
+    commentFilter === 'all'
+      ? null
+      : currentPoll.options.find((option) => option.id === commentFilter);
+  const filteredComments =
+    commentFilter === 'all'
+      ? currentPoll.comments
+      : currentPoll.comments.filter(
+          (commentItem) =>
+            commentItem.selectedOptionId === commentFilter ||
+            commentItem.selectedOptionText === targetCommentOption?.text,
+        );
+  const displayedComments = [...filteredComments].sort((a, b) => {
+    if (commentViewMode === 'byOption') {
+      const optionCompare = (a.selectedOptionText || '').localeCompare(
+        b.selectedOptionText || '',
+        'ko-KR',
+      );
+      if (optionCompare !== 0) {
+        return optionCompare;
+      }
+    }
+
+    if (commentViewMode === 'highlights') {
+      const lengthCompare = b.comment.trim().length - a.comment.trim().length;
+      if (lengthCompare !== 0) {
+        return lengthCompare;
+      }
+    }
+
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
+  const visibleComments =
+    commentViewMode === 'highlights' ? displayedComments.slice(0, 5) : displayedComments;
+  const emptyCommentMessage =
+    commentViewMode === 'highlights'
+      ? '핵심 의견으로 보여줄 피드백이 없습니다.'
+      : commentFilter === 'all'
+        ? '아직 표시할 피드백이 없습니다.'
+        : '선택한 항목에 연결된 피드백이 없습니다.';
+  const commentSummaryRows = currentPoll.options
+    .map((option) => {
+      const comments = currentPoll.comments
+        .filter(
+          (commentItem) =>
+            commentItem.selectedOptionId === option.id ||
+            commentItem.selectedOptionText === option.text,
+        )
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+      return {
+        option,
+        comments,
+        latestComment: comments[0] || null,
+      };
+    })
+    .sort((a, b) => b.comments.length - a.comments.length);
+  const featuredComment =
+    [...currentPoll.comments].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    )[0] || null;
+  const originalPollPath = currentPoll.id.startsWith('local-')
+    ? resolvePollShareUrl(currentPoll)
+    : `/poll/${encodeURIComponent(currentPoll.id)}`;
+  const voteStepItems = [
+    {
+      label: '선택',
+      active: votedOptionId !== null,
+      icon: ClipboardList,
+    },
+    {
+      label: '한마디',
+      active: comment.trim().length > 0,
+      icon: MessageSquare,
+    },
+    {
+      label: '제출',
+      active: votedOptionId !== null && !isLoading,
+      icon: Send,
+    },
+  ];
+  const consensusLabel =
+    currentPoll.totalVotes === 0
+      ? '참여 대기'
+      : voteGap <= 1 && currentPoll.options.length > 1
+        ? '접전'
+        : leadingShare >= 65
+          ? '합의 강함'
+          : leadingShare >= 50
+            ? '우세'
+            : '의견 분산';
+  const decisionHint =
+    currentPoll.totalVotes === 0
+      ? '첫 투표가 들어오면 결과 흐름을 해석할 수 있습니다.'
+      : consensusLabel === '접전'
+        ? '상위 선택지 차이가 작습니다. 링크를 더 공유해 표본을 늘리는 편이 좋습니다.'
+        : consensusLabel === '합의 강함'
+          ? '상위 선택지에 의견이 모이고 있습니다. 댓글 맥락까지 확인한 뒤 결정하기 좋습니다.'
+          : '결과가 갈리고 있습니다. 피드백을 기준으로 선택지 차이를 좁혀보세요.';
+  const shareUrl = resolvePollShareUrl(currentPoll);
+  const decisionMemo = [
+    `[pickflow 결정 메모] ${currentPoll.question}`,
+    `상태: ${pollClosed ? '마감' : consensusLabel}`,
+    leadingOption
+      ? `선두: ${leadingOption.text} (${leadingOption.voteCount}표, ${leadingShare}%)`
+      : '선두: 아직 없음',
+    `참여: ${currentPoll.totalVotes}명 · 의견 ${currentPoll.comments.length}개 · 격차 ${voteGap}표`,
+    `해석: ${decisionHint}`,
+    featuredComment
+      ? `대표 의견: ${featuredComment.comment} - ${featuredComment.voterName}`
+      : '대표 의견: 아직 없음',
+    `결과 링크: ${shareUrl}`,
+  ].join('\n');
+  const participationQrUrl = buildQrSvgDataUri(shareUrl);
+  const inviteMessage = buildPollInviteMessage(currentPoll, shareUrl, inviteMessageTone);
+  const participantContextItems = [
+    {
+      key: 'access',
+      icon: User,
+      label: '참여 방식',
+      value: hasVoted ? '이미 참여함' : '계정 없이 참여 가능',
+      help: hasVoted
+        ? '이 기기에서는 이미 선택을 제출했습니다.'
+        : '로그인이나 앱 설치 없이 바로 선택할 수 있습니다.',
+    },
+    {
+      key: 'deadline',
+      icon: AlertCircle,
+      label: '마감',
+      value: pollClosed ? '마감됨' : endAtLabel || '상시 열림',
+      help: pollClosed
+        ? '이 투표는 마감되어 새 응답을 받지 않습니다.'
+        : endAtLabel
+          ? '마감 전까지 선택과 의견을 남길 수 있습니다.'
+          : '생성자가 별도 마감 시간을 설정하지 않았습니다.',
+    },
+    {
+      key: 'context',
+      icon: FileText,
+      label: '참고자료',
+      value: attachments.length > 0 ? `${attachments.length}개 첨부` : '첨부 없음',
+      help:
+        attachments.length > 0
+          ? '선택 전에 첨부된 자료를 확인하면 판단이 쉬워집니다.'
+          : '질문과 선택지만 보고 빠르게 참여할 수 있습니다.',
+    },
+    {
+      key: 'results',
+      icon: Eye,
+      label: '결과 공개',
+      value: RESULTS_VISIBILITY_LABELS[resultsVisibility],
+      help:
+        resultsVisibility === 'always'
+          ? '선택 전에도 전체 흐름을 확인할 수 있습니다.'
+          : '다른 의견에 영향을 덜 받도록 투표 후 결과가 열립니다.',
+    },
+    {
+      key: 'effort',
+      icon: Gauge,
+      label: '예상 소요',
+      value: currentPoll.options.length <= 3 ? '20초 내 참여' : '30초 정도',
+      help:
+        currentPoll.options.length <= 3
+          ? '선택지가 적어 빠르게 고르고 이유를 남길 수 있습니다.'
+          : '선택지를 훑고 가장 가까운 의견을 고르는 데 약간의 시간이 필요합니다.',
+    },
+    {
+      key: 'sample',
+      icon: Users,
+      label: '참여 규모',
+      value: currentPoll.totalVotes > 0 ? `${currentPoll.totalVotes}명 참여` : '첫 참여 대기',
+      help:
+        currentPoll.totalVotes > 0
+          ? '이미 들어온 응답이 있어 제출 후 흐름을 비교할 수 있습니다.'
+          : '첫 선택이 들어오면 결과 흐름이 시작됩니다.',
+    },
+  ];
+  const kakaoShareDiagnostics = getKakaoShareDiagnostics(currentPoll);
+  const kakaoShareReadinessItems = kakaoShareDiagnostics.items;
+  const kakaoReadyCount = kakaoShareDiagnostics.readyCount;
+  const shareCopyPresets = [
+    {
+      id: 'kakao-room',
+      label: '카톡 단톡방',
+      title: '가볍게 투표 요청',
+      description: '친구나 팀 단톡방에 바로 붙여넣기 좋은 짧은 문구',
+      accent: 'var(--brand-accent-gold)',
+      text: `${resolveShareText(currentPoll)}\n\n30초만 골라주세요. 이유도 한 줄 남겨주면 결정에 바로 반영할게요.\n${shareUrl}`,
+    },
+    {
+      id: 'meeting',
+      label: '회의/수업',
+      title: '참여 코드 강조',
+      description: '발표 화면, 오프라인 모임, 수업에서 링크와 참여 안내를 같이 전달',
+      accent: 'var(--brand-accent-teal)',
+      text: `실시간 의견을 모으는 투표입니다.\n\n질문: ${currentPoll.question}\n참여 링크: ${shareUrl}\n결과는 투표 후 바로 확인해 주세요.`,
+    },
+    {
+      id: 'social',
+      label: 'SNS 게시',
+      title: '맥락 포함 공유',
+      description: '스토리, 커뮤니티, X 같은 공개 채널에 맞춘 설명형 문구',
+      accent: 'var(--brand-primary)',
+      text: `${currentPoll.question}\n\n선택지가 고민돼서 투표로 의견을 모으고 있어요. 가장 납득되는 선택에 투표하고 이유를 남겨주세요.\n${shareUrl}`,
+    },
+  ];
+  const embedCodeModes = [
+    {
+      id: 'standard',
+      label: '표준',
+      title: '본문 안에 자연스럽게 삽입',
+      description: '블로그, 노션형 페이지, 커뮤니티 공지에 맞는 기본 720px iframe',
+    },
+    {
+      id: 'compact',
+      label: '컴팩트',
+      title: '좁은 사이드바/랜딩 섹션',
+      description: '모바일 카드나 짧은 랜딩 섹션에 맞는 낮은 높이 iframe',
+    },
+    {
+      id: 'popup',
+      label: '팝업 버튼',
+      title: '페이지 흐름을 유지하며 열기',
+      description: 'CTA 버튼을 눌렀을 때 전체 화면 오버레이로 투표를 띄웁니다',
+    },
+  ] as const;
+  const summaryCopied = copiedId === `summary-${resultSummaryMode}-${currentPoll.id}`;
+  const markdownReportCopied = copiedId === `markdown-${currentPoll.id}`;
+  const resultImageSaved = copiedId === `image-${currentPoll.id}`;
+  const resultCsvSaved = copiedId === `csv-${currentPoll.id}`;
+  const resultActionHasError =
+    copyMessage === '결과 요약 복사에 실패했습니다.' ||
+    copyMessage === '회의록용 리포트 복사에 실패했습니다.' ||
+    copyMessage === 'CSV 결과 파일 저장에 실패했습니다.' ||
+    copyMessage === '결과 이미지 저장에 실패했습니다.' ||
+    copyMessage === '결과 이미지 미리보기를 만들지 못했습니다.';
+  const showResultActionMessage =
+    summaryCopied ||
+    markdownReportCopied ||
+    resultImageSaved ||
+    resultCsvSaved ||
+    resultActionHasError;
+  const hasEnoughSample = currentPoll.totalVotes >= Math.max(5, currentPoll.options.length * 2);
+  const hasEnoughFeedback =
+    currentPoll.comments.length >= Math.max(2, Math.ceil(currentPoll.totalVotes * 0.35));
+  const hasDecisionSignal =
+    pollClosed || (currentPoll.totalVotes > 0 && (leadingShare >= 60 || voteGap >= 2));
+  const decisionConfidenceScore = Math.min(
+    100,
+    (hasEnoughSample ? 35 : Math.min(30, currentPoll.totalVotes * 6)) +
+      (hasEnoughFeedback ? 25 : Math.min(20, currentPoll.comments.length * 8)) +
+      (hasDecisionSignal ? 25 : Math.min(14, voteGap * 7)) +
+      (pollClosed ? 15 : resultsVisibility === 'always' ? 10 : 6),
+  );
+  const decisionConfidenceLabel =
+    decisionConfidenceScore >= 80
+      ? '결정해도 좋은 상태'
+      : decisionConfidenceScore >= 55
+        ? '조금 더 모으면 안정적'
+        : '아직 표본 보강 필요';
+  const decisionConfidenceTone =
+    decisionConfidenceScore >= 80
+      ? 'var(--brand-accent-teal)'
+      : decisionConfidenceScore >= 55
+        ? 'var(--brand-accent-gold)'
+        : 'var(--brand-accent-coral)';
+  const decisionConfidenceItems = [
+    {
+      label: '표본',
+      value: `${currentPoll.totalVotes}표`,
+      passed: hasEnoughSample || pollClosed,
+      help: hasEnoughSample
+        ? '선택지 수 대비 기본 표본이 확보됐습니다.'
+        : '공유 링크를 한 번 더 보내 표본을 늘리세요.',
+    },
+    {
+      label: '의견',
+      value: `${currentPoll.comments.length}개`,
+      passed: hasEnoughFeedback || pollClosed,
+      help: hasEnoughFeedback
+        ? '선택 이유가 결과 해석을 보강하고 있습니다.'
+        : '결과를 결정하기 전 한마디를 더 받아보는 편이 좋습니다.',
+    },
+    {
+      label: '격차',
+      value: `${voteGap}표 차이`,
+      passed: hasDecisionSignal,
+      help: hasDecisionSignal
+        ? '선두 선택지가 비교적 뚜렷합니다.'
+        : '접전이라 추가 참여가 결과를 바꿀 수 있습니다.',
+    },
+    {
+      label: '상태',
+      value: pollClosed ? '마감' : '진행 중',
+      passed: pollClosed || decisionConfidenceScore >= 80,
+      help: pollClosed
+        ? '더 이상 표가 바뀌지 않아 결과 정리에 적합합니다.'
+        : '진행 중인 투표는 공유로 신뢰도를 더 높일 수 있습니다.',
+    },
+  ];
+  const operationPhase = pollClosed
+    ? '마감 정리'
+    : !hasEnoughSample
+      ? '표본 확보'
+      : !hasEnoughFeedback
+        ? '의견 보강'
+        : hasDecisionSignal
+          ? '결정 가능'
+          : '추가 확인';
+  const operationChecklist: Array<{
+    key: string;
+    label: string;
+    value: string;
+    help: string;
+    passed: boolean;
+    action: OperationChecklistAction;
+    actionLabel: string;
+  }> = [
+    {
+      key: 'sample',
+      label: '표본 확보',
+      value: `${currentPoll.totalVotes}명 참여`,
+      help: hasEnoughSample
+        ? '선택지 수 대비 기본 표본이 모였습니다.'
+        : '친구나 팀 채널에 공유해 선택 편향을 줄여보세요.',
+      passed: hasEnoughSample || pollClosed,
+      action: 'share',
+      actionLabel: '공유 열기',
+    },
+    {
+      key: 'feedback',
+      label: '이유 수집',
+      value: `${currentPoll.comments.length}개 의견`,
+      help: hasEnoughFeedback
+        ? '선택 이유가 결과 해석에 충분히 보강되고 있습니다.'
+        : '링크를 다시 보내 선택 이유를 남겨달라고 요청하세요.',
+      passed: hasEnoughFeedback || pollClosed,
+      action: 'copyLink',
+      actionLabel: '링크 복사',
+    },
+    {
+      key: 'decision',
+      label: '결정 신호',
+      value: consensusLabel,
+      help: hasDecisionSignal
+        ? '공유용 결과 카드나 요약문으로 결정을 정리하기 좋습니다.'
+        : '아직 격차가 작습니다. 표본을 더 모은 뒤 결정하세요.',
+      passed: hasDecisionSignal,
+      action: 'resultImage',
+      actionLabel: '결과 카드',
+    },
+    {
+      key: 'live',
+      label: '현장 참여',
+      value: participationQrUrl ? 'QR 준비됨' : '코드 안내 필요',
+      help: participationQrUrl
+        ? '발표 모드에서 QR을 띄우면 모바일 참여가 빨라집니다.'
+        : '링크가 길어 QR 생성이 어려우므로 JOIN CODE를 안내하세요.',
+      passed: Boolean(participationQrUrl),
+      action: 'present',
+      actionLabel: '발표 모드',
+    },
+  ];
+  const completedOperationCount = operationChecklist.filter((item) => item.passed).length;
+
+  if (isPresentationMode) {
+    return (
+      <section className="present-shell animate-slide-up">
+        <header className="present-header">
+          <div>
+            <div className="present-live-row">
+              <span>PICKFLOW LIVE RESULT</span>
+              <span className="present-live-badge">
+                <RefreshCw size={13} />
+                {isPresentAutoRefreshPaused
+                  ? '자동 갱신 일시정지'
+                  : `${presentRefreshCountdown}초 후 자동 갱신`}
+              </span>
+              <div className="present-live-controls">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (id) {
+                      fetchPoll(id);
+                      setPresentRefreshCountdown(PRESENT_REFRESH_INTERVAL_SECONDS);
+                    }
+                  }}
+                >
+                  <RefreshCw size={13} />
+                  지금 갱신
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsPresentAutoRefreshPaused((current) => !current)}
+                >
+                  {isPresentAutoRefreshPaused ? <Play size={13} /> : <Pause size={13} />}
+                  {isPresentAutoRefreshPaused ? '자동 재개' : '일시정지'}
+                </button>
+              </div>
+            </div>
+            <h1>{currentPoll.question}</h1>
+            {currentPoll.description ? <p>{currentPoll.description}</p> : null}
+          </div>
+          <a href={originalPollPath} className="present-origin-link">
+            원본 열기
+            <ExternalLink size={14} />
+          </a>
+        </header>
+
+        <div className="present-stat-grid">
+          <div>
+            <span>총 투표</span>
+            <strong>{currentPoll.totalVotes}</strong>
+          </div>
+          <div>
+            <span>의견</span>
+            <strong>{currentPoll.comments.length}</strong>
+          </div>
+          <div>
+            <span>상태</span>
+            <strong>{pollClosed ? '마감' : consensusLabel}</strong>
+          </div>
+          <div>
+            <span>참여 코드</span>
+            <strong>{currentPoll.id}</strong>
+          </div>
+        </div>
+
+        <div className="present-grid">
+          <section className="present-results-panel">
+            {sortedOptionsByVotes.map((option, index) => {
+              const percentage =
+                currentPoll.totalVotes > 0
+                  ? Math.round((option.voteCount / currentPoll.totalVotes) * 100)
+                  : 0;
+              return (
+                <article key={option.id} className={index === 0 ? 'leader' : undefined}>
+                  <div>
+                    <span>{index + 1}</span>
+                    <strong>{option.text}</strong>
+                    <small>
+                      {option.voteCount}표 · {percentage}%
+                    </small>
+                  </div>
+                  <div className="present-result-bar">
+                    <span style={{ width: `${percentage}%` }} />
+                  </div>
+                </article>
+              );
+            })}
+          </section>
+
+          <aside className="present-side-panel">
+            <div>
+              <span>결정 신호</span>
+              <strong>{consensusLabel}</strong>
+              <p>{decisionHint}</p>
+            </div>
+            <div>
+              <span>대표 의견</span>
+              <strong>{featuredComment?.voterName || '의견 대기'}</strong>
+              <p>
+                {featuredComment?.comment ||
+                  '아직 의견이 없습니다. 참여 링크를 공유해 선택 이유를 받아보세요.'}
+              </p>
+            </div>
+            <div>
+              <span>참여 링크</span>
+              <div className="present-join-card">
+                {participationQrUrl ? (
+                  <img
+                    src={participationQrUrl}
+                    alt={`${currentPoll.question} 참여 QR 코드`}
+                    style={{
+                      width: 'min(100%, 220px)',
+                      aspectRatio: '1 / 1',
+                      borderRadius: '18px',
+                      background: '#fff',
+                      padding: '0.55rem',
+                      boxShadow: '0 16px 42px rgba(0, 0, 0, 0.32)',
+                    }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      border: '1px solid rgba(232, 200, 77, 0.32)',
+                      borderRadius: 'var(--radius-sm)',
+                      color: 'var(--brand-accent-gold)',
+                      padding: '0.8rem',
+                      fontSize: '0.8rem',
+                      fontWeight: 800,
+                    }}
+                  >
+                    QR 생성에는 링크가 너무 깁니다. 참여 코드를 안내해 주세요.
+                  </div>
+                )}
+                <strong>{currentPoll.id}</strong>
+                <p className="present-share-url">{shareUrl}</p>
+                <button
+                  type="button"
+                  onClick={() => handleCopyLinkClick(currentPoll.id)}
+                  className="present-copy-button"
+                >
+                  {copiedId === currentPoll.id ? <Check size={14} /> : <Copy size={14} />}
+                  {copiedId === currentPoll.id ? '링크 복사됨' : '참여 링크 복사'}
+                </button>
+                {copiedId === currentPoll.id && copyMessage ? <small>{copyMessage}</small> : null}
+              </div>
+            </div>
+          </aside>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <div
       className="animate-slide-up"
       style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}
     >
-      {/* Header Back Controls */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <button
-          onClick={() => navigate('/')}
+      <section
+        style={{
+          border: '1px solid rgba(45, 212, 191, 0.18)',
+          borderRadius: 'var(--radius-sm)',
+          background:
+            'linear-gradient(135deg, rgba(45, 212, 191, 0.075), rgba(232, 200, 77, 0.045))',
+          padding: '1rem',
+          display: 'grid',
+          gap: '0.85rem',
+        }}
+        aria-label="투표 참여 전 안내"
+      >
+        <div
           style={{
-            background: 'none',
-            border: 'none',
-            color: 'var(--text-secondary)',
             display: 'flex',
-            alignItems: 'center',
-            gap: '4px',
-            fontSize: '0.85rem',
-            cursor: 'pointer',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            gap: '0.75rem',
+            flexWrap: 'wrap',
           }}
         >
-          <ChevronLeft size={16} />
-          <span>목록으로</span>
-        </button>
+          <div style={{ display: 'grid', gap: '0.22rem' }}>
+            <span
+              style={{
+                color: 'var(--brand-accent-teal)',
+                fontSize: '0.68rem',
+                fontWeight: 900,
+              }}
+            >
+              BEFORE YOU VOTE
+            </span>
+            <h2
+              style={{
+                margin: 0,
+                color: 'var(--text-primary)',
+                fontSize: '1rem',
+                lineHeight: 1.35,
+              }}
+            >
+              참여 전에 확인할 정보
+            </h2>
+            <p
+              style={{
+                margin: 0,
+                color: 'var(--text-secondary)',
+                fontSize: '0.74rem',
+                lineHeight: 1.5,
+              }}
+            >
+              앱 설치 없이 바로 참여할 수 있고, 필요한 맥락만 먼저 확인한 뒤 선택할 수 있습니다.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowShareModal(true)}
+            className="ghost-btn"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
+              padding: '6px 10px',
+              fontSize: '0.68rem',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <Share2 size={13} />
+            공유 정보 보기
+          </button>
+        </div>
 
-        <button
-          onClick={() => setShowShareModal(true)}
-          className="btn-secondary"
+        <div
           style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            padding: '6px 12px',
-            fontSize: '0.75rem',
-            fontWeight: 600,
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+            gap: '0.6rem',
           }}
         >
-          <Share2 size={13} />
-          <span>SNS 공유하기</span>
-        </button>
-      </div>
+          {participantContextItems.map((item) => {
+            const ContextIcon = item.icon;
+            return (
+              <article
+                key={item.key}
+                style={{
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  borderRadius: 'var(--radius-sm)',
+                  background: 'rgba(255,255,255,0.035)',
+                  padding: '0.72rem',
+                  display: 'grid',
+                  gap: '0.35rem',
+                  alignContent: 'start',
+                }}
+              >
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    color: 'var(--text-muted)',
+                    fontSize: '0.66rem',
+                    fontWeight: 800,
+                  }}
+                >
+                  <ContextIcon size={13} style={{ color: 'var(--brand-accent-teal)' }} />
+                  {item.label}
+                </span>
+                <strong
+                  style={{
+                    color: 'var(--text-primary)',
+                    fontSize: '0.82rem',
+                    lineHeight: 1.3,
+                  }}
+                >
+                  {item.value}
+                </strong>
+                <p
+                  style={{
+                    margin: 0,
+                    color: 'var(--text-secondary)',
+                    fontSize: '0.68rem',
+                    lineHeight: 1.45,
+                  }}
+                >
+                  {item.help}
+                </p>
+              </article>
+            );
+          })}
+        </div>
+      </section>
+
+      {!isEmbedMode ? (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <button
+            onClick={() => navigate('/')}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--text-secondary)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              fontSize: '0.85rem',
+              cursor: 'pointer',
+            }}
+          >
+            <ChevronLeft size={16} />
+            <span>목록으로</span>
+          </button>
+
+          <button
+            onClick={() => setShowShareModal(true)}
+            className="btn-secondary"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 12px',
+              fontSize: '0.75rem',
+              fontWeight: 600,
+            }}
+          >
+            <Share2 size={13} />
+            <span>SNS 공유하기</span>
+          </button>
+        </div>
+      ) : (
+        <div className="embed-origin-cta">
+          <span>pickflow embedded poll</span>
+          <a href={originalPollPath} target="_blank" rel="noreferrer">
+            원본에서 크게 보기
+            <ExternalLink size={12} />
+          </a>
+        </div>
+      )}
 
       {/* Main Poll Card */}
       <div
@@ -289,6 +2276,188 @@ export const PollDetail: React.FC = () => {
           cursor: 'default',
         }}
       >
+        {!isEmbedMode ? (
+          <section
+            className="share-strip"
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'minmax(0, 1fr) auto',
+              gap: '0.85rem',
+              alignItems: 'center',
+              border: '1px solid rgba(45, 212, 191, 0.18)',
+              borderRadius: 'var(--radius-sm)',
+              background: 'rgba(45, 212, 191, 0.05)',
+              padding: '0.85rem',
+            }}
+          >
+            <div
+              style={{
+                minWidth: 0,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.65rem',
+              }}
+            >
+              {participationQrUrl ? (
+                <img
+                  src={participationQrUrl}
+                  alt={`${currentPoll.question} 참여 QR 코드`}
+                  style={{
+                    width: '58px',
+                    height: '58px',
+                    borderRadius: '12px',
+                    padding: '5px',
+                    background: '#fff',
+                    flexShrink: 0,
+                  }}
+                />
+              ) : (
+                <span
+                  aria-hidden="true"
+                  style={{
+                    width: '58px',
+                    height: '58px',
+                    borderRadius: '12px',
+                    border: '1px solid rgba(232, 200, 77, 0.24)',
+                    color: 'var(--brand-accent-gold)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                  }}
+                >
+                  <QrCode size={24} />
+                </span>
+              )}
+              <div style={{ minWidth: 0, display: 'grid', gap: '0.25rem' }}>
+                <span
+                  style={{
+                    color: 'var(--brand-accent-teal)',
+                    fontSize: '0.68rem',
+                    fontWeight: 900,
+                    letterSpacing: '0.04em',
+                  }}
+                >
+                  JOIN CODE · {currentPoll.id}
+                </span>
+                <p
+                  style={{
+                    margin: 0,
+                    color: 'var(--text-secondary)',
+                    fontSize: '0.76rem',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                  title={shareUrl}
+                >
+                  {shareUrl}
+                </p>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.66rem', fontWeight: 700 }}>
+                  {participationQrUrl
+                    ? '모바일 카메라로 스캔해 바로 참여'
+                    : '링크가 길어 QR 대신 복사를 사용'}
+                </span>
+              </div>
+            </div>
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'flex-end',
+                gap: '0.45rem',
+                flexWrap: 'wrap',
+              }}
+            >
+              <button
+                type="button"
+                onClick={handleCopyJoinCodeClick}
+                className="btn-secondary"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  minHeight: '38px',
+                  padding: '8px 12px',
+                  fontSize: '0.74rem',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {copiedId === `code-${currentPoll.id}` ? <Check size={14} /> : <Code2 size={14} />}
+                코드 복사
+              </button>
+              <button
+                type="button"
+                onClick={() => handleCopyLinkClick(currentPoll.id)}
+                className="btn-secondary"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  minHeight: '38px',
+                  padding: '8px 12px',
+                  fontSize: '0.74rem',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {copiedId === currentPoll.id ? <Check size={14} /> : <Copy size={14} />}
+                링크 복사
+              </button>
+              <button
+                type="button"
+                onClick={handleCopyEmbedClick}
+                className="btn-secondary"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  minHeight: '38px',
+                  padding: '8px 12px',
+                  fontSize: '0.74rem',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {copiedId === `embed-${currentPoll.id}` ? <Check size={14} /> : <Code2 size={14} />}
+                임베드
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  window.open(`/present/${encodeURIComponent(currentPoll.id)}`, '_blank')
+                }
+                className="btn-secondary"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  minHeight: '38px',
+                  padding: '8px 12px',
+                  fontSize: '0.74rem',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                <BarChart3 size={14} />
+                발표 모드
+              </button>
+            </div>
+          </section>
+        ) : null}
+        {!isEmbedMode && copyMessage ? (
+          <p
+            style={{
+              margin: '-0.8rem 0 0',
+              color: copiedId === currentPoll.id ? 'var(--brand-accent-teal)' : 'var(--text-muted)',
+              fontSize: '0.72rem',
+            }}
+          >
+            {copyMessage}
+          </p>
+        ) : null}
+
         <div>
           <span
             style={{
@@ -324,7 +2493,7 @@ export const PollDetail: React.FC = () => {
               fontSize: '1.35rem',
               fontWeight: 800,
               color: 'var(--text-primary)',
-              letterSpacing: '-0.02em',
+              letterSpacing: 0,
               lineHeight: 1.4,
             }}
           >
@@ -345,6 +2514,120 @@ export const PollDetail: React.FC = () => {
             </p>
           )}
         </div>
+        {attachments.length > 0 ? (
+          <section
+            style={{
+              border: '1px solid var(--bg-card-border)',
+              borderRadius: 'var(--radius-sm)',
+              background: 'rgba(255,255,255,0.022)',
+              padding: '0.9rem',
+              display: 'grid',
+              gap: '0.65rem',
+            }}
+          >
+            <div style={{ display: 'grid', gap: '0.2rem' }}>
+              <h3
+                style={{
+                  margin: 0,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.9rem',
+                  fontWeight: 900,
+                }}
+              >
+                <FileText size={15} style={{ color: 'var(--brand-accent-gold)' }} />
+                참고 파일
+              </h3>
+              <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.7rem' }}>
+                투표 판단에 필요한 자료입니다. 파일을 내려받아 확인한 뒤 참여해 주세요.
+              </p>
+            </div>
+
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                gap: '0.55rem',
+              }}
+            >
+              {attachments.map((attachment, index) => (
+                <article
+                  key={`${attachment.name}-${index}`}
+                  style={{
+                    display: 'grid',
+                    gap: '0.48rem',
+                    border: '1px solid rgba(232, 200, 77, 0.18)',
+                    borderRadius: 'var(--radius-sm)',
+                    background: 'rgba(250, 204, 21, 0.045)',
+                    color: 'var(--text-primary)',
+                    padding: '0.72rem',
+                    minWidth: 0,
+                  }}
+                >
+                  <div style={{ minWidth: 0, display: 'grid', gap: '0.18rem' }}>
+                    <strong
+                      style={{
+                        fontSize: '0.78rem',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                      title={attachment.name}
+                    >
+                      {attachment.name}
+                    </strong>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.66rem' }}>
+                      {(attachment.size / 1024).toFixed(1)}KB · {attachment.type || 'file'}
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: '0.4rem',
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <a
+                      href={attachment.dataUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="ghost-btn"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        padding: '5px 9px',
+                        fontSize: '0.66rem',
+                        textDecoration: 'none',
+                      }}
+                    >
+                      <ExternalLink size={12} />
+                      미리보기
+                    </a>
+                    <a
+                      href={attachment.dataUrl}
+                      download={attachment.name}
+                      className="ghost-btn"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        padding: '5px 9px',
+                        fontSize: '0.66rem',
+                        textDecoration: 'none',
+                      }}
+                    >
+                      <Download size={12} />
+                      다운로드
+                    </a>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+        ) : null}
         {error ? (
           <p
             style={{
@@ -361,9 +2644,583 @@ export const PollDetail: React.FC = () => {
             {error}
           </p>
         ) : null}
+        {voteMessage ? (
+          <p
+            style={{
+              margin: 0,
+              color: 'var(--brand-accent-coral)',
+              fontSize: '0.78rem',
+              lineHeight: 1.45,
+              background: 'rgba(239, 68, 68, 0.12)',
+              border: '1px solid rgba(239, 68, 68, 0.2)',
+              borderRadius: 'var(--radius-sm)',
+              padding: '8px 10px',
+            }}
+          >
+            {voteMessage}
+          </p>
+        ) : null}
+
+        <section
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+            gap: '0.55rem',
+            borderTop: '1px solid rgba(255, 255, 255, 0.05)',
+            paddingTop: '0.95rem',
+          }}
+        >
+          <div className="insight-tile">
+            <span>
+              <Info size={13} />
+              진행 상태
+            </span>
+            <strong
+              style={{ color: pollClosed ? 'var(--text-muted)' : 'var(--brand-accent-teal)' }}
+            >
+              {pollClosed ? '마감됨' : '참여 가능'}
+            </strong>
+            <small>{endAtLabel}</small>
+          </div>
+          <div className="insight-tile">
+            <span>
+              <Eye size={13} />
+              결과 공개
+            </span>
+            <strong>{RESULTS_VISIBILITY_LABELS[resultsVisibility]}</strong>
+            <small>
+              {resultsVisibility === 'always'
+                ? '공유 직후부터 흐름을 볼 수 있습니다.'
+                : '투표 완료 후 결과를 볼 수 있습니다.'}
+            </small>
+          </div>
+        </section>
+
+        {canViewResults ? (
+          <section
+            style={{
+              display: 'grid',
+              gap: '0.85rem',
+              border: '1px solid rgba(45, 212, 191, 0.18)',
+              borderRadius: 'var(--radius-sm)',
+              background: 'rgba(45, 212, 191, 0.045)',
+              padding: '1rem',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                gap: '0.85rem',
+                alignItems: 'flex-start',
+                flexWrap: 'wrap',
+              }}
+            >
+              <div style={{ display: 'grid', gap: '0.25rem' }}>
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    color: 'var(--brand-accent-teal)',
+                    fontSize: '0.68rem',
+                    fontWeight: 900,
+                    letterSpacing: '0.05em',
+                  }}
+                >
+                  <Gauge size={13} />
+                  운영 체크리스트
+                </span>
+                <h3
+                  style={{
+                    margin: 0,
+                    color: 'var(--text-primary)',
+                    fontSize: '0.98rem',
+                    fontWeight: 900,
+                  }}
+                >
+                  지금 단계: {operationPhase}
+                </h3>
+                <p
+                  style={{
+                    margin: 0,
+                    color: 'var(--text-secondary)',
+                    fontSize: '0.76rem',
+                    lineHeight: 1.55,
+                  }}
+                >
+                  공유, 의견 수집, 결과 정리, 현장 참여 준비 상태를 한 번에 확인합니다.
+                </p>
+              </div>
+              <span
+                style={{
+                  border: '1px solid rgba(45, 212, 191, 0.28)',
+                  borderRadius: '999px',
+                  color:
+                    completedOperationCount === operationChecklist.length
+                      ? 'var(--brand-accent-teal)'
+                      : 'var(--brand-accent-gold)',
+                  background:
+                    completedOperationCount === operationChecklist.length
+                      ? 'rgba(45, 212, 191, 0.08)'
+                      : 'rgba(250, 204, 21, 0.08)',
+                  padding: '5px 10px',
+                  fontSize: '0.68rem',
+                  fontWeight: 900,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {completedOperationCount}/{operationChecklist.length} 준비됨
+              </span>
+            </div>
+
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                gap: '0.65rem',
+              }}
+            >
+              {operationChecklist.map((item) => (
+                <article
+                  key={item.key}
+                  style={{
+                    display: 'grid',
+                    gap: '0.55rem',
+                    alignContent: 'start',
+                    border: '1px solid var(--bg-card-border)',
+                    borderRadius: 'var(--radius-sm)',
+                    background: item.passed
+                      ? 'rgba(45, 212, 191, 0.06)'
+                      : 'rgba(255,255,255,0.025)',
+                    padding: '0.75rem',
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                    }}
+                  >
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        color: item.passed
+                          ? 'var(--brand-accent-teal)'
+                          : 'var(--brand-accent-gold)',
+                        fontSize: '0.74rem',
+                        fontWeight: 900,
+                      }}
+                    >
+                      {item.passed ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}
+                      {item.label}
+                    </span>
+                    <small style={{ color: 'var(--text-muted)', fontSize: '0.66rem' }}>
+                      {item.value}
+                    </small>
+                  </div>
+                  <p
+                    style={{
+                      margin: 0,
+                      minHeight: '2.5em',
+                      color: 'var(--text-secondary)',
+                      fontSize: '0.7rem',
+                      lineHeight: 1.45,
+                    }}
+                  >
+                    {item.help}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (item.action === 'share') {
+                        setShowShareModal(true);
+                      } else if (item.action === 'copyLink') {
+                        handleCopyLinkClick(currentPoll.id);
+                      } else if (item.action === 'resultImage') {
+                        handlePreviewResultImageClick();
+                      } else {
+                        window.open(`/present/${encodeURIComponent(currentPoll.id)}`, '_blank');
+                      }
+                    }}
+                    className="ghost-btn"
+                    style={{
+                      justifySelf: 'start',
+                      padding: '5px 9px',
+                      fontSize: '0.68rem',
+                    }}
+                  >
+                    {item.actionLabel}
+                  </button>
+                </article>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {!isEmbedMode && !isPresentationMode ? (
+          <AudienceLaunchKit
+            poll={currentPoll}
+            shareUrl={shareUrl}
+            endAtLabel={endAtLabel}
+            resultsVisibilityLabel={RESULTS_VISIBILITY_LABELS[resultsVisibility]}
+            canViewResults={canViewResults}
+          />
+        ) : null}
+
+        {canViewResults && !isEmbedMode && !isPresentationMode ? (
+          <DecisionFollowUpPanel poll={currentPoll} shareUrl={shareUrl} pollClosed={pollClosed} />
+        ) : null}
+
+        {canViewResults && !isEmbedMode && !isPresentationMode ? (
+          <ActionItemPlanner poll={currentPoll} shareUrl={shareUrl} />
+        ) : null}
+
+        {canViewResults && !isEmbedMode && !isPresentationMode ? (
+          <StakeholderReportBuilder
+            poll={currentPoll}
+            shareUrl={shareUrl}
+            pollClosed={pollClosed}
+          />
+        ) : null}
+
+        {canViewResults && !isEmbedMode && !isPresentationMode ? (
+          <LiveFacilitationConsole poll={currentPoll} shareUrl={shareUrl} pollClosed={pollClosed} />
+        ) : null}
+
+        {canViewResults && !isEmbedMode && !isPresentationMode ? (
+          <OpinionTopicCloud poll={currentPoll} />
+        ) : null}
+
+        {!hasVoted && !pollClosed && resultsVisibility === 'always' ? (
+          <section
+            style={{
+              border: '1px solid rgba(45, 212, 191, 0.22)',
+              borderRadius: 'var(--radius-sm)',
+              background: 'rgba(45, 212, 191, 0.055)',
+              padding: '1rem',
+              display: 'grid',
+              gap: '0.85rem',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '0.75rem',
+                flexWrap: 'wrap',
+              }}
+            >
+              <h3
+                style={{
+                  margin: 0,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.92rem',
+                }}
+              >
+                <BarChart3 size={15} style={{ color: 'var(--brand-accent-teal)' }} />
+                실시간 결과 미리보기
+              </h3>
+              <span className="stat-pill">현재 {currentPoll.totalVotes}표</span>
+            </div>
+            <div style={{ display: 'grid', gap: '0.55rem' }}>
+              {currentPoll.options.map((option) => {
+                const percentage =
+                  currentPoll.totalVotes > 0
+                    ? Math.round((option.voteCount / currentPoll.totalVotes) * 100)
+                    : 0;
+                return (
+                  <div key={option.id} style={{ display: 'grid', gap: '0.25rem' }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        gap: '0.75rem',
+                        color: 'var(--text-secondary)',
+                        fontSize: '0.73rem',
+                        fontWeight: 700,
+                      }}
+                    >
+                      <span style={{ overflowWrap: 'anywhere' }}>{option.text}</span>
+                      <span style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                        {percentage}% · {option.voteCount}표
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        height: '7px',
+                        borderRadius: '999px',
+                        overflow: 'hidden',
+                        background: 'rgba(255,255,255,0.06)',
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: `${percentage}%`,
+                          height: '100%',
+                          borderRadius: 'inherit',
+                          background:
+                            'linear-gradient(90deg, var(--brand-accent-teal), var(--brand-accent-gold))',
+                        }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.7rem' }}>
+              이 투표는 생성자가 결과를 항상 공개하도록 설정했습니다. 흐름을 확인한 뒤에도 바로
+              참여할 수 있습니다.
+            </p>
+          </section>
+        ) : null}
+
+        {canViewResults ? (
+          <section className="comment-briefing-card">
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '0.75rem',
+                flexWrap: 'wrap',
+              }}
+            >
+              <h3
+                style={{
+                  margin: 0,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.92rem',
+                }}
+              >
+                <MessageSquare size={15} style={{ color: 'var(--brand-accent-gold)' }} />
+                의견 요약
+              </h3>
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'flex-end',
+                  gap: '0.45rem',
+                  flexWrap: 'wrap',
+                }}
+              >
+                <span className="stat-pill">총 {currentPoll.comments.length}개 의견</span>
+                <div
+                  role="group"
+                  aria-label="결과 요약 복사 형식"
+                  style={{
+                    display: 'inline-flex',
+                    border: '1px solid var(--bg-card-border)',
+                    borderRadius: '999px',
+                    overflow: 'hidden',
+                    background: 'rgba(255,255,255,0.025)',
+                  }}
+                >
+                  {RESULT_SUMMARY_OPTIONS.map((option) => {
+                    const active = resultSummaryMode === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setResultSummaryMode(option.value)}
+                        style={{
+                          border: 'none',
+                          borderRight:
+                            option.value === 'brief' ? '1px solid var(--bg-card-border)' : 'none',
+                          background: active ? 'rgba(45, 212, 191, 0.12)' : 'transparent',
+                          color: active ? 'var(--brand-accent-teal)' : 'var(--text-muted)',
+                          padding: '5px 9px',
+                          cursor: 'pointer',
+                          fontSize: '0.66rem',
+                          fontWeight: 800,
+                          fontFamily: 'var(--font-sans)',
+                        }}
+                        aria-pressed={active}
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCopyResultSummaryClick}
+                  className="ghost-btn"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    padding: '5px 9px',
+                    fontSize: '0.68rem',
+                  }}
+                >
+                  {summaryCopied ? <Check size={12} /> : <Copy size={12} />}
+                  {summaryCopied ? '요약 복사됨' : '요약 복사'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCopyMarkdownReportClick}
+                  className="ghost-btn"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    padding: '5px 9px',
+                    fontSize: '0.68rem',
+                  }}
+                >
+                  {markdownReportCopied ? <Check size={12} /> : <ClipboardList size={12} />}
+                  {markdownReportCopied ? '회의록 복사됨' : '회의록 복사'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDownloadResultCsvClick}
+                  className="ghost-btn"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    padding: '5px 9px',
+                    fontSize: '0.68rem',
+                  }}
+                >
+                  {resultCsvSaved ? <Check size={12} /> : <FileText size={12} />}
+                  {resultCsvSaved ? 'CSV 저장됨' : 'CSV 저장'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handlePreviewResultImageClick}
+                  className="ghost-btn"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    padding: '5px 9px',
+                    fontSize: '0.68rem',
+                  }}
+                >
+                  {resultImageSaved ? <Check size={12} /> : <Download size={12} />}
+                  {resultImageSaved ? '이미지 저장됨' : '이미지 미리보기'}
+                </button>
+              </div>
+            </div>
+
+            {showResultActionMessage ? (
+              <p
+                style={{
+                  margin: 0,
+                  color: resultActionHasError
+                    ? 'var(--brand-accent-coral)'
+                    : 'var(--brand-accent-teal)',
+                  fontSize: '0.7rem',
+                  fontWeight: 700,
+                }}
+              >
+                {copyMessage}
+              </p>
+            ) : null}
+
+            {featuredComment ? (
+              <blockquote className="featured-comment">
+                <p>{featuredComment.comment}</p>
+                <footer>
+                  {featuredComment.voterName} ·{' '}
+                  {featuredComment.selectedOptionText || '선택지 정보 없음'}
+                </footer>
+              </blockquote>
+            ) : (
+              <div className="featured-comment empty">
+                <p>
+                  아직 남겨진 의견이 없습니다. 첫 번째 참여자가 선택 이유를 남기면 요약에
+                  반영됩니다.
+                </p>
+              </div>
+            )}
+
+            <div className="comment-summary-grid">
+              {commentSummaryRows.map(({ option, comments, latestComment }) => (
+                <div key={option.id} className="comment-summary-item">
+                  <span>{option.text}</span>
+                  <strong>{comments.length}개 의견</strong>
+                  <small>{latestComment?.comment || '아직 선택 이유가 없습니다.'}</small>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : (
+          <section
+            className="comment-briefing-card"
+            aria-label="결과 공개 대기 안내"
+            style={{
+              borderColor: 'rgba(232, 200, 77, 0.24)',
+              background:
+                'linear-gradient(135deg, rgba(232, 200, 77, 0.1), rgba(45, 212, 191, 0.04))',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '0.8rem',
+              }}
+            >
+              <span
+                style={{
+                  width: '34px',
+                  height: '34px',
+                  borderRadius: '12px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'var(--brand-accent-gold)',
+                  background: 'rgba(232, 200, 77, 0.12)',
+                  border: '1px solid rgba(232, 200, 77, 0.24)',
+                  flexShrink: 0,
+                }}
+              >
+                <Eye size={17} />
+              </span>
+              <div style={{ display: 'grid', gap: '0.35rem' }}>
+                <h3
+                  style={{
+                    margin: 0,
+                    color: 'var(--text-primary)',
+                    fontSize: '0.94rem',
+                    fontWeight: 800,
+                  }}
+                >
+                  투표 후 결과와 의견이 공개됩니다
+                </h3>
+                <p
+                  style={{
+                    margin: 0,
+                    color: 'var(--text-secondary)',
+                    fontSize: '0.78rem',
+                    lineHeight: 1.55,
+                  }}
+                >
+                  생성자가 참여 후 공개로 설정했습니다. 선택지를 고르고 한마디를 남기면 결과 요약,
+                  선택지별 의견, 공유용 결과 이미지를 확인할 수 있습니다.
+                </p>
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* Results Screen vs Voting Screen */}
-        {hasVoted ? (
+        {hasVoted || pollClosed ? (
           <div
             style={{
               display: 'flex',
@@ -373,6 +3230,402 @@ export const PollDetail: React.FC = () => {
               paddingTop: '1.5rem',
             }}
           >
+            <section
+              style={{
+                border: '1px solid var(--bg-card-border)',
+                borderRadius: 'var(--radius-sm)',
+                background: 'rgba(255,255,255,0.025)',
+                padding: '1rem',
+                display: 'grid',
+                gap: '0.85rem',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  gap: '0.75rem',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                }}
+              >
+                <h3
+                  style={{
+                    margin: 0,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    color: 'var(--text-primary)',
+                    fontSize: '0.94rem',
+                  }}
+                >
+                  <Gauge size={16} style={{ color: 'var(--brand-accent-teal)' }} />
+                  결정 브리핑
+                </h3>
+                <span
+                  style={{
+                    border: '1px solid rgba(45, 212, 191, 0.28)',
+                    color:
+                      consensusLabel === '접전'
+                        ? 'var(--brand-accent-coral)'
+                        : 'var(--brand-accent-teal)',
+                    background:
+                      consensusLabel === '접전'
+                        ? 'rgba(251, 113, 133, 0.08)'
+                        : 'rgba(45, 212, 191, 0.08)',
+                    borderRadius: '999px',
+                    padding: '3px 9px',
+                    fontSize: '0.68rem',
+                    fontWeight: 800,
+                  }}
+                >
+                  {consensusLabel}
+                </span>
+              </div>
+
+              <div className="insight-grid">
+                <div className="insight-tile">
+                  <span>
+                    <Trophy size={13} />
+                    선두 선택지
+                  </span>
+                  <strong>{leadingOption?.text || '아직 없음'}</strong>
+                  <small>
+                    {leadingShare}% · {leadingOption?.voteCount || 0}표
+                  </small>
+                </div>
+                <div className="insight-tile">
+                  <span>
+                    <BarChart3 size={13} />
+                    선두 격차
+                  </span>
+                  <strong>{voteGap}표</strong>
+                  <small>전체 대비 {voteGapShare}% 차이</small>
+                </div>
+                <div className="insight-tile">
+                  <span>
+                    <Users size={13} />
+                    참여 규모
+                  </span>
+                  <strong>{currentPoll.totalVotes}명</strong>
+                  <small>피드백률 {feedbackRate}%</small>
+                </div>
+              </div>
+
+              <p
+                style={{
+                  margin: 0,
+                  color: 'var(--text-secondary)',
+                  fontSize: '0.78rem',
+                  lineHeight: 1.55,
+                }}
+              >
+                {decisionHint}
+              </p>
+
+              <section
+                aria-label="의사결정 신뢰도"
+                style={{
+                  border: '1px solid rgba(45, 212, 191, 0.18)',
+                  borderRadius: 'var(--radius-sm)',
+                  background: 'rgba(45, 212, 191, 0.04)',
+                  padding: '0.85rem',
+                  display: 'grid',
+                  gap: '0.7rem',
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-start',
+                    gap: '0.75rem',
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  <div style={{ display: 'grid', gap: '0.2rem' }}>
+                    <span
+                      style={{
+                        color: 'var(--brand-accent-teal)',
+                        fontSize: '0.66rem',
+                        fontWeight: 900,
+                        letterSpacing: '0.05em',
+                      }}
+                    >
+                      DECISION CONFIDENCE
+                    </span>
+                    <strong
+                      style={{
+                        color: 'var(--text-primary)',
+                        fontSize: '0.88rem',
+                        lineHeight: 1.35,
+                      }}
+                    >
+                      {decisionConfidenceLabel}
+                    </strong>
+                  </div>
+                  <strong style={{ color: decisionConfidenceTone, fontSize: '1.05rem' }}>
+                    {decisionConfidenceScore}%
+                  </strong>
+                </div>
+
+                <div
+                  aria-hidden="true"
+                  style={{
+                    height: '8px',
+                    borderRadius: '999px',
+                    overflow: 'hidden',
+                    background: 'rgba(255,255,255,0.08)',
+                  }}
+                >
+                  <span
+                    style={{
+                      display: 'block',
+                      width: `${decisionConfidenceScore}%`,
+                      height: '100%',
+                      borderRadius: 'inherit',
+                      background:
+                        decisionConfidenceScore >= 80
+                          ? 'linear-gradient(90deg, var(--brand-accent-teal), var(--brand-primary))'
+                          : decisionConfidenceScore >= 55
+                            ? 'linear-gradient(90deg, var(--brand-accent-gold), var(--brand-accent-teal))'
+                            : 'linear-gradient(90deg, var(--brand-accent-coral), var(--brand-accent-gold))',
+                    }}
+                  />
+                </div>
+
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+                    gap: '0.5rem',
+                  }}
+                >
+                  {decisionConfidenceItems.map((item) => (
+                    <div
+                      key={item.label}
+                      style={{
+                        border: '1px solid var(--bg-card-border)',
+                        borderRadius: 'var(--radius-sm)',
+                        background: item.passed
+                          ? 'rgba(45, 212, 191, 0.055)'
+                          : 'rgba(255,255,255,0.025)',
+                        padding: '0.62rem',
+                        display: 'grid',
+                        gap: '0.28rem',
+                      }}
+                    >
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          color: item.passed
+                            ? 'var(--brand-accent-teal)'
+                            : 'var(--brand-accent-gold)',
+                          fontSize: '0.68rem',
+                          fontWeight: 900,
+                        }}
+                      >
+                        {item.passed ? <CheckCircle2 size={13} /> : <AlertCircle size={13} />}
+                        {item.label}
+                      </span>
+                      <strong style={{ color: 'var(--text-primary)', fontSize: '0.78rem' }}>
+                        {item.value}
+                      </strong>
+                      <small
+                        style={{
+                          color: 'var(--text-muted)',
+                          fontSize: '0.63rem',
+                          lineHeight: 1.42,
+                        }}
+                      >
+                        {item.help}
+                      </small>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            </section>
+
+            <section
+              style={{
+                border: '1px solid rgba(45, 212, 191, 0.2)',
+                borderRadius: 'var(--radius-sm)',
+                background:
+                  'linear-gradient(135deg, rgba(45, 212, 191, 0.08), rgba(232, 200, 77, 0.045))',
+                padding: '1rem',
+                display: 'grid',
+                gap: '0.9rem',
+              }}
+            >
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: participationQrUrl ? '72px minmax(0, 1fr)' : '1fr',
+                  gap: '0.85rem',
+                  alignItems: 'center',
+                }}
+              >
+                {participationQrUrl ? (
+                  <img
+                    src={participationQrUrl}
+                    alt={`${currentPoll.question} 참여 QR 코드`}
+                    style={{
+                      width: '72px',
+                      height: '72px',
+                      borderRadius: '14px',
+                      padding: '6px',
+                      background: '#fff',
+                      boxShadow: '0 12px 28px rgba(0,0,0,0.24)',
+                    }}
+                  />
+                ) : null}
+                <div style={{ display: 'grid', gap: '0.35rem', minWidth: 0 }}>
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      color: 'var(--brand-accent-teal)',
+                      fontSize: '0.68rem',
+                      fontWeight: 900,
+                      letterSpacing: '0.05em',
+                    }}
+                  >
+                    <Sparkles size={13} />
+                    참여 후 다음 행동
+                  </span>
+                  <h3
+                    style={{
+                      margin: 0,
+                      color: 'var(--text-primary)',
+                      fontSize: '0.98rem',
+                      fontWeight: 900,
+                      lineHeight: 1.35,
+                    }}
+                  >
+                    {hasVoted && selectedOption
+                      ? `${selectedOption.text}에 투표했습니다. 더 많은 의견을 모아보세요.`
+                      : pollClosed
+                        ? '투표는 마감됐지만 결과를 공유할 수 있습니다.'
+                        : '결과 흐름을 공유해 참여를 더 모아보세요.'}
+                  </h3>
+                  <p
+                    style={{
+                      margin: 0,
+                      color: 'var(--text-secondary)',
+                      fontSize: '0.76rem',
+                      lineHeight: 1.55,
+                    }}
+                  >
+                    현재 {currentPoll.totalVotes}명이 참여했고 의견은 {currentPoll.comments.length}
+                    개입니다. 카카오 공유, 링크 복사, 결과 이미지 저장으로 단톡방과 발표 화면에 바로
+                    이어갈 수 있습니다.
+                  </p>
+                </div>
+              </div>
+
+              <div
+                style={{
+                  display: 'flex',
+                  gap: '0.5rem',
+                  flexWrap: 'wrap',
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={handleKakaoShareClick}
+                  className="btn-primary"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '8px 12px',
+                    fontSize: '0.76rem',
+                  }}
+                >
+                  <Share2 size={14} />
+                  카카오로 더 공유
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleCopyLinkClick(currentPoll.id)}
+                  className="btn-secondary"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '8px 12px',
+                    fontSize: '0.76rem',
+                  }}
+                >
+                  {copiedId === currentPoll.id ? <Check size={14} /> : <Copy size={14} />}
+                  {copiedId === currentPoll.id ? '링크 복사됨' : '링크 복사'}
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await copyText(decisionMemo);
+                      setCopiedId(`decision-${currentPoll.id}`);
+                      setCopyMessage('결정 메모가 클립보드에 복사되었습니다.');
+                      setTimeout(() => setCopiedId(null), 2200);
+                      setTimeout(() => setCopyMessage(''), 2600);
+                    } catch (err) {
+                      console.error('decision memo copy failed', err);
+                      setCopyMessage('결정 메모 복사에 실패했습니다.');
+                      setTimeout(() => setCopyMessage(''), 2600);
+                    }
+                  }}
+                  className="btn-secondary"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '8px 12px',
+                    fontSize: '0.76rem',
+                  }}
+                >
+                  {copiedId === `decision-${currentPoll.id}` ? (
+                    <Check size={14} />
+                  ) : (
+                    <ClipboardList size={14} />
+                  )}
+                  {copiedId === `decision-${currentPoll.id}` ? '메모 복사됨' : '결정 메모'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handlePreviewResultImageClick}
+                  className="btn-secondary"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '8px 12px',
+                    fontSize: '0.76rem',
+                  }}
+                >
+                  <Download size={14} />
+                  결과 이미지
+                </button>
+                <button
+                  type="button"
+                  onClick={handleUseAsTemplateClick}
+                  className="ghost-btn"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '8px 12px',
+                    fontSize: '0.76rem',
+                  }}
+                >
+                  <Plus size={14} />이 투표로 새로 만들기
+                </button>
+              </div>
+            </section>
+
             <div
               style={{
                 display: 'flex',
@@ -536,8 +3789,75 @@ export const PollDetail: React.FC = () => {
               paddingTop: '1.5rem',
             }}
           >
-            <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
-              🗳️ 원하시는 항목을 선택하고 의견을 남겨주세요:
+            <div
+              style={{
+                display: 'grid',
+                gap: '0.75rem',
+                border: '1px solid var(--bg-card-border)',
+                borderRadius: 'var(--radius-sm)',
+                padding: '0.85rem',
+                background: 'rgba(255,255,255,0.02)',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  gap: '0.75rem',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: '0.86rem',
+                    fontWeight: 800,
+                    color: 'var(--text-primary)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <ClipboardList size={15} style={{ color: 'var(--brand-accent-teal)' }} />
+                  투표 참여
+                </span>
+                <span
+                  style={{
+                    fontSize: '0.68rem',
+                    color: selectedOption ? 'var(--brand-accent-teal)' : 'var(--text-muted)',
+                    border: '1px solid var(--bg-card-border)',
+                    borderRadius: '999px',
+                    padding: '3px 8px',
+                  }}
+                >
+                  {selectedOption ? `${selectedOption.text} 선택됨` : '선택 대기'}
+                </span>
+              </div>
+
+              <div className="vote-step-grid">
+                {voteStepItems.map((step) => {
+                  const StepIcon = step.icon;
+                  return (
+                    <div
+                      key={step.label}
+                      className={step.active ? 'vote-step active' : 'vote-step'}
+                    >
+                      {step.active ? <CheckCircle2 size={14} /> : <StepIcon size={14} />}
+                      <span>{step.label}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              <p
+                style={{
+                  margin: 0,
+                  color: 'var(--text-muted)',
+                  fontSize: '0.66rem',
+                  lineHeight: 1.42,
+                }}
+              >
+                키보드 단축키: 숫자 1~9로 선택, 0으로 10번째 선택지, Enter로 제출할 수 있습니다.
+              </p>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -558,6 +3878,7 @@ export const PollDetail: React.FC = () => {
                       textAlign: 'left',
                       border: 'none',
                       cursor: 'pointer',
+                      minHeight: opt.imageUrl ? '68px' : '54px',
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -594,6 +3915,7 @@ export const PollDetail: React.FC = () => {
                           display: 'flex',
                           alignItems: 'center',
                           gap: '8px',
+                          minWidth: 0,
                         }}
                       >
                         <span
@@ -605,7 +3927,21 @@ export const PollDetail: React.FC = () => {
                             backgroundColor: bulletColor,
                           }}
                         />
-                        {opt.text}
+                        <span style={{ overflowWrap: 'anywhere' }}>{opt.text}</span>
+                        {isSelected ? (
+                          <span
+                            style={{
+                              fontSize: '0.62rem',
+                              color: 'var(--brand-accent-teal)',
+                              border: '1px solid rgba(45, 212, 191, 0.28)',
+                              borderRadius: '999px',
+                              padding: '1px 6px',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            선택됨
+                          </span>
+                        ) : null}
                       </span>
                     </div>
 
@@ -628,6 +3964,89 @@ export const PollDetail: React.FC = () => {
               })}
             </div>
 
+            <section
+              aria-live="polite"
+              style={{
+                border: `1px solid ${
+                  voteSubmitReady ? 'rgba(45, 212, 191, 0.28)' : 'rgba(232, 200, 77, 0.22)'
+                }`,
+                borderRadius: 'var(--radius-sm)',
+                background: voteSubmitReady
+                  ? 'rgba(45, 212, 191, 0.055)'
+                  : 'rgba(250, 204, 21, 0.045)',
+                padding: '0.85rem',
+                display: 'grid',
+                gap: '0.65rem',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'flex-start',
+                  gap: '0.75rem',
+                  flexWrap: 'wrap',
+                }}
+              >
+                <div style={{ display: 'grid', gap: '0.22rem' }}>
+                  <strong
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      color: voteSubmitReady
+                        ? 'var(--brand-accent-teal)'
+                        : 'var(--brand-accent-gold)',
+                      fontSize: '0.82rem',
+                    }}
+                  >
+                    {voteSubmitReady ? <CheckCircle2 size={15} /> : <AlertCircle size={15} />}
+                    {voteSubmitReady ? '제출 준비 완료' : '선택 후 제출할 수 있습니다'}
+                  </strong>
+                  <span
+                    style={{
+                      color: 'var(--text-secondary)',
+                      fontSize: '0.72rem',
+                      lineHeight: 1.45,
+                    }}
+                  >
+                    {voteSubmitHint}
+                  </span>
+                </div>
+                <span
+                  style={{
+                    border: '1px solid var(--bg-card-border)',
+                    borderRadius: '999px',
+                    padding: '4px 9px',
+                    color: 'var(--text-muted)',
+                    fontSize: '0.66rem',
+                    fontWeight: 800,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {selectedOption ? selectedOption.text : '선택 대기'}
+                </span>
+              </div>
+
+              <div
+                style={{
+                  display: 'flex',
+                  gap: '0.45rem',
+                  flexWrap: 'wrap',
+                }}
+              >
+                <span className="stat-pill">{voterDisplayName} 이름</span>
+                <span className="stat-pill">
+                  {trimmedCommentLength > 0
+                    ? `한마디 ${trimmedCommentLength}자`
+                    : '한마디 선택 입력'}
+                </span>
+                <span className="stat-pill">
+                  {resultsVisibility === 'always' ? '결과 즉시 확인' : '제출 후 결과 확인'}
+                </span>
+              </div>
+            </section>
+
             {/* Voting Inputs */}
             {votedOptionId !== null && (
               <div
@@ -639,7 +4058,137 @@ export const PollDetail: React.FC = () => {
                   animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards',
                 }}
               >
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '8px' }}>
+                {selectedOption ? (
+                  <section
+                    aria-label="선택 제출 전 확인"
+                    style={{
+                      border: '1px solid rgba(45, 212, 191, 0.22)',
+                      borderRadius: 'var(--radius-sm)',
+                      background:
+                        'linear-gradient(135deg, rgba(45, 212, 191, 0.075), rgba(255,255,255,0.025))',
+                      padding: '0.85rem',
+                      display: 'grid',
+                      gap: '0.65rem',
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'flex-start',
+                        gap: '0.75rem',
+                        flexWrap: 'wrap',
+                      }}
+                    >
+                      <div style={{ display: 'grid', gap: '0.24rem', minWidth: 0 }}>
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            color: 'var(--brand-accent-teal)',
+                            fontSize: '0.68rem',
+                            fontWeight: 900,
+                            letterSpacing: '0.04em',
+                          }}
+                        >
+                          <CheckCircle2 size={13} />
+                          SELECTION REVIEW
+                        </span>
+                        <strong
+                          style={{
+                            color: 'var(--text-primary)',
+                            fontSize: '0.9rem',
+                            lineHeight: 1.38,
+                            overflowWrap: 'anywhere',
+                          }}
+                        >
+                          {selectedOption.text}
+                        </strong>
+                      </div>
+                      <span
+                        style={{
+                          border: '1px solid rgba(45, 212, 191, 0.28)',
+                          borderRadius: '999px',
+                          color: 'var(--brand-accent-teal)',
+                          background: 'rgba(45, 212, 191, 0.08)',
+                          padding: '4px 9px',
+                          fontSize: '0.66rem',
+                          fontWeight: 900,
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        선택지 {selectedOptionIndex + 1}
+                      </span>
+                    </div>
+
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+                        gap: '0.45rem',
+                      }}
+                    >
+                      {[
+                        {
+                          label: '변경 가능',
+                          help: '제출 전에는 다른 선택지를 다시 누를 수 있습니다.',
+                        },
+                        {
+                          label: '한마디 선택',
+                          help: '이유를 남기면 결과 해석과 공유 요약에 반영됩니다.',
+                        },
+                        {
+                          label: '결과 확인',
+                          help:
+                            resultsVisibility === 'always'
+                              ? '제출 전후 모두 실시간 흐름을 볼 수 있습니다.'
+                              : '제출 후 결과와 의견이 열립니다.',
+                        },
+                      ].map((item) => (
+                        <div
+                          key={item.label}
+                          style={{
+                            border: '1px solid rgba(255,255,255,0.08)',
+                            borderRadius: 'var(--radius-sm)',
+                            background: 'rgba(255,255,255,0.025)',
+                            padding: '0.62rem',
+                            display: 'grid',
+                            gap: '0.22rem',
+                          }}
+                        >
+                          <span
+                            style={{
+                              color: 'var(--text-primary)',
+                              fontSize: '0.7rem',
+                              fontWeight: 900,
+                            }}
+                          >
+                            {item.label}
+                          </span>
+                          <small
+                            style={{
+                              color: 'var(--text-muted)',
+                              fontSize: '0.64rem',
+                              lineHeight: 1.4,
+                            }}
+                          >
+                            {item.help}
+                          </small>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
+
+                <div
+                  className="vote-input-grid"
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 2fr)',
+                    gap: '8px',
+                  }}
+                >
                   <input
                     type="text"
                     placeholder="닉네임 (기본 익명)"
@@ -657,9 +4206,126 @@ export const PollDetail: React.FC = () => {
                     className="form-input"
                   />
                 </div>
+                <section
+                  aria-label="빠른 선택 이유"
+                  style={{
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    borderRadius: 'var(--radius-sm)',
+                    background: 'rgba(255, 255, 255, 0.025)',
+                    padding: '0.7rem',
+                    display: 'grid',
+                    gap: '0.5rem',
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      gap: '0.65rem',
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        color: 'var(--text-secondary)',
+                        fontSize: '0.7rem',
+                        fontWeight: 900,
+                      }}
+                    >
+                      <Sparkles size={13} style={{ color: 'var(--brand-accent-gold)' }} />
+                      빠른 이유 선택
+                    </span>
+                    <small style={{ color: 'var(--text-muted)', fontSize: '0.66rem' }}>
+                      누르면 한마디가 바로 채워집니다
+                    </small>
+                  </div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: '0.42rem',
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    {quickReasonChips.map((chip) => {
+                      const active = comment.trim() === chip.text;
+
+                      return (
+                        <button
+                          key={chip.id}
+                          type="button"
+                          onClick={() => setComment(chip.text)}
+                          aria-pressed={active}
+                          style={{
+                            border: active
+                              ? '1px solid rgba(45, 212, 191, 0.56)'
+                              : '1px solid rgba(255, 255, 255, 0.1)',
+                            borderRadius: '999px',
+                            background: active
+                              ? 'rgba(45, 212, 191, 0.11)'
+                              : 'rgba(5, 14, 12, 0.42)',
+                            color: active ? 'var(--brand-accent-teal)' : 'var(--text-secondary)',
+                            padding: '6px 10px',
+                            cursor: 'pointer',
+                            fontSize: '0.68rem',
+                            fontWeight: 800,
+                            fontFamily: 'var(--font-sans)',
+                          }}
+                          title={chip.text}
+                        >
+                          {chip.label}
+                        </button>
+                      );
+                    })}
+                    {comment.trim() ? (
+                      <button
+                        type="button"
+                        onClick={() => setComment('')}
+                        style={{
+                          border: '1px solid rgba(239, 68, 68, 0.18)',
+                          borderRadius: '999px',
+                          background: 'rgba(239, 68, 68, 0.06)',
+                          color: 'var(--brand-accent-coral)',
+                          padding: '6px 10px',
+                          cursor: 'pointer',
+                          fontSize: '0.68rem',
+                          fontWeight: 800,
+                          fontFamily: 'var(--font-sans)',
+                        }}
+                      >
+                        지우기
+                      </button>
+                    ) : null}
+                  </div>
+                </section>
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    gap: '0.75rem',
+                    flexWrap: 'wrap',
+                    color: 'var(--text-muted)',
+                    fontSize: '0.68rem',
+                  }}
+                >
+                  <span>{voterDisplayName} 이름으로 제출됩니다.</span>
+                  {voteDraftSavedAt ? (
+                    <span>
+                      임시저장{' '}
+                      {new Date(voteDraftSavedAt).toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </span>
+                  ) : null}
+                  <span>한마디 {comment.trim().length} / 100</span>
+                </div>
                 <button
                   onClick={handleVoteSubmit}
-                  disabled={!votedOptionId || isLoading}
+                  disabled={votedOptionId === null || isLoading || pollClosed}
                   className="btn-primary"
                   style={{ padding: '12px', fontSize: '0.85rem' }}
                 >
@@ -672,100 +4338,465 @@ export const PollDetail: React.FC = () => {
       </div>
 
       {/* Comments timeline */}
-      <div style={{ marginTop: '0.5rem' }}>
-        <h3
-          style={{
-            fontSize: '0.95rem',
-            fontWeight: 800,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            marginBottom: '0.85rem',
-            color: 'var(--text-primary)',
-          }}
-        >
-          <MessageSquare size={15} style={{ color: 'var(--brand-accent-gold)' }} />
-          <span>참여자 피드백 한마디 ({currentPoll.comments.length})</span>
-        </h3>
-
-        {currentPoll.comments.length === 0 ? (
-          <div
-            className="content-card"
-            style={{
-              textAlign: 'center',
-              padding: '2.5rem',
-              color: 'var(--text-muted)',
-              fontSize: '0.825rem',
-            }}
-          >
-            아직 작성된 피드백이 없습니다. 고민 해결을 돕는 소중한 한마디를 남겨보세요!
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            {currentPoll.comments.map((comm) => (
-              <div
-                key={comm.id}
-                className="content-card"
+      {canViewResults ? (
+        <>
+          <div style={{ marginTop: '0.5rem' }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: '0.85rem',
+                flexWrap: 'wrap',
+                marginBottom: '0.85rem',
+              }}
+            >
+              <h3
                 style={{
-                  padding: '1rem',
+                  fontSize: '0.95rem',
+                  fontWeight: 800,
                   display: 'flex',
-                  flexDirection: 'column',
+                  alignItems: 'center',
                   gap: '6px',
-                  cursor: 'default',
+                  color: 'var(--text-primary)',
                 }}
               >
+                <MessageSquare size={15} style={{ color: 'var(--brand-accent-gold)' }} />
+                <span>참여자 피드백 한마디 ({currentPoll.comments.length})</span>
+              </h3>
+              {currentPoll.comments.length > 0 ? (
                 <div
-                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                  style={{
+                    display: 'flex',
+                    gap: '0.4rem',
+                    flexWrap: 'wrap',
+                    justifyContent: 'flex-end',
+                  }}
                 >
-                  <div
-                    style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}
-                  >
-                    <span
-                      style={{
-                        fontSize: '0.825rem',
-                        fontWeight: 700,
-                        color: 'var(--text-primary)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                      }}
-                    >
-                      <User size={12} style={{ color: 'var(--text-muted)' }} />
-                      <span>{comm.voterName}</span>
-                    </span>
-                    {comm.selectedOptionText && (
-                      <span
+                  {COMMENT_VIEW_OPTIONS.map((option) => {
+                    const active = commentViewMode === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setCommentViewMode(option.value)}
+                        className="ghost-btn"
                         style={{
-                          fontSize: '0.65rem',
-                          backgroundColor: 'rgba(99, 102, 241, 0.12)',
-                          color: 'var(--brand-primary-light)',
-                          padding: '1px 6px',
-                          borderRadius: '4px',
-                          fontWeight: 700,
-                          border: '1px solid rgba(99, 102, 241, 0.15)',
+                          padding: '5px 9px',
+                          color: active ? 'var(--brand-accent-gold)' : 'var(--text-muted)',
+                          borderColor: active
+                            ? 'rgba(250, 204, 21, 0.34)'
+                            : 'var(--bg-card-border)',
+                          background: active ? 'rgba(250, 204, 21, 0.08)' : 'transparent',
                         }}
                       >
-                        {comm.selectedOptionText} 선택
-                      </span>
-                    )}
-                  </div>
-                  <span style={{ fontSize: '0.675rem', color: 'var(--text-muted)' }}>
-                    {new Date(comm.createdAt).toLocaleTimeString([], {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </span>
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    onClick={() => setCommentFilter('all')}
+                    className="ghost-btn"
+                    style={{
+                      padding: '5px 9px',
+                      color:
+                        commentFilter === 'all' ? 'var(--brand-accent-teal)' : 'var(--text-muted)',
+                      borderColor:
+                        commentFilter === 'all'
+                          ? 'rgba(45, 212, 191, 0.38)'
+                          : 'var(--bg-card-border)',
+                      background:
+                        commentFilter === 'all' ? 'rgba(45, 212, 191, 0.08)' : 'transparent',
+                    }}
+                  >
+                    전체 {currentPoll.comments.length}
+                  </button>
+                  {commentFilterOptions
+                    .filter((option) => option.count > 0)
+                    .map((option) => (
+                      <button
+                        key={option.id}
+                        type="button"
+                        onClick={() => setCommentFilter(option.id)}
+                        className="ghost-btn"
+                        style={{
+                          padding: '5px 9px',
+                          color:
+                            commentFilter === option.id
+                              ? 'var(--brand-accent-teal)'
+                              : 'var(--text-muted)',
+                          borderColor:
+                            commentFilter === option.id
+                              ? 'rgba(45, 212, 191, 0.38)'
+                              : 'var(--bg-card-border)',
+                          background:
+                            commentFilter === option.id
+                              ? 'rgba(45, 212, 191, 0.08)'
+                              : 'transparent',
+                          maxWidth: '220px',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {option.label} {option.count}
+                      </button>
+                    ))}
                 </div>
-                <p
-                  style={{ fontSize: '0.825rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}
-                >
-                  {comm.comment}
-                </p>
+              ) : null}
+            </div>
+
+            {currentPoll.comments.length === 0 ? (
+              <div
+                className="content-card"
+                style={{
+                  textAlign: 'center',
+                  padding: '2.5rem',
+                  color: 'var(--text-muted)',
+                  fontSize: '0.825rem',
+                }}
+              >
+                아직 작성된 피드백이 없습니다. 고민 해결을 돕는 소중한 한마디를 남겨보세요!
               </div>
-            ))}
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                {visibleComments.length === 0 ? (
+                  <div
+                    className="content-card"
+                    style={{
+                      textAlign: 'center',
+                      padding: '1.6rem',
+                      color: 'var(--text-muted)',
+                      fontSize: '0.78rem',
+                    }}
+                  >
+                    {emptyCommentMessage}
+                  </div>
+                ) : null}
+                {visibleComments.map((comm) => (
+                  <div
+                    key={comm.id}
+                    className="content-card"
+                    style={{
+                      padding: '1rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '6px',
+                      cursor: 'default',
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          flexWrap: 'wrap',
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: '0.825rem',
+                            fontWeight: 700,
+                            color: 'var(--text-primary)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}
+                        >
+                          <User size={12} style={{ color: 'var(--text-muted)' }} />
+                          <span>{comm.voterName}</span>
+                        </span>
+                        {comm.selectedOptionText && (
+                          <span
+                            style={{
+                              fontSize: '0.65rem',
+                              backgroundColor: 'rgba(99, 102, 241, 0.12)',
+                              color: 'var(--brand-primary-light)',
+                              padding: '1px 6px',
+                              borderRadius: '4px',
+                              fontWeight: 700,
+                              border: '1px solid rgba(99, 102, 241, 0.15)',
+                            }}
+                          >
+                            {comm.selectedOptionText} 선택
+                          </span>
+                        )}
+                      </div>
+                      <span style={{ fontSize: '0.675rem', color: 'var(--text-muted)' }}>
+                        {new Date(comm.createdAt).toLocaleTimeString([], {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </span>
+                    </div>
+                    <p
+                      style={{
+                        fontSize: '0.825rem',
+                        color: 'var(--text-secondary)',
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      {comm.comment}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        )}
-      </div>
+
+          {resultImagePreviewUrl ? (
+            <div className="modal-overlay" onClick={() => setResultImagePreviewUrl('')}>
+              <div
+                className="modal-content animate-slide-up"
+                onClick={(event) => event.stopPropagation()}
+                style={{ maxWidth: '760px' }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    gap: '1rem',
+                    alignItems: 'flex-start',
+                    marginBottom: '1rem',
+                  }}
+                >
+                  <div style={{ display: 'grid', gap: '0.25rem' }}>
+                    <h3
+                      style={{
+                        margin: 0,
+                        color: 'var(--text-primary)',
+                        fontSize: '1rem',
+                        fontWeight: 900,
+                      }}
+                    >
+                      결과 이미지 미리보기
+                    </h3>
+                    <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.78rem' }}>
+                      저장 전에 공유 카드가 어떻게 보이는지 확인하세요.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setResultImagePreviewUrl('')}
+                    className="ghost-btn"
+                    style={{ padding: '6px 10px', fontSize: '0.72rem' }}
+                  >
+                    닫기
+                  </button>
+                </div>
+
+                <figure className="result-image-preview-frame">
+                  <img
+                    src={resultImagePreviewUrl}
+                    alt={`${currentPoll.question} 결과 이미지 미리보기`}
+                  />
+                </figure>
+
+                <div className="result-image-theme-grid" aria-label="결과 이미지 테마 선택">
+                  {RESULT_IMAGE_THEME_OPTIONS.map((option) => {
+                    const active = resultImageTheme === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => handleResultImageThemeChange(option.value)}
+                        aria-pressed={active}
+                        style={{
+                          borderColor: active
+                            ? 'rgba(45, 212, 191, 0.42)'
+                            : 'var(--bg-card-border)',
+                          background: active
+                            ? 'rgba(45, 212, 191, 0.08)'
+                            : 'rgba(255,255,255,0.02)',
+                        }}
+                      >
+                        <strong
+                          style={{
+                            color: active ? 'var(--brand-accent-teal)' : 'var(--text-primary)',
+                          }}
+                        >
+                          {option.label}
+                        </strong>
+                        <span>{option.description}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="result-image-content-grid" aria-label="결과 이미지 포함 항목 선택">
+                  {RESULT_IMAGE_CONTENT_OPTIONS.map((option) => {
+                    const active = resultImageContentOptions[option.value];
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => handleResultImageContentToggle(option.value)}
+                        aria-pressed={active}
+                        style={{
+                          borderColor: active
+                            ? 'rgba(250, 204, 21, 0.38)'
+                            : 'var(--bg-card-border)',
+                          background: active
+                            ? 'rgba(250, 204, 21, 0.08)'
+                            : 'rgba(255,255,255,0.02)',
+                        }}
+                      >
+                        <strong
+                          style={{
+                            color: active ? 'var(--brand-accent-gold)' : 'var(--text-primary)',
+                          }}
+                        >
+                          {active ? '포함' : '제외'} · {option.label}
+                        </strong>
+                        <span>{option.description}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <section
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'minmax(0, 1fr) auto',
+                    gap: '0.75rem',
+                    alignItems: 'center',
+                    border: '1px solid rgba(45, 212, 191, 0.2)',
+                    borderRadius: 'var(--radius-sm)',
+                    background: 'rgba(45, 212, 191, 0.045)',
+                    padding: '0.8rem',
+                    marginBottom: '1rem',
+                    textAlign: 'left',
+                  }}
+                >
+                  <div style={{ minWidth: 0, display: 'grid', gap: '0.24rem' }}>
+                    <span
+                      style={{
+                        color: 'var(--brand-accent-teal)',
+                        fontSize: '0.66rem',
+                        fontWeight: 900,
+                        letterSpacing: '0.05em',
+                      }}
+                    >
+                      JOIN CODE
+                    </span>
+                    <strong
+                      style={{
+                        color: 'var(--text-primary)',
+                        fontSize: '1.15rem',
+                        lineHeight: 1,
+                        letterSpacing: '0.04em',
+                      }}
+                    >
+                      {currentPoll.id}
+                    </strong>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.68rem' }}>
+                      링크 대신 코드만 전달해도 상단 JOIN 입력에서 바로 참여할 수 있습니다.
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCopyJoinCodeClick}
+                    className="btn-secondary"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      padding: '8px 12px',
+                      fontSize: '0.72rem',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {copiedId === `code-${currentPoll.id}` ? (
+                      <Check size={14} />
+                    ) : (
+                      <Code2 size={14} />
+                    )}
+                    {copiedId === `code-${currentPoll.id}` ? '코드 복사됨' : '코드 복사'}
+                  </button>
+                </section>
+
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'flex-end',
+                    gap: '0.5rem',
+                    flexWrap: 'wrap',
+                    marginTop: '1rem',
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setResultImagePreviewUrl('')}
+                    className="btn-secondary"
+                    style={{ padding: '8px 12px', fontSize: '0.76rem' }}
+                  >
+                    취소
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDownloadPreviewImageClick}
+                    className="btn-primary"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '8px 12px',
+                      fontSize: '0.76rem',
+                    }}
+                  >
+                    <Download size={14} />
+                    PNG 저장
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </>
+      ) : (
+        <section
+          className="content-card"
+          style={{
+            marginTop: '0.5rem',
+            padding: '1.1rem',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '0.75rem',
+            borderColor: 'rgba(232, 200, 77, 0.2)',
+          }}
+        >
+          <Info size={17} style={{ color: 'var(--brand-accent-gold)', flexShrink: 0 }} />
+          <div>
+            <h3
+              style={{
+                margin: '0 0 0.35rem',
+                color: 'var(--text-primary)',
+                fontSize: '0.9rem',
+              }}
+            >
+              의견 타임라인은 참여 후 열립니다
+            </h3>
+            <p
+              style={{
+                margin: 0,
+                color: 'var(--text-secondary)',
+                fontSize: '0.76rem',
+                lineHeight: 1.55,
+              }}
+            >
+              투표 전에는 다른 사람의 선택 이유가 판단에 영향을 주지 않도록 숨겨집니다.
+            </p>
+          </div>
+        </section>
+      )}
 
       {/* Share Modal Backdrop */}
       {showShareModal && (
@@ -773,7 +4804,7 @@ export const PollDetail: React.FC = () => {
           <div
             className="modal-content animate-slide-up"
             onClick={(e) => e.stopPropagation()}
-            style={{ maxWidth: '460px' }}
+            style={{ maxWidth: '520px' }}
           >
             <div style={{ textAlign: 'center', marginBottom: '1.25rem' }}>
               <Sparkles
@@ -862,10 +4893,674 @@ export const PollDetail: React.FC = () => {
                 question={currentPoll.question}
                 description={currentPoll.description}
                 options={currentPoll.options.map((o) => o.text)}
+                imageUrl={currentPoll.options.find((option) => option.imageUrl)?.imageUrl}
               />
             </div>
 
+            <section
+              style={{
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: 'var(--radius-sm)',
+                background: 'rgba(255, 255, 255, 0.035)',
+                padding: '0.85rem',
+                display: 'grid',
+                gap: '0.7rem',
+                marginBottom: '1rem',
+                textAlign: 'left',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  gap: '0.7rem',
+                  alignItems: 'flex-start',
+                  flexWrap: 'wrap',
+                }}
+              >
+                <div style={{ display: 'grid', gap: '0.18rem' }}>
+                  <h4
+                    style={{
+                      margin: 0,
+                      color: 'var(--text-primary)',
+                      fontSize: '0.82rem',
+                      fontWeight: 900,
+                    }}
+                  >
+                    공유 문구 프리셋
+                  </h4>
+                  <p
+                    style={{
+                      margin: 0,
+                      color: 'var(--text-secondary)',
+                      fontSize: '0.7rem',
+                      lineHeight: 1.45,
+                    }}
+                  >
+                    링크만 복사하지 않고 상황에 맞는 초대 문구까지 한 번에 붙여넣습니다.
+                  </p>
+                </div>
+                <span
+                  style={{
+                    border: '1px solid rgba(45, 212, 191, 0.22)',
+                    borderRadius: '999px',
+                    color: 'var(--brand-accent-teal)',
+                    background: 'rgba(45, 212, 191, 0.07)',
+                    padding: '4px 9px',
+                    fontSize: '0.66rem',
+                    fontWeight: 900,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  3개 채널
+                </span>
+              </div>
+
+              <div style={{ display: 'grid', gap: '0.5rem' }}>
+                {shareCopyPresets.map((preset) => {
+                  const presetCopied = copiedId === `share-preset-${preset.id}-${currentPoll.id}`;
+
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          await copyText(preset.text);
+                          setCopiedId(`share-preset-${preset.id}-${currentPoll.id}`);
+                          setCopyMessage(`${preset.label} 공유 문구를 복사했습니다.`);
+                          setTimeout(() => setCopyMessage(''), 2600);
+                          setTimeout(() => setCopiedId(null), 2200);
+                        } catch {
+                          setCopyMessage(
+                            '공유 문구 복사에 실패했습니다. 링크를 직접 복사해 주세요.',
+                          );
+                          setTimeout(() => setCopyMessage(''), 2800);
+                        }
+                      }}
+                      style={{
+                        width: '100%',
+                        border: `1px solid ${presetCopied ? preset.accent : 'rgba(255, 255, 255, 0.1)'}`,
+                        borderRadius: 'var(--radius-sm)',
+                        background: presetCopied
+                          ? 'rgba(45, 212, 191, 0.08)'
+                          : 'rgba(5, 14, 12, 0.46)',
+                        color: 'var(--text-primary)',
+                        padding: '0.7rem',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        display: 'grid',
+                        gap: '0.32rem',
+                      }}
+                    >
+                      <span
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '0.6rem',
+                        }}
+                      >
+                        <span
+                          style={{
+                            color: preset.accent,
+                            fontSize: '0.68rem',
+                            fontWeight: 900,
+                          }}
+                        >
+                          {preset.label}
+                        </span>
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            color: presetCopied ? 'var(--brand-accent-teal)' : 'var(--text-muted)',
+                            fontSize: '0.66rem',
+                            fontWeight: 800,
+                          }}
+                        >
+                          {presetCopied ? <Check size={12} /> : <Copy size={12} />}
+                          {presetCopied ? '복사됨' : '문구 복사'}
+                        </span>
+                      </span>
+                      <strong style={{ fontSize: '0.78rem', lineHeight: 1.35 }}>
+                        {preset.title}
+                      </strong>
+                      <span
+                        style={{
+                          color: 'var(--text-secondary)',
+                          fontSize: '0.68rem',
+                          lineHeight: 1.45,
+                        }}
+                      >
+                        {preset.description}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+
+            <section
+              style={{
+                border: '1px solid rgba(250, 204, 21, 0.2)',
+                borderRadius: 'var(--radius-sm)',
+                background: kakaoShareDiagnostics.isReadyForKakao
+                  ? 'rgba(45, 212, 191, 0.045)'
+                  : 'rgba(250, 204, 21, 0.055)',
+                padding: '0.85rem',
+                display: 'grid',
+                gap: '0.7rem',
+                marginBottom: '1rem',
+                textAlign: 'left',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'flex-start',
+                  gap: '0.75rem',
+                  flexWrap: 'wrap',
+                }}
+              >
+                <div style={{ display: 'grid', gap: '0.2rem' }}>
+                  <h4
+                    style={{
+                      margin: 0,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      color: 'var(--text-primary)',
+                      fontSize: '0.82rem',
+                      fontWeight: 900,
+                    }}
+                  >
+                    <Info size={14} style={{ color: 'var(--brand-accent-gold)' }} />
+                    카카오 공유 진단
+                  </h4>
+                  <p
+                    style={{
+                      margin: 0,
+                      color: 'var(--text-secondary)',
+                      fontSize: '0.7rem',
+                      lineHeight: 1.45,
+                    }}
+                  >
+                    조건이 부족하면 버튼은 링크 복사 또는 OS 공유 시트로 안전하게 대체됩니다.
+                  </p>
+                </div>
+                <span
+                  style={{
+                    border: '1px solid rgba(250, 204, 21, 0.28)',
+                    borderRadius: '999px',
+                    color: kakaoShareDiagnostics.isReadyForKakao
+                      ? 'var(--brand-accent-teal)'
+                      : 'var(--brand-accent-gold)',
+                    background: kakaoShareDiagnostics.isReadyForKakao
+                      ? 'rgba(45, 212, 191, 0.08)'
+                      : 'rgba(250, 204, 21, 0.08)',
+                    padding: '4px 9px',
+                    fontSize: '0.66rem',
+                    fontWeight: 900,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {kakaoReadyCount}/{kakaoShareDiagnostics.totalBlockingCount} 핵심 조건
+                </span>
+              </div>
+
+              <div style={{ display: 'grid', gap: '0.45rem' }}>
+                {kakaoShareReadinessItems.map((item) => {
+                  const isManual = item.status === 'manual';
+                  const stateColor = item.passed
+                    ? 'var(--brand-accent-teal)'
+                    : isManual
+                      ? 'var(--text-muted)'
+                      : 'var(--brand-accent-gold)';
+
+                  return (
+                    <div
+                      key={item.id}
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'minmax(112px, auto) minmax(0, 1fr)',
+                        gap: '0.55rem',
+                        alignItems: 'start',
+                      }}
+                    >
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          color: stateColor,
+                          fontSize: '0.68rem',
+                          fontWeight: 900,
+                        }}
+                      >
+                        {item.passed ? (
+                          <CheckCircle2 size={13} />
+                        ) : isManual ? (
+                          <Info size={13} />
+                        ) : (
+                          <AlertCircle size={13} />
+                        )}
+                        {item.label}
+                      </span>
+                      <span
+                        style={{
+                          display: 'grid',
+                          gap: '0.22rem',
+                          color: 'var(--text-muted)',
+                          fontSize: '0.68rem',
+                          lineHeight: 1.45,
+                        }}
+                      >
+                        {item.help}
+                        {item.action ? (
+                          <small
+                            style={{
+                              color: item.passed ? 'var(--text-muted)' : 'var(--text-secondary)',
+                              fontSize: '0.64rem',
+                              fontWeight: 800,
+                            }}
+                          >
+                            조치: {item.action}
+                          </small>
+                        ) : null}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+
             {/* Copy link input */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: participationQrUrl ? '96px minmax(0, 1fr)' : '1fr',
+                gap: '0.85rem',
+                alignItems: 'center',
+                border: '1px solid rgba(45, 212, 191, 0.18)',
+                borderRadius: 'var(--radius-sm)',
+                background: 'rgba(45, 212, 191, 0.045)',
+                padding: '0.85rem',
+                marginBottom: '1rem',
+              }}
+            >
+              {participationQrUrl ? (
+                <img
+                  src={participationQrUrl}
+                  alt={`${currentPoll.question} 참여 QR 코드`}
+                  style={{
+                    width: '96px',
+                    height: '96px',
+                    borderRadius: '16px',
+                    padding: '7px',
+                    background: '#fff',
+                  }}
+                />
+              ) : null}
+              <div style={{ minWidth: 0, display: 'grid', gap: '0.28rem', textAlign: 'left' }}>
+                <span
+                  style={{
+                    color: 'var(--brand-accent-teal)',
+                    fontSize: '0.68rem',
+                    fontWeight: 900,
+                    letterSpacing: '0.04em',
+                  }}
+                >
+                  QR 참여 카드
+                </span>
+                <strong
+                  style={{
+                    color: 'var(--text-primary)',
+                    fontSize: '0.9rem',
+                    lineHeight: 1.35,
+                  }}
+                >
+                  {participationQrUrl
+                    ? '스캔하면 바로 이 투표로 이동합니다'
+                    : '링크가 길어 QR을 만들 수 없습니다'}
+                </strong>
+                <span
+                  style={{ color: 'var(--text-secondary)', fontSize: '0.72rem', lineHeight: 1.45 }}
+                >
+                  발표 화면, 회의실 모니터, 오프라인 모임에서 링크를 읽어주지 않아도 참여할 수
+                  있습니다.
+                </span>
+              </div>
+            </div>
+
+            {(() => {
+              const deadlineReminder = buildPollDeadlineReminder(
+                currentPoll,
+                resolvePollShareUrl(currentPoll),
+              );
+              const canDownloadReminder = Boolean(deadlineReminder);
+
+              return (
+                <section
+                  style={{
+                    border: canDownloadReminder
+                      ? '1px solid rgba(250, 204, 21, 0.22)'
+                      : '1px solid rgba(255,255,255,0.09)',
+                    borderRadius: 'var(--radius-sm)',
+                    background: canDownloadReminder
+                      ? 'rgba(250, 204, 21, 0.045)'
+                      : 'rgba(255,255,255,0.028)',
+                    padding: '0.85rem',
+                    display: 'grid',
+                    gap: '0.7rem',
+                    marginBottom: '1rem',
+                    textAlign: 'left',
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      justifyContent: 'space-between',
+                      gap: '0.75rem',
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <div style={{ display: 'grid', gap: '0.2rem', minWidth: 0 }}>
+                      <h4
+                        style={{
+                          margin: 0,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          color: 'var(--text-primary)',
+                          fontSize: '0.82rem',
+                          fontWeight: 900,
+                        }}
+                      >
+                        <CalendarPlus size={14} style={{ color: 'var(--brand-accent-gold)' }} />
+                        마감 리마인더
+                      </h4>
+                      <p
+                        style={{
+                          margin: 0,
+                          color: 'var(--text-secondary)',
+                          fontSize: '0.7rem',
+                          lineHeight: 1.45,
+                        }}
+                      >
+                        공유한 뒤 잊히지 않도록 마감 전 캘린더 알림 파일을 저장합니다.
+                      </p>
+                    </div>
+                    {canDownloadReminder ? (
+                      <a
+                        href={deadlineReminder?.dataUri}
+                        download={`picky-${currentPoll.id}-deadline-reminder.ics`}
+                        className="btn-secondary"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          padding: '8px 11px',
+                          color: 'var(--brand-accent-gold)',
+                          borderColor: 'rgba(250, 204, 21, 0.28)',
+                          textDecoration: 'none',
+                          fontSize: '0.7rem',
+                          fontWeight: 900,
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        <Download size={14} />
+                        .ics 저장
+                      </a>
+                    ) : (
+                      <span
+                        style={{
+                          border: '1px solid rgba(255,255,255,0.1)',
+                          borderRadius: '999px',
+                          color: 'var(--text-muted)',
+                          background: 'rgba(255,255,255,0.035)',
+                          padding: '5px 9px',
+                          fontSize: '0.66rem',
+                          fontWeight: 900,
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        마감 설정 필요
+                      </span>
+                    )}
+                  </div>
+
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+                      gap: '0.45rem',
+                    }}
+                  >
+                    <div
+                      style={{
+                        border: '1px solid rgba(255,255,255,0.08)',
+                        borderRadius: 'var(--radius-sm)',
+                        background: 'rgba(255,255,255,0.025)',
+                        padding: '0.62rem',
+                      }}
+                    >
+                      <span
+                        style={{ color: 'var(--text-muted)', fontSize: '0.62rem', fontWeight: 900 }}
+                      >
+                        WHEN
+                      </span>
+                      <strong
+                        style={{
+                          display: 'block',
+                          color: 'var(--text-primary)',
+                          fontSize: '0.74rem',
+                          lineHeight: 1.35,
+                        }}
+                      >
+                        {currentPoll.endsAt ? formatEndAt(currentPoll.endsAt) : '마감 없음'}
+                      </strong>
+                    </div>
+                    <div
+                      style={{
+                        border: '1px solid rgba(255,255,255,0.08)',
+                        borderRadius: 'var(--radius-sm)',
+                        background: 'rgba(255,255,255,0.025)',
+                        padding: '0.62rem',
+                      }}
+                    >
+                      <span
+                        style={{ color: 'var(--text-muted)', fontSize: '0.62rem', fontWeight: 900 }}
+                      >
+                        ALERT
+                      </span>
+                      <strong
+                        style={{
+                          display: 'block',
+                          color: 'var(--text-primary)',
+                          fontSize: '0.74rem',
+                          lineHeight: 1.35,
+                        }}
+                      >
+                        {deadlineReminder?.alertLabel || '마감 설정 후 가능'}
+                      </strong>
+                    </div>
+                    <div
+                      style={{
+                        border: '1px solid rgba(255,255,255,0.08)',
+                        borderRadius: 'var(--radius-sm)',
+                        background: 'rgba(255,255,255,0.025)',
+                        padding: '0.62rem',
+                      }}
+                    >
+                      <span
+                        style={{ color: 'var(--text-muted)', fontSize: '0.62rem', fontWeight: 900 }}
+                      >
+                        STATUS
+                      </span>
+                      <strong
+                        style={{
+                          display: 'block',
+                          color: canDownloadReminder
+                            ? 'var(--brand-accent-gold)'
+                            : 'var(--text-muted)',
+                          fontSize: '0.74rem',
+                          lineHeight: 1.35,
+                        }}
+                      >
+                        {canDownloadReminder ? '저장 가능' : '비활성'}
+                      </strong>
+                    </div>
+                  </div>
+                </section>
+              );
+            })()}
+
+            <section
+              style={{
+                border: '1px solid rgba(255,255,255,0.09)',
+                borderRadius: 'var(--radius-sm)',
+                background: 'rgba(255,255,255,0.035)',
+                padding: '0.85rem',
+                display: 'grid',
+                gap: '0.7rem',
+                marginBottom: '1rem',
+                textAlign: 'left',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  justifyContent: 'space-between',
+                  gap: '0.75rem',
+                  flexWrap: 'wrap',
+                }}
+              >
+                <div style={{ display: 'grid', gap: '0.2rem' }}>
+                  <h4
+                    style={{
+                      margin: 0,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      color: 'var(--text-primary)',
+                      fontSize: '0.82rem',
+                      fontWeight: 900,
+                    }}
+                  >
+                    <Send size={14} style={{ color: 'var(--brand-accent-teal)' }} />
+                    초대 메시지
+                  </h4>
+                  <p
+                    style={{
+                      margin: 0,
+                      color: 'var(--text-secondary)',
+                      fontSize: '0.7rem',
+                      lineHeight: 1.45,
+                    }}
+                  >
+                    카카오톡, 문자, 슬랙에 그대로 붙여넣을 수 있도록 질문, 코드, 마감, 첨부 안내를
+                    묶었습니다.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCopyInviteMessageClick}
+                  className="ghost-btn"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    padding: '6px 10px',
+                    fontSize: '0.68rem',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {copiedId === `invite-${currentPoll.id}` ? (
+                    <Check size={13} />
+                  ) : (
+                    <Copy size={13} />
+                  )}
+                  {copiedId === `invite-${currentPoll.id}` ? '복사됨' : '문구 복사'}
+                </button>
+              </div>
+
+              <div
+                role="group"
+                aria-label="초대 메시지 목적 선택"
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+                  gap: '0.4rem',
+                }}
+              >
+                {INVITE_MESSAGE_TONE_OPTIONS.map((option) => {
+                  const active = inviteMessageTone === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setInviteMessageTone(option.value)}
+                      aria-pressed={active}
+                      style={{
+                        border: active
+                          ? '1px solid rgba(45, 212, 191, 0.45)'
+                          : '1px solid var(--bg-card-border)',
+                        borderRadius: 'var(--radius-sm)',
+                        background: active ? 'rgba(45, 212, 191, 0.09)' : 'rgba(255,255,255,0.025)',
+                        color: active ? 'var(--brand-accent-teal)' : 'var(--text-secondary)',
+                        padding: '0.55rem 0.45rem',
+                        cursor: 'pointer',
+                        display: 'grid',
+                        gap: '0.18rem',
+                        textAlign: 'left',
+                        fontFamily: 'var(--font-sans)',
+                      }}
+                    >
+                      <strong style={{ fontSize: '0.68rem', fontWeight: 900 }}>
+                        {option.label}
+                      </strong>
+                      <span
+                        style={{
+                          color: active ? 'var(--text-secondary)' : 'var(--text-muted)',
+                          fontSize: '0.62rem',
+                          lineHeight: 1.35,
+                        }}
+                      >
+                        {option.description}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <textarea
+                readOnly
+                aria-label="공유 초대 메시지"
+                value={inviteMessage}
+                onFocus={(event) => event.currentTarget.select()}
+                style={{
+                  width: '100%',
+                  minHeight: '136px',
+                  resize: 'vertical',
+                  border: '1px solid var(--bg-card-border)',
+                  borderRadius: 'var(--radius-sm)',
+                  background: 'oklch(11% 0.015 260)',
+                  color: 'var(--text-secondary)',
+                  padding: '0.75rem',
+                  fontFamily: 'var(--font-sans)',
+                  fontSize: '0.72rem',
+                  lineHeight: 1.55,
+                  outline: 'none',
+                }}
+              />
+            </section>
+
             <div
               style={{
                 display: 'flex',
@@ -896,7 +5591,10 @@ export const PollDetail: React.FC = () => {
                   style={{
                     margin: 0,
                     fontSize: '0.7rem',
-                    color: 'var(--brand-accent-coral)',
+                    color:
+                      copiedId === currentPoll.id
+                        ? 'var(--brand-accent-teal)'
+                        : 'var(--brand-accent-coral)',
                   }}
                 >
                   {copyMessage}
@@ -921,6 +5619,153 @@ export const PollDetail: React.FC = () => {
                 {copiedId === currentPoll.id ? <Check size={16} /> : <Copy size={16} />}
               </button>
             </div>
+
+            <section
+              style={{
+                border: '1px solid rgba(45, 212, 191, 0.18)',
+                borderRadius: 'var(--radius-sm)',
+                background: 'rgba(45, 212, 191, 0.04)',
+                padding: '0.85rem',
+                display: 'grid',
+                gap: '0.72rem',
+                marginBottom: '1rem',
+                textAlign: 'left',
+              }}
+            >
+              <div style={{ display: 'grid', gap: '0.18rem' }}>
+                <h4
+                  style={{
+                    margin: 0,
+                    color: 'var(--text-primary)',
+                    fontSize: '0.82rem',
+                    fontWeight: 900,
+                  }}
+                >
+                  웹사이트 임베드 코드
+                </h4>
+                <p
+                  style={{
+                    margin: 0,
+                    color: 'var(--text-secondary)',
+                    fontSize: '0.7rem',
+                    lineHeight: 1.45,
+                  }}
+                >
+                  게시 위치에 맞는 형태를 선택하면 코드가 바로 바뀝니다.
+                </p>
+              </div>
+
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(116px, 1fr))',
+                  gap: '0.45rem',
+                }}
+              >
+                {embedCodeModes.map((mode) => {
+                  const selected = embedCodeMode === mode.id;
+
+                  return (
+                    <button
+                      key={mode.id}
+                      type="button"
+                      onClick={() => setEmbedCodeMode(mode.id)}
+                      style={{
+                        border: selected
+                          ? '1px solid rgba(45, 212, 191, 0.62)'
+                          : '1px solid rgba(255, 255, 255, 0.1)',
+                        borderRadius: 'var(--radius-sm)',
+                        background: selected ? 'rgba(45, 212, 191, 0.1)' : 'rgba(5, 14, 12, 0.42)',
+                        color: 'var(--text-primary)',
+                        padding: '0.62rem',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        display: 'grid',
+                        gap: '0.28rem',
+                      }}
+                    >
+                      <span
+                        style={{
+                          color: selected ? 'var(--brand-accent-teal)' : 'var(--text-muted)',
+                          fontSize: '0.66rem',
+                          fontWeight: 900,
+                        }}
+                      >
+                        {mode.label}
+                      </span>
+                      <strong style={{ fontSize: '0.74rem', lineHeight: 1.3 }}>{mode.title}</strong>
+                      <span
+                        style={{
+                          color: 'var(--text-secondary)',
+                          fontSize: '0.64rem',
+                          lineHeight: 1.35,
+                        }}
+                      >
+                        {mode.description}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <textarea
+                readOnly
+                value={buildPollEmbedCode(currentPoll, embedCodeMode)}
+                aria-label="선택한 임베드 코드"
+                style={{
+                  width: '100%',
+                  minHeight: '96px',
+                  resize: 'vertical',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: 'var(--radius-sm)',
+                  background: 'rgba(2, 8, 7, 0.64)',
+                  color: 'var(--text-secondary)',
+                  padding: '0.72rem',
+                  fontSize: '0.68rem',
+                  lineHeight: 1.45,
+                  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                }}
+              />
+
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await copyText(buildPollEmbedCode(currentPoll, embedCodeMode));
+                    setCopiedId(`embed-${embedCodeMode}-${currentPoll.id}`);
+                    setCopyMessage(
+                      `${embedCodeModes.find((mode) => mode.id === embedCodeMode)?.label || '선택한'} 임베드 코드를 복사했습니다.`,
+                    );
+                    setTimeout(() => setCopyMessage(''), 2600);
+                    setTimeout(() => setCopiedId(null), 2200);
+                  } catch {
+                    setCopyMessage('임베드 코드 복사에 실패했습니다.');
+                    setTimeout(() => setCopyMessage(''), 2800);
+                  }
+                }}
+                className="btn-secondary"
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  fontSize: '0.75rem',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  color:
+                    copiedId === `embed-${embedCodeMode}-${currentPoll.id}`
+                      ? 'var(--brand-accent-teal)'
+                      : 'var(--text-primary)',
+                }}
+              >
+                {copiedId === `embed-${embedCodeMode}-${currentPoll.id}` ? (
+                  <Check size={14} />
+                ) : (
+                  <Copy size={14} />
+                )}
+                선택한 임베드 코드 복사
+              </button>
+            </section>
 
             {/* Sharing Intents */}
             <div
@@ -949,15 +5794,14 @@ export const PollDetail: React.FC = () => {
               >
                 <span>🐦 X (Twitter)</span>
               </a>
-              <a
-                href={`https://share.kakaocast.daum.net/intent?text=${encodeURIComponent(`${resolveShareText(currentPoll)}\n${resolvePollShareUrl(currentPoll)}`)}`}
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                type="button"
+                onClick={handleKakaoShareClick}
                 className="btn-secondary"
                 style={{
                   padding: '10px',
                   fontSize: '0.75rem',
-                  textDecoration: 'none',
+                  cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -968,7 +5812,7 @@ export const PollDetail: React.FC = () => {
                 }}
               >
                 <span>💬 카카오톡 공유</span>
-              </a>
+              </button>
             </div>
 
             <button

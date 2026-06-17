@@ -234,7 +234,7 @@ export const AuthPage: React.FC = () => {
             <p style={{ color: 'var(--brand-accent-gold)', fontWeight: 700, fontSize: '0.74rem' }}>
               pickflow Auth Flow
             </p>
-            <h1 style={{ fontSize: '1.55rem', margin: 0, letterSpacing: '-0.02em' }}>
+            <h1 style={{ fontSize: '1.55rem', margin: 0, letterSpacing: 0 }}>
               {MODE_LABELS[activeMode]}
             </h1>
             <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>

@@ -250,7 +250,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               fontSize: '1.35rem',
               fontWeight: 800,
               color: 'var(--text-primary)',
-              letterSpacing: '-0.02em',
+              letterSpacing: 0,
             }}
           >
             {isLoginMode ? '웰컴 투 피키!' : isRegisterMode ? '피키 회원가입' : '비회원 빠른 시작'}
