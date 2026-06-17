@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { CheckCheck, LogIn, LogOut, Menu, X, User, ShieldCheck } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { ArrowRight, CheckCheck, LogIn, LogOut, Menu, X, User, ShieldCheck } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 import { AuthModal, type AuthMode } from './AuthModal';
 
@@ -11,6 +11,7 @@ const navItems = [
 
 export const Navbar: React.FC = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const { user, logout, needsReauth, clearError, setNeedsReauth } = useAuthStore();
   const SESSION_REAUTH_SUBTITLE = '세션이 만료되었습니다. 다시 로그인해 주세요.';
 
@@ -18,6 +19,8 @@ export const Navbar: React.FC = () => {
   const [authModalMode, setAuthModalMode] = useState<AuthMode>('login');
   const [authModalSubTitle, setAuthModalSubTitle] = useState<string | undefined>(undefined);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [joinCodeInput, setJoinCodeInput] = useState('');
+  const [joinCodeError, setJoinCodeError] = useState('');
 
   const showAuthErrorHint = !!needsReauth;
 
@@ -41,6 +44,26 @@ export const Navbar: React.FC = () => {
   const handleLogout = () => {
     logout();
     setMobileOpen(false);
+  };
+
+  const handleJoinCodeSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const normalizedCode = joinCodeInput.trim().replace(/^#/, '').replace(/\s+/g, '');
+
+    if (!normalizedCode) {
+      setJoinCodeError('코드 입력');
+      return;
+    }
+
+    if (!/^[A-Za-z0-9_-]{4,80}$/.test(normalizedCode)) {
+      setJoinCodeError('형식 확인');
+      return;
+    }
+
+    setJoinCodeError('');
+    setJoinCodeInput('');
+    setMobileOpen(false);
+    navigate(`/poll/${encodeURIComponent(normalizedCode)}`);
   };
 
   useEffect(() => {
@@ -81,7 +104,7 @@ export const Navbar: React.FC = () => {
             style={{
               fontSize: '1.22rem',
               fontWeight: 900,
-              letterSpacing: '-0.03em',
+              letterSpacing: 0,
               background:
                 'linear-gradient(90deg, var(--brand-primary-light), var(--brand-primary))',
               WebkitBackgroundClip: 'text',
@@ -139,6 +162,73 @@ export const Navbar: React.FC = () => {
               </Link>
             );
           })}
+          <form
+            onSubmit={handleJoinCodeSubmit}
+            aria-label="참여 코드로 투표 입장"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              border: '1px solid rgba(45, 212, 191, 0.18)',
+              borderRadius: '999px',
+              background: 'rgba(45, 212, 191, 0.055)',
+              padding: '4px 5px 4px 10px',
+            }}
+          >
+            <span
+              style={{
+                color: joinCodeError ? 'var(--brand-accent-gold)' : 'var(--brand-accent-teal)',
+                fontSize: '0.62rem',
+                fontWeight: 900,
+                letterSpacing: '0.04em',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {joinCodeError || 'JOIN'}
+            </span>
+            <input
+              value={joinCodeInput}
+              onChange={(event) => {
+                setJoinCodeInput(event.target.value);
+                if (joinCodeError) {
+                  setJoinCodeError('');
+                }
+              }}
+              placeholder="참여 코드"
+              aria-label="참여 코드"
+              autoCapitalize="none"
+              autoCorrect="off"
+              style={{
+                width: '92px',
+                border: 'none',
+                outline: 'none',
+                background: 'transparent',
+                color: 'var(--text-primary)',
+                fontFamily: 'var(--font-sans)',
+                fontSize: '0.72rem',
+                fontWeight: 800,
+              }}
+            />
+            <button
+              type="submit"
+              aria-label="참여 코드로 입장"
+              style={{
+                width: '28px',
+                height: '28px',
+                border: '1px solid rgba(45, 212, 191, 0.28)',
+                borderRadius: '999px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'rgba(45, 212, 191, 0.12)',
+                color: 'var(--brand-accent-teal)',
+                cursor: 'pointer',
+                flexShrink: 0,
+              }}
+            >
+              <ArrowRight size={13} />
+            </button>
+          </form>
         </div>
 
         <div
@@ -190,7 +280,7 @@ export const Navbar: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => handleAuthModalOpen('login', SESSION_REAUTH_SUBTITLE)}
-                  className="btn-secondary"
+                  className="btn-secondary desktop-auth-action"
                   style={{
                     padding: '8px 12px',
                     fontSize: '0.75rem',
@@ -206,6 +296,7 @@ export const Navbar: React.FC = () => {
 
               <button
                 onClick={handleLogout}
+                className="desktop-auth-action"
                 style={{
                   background: 'none',
                   border: '1px solid var(--bg-card-border)',
@@ -229,7 +320,7 @@ export const Navbar: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => handleAuthModalOpen('login', SESSION_REAUTH_SUBTITLE)}
-                  className="btn-secondary"
+                  className="btn-secondary desktop-auth-action"
                   style={{
                     padding: '8px 12px',
                     fontSize: '0.75rem',
@@ -245,7 +336,7 @@ export const Navbar: React.FC = () => {
 
               <Link
                 to="/auth/login"
-                className="btn-secondary"
+                className="btn-secondary desktop-auth-action"
                 style={{
                   padding: '8px 12px',
                   fontSize: '0.74rem',
@@ -260,7 +351,7 @@ export const Navbar: React.FC = () => {
               </Link>
               <Link
                 to="/auth/register"
-                className="btn-secondary"
+                className="btn-secondary desktop-auth-action"
                 style={{
                   padding: '8px 12px',
                   fontSize: '0.74rem',
@@ -277,7 +368,7 @@ export const Navbar: React.FC = () => {
               <button
                 type="button"
                 onClick={() => handleAuthModalOpen('guest', '비회원으로 바로 시작해요')}
-                className="btn-secondary"
+                className="btn-secondary desktop-auth-action"
                 style={{
                   padding: '8px 12px',
                   fontSize: '0.74rem',
@@ -330,6 +421,87 @@ export const Navbar: React.FC = () => {
               gap: '0.45rem',
             }}
           >
+            <form
+              onSubmit={handleJoinCodeSubmit}
+              aria-label="모바일 참여 코드로 투표 입장"
+              style={{
+                display: 'grid',
+                gap: '0.5rem',
+                border: '1px solid rgba(45, 212, 191, 0.22)',
+                borderRadius: '10px',
+                background: 'rgba(45, 212, 191, 0.065)',
+                padding: '0.72rem',
+                marginBottom: '0.2rem',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: '0.6rem',
+                }}
+              >
+                <span
+                  style={{
+                    color: joinCodeError ? 'var(--brand-accent-gold)' : 'var(--brand-accent-teal)',
+                    fontSize: '0.7rem',
+                    fontWeight: 900,
+                    letterSpacing: '0.04em',
+                  }}
+                >
+                  {joinCodeError || 'JOIN CODE로 바로 참여'}
+                </span>
+                <small style={{ color: 'var(--text-muted)', fontSize: '0.66rem' }}>
+                  QR을 못 쓸 때
+                </small>
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <input
+                  value={joinCodeInput}
+                  onChange={(event) => {
+                    setJoinCodeInput(event.target.value);
+                    if (joinCodeError) {
+                      setJoinCodeError('');
+                    }
+                  }}
+                  placeholder="공유받은 코드 입력"
+                  aria-label="모바일 참여 코드"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  style={{
+                    minWidth: 0,
+                    flex: 1,
+                    border: '1px solid var(--bg-card-border)',
+                    borderRadius: '8px',
+                    background: 'rgba(255,255,255,0.035)',
+                    color: 'var(--text-primary)',
+                    fontFamily: 'var(--font-sans)',
+                    fontSize: '0.82rem',
+                    fontWeight: 800,
+                    padding: '9px 10px',
+                    outline: 'none',
+                  }}
+                />
+                <button
+                  type="submit"
+                  className="btn-primary"
+                  style={{
+                    minWidth: '76px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '5px',
+                    padding: '9px 10px',
+                    fontSize: '0.76rem',
+                  }}
+                >
+                  입장
+                  <ArrowRight size={13} />
+                </button>
+              </div>
+            </form>
+
             {navItems.map((item) => (
               <Link
                 key={item.path}
@@ -347,21 +519,143 @@ export const Navbar: React.FC = () => {
                 {item.label}
               </Link>
             ))}
-            <button
-              type="button"
-              onClick={() => handleAuthModalOpen('guest', '비회원으로 바로 시작해요')}
+            <form
+              onSubmit={handleJoinCodeSubmit}
+              aria-label="모바일 참여 코드로 투표 입장"
               style={{
-                marginTop: '0.15rem',
-                textAlign: 'left',
-                background: 'transparent',
-                color: 'var(--text-secondary)',
-                border: '1px dashed var(--bg-card-border)',
+                display: 'grid',
+                gap: '0.45rem',
+                border: '1px solid rgba(45, 212, 191, 0.2)',
                 borderRadius: '8px',
-                padding: '10px 12px',
+                background: 'rgba(45, 212, 191, 0.055)',
+                padding: '0.75rem',
               }}
             >
-              빠른 시작 모드
-            </button>
+              <label
+                htmlFor="mobile-join-code-input"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  color: joinCodeError ? 'var(--brand-accent-gold)' : 'var(--brand-accent-teal)',
+                  fontSize: '0.68rem',
+                  fontWeight: 900,
+                  letterSpacing: '0.05em',
+                }}
+              >
+                JOIN CODE
+                <span style={{ color: 'var(--text-muted)', fontWeight: 700, letterSpacing: 0 }}>
+                  {joinCodeError || '공유받은 코드로 바로 입장'}
+                </span>
+              </label>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <input
+                  id="mobile-join-code-input"
+                  value={joinCodeInput}
+                  onChange={(event) => {
+                    setJoinCodeInput(event.target.value);
+                    if (joinCodeError) {
+                      setJoinCodeError('');
+                    }
+                  }}
+                  placeholder="참여 코드 입력"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    border: '1px solid var(--bg-card-border)',
+                    borderRadius: '8px',
+                    background: 'rgba(255,255,255,0.035)',
+                    color: 'var(--text-primary)',
+                    fontFamily: 'var(--font-sans)',
+                    fontSize: '0.82rem',
+                    fontWeight: 800,
+                    padding: '9px 10px',
+                  }}
+                />
+                <button
+                  type="submit"
+                  style={{
+                    border: '1px solid rgba(45, 212, 191, 0.32)',
+                    borderRadius: '8px',
+                    background: 'rgba(45, 212, 191, 0.12)',
+                    color: 'var(--brand-accent-teal)',
+                    cursor: 'pointer',
+                    fontFamily: 'var(--font-sans)',
+                    fontSize: '0.78rem',
+                    fontWeight: 900,
+                    padding: '9px 12px',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  입장
+                </button>
+              </div>
+            </form>
+            {user ? (
+              <button
+                type="button"
+                onClick={handleLogout}
+                style={{
+                  marginTop: '0.15rem',
+                  textAlign: 'left',
+                  background: 'transparent',
+                  color: 'var(--text-secondary)',
+                  border: '1px dashed var(--bg-card-border)',
+                  borderRadius: '8px',
+                  padding: '10px 12px',
+                }}
+              >
+                로그아웃
+              </button>
+            ) : (
+              <>
+                <Link
+                  to="/auth/login"
+                  onClick={() => setMobileOpen(false)}
+                  style={{
+                    textDecoration: 'none',
+                    color: 'var(--text-secondary)',
+                    border: '1px dashed var(--bg-card-border)',
+                    borderRadius: '8px',
+                    padding: '10px 12px',
+                    fontSize: '0.85rem',
+                  }}
+                >
+                  로그인
+                </Link>
+                <Link
+                  to="/auth/register"
+                  onClick={() => setMobileOpen(false)}
+                  style={{
+                    textDecoration: 'none',
+                    color: 'var(--text-secondary)',
+                    border: '1px dashed var(--bg-card-border)',
+                    borderRadius: '8px',
+                    padding: '10px 12px',
+                    fontSize: '0.85rem',
+                  }}
+                >
+                  회원가입
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => handleAuthModalOpen('guest', '비회원으로 바로 시작해요')}
+                  style={{
+                    marginTop: '0.15rem',
+                    textAlign: 'left',
+                    background: 'transparent',
+                    color: 'var(--text-secondary)',
+                    border: '1px dashed var(--bg-card-border)',
+                    borderRadius: '8px',
+                    padding: '10px 12px',
+                  }}
+                >
+                  빠른 시작 모드
+                </button>
+              </>
+            )}
           </div>
         ) : null}
       </nav>
@@ -376,7 +670,8 @@ export const Navbar: React.FC = () => {
       <style>{`
         @media (max-width: 980px) {
           .desktop-nav,
-          .desktop-user-chip { display: none !important; }
+          .desktop-user-chip,
+          .desktop-auth-action { display: none !important; }
           .mobile-menu-trigger { display: inline-flex !important; }
           .topbar-shell { position: sticky; }
         }

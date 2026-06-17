@@ -83,8 +83,30 @@ const loadCachedPolls = (): Poll[] => {
                     : undefined,
               }))
           : [],
+        attachments: Array.isArray(item.attachments)
+          ? item.attachments
+              .filter(
+                (attachment: any) =>
+                  attachment &&
+                  typeof attachment.name === 'string' &&
+                  typeof attachment.type === 'string' &&
+                  typeof attachment.size === 'number' &&
+                  typeof attachment.dataUrl === 'string',
+              )
+              .map((attachment: any) => ({
+                name: attachment.name,
+                type: attachment.type,
+                size: attachment.size,
+                dataUrl: attachment.dataUrl,
+              }))
+          : [],
         createdAt: typeof item.createdAt === 'string' ? item.createdAt : new Date().toISOString(),
+        endsAt: typeof item.endsAt === 'string' ? item.endsAt : null,
         totalVotes: typeof item.totalVotes === 'number' ? item.totalVotes : 0,
+        resultsVisibility:
+          item.resultsVisibility === 'always' || item.resultsVisibility === 'afterVote'
+            ? item.resultsVisibility
+            : 'afterVote',
         creatorId: item.creatorId,
         creatorIsGuest: Boolean(item.creatorIsGuest),
       }));
@@ -135,12 +157,54 @@ const findPollFromLocalCache = (pollId: string): Poll | undefined => {
   return cached.find((poll) => poll.id === pollId);
 };
 
+const shouldCreateLocalPollFallback = (status: number) => {
+  return status === 404 || status === 405 || status >= 500;
+};
+
+const isPollClosed = (poll: Poll | null | undefined) => {
+  if (!poll?.endsAt) {
+    return false;
+  }
+
+  const endsAtTime = new Date(poll.endsAt).getTime();
+  return Number.isFinite(endsAtTime) && Date.now() >= endsAtTime;
+};
+
+const createLocalPoll = (input: CreatePollInput): Poll => {
+  const user = useAuthStore.getState().user;
+  const localIdBase = Date.now().toString(36);
+
+  return {
+    id: `local-${localIdBase}`,
+    question: input.question,
+    description: input.description || null,
+    options: input.options.map((option, index) => ({
+      id: index + 1,
+      text: option.text,
+      voteCount: 0,
+      imageUrl: option.imageUrl || null,
+    })),
+    comments: [],
+    attachments: input.attachments || [],
+    createdAt: new Date().toISOString(),
+    endsAt: input.endsAt || null,
+    totalVotes: 0,
+    resultsVisibility: input.resultsVisibility || 'afterVote',
+    creatorId: user?.id || `guest-${localIdBase}`,
+    creatorIsGuest: user?.isGuest ?? true,
+  };
+};
+
 const applyLocalVote = (
   poll: Poll,
   optionId: number,
   voterName?: string | null,
   comment?: string | null,
 ): Poll | null => {
+  if (isPollClosed(poll)) {
+    return null;
+  }
+
   const target = poll.options.find((option) => option.id === optionId);
   if (!target) {
     return null;
@@ -282,18 +346,30 @@ export const usePollStore = create<PollState>((set, get) => ({
       const merged = mergePollsWithLocalCache(parsed);
       set({ polls: merged, isLoading: false });
     } catch (err: any) {
-      set({ error: err.message || '에러가 발생했습니다.', isLoading: false });
+      const fallback = mergePollsWithLocalCache([]);
+      set({ polls: fallback, error: err.message || '에러가 발생했습니다.', isLoading: false });
     }
   },
 
   fetchPoll: async (id) => {
+    if (id.startsWith('local-')) {
+      const cached = get().polls.find((poll) => poll.id === id) || findPollFromLocalCache(id);
+      if (cached) {
+        set({ currentPoll: cached, error: null, isLoading: false });
+        return cached;
+      }
+    }
+
     set({ isLoading: true, error: null, currentPoll: null });
     try {
       const res = await requestApi(`/polls/${id}`);
       if (!res.ok) {
         const cached = get().polls.find((poll) => poll.id === id) || findPollFromLocalCache(id);
 
-        if (cached && res.status === 404) {
+        if (
+          cached &&
+          (res.status === 404 || res.status === 405 || res.status >= 500 || id.startsWith('local-'))
+        ) {
           set({ currentPoll: cached, error: null, isLoading: false });
           return cached;
         }
@@ -306,6 +382,12 @@ export const usePollStore = create<PollState>((set, get) => ({
       set({ currentPoll: data, isLoading: false });
       return data;
     } catch (err: any) {
+      const cached = get().polls.find((poll) => poll.id === id) || findPollFromLocalCache(id);
+      if (cached) {
+        set({ currentPoll: cached, error: null, isLoading: false });
+        return cached;
+      }
+
       set({ error: err.message || '에러가 발생했습니다.', isLoading: false });
       return null;
     }
@@ -313,6 +395,13 @@ export const usePollStore = create<PollState>((set, get) => ({
 
   createPoll: async (input) => {
     set({ isLoading: true, error: null });
+    const commitCreatedPoll = (data: Poll) => {
+      const nextPolls = [data, ...get().polls.filter((poll) => poll.id !== data.id)];
+      upsertPollToCache(data, nextPolls);
+      set({ polls: nextPolls, currentPoll: data, isLoading: false, error: null });
+      return data;
+    };
+
     try {
       const token = getAuthToken();
       const headers: Record<string, string> = {
@@ -328,23 +417,33 @@ export const usePollStore = create<PollState>((set, get) => ({
         body: JSON.stringify(input),
       });
       if (!res.ok) {
+        if (shouldCreateLocalPollFallback(res.status)) {
+          return commitCreatedPoll(createLocalPoll(input));
+        }
+
         const message = await setAuthSessionExpired(res, '고민을 생성하는데 실패했습니다.');
-        throw new Error(message);
+        set({ error: message, isLoading: false });
+        return null;
       }
 
       const data = ensurePollPayload(await parseApiPayload(res));
-      const nextPolls = [data, ...get().polls.filter((poll) => poll.id !== data.id)];
-      upsertPollToCache(data, nextPolls);
-      set({ polls: nextPolls, currentPoll: data, isLoading: false });
-      return data;
+      return commitCreatedPoll(data);
     } catch (err: any) {
-      set({ error: err.message || '에러가 발생했습니다.', isLoading: false });
-      return null;
+      console.info('[picky] falling back to local poll creation', err);
+      return commitCreatedPoll(createLocalPoll(input));
     }
   },
 
   vote: async (id, input) => {
     set({ isLoading: true, error: null });
+    const knownPoll =
+      get().currentPoll || get().polls.find((poll) => poll.id === id) || findPollFromLocalCache(id);
+
+    if (isPollClosed(knownPoll)) {
+      set({ error: '마감된 투표에는 더 이상 참여할 수 없습니다.', isLoading: false });
+      return false;
+    }
+
     try {
       const token = getAuthToken();
       const headers: Record<string, string> = {

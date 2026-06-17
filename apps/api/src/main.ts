@@ -2,9 +2,13 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import helmet from 'helmet';
 import compression from 'compression';
+import { NestExpressApplication } from '@nestjs/platform-express';
 
 export async function createApiServer() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  app.useBodyParser('json', { limit: '2mb' });
+  app.useBodyParser('urlencoded', { extended: true, limit: '2mb' });
 
   // Enable CORS for frontend integration
   app.enableCors({

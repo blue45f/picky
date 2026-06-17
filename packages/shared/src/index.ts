@@ -1,20 +1,49 @@
 import { z } from 'zod';
 
+export const PollResultsVisibilitySchema = z.enum(['afterVote', 'always']);
+
+export type PollResultsVisibility = z.infer<typeof PollResultsVisibilitySchema>;
+
+export const PollAttachmentSchema = z.object({
+  name: z
+    .string()
+    .min(1, '첨부파일 이름은 필수입니다.')
+    .max(120, '첨부파일 이름은 120자 이하이어야 합니다.'),
+  type: z.string().max(80, '첨부파일 형식은 80자 이하이어야 합니다.'),
+  size: z
+    .number()
+    .int()
+    .min(1, '첨부파일 크기가 올바르지 않습니다.')
+    .max(300_000, '첨부파일은 300KB 이하만 등록할 수 있습니다.'),
+  dataUrl: z.string().max(420_000, '첨부파일 데이터는 파일당 420KB 이하이어야 합니다.'),
+});
+
 export const CreatePollSchema = z.object({
   question: z
     .string()
     .min(2, '질문은 최소 2글자 이상이어야 합니다.')
     .max(100, '질문은 최대 100글자 이하이어야 합니다.'),
   description: z.string().max(500, '설명은 최대 500글자 이하이어야 합니다.').optional().nullable(),
+  endsAt: z.string().datetime('마감 시간 형식이 올바르지 않습니다.').optional().nullable(),
+  resultsVisibility: PollResultsVisibilitySchema.optional().nullable(),
   options: z
     .array(
       z.object({
         text: z.string().min(1, '선택지는 빈 칸일 수 없습니다.'),
-        imageUrl: z.string().optional().nullable(),
+        imageUrl: z
+          .string()
+          .max(160_000, '이미지 데이터는 선택지당 160KB 이하이어야 합니다.')
+          .optional()
+          .nullable(),
       }),
     )
     .min(2, '최소 2개 이상의 선택지가 필요합니다.')
     .max(10, '최대 10개까지의 선택지만 등록 가능합니다.'),
+  attachments: z
+    .array(PollAttachmentSchema)
+    .max(3, '첨부파일은 최대 3개까지 등록 가능합니다.')
+    .optional()
+    .nullable(),
   categoryId: z.string().optional().nullable(),
 });
 
@@ -48,14 +77,19 @@ export interface PollComment {
   selectedOptionText?: string;
 }
 
+export type PollAttachment = z.infer<typeof PollAttachmentSchema>;
+
 export interface Poll {
   id: string;
   question: string;
   description?: string | null;
   options: PollOption[];
   comments: PollComment[];
+  attachments?: PollAttachment[];
   createdAt: string;
+  endsAt?: string | null;
   totalVotes: number;
+  resultsVisibility?: PollResultsVisibility | null;
   creatorId?: string | null;
   creatorIsGuest?: boolean;
 }
