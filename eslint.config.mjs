@@ -5,7 +5,7 @@ import globals from 'globals';
 
 export default ts.config(
   {
-    ignores: ['**/dist/**', '**/node_modules/**', 'dist/**', 'node_modules/**'],
+    ignores: ['**/dist/**', '**/node_modules/**', '.vercel/**', 'dist/**', 'node_modules/**'],
   },
   js.configs.recommended,
   ...ts.configs.recommended,

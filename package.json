@@ -25,5 +25,19 @@
     "prettier": "^3.8.3",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.61.0"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.1.26",
+    "@nestjs/core": "^11.1.26",
+    "@nestjs/jwt": "^11.0.2",
+    "@nestjs/platform-express": "^11.1.26",
+    "@picky/shared": "workspace:*",
+    "@vercel/kv": "^3.0.0",
+    "compression": "^1.8.1",
+    "helmet": "^8.2.0",
+    "nestjs-zod": "^4.3.1",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "zod": "^3.25.76"
   }
 }

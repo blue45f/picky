@@ -7,6 +7,43 @@ settings:
 importers:
 
   .:
+    dependencies:
+      '@nestjs/common':
+        specifier: ^11.1.26
+        version: 11.1.26(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/core':
+        specifier: ^11.1.26
+        version: 11.1.26(@nestjs/common@11.1.26(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@11.1.26)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/jwt':
+        specifier: ^11.0.2
+        version: 11.0.2(@nestjs/common@11.1.26(reflect-metadata@0.2.2)(rxjs@7.8.2))
+      '@nestjs/platform-express':
+        specifier: ^11.1.26
+        version: 11.1.26(@nestjs/common@11.1.26(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.26)
+      '@picky/shared':
+        specifier: workspace:*
+        version: link:packages/shared
+      '@vercel/kv':
+        specifier: ^3.0.0
+        version: 3.0.0
+      compression:
+        specifier: ^1.8.1
+        version: 1.8.1
+      helmet:
+        specifier: ^8.2.0
+        version: 8.2.0
+      nestjs-zod:
+        specifier: ^4.3.1
+        version: 4.3.1(@nestjs/common@11.1.26(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.26)(zod@3.25.76)
+      reflect-metadata:
+        specifier: ^0.2.2
+        version: 0.2.2
+      rxjs:
+        specifier: ^7.8.2
+        version: 7.8.2
+      zod:
+        specifier: ^3.25.76
+        version: 3.25.76
     devDependencies:
       '@eslint/js':
         specifier: ^10.0.1
