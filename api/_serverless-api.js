@@ -90,7 +90,7 @@ var require_database_service = __commonJS({
                   id: 1,
                   text: "PromptMarket (\uD504\uB86C\uD504\uD2B8/\uC5D0\uC774\uC804\uD2B8 \uB9C8\uCF13)",
                   voteCount: 15,
-                  imageUrl: "https://images.unsplash.com/photo-1677442136019-21780efad99a?w=400&q=80"
+                  imageUrl: null
                 },
                 {
                   id: 2,

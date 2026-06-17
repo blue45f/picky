@@ -69,7 +69,7 @@ export class DatabaseService implements OnModuleInit {
               id: 1,
               text: 'PromptMarket (프롬프트/에이전트 마켓)',
               voteCount: 15,
-              imageUrl: 'https://images.unsplash.com/photo-1677442136019-21780efad99a?w=400&q=80',
+              imageUrl: null,
             },
             {
               id: 2,
