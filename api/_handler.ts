@@ -1,4 +1,4 @@
-import { createApiServer } from '../apps/api/dist/main.js';
+import { createApiServer } from './_dist/main.js';
 
 let cachedHandler: ((req: any, res: any) => Promise<void> | void) | null = null;
 

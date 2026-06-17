@@ -5,7 +5,14 @@ import globals from 'globals';
 
 export default ts.config(
   {
-    ignores: ['**/dist/**', '**/node_modules/**', '.vercel/**', 'dist/**', 'node_modules/**'],
+    ignores: [
+      '**/dist/**',
+      '**/_dist/**',
+      '**/node_modules/**',
+      '.vercel/**',
+      'dist/**',
+      'node_modules/**',
+    ],
   },
   js.configs.recommended,
   ...ts.configs.recommended,
@@ -23,9 +30,9 @@ export default ts.config(
     rules: {
       'react/react-in-jsx-scope': 'off',
       '@typescript-eslint/no-explicit-any': 'off',
-      '@typescript-eslint/no-unused-vars': ['error', { 'argsIgnorePattern': '^_' }],
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
       '@typescript-eslint/no-unused-expressions': 'off',
       'no-empty': 'warn',
     },
-  }
+  },
 );
