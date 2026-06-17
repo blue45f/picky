@@ -11,3 +11,4 @@ dist
 .vscode
 build
 .vercel
+api/_dist
