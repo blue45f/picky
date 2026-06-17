@@ -3,6 +3,11 @@
   "outputDirectory": "apps/web/dist",
   "cleanUrls": true,
   "trailingSlash": false,
+  "functions": {
+    "api/index.ts": {
+      "includeFiles": "apps/api/dist/**"
+    }
+  },
   "rewrites": [
     {
       "source": "/api/:path*",
