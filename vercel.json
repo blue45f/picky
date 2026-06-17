@@ -5,7 +5,7 @@
   "trailingSlash": false,
   "functions": {
     "api/**/*.ts": {
-      "includeFiles": "api/_dist/**/*"
+      "includeFiles": "serverless-api/**/*"
     }
   },
   "rewrites": [

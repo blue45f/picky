@@ -8,6 +8,7 @@ export default ts.config(
     ignores: [
       '**/dist/**',
       '**/_dist/**',
+      'serverless-api/**',
       '**/node_modules/**',
       '.vercel/**',
       'dist/**',
