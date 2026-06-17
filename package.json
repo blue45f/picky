@@ -12,13 +12,14 @@
     "dev": "pnpm -r --parallel --filter=./apps/* run dev",
     "dev:web": "pnpm --filter @picky/web run dev",
     "dev:api": "pnpm --filter @picky/api run dev",
-    "build": "pnpm -r run build && rm -rf serverless-api && mkdir -p serverless-api && cp -R apps/api/dist/. serverless-api",
+    "build": "pnpm -r run build && node scripts/build-vercel-api-bundle.mjs",
     "lint": "eslint .",
     "format": "prettier --write \"**/*.{ts,tsx,js,json,md,css,yml,yaml}\"",
     "typecheck": "pnpm -r run typecheck"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "esbuild": "0.27.7",
     "eslint": "^10.4.0",
     "eslint-plugin-react": "^7.37.5",
     "globals": "^17.6.0",

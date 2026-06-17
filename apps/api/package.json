@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "nest start --watch",
-    "build": "nest build",
+    "build": "rm -f tsconfig.tsbuildinfo && nest build",
     "typecheck": "tsc -p ./tsconfig.json --noEmit",
     "start": "nest start"
   },

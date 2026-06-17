@@ -1,4 +1,4 @@
-import { createApiServer } from '../serverless-api/main.js';
+import { createApiServer } from './_serverless-api.js';
 
 let cachedHandler: ((req: any, res: any) => Promise<void> | void) | null = null;
 
