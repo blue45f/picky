@@ -1,0 +1,37 @@
+:root {
+  --pickflow-bg: #061411;
+  --pickflow-accent: #13c2a3;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--pickflow-bg);
+  color: #f4fbf8;
+  font-family:
+    'Pretendard Variable',
+    Pretendard,
+    -apple-system,
+    BlinkMacSystemFont,
+    system-ui,
+    Roboto,
+    'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  /* WebView 오버스크롤 바운스 억제 */
+  overscroll-behavior-y: none;
+}
+
+#root {
+  min-height: 100dvh;
+}
+
+a {
+  color: inherit;
+}

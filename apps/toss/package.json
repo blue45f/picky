@@ -1,0 +1,33 @@
+{
+  "name": "@picky/toss",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "granite dev",
+    "build": "ait build",
+    "deploy": "ait deploy",
+    "typecheck": "tsc -b",
+    "lint": "eslint .",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@apps-in-toss/web-framework": "^2.9.1",
+    "@emotion/react": "^11.14.0",
+    "@picky/shared": "workspace:*",
+    "@toss/tds-mobile": "^2.5.0",
+    "@toss/tds-mobile-ait": "^2.5.0",
+    "lucide-react": "^0.475.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.30.1",
+    "zustand": "^5.0.3"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "~5.7.3",
+    "vite": "^6.2.0"
+  }
+}
