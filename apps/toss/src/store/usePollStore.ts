@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Poll, CreatePollInput, VoteInput } from '@picky/shared';
+import type { Poll, CreatePollInput, VoteInput } from '../shared';
 import { useAuthStore } from './useAuthStore';
 import { parseApiPayload, requestApi } from '../lib/api';
 

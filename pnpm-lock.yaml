@@ -145,9 +145,6 @@ importers:
       '@emotion/react':
         specifier: ^11.14.0
         version: 11.14.0(@types/react@18.3.31)(react@18.3.1)
-      '@picky/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
       '@toss/tds-mobile':
         specifier: ^2.5.0
         version: 2.5.0(@emotion/react@11.14.0(@types/react@18.3.31)(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -166,6 +163,9 @@ importers:
       react-router-dom:
         specifier: ^6.30.1
         version: 6.30.4(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      zod:
+        specifier: ^3.23.8
+        version: 3.25.76
       zustand:
         specifier: ^5.0.3
         version: 5.0.14(@types/react@18.3.31)(react@18.3.1)(use-sync-external-store@1.6.0(react@18.3.1))
@@ -9359,6 +9359,14 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  '@babel/plugin-proposal-class-properties@7.18.6(@babel/core@7.29.7)':
+    dependencies:
+      '@babel/core': 7.29.7
+      '@babel/helper-create-class-features-plugin': 7.29.7(@babel/core@7.29.7)
+      '@babel/helper-plugin-utils': 7.29.7
+    transitivePeerDependencies:
+      - supports-color
+
   '@babel/plugin-proposal-export-default-from@7.29.7(@babel/core@7.23.9)':
     dependencies:
       '@babel/core': 7.23.9
@@ -9380,6 +9388,12 @@ snapshots:
       '@babel/core': 7.28.5
       '@babel/helper-plugin-utils': 7.29.7
       '@babel/plugin-syntax-nullish-coalescing-operator': 7.8.3(@babel/core@7.28.5)
+
+  '@babel/plugin-proposal-nullish-coalescing-operator@7.18.6(@babel/core@7.29.7)':
+    dependencies:
+      '@babel/core': 7.29.7
+      '@babel/helper-plugin-utils': 7.29.7
+      '@babel/plugin-syntax-nullish-coalescing-operator': 7.8.3(@babel/core@7.29.7)
 
   '@babel/plugin-proposal-numeric-separator@7.18.6(@babel/core@7.23.9)':
     dependencies:
@@ -9438,6 +9452,15 @@ snapshots:
       '@babel/helper-plugin-utils': 7.29.7
       '@babel/helper-skip-transparent-expression-wrappers': 7.29.7
       '@babel/plugin-syntax-optional-chaining': 7.8.3(@babel/core@7.28.5)
+    transitivePeerDependencies:
+      - supports-color
+
+  '@babel/plugin-proposal-optional-chaining@7.21.0(@babel/core@7.29.7)':
+    dependencies:
+      '@babel/core': 7.29.7
+      '@babel/helper-plugin-utils': 7.29.7
+      '@babel/helper-skip-transparent-expression-wrappers': 7.29.7
+      '@babel/plugin-syntax-optional-chaining': 7.8.3(@babel/core@7.29.7)
     transitivePeerDependencies:
       - supports-color
 
@@ -9592,6 +9615,11 @@ snapshots:
       '@babel/core': 7.28.5
       '@babel/helper-plugin-utils': 7.29.7
 
+  '@babel/plugin-syntax-nullish-coalescing-operator@7.8.3(@babel/core@7.29.7)':
+    dependencies:
+      '@babel/core': 7.29.7
+      '@babel/helper-plugin-utils': 7.29.7
+
   '@babel/plugin-syntax-numeric-separator@7.10.4(@babel/core@7.23.9)':
     dependencies:
       '@babel/core': 7.23.9
@@ -9630,6 +9658,11 @@ snapshots:
   '@babel/plugin-syntax-optional-chaining@7.8.3(@babel/core@7.28.5)':
     dependencies:
       '@babel/core': 7.28.5
+      '@babel/helper-plugin-utils': 7.29.7
+
+  '@babel/plugin-syntax-optional-chaining@7.8.3(@babel/core@7.29.7)':
+    dependencies:
+      '@babel/core': 7.29.7
       '@babel/helper-plugin-utils': 7.29.7
 
   '@babel/plugin-syntax-private-property-in-object@7.14.5(@babel/core@7.23.9)':
@@ -9923,12 +9956,6 @@ snapshots:
       '@babel/core': 7.28.5
       '@babel/helper-plugin-utils': 7.29.7
       '@babel/plugin-syntax-flow': 7.29.7(@babel/core@7.28.5)
-
-  '@babel/plugin-transform-flow-strip-types@7.29.7(@babel/core@7.23.9)':
-    dependencies:
-      '@babel/core': 7.23.9
-      '@babel/helper-plugin-utils': 7.29.7
-      '@babel/plugin-syntax-flow': 7.29.7(@babel/core@7.23.9)
 
   '@babel/plugin-transform-flow-strip-types@7.29.7(@babel/core@7.29.7)':
     dependencies:
@@ -10685,13 +10712,6 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@babel/preset-flow@7.29.7(@babel/core@7.23.9)':
-    dependencies:
-      '@babel/core': 7.23.9
-      '@babel/helper-plugin-utils': 7.29.7
-      '@babel/helper-validator-option': 7.29.7
-      '@babel/plugin-transform-flow-strip-types': 7.29.7(@babel/core@7.23.9)
-
   '@babel/preset-flow@7.29.7(@babel/core@7.29.7)':
     dependencies:
       '@babel/core': 7.29.7
@@ -10736,17 +10756,6 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@babel/preset-typescript@7.29.7(@babel/core@7.23.9)':
-    dependencies:
-      '@babel/core': 7.23.9
-      '@babel/helper-plugin-utils': 7.29.7
-      '@babel/helper-validator-option': 7.29.7
-      '@babel/plugin-syntax-jsx': 7.29.7(@babel/core@7.23.9)
-      '@babel/plugin-transform-modules-commonjs': 7.29.7(@babel/core@7.23.9)
-      '@babel/plugin-transform-typescript': 7.29.7(@babel/core@7.23.9)
-    transitivePeerDependencies:
-      - supports-color
-
   '@babel/preset-typescript@7.29.7(@babel/core@7.29.7)':
     dependencies:
       '@babel/core': 7.29.7
@@ -10757,15 +10766,6 @@ snapshots:
       '@babel/plugin-transform-typescript': 7.29.7(@babel/core@7.29.7)
     transitivePeerDependencies:
       - supports-color
-
-  '@babel/register@7.29.7(@babel/core@7.23.9)':
-    dependencies:
-      '@babel/core': 7.23.9
-      clone-deep: 4.0.1
-      find-cache-dir: 2.1.0
-      make-dir: 2.1.0
-      pirates: 4.0.7
-      source-map-support: 0.5.21
 
   '@babel/register@7.29.7(@babel/core@7.29.7)':
     dependencies:
@@ -14008,9 +14008,9 @@ snapshots:
 
   b4a@1.8.1: {}
 
-  babel-core@7.0.0-bridge.0(@babel/core@7.23.9):
+  babel-core@7.0.0-bridge.0(@babel/core@7.29.7):
     dependencies:
-      '@babel/core': 7.23.9
+      '@babel/core': 7.29.7
 
   babel-jest@29.7.0(@babel/core@7.23.9):
     dependencies:
@@ -16059,7 +16059,7 @@ snapshots:
 
   istanbul-lib-instrument@5.2.1:
     dependencies:
-      '@babel/core': 7.23.9
+      '@babel/core': 7.29.7
       '@babel/parser': 7.29.7
       '@istanbuljs/schema': 0.1.6
       istanbul-lib-coverage: 3.2.2
@@ -16069,7 +16069,7 @@ snapshots:
 
   istanbul-lib-instrument@6.0.3:
     dependencies:
-      '@babel/core': 7.23.9
+      '@babel/core': 7.29.7
       '@babel/parser': 7.29.7
       '@istanbuljs/schema': 0.1.6
       istanbul-lib-coverage: 3.2.2
@@ -16491,19 +16491,19 @@ snapshots:
 
   jscodeshift@0.14.0(@babel/preset-env@7.28.5(@babel/core@7.23.9)):
     dependencies:
-      '@babel/core': 7.23.9
+      '@babel/core': 7.29.7
       '@babel/parser': 7.29.7
-      '@babel/plugin-proposal-class-properties': 7.18.6(@babel/core@7.23.9)
-      '@babel/plugin-proposal-nullish-coalescing-operator': 7.18.6(@babel/core@7.23.9)
-      '@babel/plugin-proposal-optional-chaining': 7.21.0(@babel/core@7.23.9)
-      '@babel/plugin-transform-modules-commonjs': 7.29.7(@babel/core@7.23.9)
+      '@babel/plugin-proposal-class-properties': 7.18.6(@babel/core@7.29.7)
+      '@babel/plugin-proposal-nullish-coalescing-operator': 7.18.6(@babel/core@7.29.7)
+      '@babel/plugin-proposal-optional-chaining': 7.21.0(@babel/core@7.29.7)
+      '@babel/plugin-transform-modules-commonjs': 7.29.7(@babel/core@7.29.7)
       '@babel/preset-env': 7.28.5(@babel/core@7.23.9)
-      '@babel/preset-flow': 7.29.7(@babel/core@7.23.9)
-      '@babel/preset-typescript': 7.29.7(@babel/core@7.23.9)
-      '@babel/register': 7.29.7(@babel/core@7.23.9)
-      babel-core: 7.0.0-bridge.0(@babel/core@7.23.9)
+      '@babel/preset-flow': 7.29.7(@babel/core@7.29.7)
+      '@babel/preset-typescript': 7.29.7(@babel/core@7.29.7)
+      '@babel/register': 7.29.7(@babel/core@7.29.7)
+      babel-core: 7.0.0-bridge.0(@babel/core@7.29.7)
       chalk: 4.1.2
-      flow-parser: 0.206.0
+      flow-parser: 0.318.0
       graceful-fs: 4.2.11
       micromatch: 4.0.8
       neo-async: 2.6.2
@@ -17228,7 +17228,7 @@ snapshots:
     dependencies:
       '@babel/core': 7.28.5
       '@babel/generator': 7.28.5
-      '@babel/parser': 7.28.5
+      '@babel/parser': 7.29.7
       '@babel/types': 7.28.5
       babel-preset-fbjs: 3.4.0(@babel/core@7.28.5)
       metro: 0.76.8
@@ -18076,7 +18076,7 @@ snapshots:
     dependencies:
       object-assign: 4.1.1
       react: 18.3.1
-      react-is: 16.13.1
+      react-is: 18.3.1
 
   react-stately@3.47.0(react@18.3.1):
     dependencies:

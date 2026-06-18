@@ -12,3 +12,5 @@ dist
 .vscode
 build
 .vercel
+.granite
+*.ait

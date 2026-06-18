@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@toss/tds-mobile';
-import { CreatePollSchema, type CreatePollInput, type PollResultsVisibility } from '@picky/shared';
+import { CreatePollSchema, type CreatePollInput, type PollResultsVisibility } from '../shared';
 import { usePollStore } from '../store/usePollStore';
 import { theme } from '../theme';
 

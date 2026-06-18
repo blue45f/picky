@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Top } from '@toss/tds-mobile';
-import type { Poll } from '@picky/shared';
+import type { Poll } from '../shared';
 import { usePollStore } from '../store/usePollStore';
 import { theme, pageShell } from '../theme';
 

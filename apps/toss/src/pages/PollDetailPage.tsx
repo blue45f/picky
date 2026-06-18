@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@toss/tds-mobile';
-import type { Poll } from '@picky/shared';
+import type { Poll } from '../shared';
 import { usePollStore } from '../store/usePollStore';
 import { useIdentity } from '../store/useIdentity';
 import { rememberRecentPoll } from '../lib/pollHistory';

@@ -1,4 +1,4 @@
-import type { Poll } from '@picky/shared';
+import type { Poll } from '../shared';
 
 const RECENT_POLL_HISTORY_KEY = 'picky_recent_poll_history_v1';
 const MAX_RECENT_POLLS = 8;

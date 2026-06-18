@@ -1,4 +1,4 @@
-import type { Poll } from '@picky/shared';
+import type { Poll } from '../shared';
 import { shareMessage } from './toss';
 
 const SHARE_PREFIX = '[픽플로우 투표] ';

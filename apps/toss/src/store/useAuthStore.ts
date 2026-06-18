@@ -5,7 +5,7 @@ import type {
   LoginInput,
   GuestRegisterInput,
   AuthResult,
-} from '@picky/shared';
+} from '../shared';
 import { parseApiPayload, requestApi } from '../lib/api';
 
 interface AuthState {
