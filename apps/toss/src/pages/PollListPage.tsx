@@ -26,6 +26,7 @@ function PollCard({ poll, onClick }: { poll: Poll; onClick: () => void }) {
   return (
     <button
       type="button"
+      className="pressable"
       onClick={onClick}
       style={{
         display: 'block',

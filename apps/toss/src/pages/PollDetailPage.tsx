@@ -115,6 +115,7 @@ export function PollDetailPage() {
       >
         <button
           type="button"
+          className="pressable"
           aria-label="뒤로"
           onClick={() => navigate('/')}
           style={{ background: 'none', border: 'none', color: theme.text, fontSize: 22 }}

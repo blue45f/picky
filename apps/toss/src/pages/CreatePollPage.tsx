@@ -83,6 +83,7 @@ export function CreatePollPage() {
       >
         <button
           type="button"
+          className="pressable"
           aria-label="뒤로"
           onClick={() => navigate(-1)}
           style={{
@@ -136,6 +137,7 @@ export function CreatePollPage() {
             {options.length > MIN_OPTIONS ? (
               <button
                 type="button"
+                className="pressable"
                 aria-label={`선택지 ${index + 1} 삭제`}
                 onClick={() => removeOption(index)}
                 style={{
@@ -156,6 +158,7 @@ export function CreatePollPage() {
         {options.length < MAX_OPTIONS ? (
           <button
             type="button"
+            className="pressable"
             onClick={addOption}
             style={{
               width: '100%',
