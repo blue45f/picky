@@ -2843,10 +2843,12 @@ export const CreatePoll: React.FC = () => {
                       <Trash2
                         size={15}
                         style={{ transition: 'color 0.2s' }}
-                        onMouseEnter={(e) =>
+                        onMouseEnter={(e: React.MouseEvent<SVGSVGElement>) =>
                           (e.currentTarget.style.color = 'var(--brand-accent-coral)')
                         }
-                        onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
+                        onMouseLeave={(e: React.MouseEvent<SVGSVGElement>) =>
+                          (e.currentTarget.style.color = 'var(--text-muted)')
+                        }
                       />
                     </button>
                   ) : null}

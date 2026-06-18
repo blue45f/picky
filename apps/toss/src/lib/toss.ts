@@ -4,10 +4,13 @@
  */
 import {
   appLogin,
+  generateHapticFeedback,
   getAnonymousKey,
   getOperationalEnvironment,
   getSchemeUri,
+  requestReview,
   share,
+  type HapticFeedbackType,
 } from '@apps-in-toss/web-framework';
 
 export type TossEnv = 'toss' | 'sandbox' | 'web';
@@ -52,6 +55,42 @@ export async function tossAppLogin(): Promise<{
     return result ?? null;
   } catch {
     return null;
+  }
+}
+
+export type { HapticFeedbackType };
+
+/**
+ * 네이티브 햅틱 진동. 토스 밖(브라우저/개발)에서는 조용히 무시돼요.
+ * 선택/투표/성공/오류 등 인터랙션 피드백에 사용해요.
+ */
+export function hapticFeedback(type: HapticFeedbackType): void {
+  if (!isInToss()) {
+    return;
+  }
+  try {
+    void generateHapticFeedback({ type });
+  } catch {
+    // 미지원 디바이스/환경은 조용히 무시
+  }
+}
+
+/**
+ * 토스 네이티브 미니앱 리뷰 요청 시트. 지원·토스 환경에서만 동작.
+ * @returns 요청을 띄웠는지 여부
+ */
+export async function requestAppReview(): Promise<boolean> {
+  if (!isInToss()) {
+    return false;
+  }
+  try {
+    if (typeof requestReview.isSupported === 'function' && !requestReview.isSupported()) {
+      return false;
+    }
+    await requestReview();
+    return true;
+  } catch {
+    return false;
   }
 }
 

@@ -1,5 +1,5 @@
-// 이 파일은 packages/shared/src/index.ts 의 복사본이에요(앱인토스 ait 번들이
-// workspace:* 패키지를 처리하지 못해 벤더링). 원본 변경 시 함께 갱신하세요.
+// 이 파일은 packages/shared/src/index.ts 의 복사본이에요(앱인토스 .ait 번들이
+// workspace:* 패키지를 처리하지 못해 벤더링). 원본 변경 시 `pnpm sync:toss-shared` 로 갱신하세요.
 import { z } from 'zod';
 
 export const PollResultsVisibilitySchema = z.enum(['afterVote', 'always']);
