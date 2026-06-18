@@ -1,16 +1,23 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "NodeNext",
-    "moduleResolution": "nodenext",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
     "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "noUncheckedIndexedAccess": true,
     "declaration": true,
-    "outDir": "./dist",
+    "noEmit": true,
     "rootDir": "./src",
+    "lib": ["ES2022"],
     "types": ["node"],
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "ignoreDeprecations": "6.0"
   },
   "include": ["src/**/*"]
 }

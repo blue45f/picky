@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Check, Copy, MessageCircle, Sparkles, Tags, TrendingUp } from 'lucide-react';
-import { Poll } from '@picky/shared';
+import type { Poll } from '@picky/shared';
 import { copyText } from '../lib/pollShare';
 
 type KeywordStat = {

@@ -523,42 +523,70 @@ var require_auth_service = __commonJS({
   }
 });
 
-// packages/shared/dist/index.js
+// packages/shared/dist/index.cjs
 var require_dist = __commonJS({
-  "packages/shared/dist/index.js"(exports2) {
+  "packages/shared/dist/index.cjs"(exports2, module2) {
     "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.GuestRegisterSchema = exports2.LoginSchema = exports2.RegisterSchema = exports2.VoteSchema = exports2.CreatePollSchema = exports2.PollAttachmentSchema = exports2.PollResultsVisibilitySchema = void 0;
-    var zod_1 = require("zod");
-    exports2.PollResultsVisibilitySchema = zod_1.z.enum(["afterVote", "always"]);
-    exports2.PollAttachmentSchema = zod_1.z.object({
-      name: zod_1.z.string().min(1, "\uCCA8\uBD80\uD30C\uC77C \uC774\uB984\uC740 \uD544\uC218\uC785\uB2C8\uB2E4.").max(120, "\uCCA8\uBD80\uD30C\uC77C \uC774\uB984\uC740 120\uC790 \uC774\uD558\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4."),
-      type: zod_1.z.string().max(80, "\uCCA8\uBD80\uD30C\uC77C \uD615\uC2DD\uC740 80\uC790 \uC774\uD558\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4."),
-      size: zod_1.z.number().int().min(1, "\uCCA8\uBD80\uD30C\uC77C \uD06C\uAE30\uAC00 \uC62C\uBC14\uB974\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.").max(3e5, "\uCCA8\uBD80\uD30C\uC77C\uC740 300KB \uC774\uD558\uB9CC \uB4F1\uB85D\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4."),
-      dataUrl: zod_1.z.string().max(42e4, "\uCCA8\uBD80\uD30C\uC77C \uB370\uC774\uD130\uB294 \uD30C\uC77C\uB2F9 420KB \uC774\uD558\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4.")
+    var __defProp = Object.defineProperty;
+    var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+    var __getOwnPropNames2 = Object.getOwnPropertyNames;
+    var __hasOwnProp = Object.prototype.hasOwnProperty;
+    var __export = (target, all) => {
+      for (var name in all)
+        __defProp(target, name, { get: all[name], enumerable: true });
+    };
+    var __copyProps = (to, from, except, desc) => {
+      if (from && typeof from === "object" || typeof from === "function") {
+        for (let key of __getOwnPropNames2(from))
+          if (!__hasOwnProp.call(to, key) && key !== except)
+            __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+      }
+      return to;
+    };
+    var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+    var index_exports = {};
+    __export(index_exports, {
+      CreatePollSchema: () => CreatePollSchema,
+      GuestRegisterSchema: () => GuestRegisterSchema,
+      LoginSchema: () => LoginSchema,
+      PollAttachmentSchema: () => PollAttachmentSchema,
+      PollResultsVisibilitySchema: () => PollResultsVisibilitySchema,
+      RegisterSchema: () => RegisterSchema,
+      VoteSchema: () => VoteSchema
     });
-    exports2.CreatePollSchema = zod_1.z.object({
-      question: zod_1.z.string().min(2, "\uC9C8\uBB38\uC740 \uCD5C\uC18C 2\uAE00\uC790 \uC774\uC0C1\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4.").max(100, "\uC9C8\uBB38\uC740 \uCD5C\uB300 100\uAE00\uC790 \uC774\uD558\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4."),
-      description: zod_1.z.string().max(500, "\uC124\uBA85\uC740 \uCD5C\uB300 500\uAE00\uC790 \uC774\uD558\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4.").optional().nullable(),
-      endsAt: zod_1.z.string().datetime("\uB9C8\uAC10 \uC2DC\uAC04 \uD615\uC2DD\uC774 \uC62C\uBC14\uB974\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.").optional().nullable(),
-      resultsVisibility: exports2.PollResultsVisibilitySchema.optional().nullable(),
-      options: zod_1.z.array(zod_1.z.object({
-        text: zod_1.z.string().min(1, "\uC120\uD0DD\uC9C0\uB294 \uBE48 \uCE78\uC77C \uC218 \uC5C6\uC2B5\uB2C8\uB2E4."),
-        imageUrl: zod_1.z.string().max(16e4, "\uC774\uBBF8\uC9C0 \uB370\uC774\uD130\uB294 \uC120\uD0DD\uC9C0\uB2F9 160KB \uC774\uD558\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4.").optional().nullable()
-      })).min(2, "\uCD5C\uC18C 2\uAC1C \uC774\uC0C1\uC758 \uC120\uD0DD\uC9C0\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4.").max(10, "\uCD5C\uB300 10\uAC1C\uAE4C\uC9C0\uC758 \uC120\uD0DD\uC9C0\uB9CC \uB4F1\uB85D \uAC00\uB2A5\uD569\uB2C8\uB2E4."),
-      attachments: zod_1.z.array(exports2.PollAttachmentSchema).max(3, "\uCCA8\uBD80\uD30C\uC77C\uC740 \uCD5C\uB300 3\uAC1C\uAE4C\uC9C0 \uB4F1\uB85D \uAC00\uB2A5\uD569\uB2C8\uB2E4.").optional().nullable(),
-      categoryId: zod_1.z.string().optional().nullable()
+    module2.exports = __toCommonJS(index_exports);
+    var import_zod = require("zod");
+    var PollResultsVisibilitySchema = import_zod.z.enum(["afterVote", "always"]);
+    var PollAttachmentSchema = import_zod.z.object({
+      name: import_zod.z.string().min(1, "\uCCA8\uBD80\uD30C\uC77C \uC774\uB984\uC740 \uD544\uC218\uC785\uB2C8\uB2E4.").max(120, "\uCCA8\uBD80\uD30C\uC77C \uC774\uB984\uC740 120\uC790 \uC774\uD558\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4."),
+      type: import_zod.z.string().max(80, "\uCCA8\uBD80\uD30C\uC77C \uD615\uC2DD\uC740 80\uC790 \uC774\uD558\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4."),
+      size: import_zod.z.number().int().min(1, "\uCCA8\uBD80\uD30C\uC77C \uD06C\uAE30\uAC00 \uC62C\uBC14\uB974\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.").max(3e5, "\uCCA8\uBD80\uD30C\uC77C\uC740 300KB \uC774\uD558\uB9CC \uB4F1\uB85D\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4."),
+      dataUrl: import_zod.z.string().max(42e4, "\uCCA8\uBD80\uD30C\uC77C \uB370\uC774\uD130\uB294 \uD30C\uC77C\uB2F9 420KB \uC774\uD558\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4.")
     });
-    exports2.VoteSchema = zod_1.z.object({
-      optionId: zod_1.z.number({ required_error: "\uC120\uD0DD\uD560 \uC635\uC158 ID\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4." }),
-      voterName: zod_1.z.string().max(20, "\uD22C\uD45C\uC790 \uB2C9\uB124\uC784\uC740 \uCD5C\uB300 20\uC790 \uC774\uD558\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4.").optional().nullable(),
-      comment: zod_1.z.string().max(100, "\uC758\uACAC\uC740 \uCD5C\uB300 100\uC790 \uC774\uD558\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4.").optional().nullable()
+    var CreatePollSchema = import_zod.z.object({
+      question: import_zod.z.string().min(2, "\uC9C8\uBB38\uC740 \uCD5C\uC18C 2\uAE00\uC790 \uC774\uC0C1\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4.").max(100, "\uC9C8\uBB38\uC740 \uCD5C\uB300 100\uAE00\uC790 \uC774\uD558\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4."),
+      description: import_zod.z.string().max(500, "\uC124\uBA85\uC740 \uCD5C\uB300 500\uAE00\uC790 \uC774\uD558\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4.").optional().nullable(),
+      endsAt: import_zod.z.string().datetime("\uB9C8\uAC10 \uC2DC\uAC04 \uD615\uC2DD\uC774 \uC62C\uBC14\uB974\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.").optional().nullable(),
+      resultsVisibility: PollResultsVisibilitySchema.optional().nullable(),
+      options: import_zod.z.array(
+        import_zod.z.object({
+          text: import_zod.z.string().min(1, "\uC120\uD0DD\uC9C0\uB294 \uBE48 \uCE78\uC77C \uC218 \uC5C6\uC2B5\uB2C8\uB2E4."),
+          imageUrl: import_zod.z.string().max(16e4, "\uC774\uBBF8\uC9C0 \uB370\uC774\uD130\uB294 \uC120\uD0DD\uC9C0\uB2F9 160KB \uC774\uD558\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4.").optional().nullable()
+        })
+      ).min(2, "\uCD5C\uC18C 2\uAC1C \uC774\uC0C1\uC758 \uC120\uD0DD\uC9C0\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4.").max(10, "\uCD5C\uB300 10\uAC1C\uAE4C\uC9C0\uC758 \uC120\uD0DD\uC9C0\uB9CC \uB4F1\uB85D \uAC00\uB2A5\uD569\uB2C8\uB2E4."),
+      attachments: import_zod.z.array(PollAttachmentSchema).max(3, "\uCCA8\uBD80\uD30C\uC77C\uC740 \uCD5C\uB300 3\uAC1C\uAE4C\uC9C0 \uB4F1\uB85D \uAC00\uB2A5\uD569\uB2C8\uB2E4.").optional().nullable(),
+      categoryId: import_zod.z.string().optional().nullable()
     });
-    exports2.RegisterSchema = zod_1.z.object({
-      email: zod_1.z.string({ required_error: "\uC774\uBA54\uC77C\uC740 \uD544\uC218\uC785\uB2C8\uB2E4." }).trim().email("\uC62C\uBC14\uB978 \uC774\uBA54\uC77C \uD615\uC2DD\uC774 \uC544\uB2D9\uB2C8\uB2E4."),
-      password: zod_1.z.string({ required_error: "\uBE44\uBC00\uBC88\uD638\uB294 \uD544\uC218\uC785\uB2C8\uB2E4." }).min(6, "\uBE44\uBC00\uBC88\uD638\uB294 \uCD5C\uC18C 6\uC790 \uC774\uC0C1\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4."),
-      nickname: zod_1.z.string().trim().min(2, "\uB2C9\uB124\uC784\uC740 \uCD5C\uC18C 2\uC790 \uC774\uC0C1\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4.").max(20, "\uB2C9\uB124\uC784\uC740 \uCD5C\uB300 20\uC790 \uC774\uD558\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4.").optional(),
-      name: zod_1.z.string().trim().min(2, "\uB2C9\uB124\uC784\uC740 \uCD5C\uC18C 2\uC790 \uC774\uC0C1\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4.").max(20, "\uB2C9\uB124\uC784\uC740 \uCD5C\uB300 20\uC790 \uC774\uD558\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4.").optional()
+    var VoteSchema = import_zod.z.object({
+      optionId: import_zod.z.number({ required_error: "\uC120\uD0DD\uD560 \uC635\uC158 ID\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4." }),
+      voterName: import_zod.z.string().max(20, "\uD22C\uD45C\uC790 \uB2C9\uB124\uC784\uC740 \uCD5C\uB300 20\uC790 \uC774\uD558\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4.").optional().nullable(),
+      comment: import_zod.z.string().max(100, "\uC758\uACAC\uC740 \uCD5C\uB300 100\uC790 \uC774\uD558\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4.").optional().nullable()
+    });
+    var RegisterSchema = import_zod.z.object({
+      email: import_zod.z.string({ required_error: "\uC774\uBA54\uC77C\uC740 \uD544\uC218\uC785\uB2C8\uB2E4." }).trim().email("\uC62C\uBC14\uB978 \uC774\uBA54\uC77C \uD615\uC2DD\uC774 \uC544\uB2D9\uB2C8\uB2E4."),
+      password: import_zod.z.string({ required_error: "\uBE44\uBC00\uBC88\uD638\uB294 \uD544\uC218\uC785\uB2C8\uB2E4." }).min(6, "\uBE44\uBC00\uBC88\uD638\uB294 \uCD5C\uC18C 6\uC790 \uC774\uC0C1\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4."),
+      nickname: import_zod.z.string().trim().min(2, "\uB2C9\uB124\uC784\uC740 \uCD5C\uC18C 2\uC790 \uC774\uC0C1\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4.").max(20, "\uB2C9\uB124\uC784\uC740 \uCD5C\uB300 20\uC790 \uC774\uD558\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4.").optional(),
+      name: import_zod.z.string().trim().min(2, "\uB2C9\uB124\uC784\uC740 \uCD5C\uC18C 2\uC790 \uC774\uC0C1\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4.").max(20, "\uB2C9\uB124\uC784\uC740 \uCD5C\uB300 20\uC790 \uC774\uD558\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4.").optional()
     }).superRefine((value, ctx) => {
       const resolved = value.nickname ?? value.name;
       if (!resolved || !resolved.trim()) {
@@ -573,12 +601,12 @@ var require_dist = __commonJS({
       password,
       nickname: (nickname ?? name ?? "").trim()
     }));
-    exports2.LoginSchema = zod_1.z.object({
-      email: zod_1.z.string({ required_error: "\uC774\uBA54\uC77C\uC740 \uD544\uC218\uC785\uB2C8\uB2E4." }).trim().email("\uC62C\uBC14\uB978 \uC774\uBA54\uC77C \uD615\uC2DD\uC774 \uC544\uB2D9\uB2C8\uB2E4."),
-      password: zod_1.z.string({ required_error: "\uBE44\uBC00\uBC88\uD638\uB294 \uD544\uC218\uC785\uB2C8\uB2E4." }).min(6, "\uBE44\uBC00\uBC88\uD638\uB294 \uCD5C\uC18C 6\uC790 \uC774\uC0C1\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4.")
+    var LoginSchema = import_zod.z.object({
+      email: import_zod.z.string({ required_error: "\uC774\uBA54\uC77C\uC740 \uD544\uC218\uC785\uB2C8\uB2E4." }).trim().email("\uC62C\uBC14\uB978 \uC774\uBA54\uC77C \uD615\uC2DD\uC774 \uC544\uB2D9\uB2C8\uB2E4."),
+      password: import_zod.z.string({ required_error: "\uBE44\uBC00\uBC88\uD638\uB294 \uD544\uC218\uC785\uB2C8\uB2E4." }).min(6, "\uBE44\uBC00\uBC88\uD638\uB294 \uCD5C\uC18C 6\uC790 \uC774\uC0C1\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4.")
     });
-    exports2.GuestRegisterSchema = zod_1.z.object({
-      nickname: zod_1.z.string({ required_error: "\uB2C9\uB124\uC784\uC740 \uD544\uC218\uC785\uB2C8\uB2E4." }).trim().min(2, "\uB2C9\uB124\uC784\uC740 \uCD5C\uC18C 2\uC790 \uC774\uC0C1\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4.").max(20, "\uB2C9\uB124\uC784\uC740 \uCD5C\uB300 20\uC790 \uC774\uD558\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4.")
+    var GuestRegisterSchema = import_zod.z.object({
+      nickname: import_zod.z.string({ required_error: "\uB2C9\uB124\uC784\uC740 \uD544\uC218\uC785\uB2C8\uB2E4." }).trim().min(2, "\uB2C9\uB124\uC784\uC740 \uCD5C\uC18C 2\uC790 \uC774\uC0C1\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4.").max(20, "\uB2C9\uB124\uC784\uC740 \uCD5C\uB300 20\uC790 \uC774\uD558\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4.")
     });
   }
 });
@@ -1109,8 +1137,8 @@ var require_poll_controller = __commonJS({
         return this.pollService.vote(id, dto);
       }
       getRequestOrigin(req) {
-        const proto = String(req.headers["x-forwarded-proto"] || req.protocol || "https").split(",")[0].trim();
-        const host = String(req.headers["x-forwarded-host"] || req.headers.host || "localhost:5173").split(",")[0].trim();
+        const proto = (String(req.headers["x-forwarded-proto"] || req.protocol || "https").split(",")[0] ?? "").trim();
+        const host = (String(req.headers["x-forwarded-host"] || req.headers.host || "localhost:5173").split(",")[0] ?? "").trim();
         return `${proto}://${host}`;
       }
       getPublicAppOrigin(req) {
@@ -1169,7 +1197,7 @@ var require_poll_controller = __commonJS({
         return defaultImage;
       }
       resolveImageMimeType(value) {
-        const pathname = value.split("?")[0].toLowerCase();
+        const pathname = (value.split("?")[0] ?? "").toLowerCase();
         if (pathname.endsWith(".png")) {
           return "image/png";
         }
@@ -1183,15 +1211,15 @@ var require_poll_controller = __commonJS({
         if (!match) {
           return null;
         }
-        return match[1] === "image/jpg" ? "image/jpeg" : match[1];
+        return match[1] === "image/jpg" ? "image/jpeg" : match[1] ?? null;
       }
       parseDataImage(value) {
         const match = value.match(/^data:(image\/(?:png|jpe?g|webp));base64,([A-Za-z0-9+/=]+)$/);
         if (!match) {
           return null;
         }
-        const mimeType = match[1] === "image/jpg" ? "image/jpeg" : match[1];
-        const buffer = Buffer.from(match[2], "base64");
+        const mimeType = match[1] === "image/jpg" ? "image/jpeg" : match[1] ?? "image/jpeg";
+        const buffer = Buffer.from(match[2] ?? "", "base64");
         if (!buffer.length) {
           return null;
         }

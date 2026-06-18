@@ -39,7 +39,7 @@ import { LiveFacilitationConsole } from '../components/LiveFacilitationConsole';
 import { OpinionTopicCloud } from '../components/OpinionTopicCloud';
 import { ActionItemPlanner } from '../components/ActionItemPlanner';
 import { StakeholderReportBuilder } from '../components/StakeholderReportBuilder';
-import { Poll, PollResultsVisibility } from '@picky/shared';
+import type { Poll, PollResultsVisibility } from '@picky/shared';
 import {
   resolvePollShareUrl,
   buildPollEmbedCode,

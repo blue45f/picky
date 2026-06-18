@@ -10,7 +10,7 @@ import {
   ShieldCheck,
   Users,
 } from 'lucide-react';
-import { Poll } from '@picky/shared';
+import type { Poll } from '@picky/shared';
 import { copyText } from '../lib/pollShare';
 
 type ReportAudience = 'decision' | 'participants' | 'retrospective';
@@ -27,7 +27,7 @@ type ReportAudienceConfig = {
   description: string;
 };
 
-const REPORT_AUDIENCES: ReportAudienceConfig[] = [
+const REPORT_AUDIENCES: [ReportAudienceConfig, ...ReportAudienceConfig[]] = [
   {
     id: 'decision',
     label: '의사결정권자',

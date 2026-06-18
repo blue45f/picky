@@ -1,4 +1,4 @@
-import { Poll } from '@picky/shared';
+import type { Poll } from '@picky/shared';
 
 const SHARE_PREFIX = '[픽플로우 투표] ';
 const DEFAULT_SHARE_TITLE = 'pickflow - 고민 투표 공유 플랫폼';
@@ -127,12 +127,14 @@ const setMetaContent = (selector: string, content: string) => {
   let element = document.head.querySelector<HTMLMetaElement>(selector);
   if (!element) {
     const match = selector.match(/^meta\[(name|property)="([^"]+)"\]$/);
-    if (!match) {
+    const attributeName = match?.[1];
+    const attributeValue = match?.[2];
+    if (!attributeName || attributeValue === undefined) {
       return;
     }
 
     element = document.createElement('meta');
-    element.setAttribute(match[1], match[2]);
+    element.setAttribute(attributeName, attributeValue);
     document.head.appendChild(element);
   }
 

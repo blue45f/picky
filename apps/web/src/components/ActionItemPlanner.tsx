@@ -10,7 +10,7 @@ import {
   Target,
   UserRound,
 } from 'lucide-react';
-import { Poll } from '@picky/shared';
+import type { Poll } from '@picky/shared';
 import { copyText } from '../lib/pollShare';
 
 type ActionItemPlannerProps = {

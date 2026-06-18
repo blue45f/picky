@@ -121,14 +121,20 @@ const addErrorCorrection = (dataCodewords: number[]) => {
 
   for (let i = 0; i < maxDataLength; i += 1) {
     blocks.forEach((block) => {
-      if (i < block.data.length) {
-        result.push(block.data[i]);
+      const value = block.data[i];
+      if (value !== undefined) {
+        result.push(value);
       }
     });
   }
 
   for (let i = 0; i < QR_ECC_CODEWORDS_PER_BLOCK; i += 1) {
-    blocks.forEach((block) => result.push(block.ecc[i]));
+    blocks.forEach((block) => {
+      const value = block.ecc[i];
+      if (value !== undefined) {
+        result.push(value);
+      }
+    });
   }
 
   return result;
@@ -144,8 +150,14 @@ const setFunctionModule = (matrix: QrMatrix, x: number, y: number, isBlack: bool
     return;
   }
 
-  matrix.modules[y][x] = isBlack;
-  matrix.isFunction[y][x] = true;
+  const moduleRow = matrix.modules[y];
+  const functionRow = matrix.isFunction[y];
+  if (!moduleRow || !functionRow) {
+    return;
+  }
+
+  moduleRow[x] = isBlack;
+  functionRow[x] = true;
 };
 
 const drawFinderPattern = (matrix: QrMatrix, centerX: number, centerY: number) => {
@@ -239,10 +251,10 @@ const drawFunctionPatterns = (matrix: QrMatrix) => {
   drawFinderPattern(matrix, 3, QR_SIZE - 4);
 
   for (let i = 0; i < QR_SIZE; i += 1) {
-    if (!matrix.isFunction[6][i]) {
+    if (!matrix.isFunction[6]?.[i]) {
       setFunctionModule(matrix, i, 6, i % 2 === 0);
     }
-    if (!matrix.isFunction[i][6]) {
+    if (!matrix.isFunction[i]?.[6]) {
       setFunctionModule(matrix, 6, i, i % 2 === 0);
     }
   }
@@ -279,10 +291,15 @@ const drawCodewords = (matrix: QrMatrix, codewords: number[]) => {
     for (let vertical = 0; vertical < QR_SIZE; vertical += 1) {
       const upward = ((right + 1) & 2) === 0;
       const y = upward ? QR_SIZE - 1 - vertical : vertical;
+      const moduleRow = matrix.modules[y];
+      const functionRow = matrix.isFunction[y];
+      if (!moduleRow || !functionRow) {
+        continue;
+      }
 
       for (let column = 0; column < 2; column += 1) {
         const x = right - column;
-        if (matrix.isFunction[y][x]) {
+        if (functionRow[x]) {
           continue;
         }
 
@@ -291,7 +308,7 @@ const drawCodewords = (matrix: QrMatrix, codewords: number[]) => {
         if (shouldMask(x, y)) {
           isBlack = !isBlack;
         }
-        matrix.modules[y][x] = isBlack;
+        moduleRow[x] = isBlack;
         bitIndex += 1;
       }
     }

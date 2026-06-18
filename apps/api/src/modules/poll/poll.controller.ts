@@ -222,12 +222,14 @@ export class PollController {
   }
 
   private getRequestOrigin(req: any): string {
-    const proto = String(req.headers['x-forwarded-proto'] || req.protocol || 'https')
-      .split(',')[0]
-      .trim();
-    const host = String(req.headers['x-forwarded-host'] || req.headers.host || 'localhost:5173')
-      .split(',')[0]
-      .trim();
+    const proto = (
+      String(req.headers['x-forwarded-proto'] || req.protocol || 'https').split(',')[0] ?? ''
+    ).trim();
+    const host = (
+      String(req.headers['x-forwarded-host'] || req.headers.host || 'localhost:5173').split(
+        ',',
+      )[0] ?? ''
+    ).trim();
     return `${proto}://${host}`;
   }
 
@@ -314,7 +316,7 @@ export class PollController {
   }
 
   private resolveImageMimeType(value: string): string {
-    const pathname = value.split('?')[0].toLowerCase();
+    const pathname = (value.split('?')[0] ?? '').toLowerCase();
     if (pathname.endsWith('.png')) {
       return 'image/png';
     }
@@ -330,7 +332,7 @@ export class PollController {
       return null;
     }
 
-    return match[1] === 'image/jpg' ? 'image/jpeg' : match[1];
+    return match[1] === 'image/jpg' ? 'image/jpeg' : (match[1] ?? null);
   }
 
   private parseDataImage(value: string): { mimeType: string; buffer: Buffer } | null {
@@ -339,8 +341,8 @@ export class PollController {
       return null;
     }
 
-    const mimeType = match[1] === 'image/jpg' ? 'image/jpeg' : match[1];
-    const buffer = Buffer.from(match[2], 'base64');
+    const mimeType = match[1] === 'image/jpg' ? 'image/jpeg' : (match[1] ?? 'image/jpeg');
+    const buffer = Buffer.from(match[2] ?? '', 'base64');
     if (!buffer.length) {
       return null;
     }

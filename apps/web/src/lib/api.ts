@@ -247,6 +247,9 @@ export const requestApi = async (path: string, init: RequestInit = {}): Promise<
 
   for (let i = 0; i < candidates.length; i += 1) {
     const base = candidates[i];
+    if (!base) {
+      continue;
+    }
     try {
       const res = await fetch(`${base}${path}`, init);
       const needRetry = shouldRetryOnFailure(res, i, candidates.length, base);

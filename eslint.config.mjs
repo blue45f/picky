@@ -36,4 +36,16 @@ export default ts.config(
       'no-empty': 'warn',
     },
   },
+  {
+    // verbatimModuleSyntax is enabled for apps/web + packages (NOT apps/api,
+    // whose NestJS DI relies on runtime type imports via emitDecoratorMetadata).
+    // Enforce type-only imports there so `eslint --fix` keeps them consistent.
+    files: ['apps/web/**/*.{ts,tsx}', 'packages/**/*.{ts,tsx}'],
+    rules: {
+      '@typescript-eslint/consistent-type-imports': [
+        'error',
+        { prefer: 'type-imports', fixStyle: 'separate-type-imports' },
+      ],
+    },
+  },
 );

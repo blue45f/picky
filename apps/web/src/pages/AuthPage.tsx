@@ -1,4 +1,5 @@
-import React, { FormEvent, useEffect, useMemo, useState } from 'react';
+import type { FormEvent } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, CircleHelp } from 'lucide-react';
 import { Mail, Lock, User, Play, Sparkles } from 'lucide-react';

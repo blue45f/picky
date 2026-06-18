@@ -950,8 +950,11 @@ export const CreatePoll: React.FC = () => {
   const publishReadyCount = publishReviewItems.filter((item) => item.ready).length;
 
   const applyPreset = (index: number) => {
-    setActivePresetIndex(index);
     const template = PRESET_TEMPLATES[index];
+    if (!template) {
+      return;
+    }
+    setActivePresetIndex(index);
     clearError();
     setFormError('');
     setQuestion(template.question);
@@ -1033,14 +1036,22 @@ export const CreatePoll: React.FC = () => {
   };
 
   const handleOptionTextChange = (index: number, text: string) => {
+    const current = options[index];
+    if (!current) {
+      return;
+    }
     const nextOptions = [...options];
-    nextOptions[index] = { ...nextOptions[index], text };
+    nextOptions[index] = { ...current, text };
     setOptions(nextOptions);
   };
 
   const handleOptionImageChange = (index: number, imageUrl: string) => {
+    const current = options[index];
+    if (!current) {
+      return;
+    }
     const nextOptions = [...options];
-    nextOptions[index] = { ...nextOptions[index], imageUrl };
+    nextOptions[index] = { ...current, imageUrl };
     setOptions(nextOptions);
   };
 
