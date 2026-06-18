@@ -11,6 +11,7 @@ import {
   Type,
   Wand2,
 } from 'lucide-react';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 const colorTokens = [
   {
@@ -197,6 +198,7 @@ const densityStyles: Record<DensityMode, DensityStyle> = {
 };
 
 export const DesignSystem: React.FC = () => {
+  useDocumentTitle('디자인 시스템');
   const [density, setDensity] = useState<DensityMode>('balanced');
   const [copyKey, setCopyKey] = useState<string>('');
   const [ctaMode, setCtaMode] = useState<'text' | 'loading'>('text');

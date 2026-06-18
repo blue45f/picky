@@ -11,6 +11,7 @@ import {
 } from 'react-router-dom';
 import { Heart } from 'lucide-react';
 import { Navbar } from './components/Navbar';
+import { RouteAnnouncer } from './components/layout/RouteAnnouncer';
 import { PollList } from './pages/PollList';
 import { CreatePoll } from './pages/CreatePoll';
 import { PollDetail } from './pages/PollDetail';
@@ -68,10 +69,14 @@ export const App: React.FC = () => {
           position: 'relative',
         }}
       >
+        <a href="#main-content" className="skip-link">
+          본문으로 건너뛰기
+        </a>
+        <RouteAnnouncer />
         <Navbar />
         <FallbackRouteBridge />
 
-        <main className="page-shell" style={{ flexGrow: 1 }}>
+        <main id="main-content" tabIndex={-1} className="page-shell" style={{ flexGrow: 1 }}>
           <Routes>
             <Route path="/" element={<PollList />} />
             <Route path="/create" element={<CreatePoll />} />

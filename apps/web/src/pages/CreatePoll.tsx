@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { usePollStore } from '../store/usePollStore';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { SnsPreviewCard } from '../components/SnsPreviewCard';
 import { ParticipantPreviewPanel } from '../components/ParticipantPreviewPanel';
 import { buildShareablePollSnapshot } from '../lib/pollShare';
@@ -468,6 +469,7 @@ const compressImageFile = async (file: File): Promise<string> => {
 };
 
 export const CreatePoll: React.FC = () => {
+  useDocumentTitle('새 고민 작성');
   const { createPoll, isLoading, error, clearError } = usePollStore();
   const navigate = useNavigate();
   const [cachedDraft, setCachedDraft] = useState<PollDraft | null>(() => loadDraftFromStorage());

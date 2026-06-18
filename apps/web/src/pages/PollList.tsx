@@ -29,6 +29,7 @@ import {
 import type { Poll } from '@picky/shared';
 import { usePollStore } from '../store/usePollStore';
 import { useAuthStore } from '../store/useAuthStore';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { buildPollEmbedCode, copyText, resolvePollShareUrl } from '../lib/pollShare';
 import {
   clearRecentPollHistory,
@@ -339,6 +340,7 @@ const signalOptions: { value: SignalMode; label: string }[] = [
 type ViewMode = 'stack' | 'compact';
 
 export const PollList: React.FC = () => {
+  useDocumentTitle('고민 둘러보기');
   const { polls, isLoading, fetchPolls, error, setCurrentPoll } = usePollStore();
   const userId = useAuthStore((state) => state.user?.id);
   const isGuest = useAuthStore((state) => state.user?.isGuest);

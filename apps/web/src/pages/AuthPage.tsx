@@ -5,6 +5,7 @@ import { Mail, Lock, User, Play, Sparkles } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import * as Tabs from '@radix-ui/react-tabs';
 import { useAuthStore } from '../store/useAuthStore';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 type AuthMode = 'login' | 'register' | 'guest';
 
@@ -27,6 +28,7 @@ export const AuthPage: React.FC = () => {
   const navigate = useNavigate();
   const { mode: modeParam } = useParams<{ mode: string }>();
   const mode = useMemo(() => resolveMode(modeParam), [modeParam]);
+  useDocumentTitle(MODE_LABELS[mode]);
   const [searchParams, setSearchParams] = useSearchParams();
   const nextPath = searchParams.get('next') || '/';
 
