@@ -10,7 +10,7 @@ import { hasVotedLocally } from '../lib/votes';
 import { hapticFeedback } from '../lib/toss';
 import { getRecentPollHistory, type RecentPollHistoryItem } from '../lib/pollHistory';
 import { Chip, ProgressBar, SegmentedControl, Skeleton } from '../components/ui';
-import { CountdownChip } from '../components/Countdown';
+import { CountdownChip, useCountdown } from '../components/Countdown';
 
 type StatusFilter = 'all' | 'open' | 'closed';
 type SortKey = 'recent' | 'popular' | 'closing';
@@ -29,7 +29,8 @@ const SORT_OPTIONS = [
 
 function PollCard({ poll, index, onClick }: { poll: Poll; index: number; onClick: () => void }) {
   const leading = leadingOption(poll);
-  const closed = isPollClosed(poll);
+  const remaining = useCountdown(poll.endsAt);
+  const closed = isPollClosed(poll) || (remaining != null && remaining <= 0);
   const voted = hasVotedLocally(poll.id);
   const percent = leading ? optionPercent(leading.voteCount, poll.totalVotes) : 0;
 
@@ -55,7 +56,7 @@ function PollCard({ poll, index, onClick }: { poll: Poll; index: number; onClick
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
         <Chip tone={closed ? 'muted' : 'accent'}>{closed ? '마감' : '진행중'}</Chip>
         {voted ? <Chip tone="gold">✓ 참여함</Chip> : null}
-        {!closed ? <CountdownChip endsAt={poll.endsAt} /> : null}
+        {!closed ? <CountdownChip remaining={remaining} /> : null}
         <span style={{ fontSize: 12, color: theme.textMuted, alignSelf: 'center' }}>
           {formatRelativeTime(poll.createdAt)}
         </span>
@@ -332,7 +333,7 @@ export function PollListPage() {
           />
         </div>
 
-        <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+        <div role="group" aria-label="정렬" style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
           {SORT_OPTIONS.map((option) => {
             const active = option.value === sortKey;
             return (

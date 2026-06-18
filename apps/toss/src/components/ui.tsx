@@ -206,7 +206,7 @@ export function AppBar({
           ←
         </button>
       ) : null}
-      <strong style={{ flex: 1, fontSize: 17, fontWeight: 800, minWidth: 0 }}>{title}</strong>
+      <h1 style={{ flex: 1, fontSize: 17, fontWeight: 800, minWidth: 0, margin: 0 }}>{title}</h1>
       {right ? <div style={{ flexShrink: 0 }}>{right}</div> : null}
     </header>
   );

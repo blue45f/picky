@@ -13,6 +13,8 @@ const MIN_OPTIONS = 2;
 const QUESTION_MAX = 100;
 const DESC_MAX = 500;
 const OPTION_MAX = 60;
+// 서버는 마감 시각이 현재보다 최소 1분 이후일 것을 요구해요.
+const DEADLINE_BUFFER_MS = 60_000;
 
 type DeadlinePreset = 'none' | '6h' | '1d' | '3d' | '1w' | 'custom';
 
@@ -70,6 +72,8 @@ export function CreatePollPage() {
   const [resultsVisibility, setResultsVisibility] = useState<PollResultsVisibility>('afterVote');
   const [deadlinePreset, setDeadlinePreset] = useState<DeadlinePreset>('none');
   const [customDeadline, setCustomDeadline] = useState('');
+  // 선택 시점에 마감 시각(ISO)을 확정해, 미리보기와 실제 저장값이 어긋나지 않게 해요.
+  const [endsAtIso, setEndsAtIso] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const minCustom = useMemo(() => toDateTimeLocalValue(new Date(Date.now() + 5 * 60_000)), []);
@@ -77,27 +81,35 @@ export function CreatePollPage() {
   const filledOptions = options.map((opt) => opt.trim()).filter((opt) => opt.length > 0);
   const canSubmit = question.trim().length >= 2 && filledOptions.length >= MIN_OPTIONS;
 
-  const resolveEndsAt = (): string | null | undefined => {
-    if (deadlinePreset === 'none') return null;
-    if (deadlinePreset === 'custom') {
-      return fromDateTimeLocalValue(customDeadline);
+  const selectDeadlinePreset = (value: DeadlinePreset) => {
+    setDeadlinePreset(value);
+    if (value === 'none') {
+      setEndsAtIso(null);
+    } else if (value === 'custom') {
+      setEndsAtIso(fromDateTimeLocalValue(customDeadline));
+    } else {
+      const preset = DEADLINE_PRESETS.find((item) => item.value === value);
+      setEndsAtIso(preset && preset.ms > 0 ? new Date(Date.now() + preset.ms).toISOString() : null);
     }
-    const preset = DEADLINE_PRESETS.find((item) => item.value === deadlinePreset);
-    if (!preset || preset.ms <= 0) return null;
-    return new Date(Date.now() + preset.ms).toISOString();
   };
 
+  const handleCustomDeadlineChange = (value: string) => {
+    setCustomDeadline(value);
+    setEndsAtIso(fromDateTimeLocalValue(value));
+  };
+
+  const isDeadlinePast =
+    endsAtIso != null && new Date(endsAtIso).getTime() <= Date.now() + DEADLINE_BUFFER_MS;
+
   const deadlinePreview = useMemo(() => {
-    if (deadlinePreset === 'none') return null;
-    const endsAt = resolveEndsAt();
-    if (!endsAt) return null;
-    return new Date(endsAt).toLocaleString('ko-KR', {
+    if (!endsAtIso) return null;
+    return new Date(endsAtIso).toLocaleString('ko-KR', {
       month: 'long',
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
     });
-  }, [deadlinePreset, customDeadline]);
+  }, [endsAtIso]);
 
   const updateOption = (index: number, value: string) => {
     setOptions((prev) => prev.map((opt, i) => (i === index ? value : opt)));
@@ -112,17 +124,24 @@ export function CreatePollPage() {
   const handleSubmit = async () => {
     setError(null);
 
-    if (deadlinePreset === 'custom' && !fromDateTimeLocalValue(customDeadline)) {
-      hapticFeedback('error');
-      setError('마감 시간을 선택하거나 "없음"으로 바꿔 주세요.');
-      return;
+    if (deadlinePreset !== 'none') {
+      if (!endsAtIso) {
+        hapticFeedback('error');
+        setError('마감 시간을 선택하거나 "없음"으로 바꿔 주세요.');
+        return;
+      }
+      if (new Date(endsAtIso).getTime() <= Date.now() + DEADLINE_BUFFER_MS) {
+        hapticFeedback('error');
+        setError('마감 시간은 현재보다 최소 1분 이후로 선택해 주세요.');
+        return;
+      }
     }
 
     const candidate = {
       question: question.trim(),
       description: description.trim() || null,
       resultsVisibility,
-      endsAt: resolveEndsAt(),
+      endsAt: endsAtIso,
       options: filledOptions.map((text) => ({ text })),
     };
 
@@ -185,7 +204,7 @@ export function CreatePollPage() {
         <div style={labelRowStyle}>
           <label style={labelStyle}>선택지 * (최소 2개)</label>
           <span style={counterStyle}>
-            {filledOptions.length}/{options.length}
+            {filledOptions.length} / 최소 {MIN_OPTIONS}개
           </span>
         </div>
         {options.map((opt, index) => (
@@ -241,7 +260,11 @@ export function CreatePollPage() {
 
         <div style={labelRowStyle}>
           <label style={labelStyle}>마감 시간</label>
-          {deadlinePreview ? <Chip tone="gold">~ {deadlinePreview}</Chip> : null}
+          {deadlinePreview ? (
+            <Chip tone={isDeadlinePast ? 'danger' : 'gold'}>
+              {isDeadlinePast ? '⚠ 지난 시각' : `~ ${deadlinePreview}`}
+            </Chip>
+          ) : null}
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {DEADLINE_PRESETS.map((preset) => {
@@ -252,7 +275,7 @@ export function CreatePollPage() {
                 type="button"
                 className="pressable"
                 aria-pressed={active}
-                onClick={() => setDeadlinePreset(preset.value)}
+                onClick={() => selectDeadlinePreset(preset.value)}
                 style={{
                   padding: '8px 14px',
                   borderRadius: theme.radiusPill,
@@ -274,7 +297,7 @@ export function CreatePollPage() {
             type="datetime-local"
             value={customDeadline}
             min={minCustom}
-            onChange={(e) => setCustomDeadline(e.target.value)}
+            onChange={(e) => handleCustomDeadlineChange(e.target.value)}
             style={{ ...fieldStyle, marginTop: 8, colorScheme: 'dark' }}
             aria-label="마감 시간 직접 선택"
           />

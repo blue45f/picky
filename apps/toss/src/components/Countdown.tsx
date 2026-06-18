@@ -1,8 +1,13 @@
 import { useEffect, useState } from 'react';
-import { formatCountdown, getRemainingMs, isDeadlineSoon } from '../lib/format';
+import { formatCountdown, getRemainingMs } from '../lib/format';
 import { Chip } from './ui';
 
-/** 마감까지 남은 ms를 1초마다 갱신. 마감 없음 → null. */
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * 마감까지 남은 ms를 1초마다 갱신. 마감 없음 → null.
+ * 부모가 이 값으로 `closed` 등 게이팅을 함께 파생하면 카운트다운과 상태가 lockstep으로 전환돼요.
+ */
 export function useCountdown(endsAt: string | null | undefined): number | null {
   const [remaining, setRemaining] = useState<number | null>(() => getRemainingMs(endsAt));
 
@@ -12,14 +17,9 @@ export function useCountdown(endsAt: string | null | undefined): number | null {
       return;
     }
 
-    const tick = () => {
+    const timer = window.setInterval(() => {
       const next = getRemainingMs(endsAt);
       setRemaining(next);
-      return next;
-    };
-
-    const timer = window.setInterval(() => {
-      const next = tick();
       if (next != null && next <= 0) {
         window.clearInterval(timer);
       }
@@ -31,15 +31,14 @@ export function useCountdown(endsAt: string | null | undefined): number | null {
   return remaining;
 }
 
-/** 마감 카운트다운 배지. 진행중 마감이 있을 때만 렌더. */
-export function CountdownChip({ endsAt }: { endsAt: string | null | undefined }) {
-  const remaining = useCountdown(endsAt);
-  if (remaining == null) {
+/**
+ * 마감 카운트다운 배지. 부모가 틱하는 `remaining`을 받아 표시만 해요(자체 타이머 없음).
+ * 마감 없음/경과 시 null을 반환하므로 '진행중/마감' 상태 배지와 모순되지 않아요.
+ */
+export function CountdownChip({ remaining }: { remaining: number | null }) {
+  if (remaining == null || remaining <= 0) {
     return null;
   }
-  if (remaining <= 0) {
-    return <Chip tone="muted">마감됨</Chip>;
-  }
-  const soon = isDeadlineSoon(endsAt);
+  const soon = remaining <= DAY_MS;
   return <Chip tone={soon ? 'gold' : 'muted'}>⏳ {formatCountdown(remaining)} 남음</Chip>;
 }

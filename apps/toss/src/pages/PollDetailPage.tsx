@@ -12,7 +12,7 @@ import { getVotedOptionId, rememberVote } from '../lib/votes';
 import { hapticFeedback, requestAppReview } from '../lib/toss';
 import { theme, stickyActionBar } from '../theme';
 import { Chip, ProgressBar } from '../components/ui';
-import { CountdownChip } from '../components/Countdown';
+import { CountdownChip, useCountdown } from '../components/Countdown';
 import { Toast, useToast } from '../components/Toast';
 
 const REVIEW_ASKED_KEY = 'pickflow_review_asked';
@@ -52,7 +52,9 @@ export function PollDetailPage() {
   }, [id]);
 
   const poll = currentPoll && currentPoll.id === id ? currentPoll : null;
-  const closed = isPollClosed(poll);
+  // 부모에서 카운트다운을 틱하게 해, 마감 순간 상태 배지·투표바·옵션 비활성이 함께 전환되도록 해요.
+  const remaining = useCountdown(poll?.endsAt);
+  const closed = isPollClosed(poll) || (remaining != null && remaining <= 0);
   const hasVoted = votedOptionId != null;
   const showResults = useMemo(
     () => hasVoted || closed || poll?.resultsVisibility === 'always',
@@ -166,7 +168,7 @@ export function PollDetailPage() {
           ←
         </button>
         <Chip tone={closed ? 'muted' : 'accent'}>{closed ? '마감된 투표' : '진행중'}</Chip>
-        {!closed ? <CountdownChip endsAt={poll.endsAt} /> : null}
+        {!closed ? <CountdownChip remaining={remaining} /> : null}
       </header>
 
       <div style={{ maxWidth: 520, margin: '0 auto', padding: '0 20px 140px' }}>
