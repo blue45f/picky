@@ -7,6 +7,7 @@ import type {
   AuthResult,
 } from '../shared';
 import { parseApiPayload, requestApi } from '../lib/api';
+import { tossAppLogin } from '../lib/toss';
 
 interface AuthState {
   user: UserProfile | null;
@@ -19,6 +20,10 @@ interface AuthState {
 
   register: (input: RegisterInput) => Promise<boolean>;
   login: (input: LoginInput) => Promise<boolean>;
+  /** 앱인토스 getAnonymousKey(hash) 기반 식별 로그인 (서버 mTLS 불필요). */
+  loginWithToss: (anonymousKey: string, nickname?: string | null) => Promise<boolean>;
+  /** 앱인토스 토스 로그인(appLogin) → 서버 mTLS 토큰 교환. 미설정 시 안내 메시지 반환. */
+  loginWithTossAccount: () => Promise<{ ok: boolean; message?: string }>;
   registerGuest: (input: GuestRegisterInput) => Promise<boolean>;
   logout: () => void;
   fetchMe: () => Promise<void>;
@@ -350,6 +355,47 @@ export const useAuthStore = create<AuthState>((set, get) => {
           validationErrors: {},
         });
         return false;
+      }
+    },
+
+    loginWithToss: async (anonymousKey, nickname) => {
+      try {
+        const res = await requestApi('/auth/toss', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ anonymousKey, nickname: nickname?.trim() || undefined }),
+        });
+        const data = (await parseApiPayload(res)) as AuthResult;
+        if (!res.ok || !isAuthResultPayload(data)) {
+          return false;
+        }
+        return commitAuthSuccess(set, data);
+      } catch {
+        return false;
+      }
+    },
+
+    loginWithTossAccount: async () => {
+      const result = await tossAppLogin();
+      if (!result) {
+        return { ok: false, message: '토스 로그인을 진행할 수 없어요.' };
+      }
+      try {
+        const res = await requestApi('/auth/toss/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(result),
+        });
+        const data = (await parseApiPayload(res)) as AuthResult;
+        if (!res.ok || !isAuthResultPayload(data)) {
+          const message =
+            (data as { message?: string })?.message || '토스 로그인 서버 처리에 실패했어요.';
+          return { ok: false, message };
+        }
+        commitAuthSuccess(set, data);
+        return { ok: true };
+      } catch (err: any) {
+        return { ok: false, message: err?.message || '토스 로그인에 실패했어요.' };
       }
     },
 

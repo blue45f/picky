@@ -1,6 +1,13 @@
-import { Injectable, BadRequestException, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  UnauthorizedException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as crypto from 'crypto';
+import * as https from 'https';
+import * as fs from 'fs';
 import { DatabaseService, DatabaseUser } from '../database/database.service';
 import {
   RegisterInput,
@@ -8,7 +15,11 @@ import {
   GuestRegisterInput,
   UserProfile,
   AuthResult,
+  TossIdentityInput,
+  TossLoginInput,
 } from '@picky/shared';
+
+const APPS_IN_TOSS_API_BASE = 'https://apps-in-toss-api.toss.im';
 
 @Injectable()
 export class AuthService {
@@ -134,6 +145,153 @@ export class AuthService {
       accessToken,
       user: this.toProfile(user),
     };
+  }
+
+  /**
+   * 앱인토스 getAnonymousKey(hash) 기반 식별 로그인.
+   * anonymousKey로 결정적 userId를 만들어 멱등 생성 → 같은 사용자는 항상 같은 계정.
+   * 서버 mTLS·사용자 동의 없이 동작해요.
+   */
+  async loginWithTossIdentity(input: TossIdentityInput): Promise<AuthResult> {
+    const fingerprint = crypto
+      .createHash('sha256')
+      .update(input.anonymousKey)
+      .digest('hex')
+      .slice(0, 32);
+    const userId = `toss-${fingerprint}`;
+    const nickname = (input.nickname?.trim() || '토스 사용자').slice(0, 20);
+
+    let user = await this.db.getUserById(userId);
+    if (!user) {
+      user = {
+        id: userId,
+        email: '',
+        passwordHash: '',
+        salt: '',
+        nickname,
+        createdAt: new Date().toISOString(),
+        isGuest: false,
+      };
+      await this.db.createUser(user);
+    }
+
+    const accessToken = await this.signPayload({
+      sub: user.id,
+      email: user.email,
+      nickname: user.nickname,
+      isGuest: user.isGuest,
+    });
+
+    return { accessToken, user: this.toProfile(user) };
+  }
+
+  /**
+   * 앱인토스 토스 로그인(appLogin) 인가 코드 → 서버 mTLS 토큰 교환 → 사용자 조회.
+   * mTLS 인증서(콘솔 발급)가 환경변수로 설정돼야 동작해요. 미설정 시 503으로 안내.
+   */
+  async loginWithTossAuthCode(input: TossLoginInput): Promise<AuthResult> {
+    const agent = this.createMtlsAgent();
+
+    const tokenResponse = await this.requestTossApi<{
+      success?: { accessToken?: string };
+    }>('POST', '/api-partner/v1/apps-in-toss/user/oauth2/generate-token', agent, {
+      body: { authorizationCode: input.authorizationCode, referrer: input.referrer ?? 'DEFAULT' },
+    });
+
+    const tossAccessToken = tokenResponse?.success?.accessToken;
+    if (!tossAccessToken) {
+      throw new UnauthorizedException('토스 로그인 토큰 발급에 실패했어요.');
+    }
+
+    const meResponse = await this.requestTossApi<{
+      success?: { userKey?: number };
+    }>('GET', '/api-partner/v1/apps-in-toss/user/oauth2/login-me', agent, {
+      bearer: tossAccessToken,
+    });
+
+    const userKey = meResponse?.success?.userKey;
+    if (userKey == null) {
+      throw new UnauthorizedException('토스 사용자 정보를 가져오지 못했어요.');
+    }
+
+    const userId = `toss-user-${userKey}`;
+    let user = await this.db.getUserById(userId);
+    if (!user) {
+      user = {
+        id: userId,
+        email: '',
+        passwordHash: '',
+        salt: '',
+        nickname: '토스 사용자',
+        createdAt: new Date().toISOString(),
+        isGuest: false,
+      };
+      await this.db.createUser(user);
+    }
+
+    const accessToken = await this.signPayload({
+      sub: user.id,
+      email: user.email,
+      nickname: user.nickname,
+      isGuest: user.isGuest,
+    });
+
+    return { accessToken, user: this.toProfile(user) };
+  }
+
+  private createMtlsAgent(): https.Agent {
+    const certPath = process.env.APPS_IN_TOSS_MTLS_CERT_PATH?.trim();
+    const keyPath = process.env.APPS_IN_TOSS_MTLS_KEY_PATH?.trim();
+    if (!certPath || !keyPath) {
+      throw new ServiceUnavailableException(
+        '토스 로그인(서버 mTLS) 인증서가 설정되지 않았어요. ' +
+          '콘솔에서 mTLS 인증서를 발급해 APPS_IN_TOSS_MTLS_CERT_PATH/KEY_PATH 환경변수에 설정하거나, ' +
+          'getAnonymousKey 기반 식별 로그인을 사용해 주세요.',
+      );
+    }
+    return new https.Agent({ cert: fs.readFileSync(certPath), key: fs.readFileSync(keyPath) });
+  }
+
+  private requestTossApi<T>(
+    method: 'GET' | 'POST',
+    path: string,
+    agent: https.Agent,
+    options: { body?: unknown; bearer?: string } = {},
+  ): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const url = new URL(`${APPS_IN_TOSS_API_BASE}${path}`);
+      const payload = options.body == null ? undefined : JSON.stringify(options.body);
+      const request = https.request(
+        url,
+        {
+          method,
+          agent,
+          headers: {
+            'Content-Type': 'application/json',
+            ...(options.bearer ? { Authorization: `Bearer ${options.bearer}` } : {}),
+            ...(payload ? { 'Content-Length': Buffer.byteLength(payload) } : {}),
+          },
+        },
+        (response) => {
+          let raw = '';
+          response.on('data', (chunk) => {
+            raw += chunk;
+          });
+          response.on('end', () => {
+            try {
+              resolve(raw ? (JSON.parse(raw) as T) : ({} as T));
+            } catch {
+              reject(new UnauthorizedException('토스 API 응답을 해석하지 못했어요.'));
+            }
+          });
+        },
+      );
+      request.on('error', (error) => reject(error));
+      if (payload) {
+        request.write(payload);
+      }
+      request.end();
+    });
   }
 
   async validateUser(payload: any): Promise<UserProfile> {

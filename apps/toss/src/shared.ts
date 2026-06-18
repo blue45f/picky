@@ -170,3 +170,31 @@ export interface AuthResult {
   accessToken: string;
   user: UserProfile;
 }
+
+/** 앱인토스 비게임 미니앱 getAnonymousKey(hash) 기반 식별 로그인. 서버/mTLS 불필요. */
+export const TossIdentitySchema = z.object({
+  anonymousKey: z
+    .string({ required_error: '토스 사용자 식별키가 필요합니다.' })
+    .trim()
+    .min(8, '유효하지 않은 식별키입니다.')
+    .max(256, '유효하지 않은 식별키입니다.'),
+  nickname: z
+    .string()
+    .trim()
+    .max(20, '닉네임은 최대 20자 이하이어야 합니다.')
+    .optional()
+    .nullable(),
+});
+
+export type TossIdentityInput = z.infer<typeof TossIdentitySchema>;
+
+/** 앱인토스 토스 로그인 appLogin 인가 코드 기반(서버 mTLS 토큰 교환) 로그인. */
+export const TossLoginSchema = z.object({
+  authorizationCode: z
+    .string({ required_error: '인가 코드가 필요합니다.' })
+    .trim()
+    .min(1, '인가 코드가 필요합니다.'),
+  referrer: z.string().trim().min(1).optional().nullable(),
+});
+
+export type TossLoginInput = z.infer<typeof TossLoginSchema>;

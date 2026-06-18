@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { getStableUserKey, getTossEnv, type TossEnv } from '../lib/toss';
+import { useAuthStore } from './useAuthStore';
 
 const NAME_KEY = 'pickflow_display_name';
 
@@ -33,6 +34,19 @@ export const useIdentity = create<IdentityState>((set, get) => ({
     const env = getTossEnv();
     const userKey = await getStableUserKey();
     set({ env, userKey, initialized: true });
+
+    // 토스 환경: 식별키로 서버 세션을 발급받아 작성/투표를 안정적 사용자에 귀속.
+    if (userKey) {
+      const ok = await useAuthStore
+        .getState()
+        .loginWithToss(userKey, get().displayName || undefined);
+      if (ok) {
+        const profile = useAuthStore.getState().user;
+        if (profile?.nickname && !get().displayName) {
+          set({ displayName: profile.nickname });
+        }
+      }
+    }
   },
   setDisplayName: (name: string) => {
     const trimmed = name.trim();
