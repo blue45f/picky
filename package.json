@@ -22,7 +22,9 @@
     "format:check": "prettier --check \"**/*.{ts,tsx,js,json,md,css,yml,yaml}\"",
     "typecheck": "pnpm -r run typecheck",
     "test": "pnpm -r --if-present run test",
-    "verify": "pnpm run format:check && pnpm run lint:ci && pnpm run typecheck && pnpm run test && pnpm run build",
+    "check:shared": "node scripts/sync-toss-shared.mjs",
+    "sync:toss-shared": "node scripts/sync-toss-shared.mjs --write",
+    "verify": "pnpm run check:shared && pnpm run format:check && pnpm run lint:ci && pnpm run typecheck && pnpm run test && pnpm run build",
     "verify:push": "pnpm run verify",
     "prepare": "husky"
   },

@@ -65,11 +65,60 @@ a {
 .rise {
   animation: pf-fadeUp 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
+/* 진행률 바 채움 트랜지션 */
+.pf-bar-fill {
+  transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* 로딩 스켈레톤 시머 */
+.pf-skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.05) 25%,
+    rgba(255, 255, 255, 0.12) 50%,
+    rgba(255, 255, 255, 0.05) 75%
+  );
+  background-size: 220% 100%;
+  animation: pf-shimmer 1.3s ease-in-out infinite;
+}
+@keyframes pf-shimmer {
+  0% {
+    background-position: 180% 0;
+  }
+  100% {
+    background-position: -180% 0;
+  }
+}
+
+/* 토스트 등장 */
+@keyframes pf-toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+/* 리스트 카드 등장 스태거 (인라인 animation-delay와 함께 사용) */
+.rise-stagger {
+  animation: pf-fadeUp 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .rise {
+  .rise,
+  .rise-stagger {
     animation: none;
   }
   .pressable {
     transition: none;
+  }
+  .pf-bar-fill {
+    transition: none;
+  }
+  .pf-skeleton {
+    animation: none;
   }
 }

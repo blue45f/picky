@@ -14,3 +14,4 @@ build
 .vercel
 .granite
 *.ait
+.playwright-mcp
