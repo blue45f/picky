@@ -9,10 +9,12 @@
     "pnpm": ">=11.0.0"
   },
   "scripts": {
-    "dev": "pnpm -r --parallel --filter=./apps/* run dev",
+    "dev": "pnpm -r --parallel --filter=./apps/* --filter=!@picky/toss run dev",
     "dev:web": "pnpm --filter @picky/web run dev",
     "dev:api": "pnpm --filter @picky/api run dev",
-    "build": "pnpm -r run build && node scripts/build-vercel-api-bundle.mjs",
+    "dev:toss": "pnpm --filter @picky/toss run dev",
+    "build": "pnpm -r --filter=!@picky/toss run build && node scripts/build-vercel-api-bundle.mjs",
+    "build:toss": "pnpm --filter @picky/toss run build",
     "lint": "eslint .",
     "lint:strict": "eslint . --max-warnings=0",
     "lint:ci": "pnpm run lint:strict",
