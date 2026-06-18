@@ -390,7 +390,10 @@ var require_auth_service = __commonJS({
     var common_1 = require("@nestjs/common");
     var jwt_1 = require("@nestjs/jwt");
     var crypto = __importStar(require("crypto"));
+    var https = __importStar(require("https"));
+    var fs = __importStar(require("fs"));
     var database_service_1 = require_database_service();
+    var APPS_IN_TOSS_API_BASE = "https://apps-in-toss-api.toss.im";
     var AuthService = class AuthService {
       db;
       jwtService;
@@ -492,6 +495,109 @@ var require_auth_service = __commonJS({
           user: this.toProfile(user)
         };
       }
+      async loginWithTossIdentity(input) {
+        const fingerprint = crypto.createHash("sha256").update(input.anonymousKey).digest("hex").slice(0, 32);
+        const userId = `toss-${fingerprint}`;
+        const nickname = (input.nickname?.trim() || "\uD1A0\uC2A4 \uC0AC\uC6A9\uC790").slice(0, 20);
+        let user = await this.db.getUserById(userId);
+        if (!user) {
+          user = {
+            id: userId,
+            email: "",
+            passwordHash: "",
+            salt: "",
+            nickname,
+            createdAt: (/* @__PURE__ */ new Date()).toISOString(),
+            isGuest: false
+          };
+          await this.db.createUser(user);
+        }
+        const accessToken = await this.signPayload({
+          sub: user.id,
+          email: user.email,
+          nickname: user.nickname,
+          isGuest: user.isGuest
+        });
+        return { accessToken, user: this.toProfile(user) };
+      }
+      async loginWithTossAuthCode(input) {
+        const agent = this.createMtlsAgent();
+        const tokenResponse = await this.requestTossApi("POST", "/api-partner/v1/apps-in-toss/user/oauth2/generate-token", agent, {
+          body: { authorizationCode: input.authorizationCode, referrer: input.referrer ?? "DEFAULT" }
+        });
+        const tossAccessToken = tokenResponse?.success?.accessToken;
+        if (!tossAccessToken) {
+          throw new common_1.UnauthorizedException("\uD1A0\uC2A4 \uB85C\uADF8\uC778 \uD1A0\uD070 \uBC1C\uAE09\uC5D0 \uC2E4\uD328\uD588\uC5B4\uC694.");
+        }
+        const meResponse = await this.requestTossApi("GET", "/api-partner/v1/apps-in-toss/user/oauth2/login-me", agent, {
+          bearer: tossAccessToken
+        });
+        const userKey = meResponse?.success?.userKey;
+        if (userKey == null) {
+          throw new common_1.UnauthorizedException("\uD1A0\uC2A4 \uC0AC\uC6A9\uC790 \uC815\uBCF4\uB97C \uAC00\uC838\uC624\uC9C0 \uBABB\uD588\uC5B4\uC694.");
+        }
+        const userId = `toss-user-${userKey}`;
+        let user = await this.db.getUserById(userId);
+        if (!user) {
+          user = {
+            id: userId,
+            email: "",
+            passwordHash: "",
+            salt: "",
+            nickname: "\uD1A0\uC2A4 \uC0AC\uC6A9\uC790",
+            createdAt: (/* @__PURE__ */ new Date()).toISOString(),
+            isGuest: false
+          };
+          await this.db.createUser(user);
+        }
+        const accessToken = await this.signPayload({
+          sub: user.id,
+          email: user.email,
+          nickname: user.nickname,
+          isGuest: user.isGuest
+        });
+        return { accessToken, user: this.toProfile(user) };
+      }
+      createMtlsAgent() {
+        const certPath = process.env.APPS_IN_TOSS_MTLS_CERT_PATH?.trim();
+        const keyPath = process.env.APPS_IN_TOSS_MTLS_KEY_PATH?.trim();
+        if (!certPath || !keyPath) {
+          throw new common_1.ServiceUnavailableException("\uD1A0\uC2A4 \uB85C\uADF8\uC778(\uC11C\uBC84 mTLS) \uC778\uC99D\uC11C\uAC00 \uC124\uC815\uB418\uC9C0 \uC54A\uC558\uC5B4\uC694. \uCF58\uC194\uC5D0\uC11C mTLS \uC778\uC99D\uC11C\uB97C \uBC1C\uAE09\uD574 APPS_IN_TOSS_MTLS_CERT_PATH/KEY_PATH \uD658\uACBD\uBCC0\uC218\uC5D0 \uC124\uC815\uD558\uAC70\uB098, getAnonymousKey \uAE30\uBC18 \uC2DD\uBCC4 \uB85C\uADF8\uC778\uC744 \uC0AC\uC6A9\uD574 \uC8FC\uC138\uC694.");
+        }
+        return new https.Agent({ cert: fs.readFileSync(certPath), key: fs.readFileSync(keyPath) });
+      }
+      requestTossApi(method, path, agent, options = {}) {
+        return new Promise((resolve, reject) => {
+          const url = new URL(`${APPS_IN_TOSS_API_BASE}${path}`);
+          const payload = options.body == null ? void 0 : JSON.stringify(options.body);
+          const request = https.request(url, {
+            method,
+            agent,
+            headers: {
+              "Content-Type": "application/json",
+              ...options.bearer ? { Authorization: `Bearer ${options.bearer}` } : {},
+              ...payload ? { "Content-Length": Buffer.byteLength(payload) } : {}
+            }
+          }, (response) => {
+            let raw = "";
+            response.on("data", (chunk) => {
+              raw += chunk;
+            });
+            response.on("end", () => {
+              try {
+                resolve(raw ? JSON.parse(raw) : {});
+              } catch {
+                reject(new common_1.UnauthorizedException("\uD1A0\uC2A4 API \uC751\uB2F5\uC744 \uD574\uC11D\uD558\uC9C0 \uBABB\uD588\uC5B4\uC694."));
+              }
+            });
+          });
+          request.on("error", (error) => reject(error));
+          if (payload) {
+            request.write(payload);
+          }
+          request.end();
+        });
+      }
       async validateUser(payload) {
         if (!payload?.sub || typeof payload?.sub !== "string") {
           throw new common_1.UnauthorizedException("\uC720\uD6A8\uD558\uC9C0 \uC54A\uC740 \uC0AC\uC6A9\uC790\uC785\uB2C8\uB2E4.");
@@ -552,6 +658,8 @@ var require_dist = __commonJS({
       PollAttachmentSchema: () => PollAttachmentSchema,
       PollResultsVisibilitySchema: () => PollResultsVisibilitySchema,
       RegisterSchema: () => RegisterSchema,
+      TossIdentitySchema: () => TossIdentitySchema,
+      TossLoginSchema: () => TossLoginSchema,
       VoteSchema: () => VoteSchema
     });
     module2.exports = __toCommonJS(index_exports);
@@ -607,6 +715,14 @@ var require_dist = __commonJS({
     });
     var GuestRegisterSchema = import_zod.z.object({
       nickname: import_zod.z.string({ required_error: "\uB2C9\uB124\uC784\uC740 \uD544\uC218\uC785\uB2C8\uB2E4." }).trim().min(2, "\uB2C9\uB124\uC784\uC740 \uCD5C\uC18C 2\uC790 \uC774\uC0C1\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4.").max(20, "\uB2C9\uB124\uC784\uC740 \uCD5C\uB300 20\uC790 \uC774\uD558\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4.")
+    });
+    var TossIdentitySchema = import_zod.z.object({
+      anonymousKey: import_zod.z.string({ required_error: "\uD1A0\uC2A4 \uC0AC\uC6A9\uC790 \uC2DD\uBCC4\uD0A4\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4." }).trim().min(8, "\uC720\uD6A8\uD558\uC9C0 \uC54A\uC740 \uC2DD\uBCC4\uD0A4\uC785\uB2C8\uB2E4.").max(256, "\uC720\uD6A8\uD558\uC9C0 \uC54A\uC740 \uC2DD\uBCC4\uD0A4\uC785\uB2C8\uB2E4."),
+      nickname: import_zod.z.string().trim().max(20, "\uB2C9\uB124\uC784\uC740 \uCD5C\uB300 20\uC790 \uC774\uD558\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4.").optional().nullable()
+    });
+    var TossLoginSchema = import_zod.z.object({
+      authorizationCode: import_zod.z.string({ required_error: "\uC778\uAC00 \uCF54\uB4DC\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4." }).trim().min(1, "\uC778\uAC00 \uCF54\uB4DC\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4."),
+      referrer: import_zod.z.string().trim().min(1).optional().nullable()
     });
   }
 });
@@ -722,6 +838,10 @@ var require_auth_controller = __commonJS({
     };
     var GuestRegisterDto = class extends (0, nestjs_zod_1.createZodDto)(shared_1.GuestRegisterSchema) {
     };
+    var TossIdentityDto = class extends (0, nestjs_zod_1.createZodDto)(shared_1.TossIdentitySchema) {
+    };
+    var TossLoginDto = class extends (0, nestjs_zod_1.createZodDto)(shared_1.TossLoginSchema) {
+    };
     var AuthController = class AuthController {
       authService;
       constructor(authService) {
@@ -735,6 +855,12 @@ var require_auth_controller = __commonJS({
       }
       async login(dto) {
         return this.authService.login(dto);
+      }
+      async loginWithTossIdentity(dto) {
+        return this.authService.loginWithTossIdentity(dto);
+      }
+      async loginWithTossAuthCode(dto) {
+        return this.authService.loginWithTossAuthCode(dto);
       }
       async me(req) {
         const user = await this.authService.validateUser(req.user);
@@ -763,6 +889,20 @@ var require_auth_controller = __commonJS({
       __metadata("design:paramtypes", [LoginDto]),
       __metadata("design:returntype", Promise)
     ], AuthController.prototype, "login", null);
+    __decorate([
+      (0, common_1.Post)("toss"),
+      __param(0, (0, common_1.Body)()),
+      __metadata("design:type", Function),
+      __metadata("design:paramtypes", [TossIdentityDto]),
+      __metadata("design:returntype", Promise)
+    ], AuthController.prototype, "loginWithTossIdentity", null);
+    __decorate([
+      (0, common_1.Post)("toss/login"),
+      __param(0, (0, common_1.Body)()),
+      __metadata("design:type", Function),
+      __metadata("design:paramtypes", [TossLoginDto]),
+      __metadata("design:returntype", Promise)
+    ], AuthController.prototype, "loginWithTossAuthCode", null);
     __decorate([
       (0, common_1.Get)("me"),
       (0, common_1.UseGuards)(auth_guard_1.AuthGuard),
