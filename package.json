@@ -20,7 +20,7 @@
     "lint:ci": "pnpm run lint:strict",
     "format": "prettier --write \"**/*.{ts,tsx,js,json,md,css,yml,yaml}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,json,md,css,yml,yaml}\"",
-    "typecheck": "pnpm -r run typecheck",
+    "typecheck": "pnpm --filter @picky/shared run build && pnpm -r run typecheck",
     "test": "pnpm -r --if-present run test",
     "check:shared": "node scripts/sync-toss-shared.mjs",
     "sync:toss-shared": "node scripts/sync-toss-shared.mjs --write",
