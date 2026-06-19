@@ -6,6 +6,7 @@ import {
   Routes,
   useLocation,
   useNavigate,
+  useParams,
   useSearchParams,
   Link,
 } from 'react-router-dom';
@@ -37,6 +38,14 @@ const RouteFallback: React.FC = () => (
 );
 
 const FALLBACK_QUERY_KEY = '__fallback';
+
+const ShareRouteRedirect: React.FC = () => {
+  const { id } = useParams<{ id: string }>();
+  const location = useLocation();
+  const pollPath = id ? `/poll/${encodeURIComponent(id)}` : '/';
+
+  return <Navigate to={`${pollPath}${location.search}${location.hash}`} replace />;
+};
 
 const FallbackRouteBridge: React.FC = () => {
   const navigate = useNavigate();
@@ -100,6 +109,7 @@ export const App: React.FC = () => {
               <Route path="/create" element={<CreatePoll />} />
               <Route path="/design" element={<DesignSystem />} />
               <Route path="/poll/:id" element={<PollDetail />} />
+              <Route path="/share/:id" element={<ShareRouteRedirect />} />
               <Route path="/embed/:id" element={<PollDetail />} />
               <Route path="/present/:id" element={<PollDetail />} />
               <Route path="/auth" element={<Navigate to="/auth/login" replace />} />
