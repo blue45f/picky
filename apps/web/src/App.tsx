@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, Suspense, lazy } from 'react';
 import {
   BrowserRouter,
   Navigate,
@@ -12,12 +12,29 @@ import {
 import { Heart } from 'lucide-react';
 import { Navbar } from './components/Navbar';
 import { RouteAnnouncer } from './components/layout/RouteAnnouncer';
-import { PollList } from './pages/PollList';
-import { CreatePoll } from './pages/CreatePoll';
-import { PollDetail } from './pages/PollDetail';
-import { DesignSystem } from './pages/DesignSystem';
-import { AuthPage } from './pages/AuthPage';
 import { useAuthStore } from './store/useAuthStore';
+
+// 라우트 단위 코드 스플리팅 — 초기 번들에서 무거운 페이지(작성/디자인 등)를 분리해요.
+const PollList = lazy(() => import('./pages/PollList').then((m) => ({ default: m.PollList })));
+const CreatePoll = lazy(() =>
+  import('./pages/CreatePoll').then((m) => ({ default: m.CreatePoll })),
+);
+const PollDetail = lazy(() =>
+  import('./pages/PollDetail').then((m) => ({ default: m.PollDetail })),
+);
+const DesignSystem = lazy(() =>
+  import('./pages/DesignSystem').then((m) => ({ default: m.DesignSystem })),
+);
+const AuthPage = lazy(() => import('./pages/AuthPage').then((m) => ({ default: m.AuthPage })));
+
+const RouteFallback: React.FC = () => (
+  <div aria-busy="true" aria-live="polite" style={{ display: 'grid', gap: '1rem' }}>
+    <span className="sr-only">페이지를 불러오는 중…</span>
+    <div className="skeleton" style={{ height: 34, width: '62%' }} />
+    <div className="skeleton" style={{ height: 200 }} />
+    <div className="skeleton" style={{ height: 120 }} />
+  </div>
+);
 
 const FALLBACK_QUERY_KEY = '__fallback';
 
@@ -77,17 +94,19 @@ export const App: React.FC = () => {
         <FallbackRouteBridge />
 
         <main id="main-content" tabIndex={-1} className="page-shell" style={{ flexGrow: 1 }}>
-          <Routes>
-            <Route path="/" element={<PollList />} />
-            <Route path="/create" element={<CreatePoll />} />
-            <Route path="/design" element={<DesignSystem />} />
-            <Route path="/poll/:id" element={<PollDetail />} />
-            <Route path="/embed/:id" element={<PollDetail />} />
-            <Route path="/present/:id" element={<PollDetail />} />
-            <Route path="/auth" element={<Navigate to="/auth/login" replace />} />
-            <Route path="/auth/:mode" element={<AuthPage />} />
-            <Route path="*" element={<PollList />} />
-          </Routes>
+          <Suspense fallback={<RouteFallback />}>
+            <Routes>
+              <Route path="/" element={<PollList />} />
+              <Route path="/create" element={<CreatePoll />} />
+              <Route path="/design" element={<DesignSystem />} />
+              <Route path="/poll/:id" element={<PollDetail />} />
+              <Route path="/embed/:id" element={<PollDetail />} />
+              <Route path="/present/:id" element={<PollDetail />} />
+              <Route path="/auth" element={<Navigate to="/auth/login" replace />} />
+              <Route path="/auth/:mode" element={<AuthPage />} />
+              <Route path="*" element={<PollList />} />
+            </Routes>
+          </Suspense>
         </main>
 
         <footer
