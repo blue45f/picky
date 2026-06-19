@@ -5,6 +5,7 @@ import { CreatePollSchema, type CreatePollInput, type PollResultsVisibility } fr
 import { usePollStore } from '../store/usePollStore';
 import { theme, stickyActionBar } from '../theme';
 import { fromDateTimeLocalValue, toDateTimeLocalValue } from '../lib/format';
+import { fileToDownscaledDataUrl, isUsableImageUrl } from '../lib/image';
 import { hapticFeedback } from '../lib/toss';
 import { AppBar, Chip, SegmentedControl } from '../components/ui';
 
@@ -17,6 +18,13 @@ const OPTION_MAX = 60;
 const DEADLINE_BUFFER_MS = 60_000;
 
 type DeadlinePreset = 'none' | '6h' | '1d' | '3d' | '1w' | 'custom';
+
+interface OptionDraft {
+  text: string;
+  imageUrl: string | null;
+}
+
+const emptyOption = (): OptionDraft => ({ text: '', imageUrl: null });
 
 const DEADLINE_PRESETS = [
   { value: 'none', label: '없음', ms: 0 },
@@ -41,6 +49,16 @@ const fieldStyle: React.CSSProperties = {
   padding: '12px 14px',
   fontSize: 15,
   outline: 'none',
+};
+
+const squareBtnStyle: React.CSSProperties = {
+  flexShrink: 0,
+  width: 44,
+  border: `1px solid ${theme.border}`,
+  borderRadius: theme.radiusSm,
+  background: theme.surface,
+  cursor: 'pointer',
+  fontSize: 16,
 };
 
 const labelRowStyle: React.CSSProperties = {
@@ -68,7 +86,9 @@ export function CreatePollPage() {
 
   const [question, setQuestion] = useState('');
   const [description, setDescription] = useState('');
-  const [options, setOptions] = useState<string[]>(['', '']);
+  const [options, setOptions] = useState<OptionDraft[]>(() => [emptyOption(), emptyOption()]);
+  const [openImageIndex, setOpenImageIndex] = useState<number | null>(null);
+  const [linkDrafts, setLinkDrafts] = useState<Record<number, string>>({});
   const [resultsVisibility, setResultsVisibility] = useState<PollResultsVisibility>('afterVote');
   const [deadlinePreset, setDeadlinePreset] = useState<DeadlinePreset>('none');
   const [customDeadline, setCustomDeadline] = useState('');
@@ -78,7 +98,7 @@ export function CreatePollPage() {
 
   const minCustom = useMemo(() => toDateTimeLocalValue(new Date(Date.now() + 5 * 60_000)), []);
 
-  const filledOptions = options.map((opt) => opt.trim()).filter((opt) => opt.length > 0);
+  const filledOptions = options.filter((opt) => opt.text.trim().length > 0);
   const canSubmit = question.trim().length >= 2 && filledOptions.length >= MIN_OPTIONS;
 
   const selectDeadlinePreset = (value: DeadlinePreset) => {
@@ -111,15 +131,46 @@ export function CreatePollPage() {
     });
   }, [endsAtIso]);
 
-  const updateOption = (index: number, value: string) => {
-    setOptions((prev) => prev.map((opt, i) => (i === index ? value : opt)));
+  const updateOptionText = (index: number, value: string) => {
+    setOptions((prev) => prev.map((opt, i) => (i === index ? { ...opt, text: value } : opt)));
+  };
+  const setOptionImage = (index: number, imageUrl: string | null) => {
+    setOptions((prev) => prev.map((opt, i) => (i === index ? { ...opt, imageUrl } : opt)));
   };
   const addOption = () => {
-    setOptions((prev) => (prev.length < MAX_OPTIONS ? [...prev, ''] : prev));
+    setOptions((prev) => (prev.length < MAX_OPTIONS ? [...prev, emptyOption()] : prev));
     hapticFeedback('tickWeak');
   };
   const removeOption = (index: number) =>
     setOptions((prev) => (prev.length > MIN_OPTIONS ? prev.filter((_, i) => i !== index) : prev));
+
+  const handleImageFile = async (index: number, file: File) => {
+    setError(null);
+    try {
+      const dataUrl = await fileToDownscaledDataUrl(file);
+      setOptionImage(index, dataUrl);
+      hapticFeedback('tickWeak');
+    } catch (err) {
+      hapticFeedback('error');
+      setError(err instanceof Error ? err.message : '이미지를 처리하지 못했어요.');
+    }
+  };
+
+  const applyImageLink = (index: number) => {
+    const draft = (linkDrafts[index] ?? '').trim();
+    if (!draft) {
+      return;
+    }
+    if (!isUsableImageUrl(draft)) {
+      hapticFeedback('error');
+      setError('올바른 이미지 링크(URL)가 아니에요.');
+      return;
+    }
+    setError(null);
+    setOptionImage(index, draft);
+    setLinkDrafts((prev) => ({ ...prev, [index]: '' }));
+    hapticFeedback('tickWeak');
+  };
 
   const handleSubmit = async () => {
     setError(null);
@@ -142,7 +193,10 @@ export function CreatePollPage() {
       description: description.trim() || null,
       resultsVisibility,
       endsAt: endsAtIso,
-      options: filledOptions.map((text) => ({ text })),
+      options: filledOptions.map((opt) => ({
+        text: opt.text.trim(),
+        imageUrl: opt.imageUrl || null,
+      })),
     };
 
     const parsed = CreatePollSchema.safeParse(candidate);
@@ -202,42 +256,168 @@ export function CreatePollPage() {
         />
 
         <div style={labelRowStyle}>
-          <label style={labelStyle}>선택지 * (최소 2개)</label>
+          <label style={labelStyle}>선택지 * (최소 2개 · 사진 선택)</label>
           <span style={counterStyle}>
             {filledOptions.length} / 최소 {MIN_OPTIONS}개
           </span>
         </div>
-        {options.map((opt, index) => (
-          <div key={index} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-            <input
-              style={fieldStyle}
-              value={opt}
-              maxLength={OPTION_MAX}
-              placeholder={`선택지 ${index + 1}`}
-              aria-label={`선택지 ${index + 1}`}
-              onChange={(e) => updateOption(index, e.target.value)}
-            />
-            {options.length > MIN_OPTIONS ? (
-              <button
-                type="button"
-                className="pressable"
-                aria-label={`선택지 ${index + 1} 삭제`}
-                onClick={() => removeOption(index)}
-                style={{
-                  flexShrink: 0,
-                  width: 44,
-                  border: `1px solid ${theme.border}`,
-                  borderRadius: theme.radiusSm,
-                  background: theme.surface,
-                  color: theme.textMuted,
-                  cursor: 'pointer',
-                }}
-              >
-                ✕
-              </button>
-            ) : null}
-          </div>
-        ))}
+        {options.map((opt, index) => {
+          const editorOpen = openImageIndex === index || Boolean(opt.imageUrl);
+          return (
+            <div key={index} style={{ marginBottom: 10 }}>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  style={fieldStyle}
+                  value={opt.text}
+                  maxLength={OPTION_MAX}
+                  placeholder={`선택지 ${index + 1}`}
+                  aria-label={`선택지 ${index + 1}`}
+                  onChange={(e) => updateOptionText(index, e.target.value)}
+                />
+                <button
+                  type="button"
+                  className="pressable"
+                  aria-label={`선택지 ${index + 1} 사진`}
+                  aria-pressed={editorOpen}
+                  onClick={() => setOpenImageIndex((prev) => (prev === index ? null : index))}
+                  style={{
+                    ...squareBtnStyle,
+                    color: opt.imageUrl ? theme.accent : theme.textMuted,
+                  }}
+                >
+                  📷
+                </button>
+                {options.length > MIN_OPTIONS ? (
+                  <button
+                    type="button"
+                    className="pressable"
+                    aria-label={`선택지 ${index + 1} 삭제`}
+                    onClick={() => removeOption(index)}
+                    style={{ ...squareBtnStyle, color: theme.textMuted }}
+                  >
+                    ✕
+                  </button>
+                ) : null}
+              </div>
+
+              {editorOpen ? (
+                <div
+                  style={{
+                    marginTop: 8,
+                    padding: 10,
+                    border: `1px dashed ${theme.border}`,
+                    borderRadius: theme.radiusSm,
+                  }}
+                >
+                  {opt.imageUrl ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <img
+                        src={opt.imageUrl}
+                        alt=""
+                        style={{
+                          width: 56,
+                          height: 56,
+                          objectFit: 'cover',
+                          borderRadius: 8,
+                          border: `1px solid ${theme.border}`,
+                        }}
+                      />
+                      <span style={{ flex: 1, fontSize: 13, color: theme.textMuted }}>
+                        사진이 추가됐어요
+                      </span>
+                      <button
+                        type="button"
+                        className="pressable"
+                        onClick={() => setOptionImage(index, null)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: theme.danger,
+                          fontSize: 13,
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          padding: 0,
+                        }}
+                      >
+                        삭제
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'grid', gap: 8 }}>
+                      <label
+                        className="pressable"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 6,
+                          padding: '10px',
+                          border: `1px solid ${theme.border}`,
+                          borderRadius: theme.radiusSm,
+                          background: theme.surface,
+                          color: theme.text,
+                          fontWeight: 700,
+                          fontSize: 14,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        📷 이미지 업로드
+                        <input
+                          type="file"
+                          accept="image/*"
+                          style={{ display: 'none' }}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              void handleImageFile(index, file);
+                            }
+                            e.target.value = '';
+                          }}
+                        />
+                      </label>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <input
+                          style={{ ...fieldStyle, fontSize: 13 }}
+                          value={linkDrafts[index] ?? ''}
+                          placeholder="또는 이미지 링크(URL)"
+                          inputMode="url"
+                          aria-label={`선택지 ${index + 1} 이미지 링크`}
+                          onChange={(e) =>
+                            setLinkDrafts((prev) => ({ ...prev, [index]: e.target.value }))
+                          }
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              applyImageLink(index);
+                            }
+                          }}
+                        />
+                        <button
+                          type="button"
+                          className="pressable"
+                          onClick={() => applyImageLink(index)}
+                          style={{
+                            flexShrink: 0,
+                            padding: '0 16px',
+                            border: `1px solid ${theme.accent}`,
+                            borderRadius: theme.radiusSm,
+                            background: theme.accentSoft,
+                            color: theme.accent,
+                            fontWeight: 700,
+                            fontSize: 13,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          추가
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : null}
+            </div>
+          );
+        })}
         {options.length < MAX_OPTIONS ? (
           <button
             type="button"
