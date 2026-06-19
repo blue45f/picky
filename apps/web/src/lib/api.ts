@@ -185,6 +185,7 @@ const shouldRetryOnFailure = (
   index: number,
   total: number,
   base: string,
+  method: string,
 ): boolean => {
   if (index >= total - 1) {
     return false;
@@ -194,7 +195,7 @@ const shouldRetryOnFailure = (
     return true;
   }
 
-  if (res.status >= 500) {
+  if ((method === 'GET' || method === 'HEAD') && res.status >= 500) {
     return true;
   }
 
@@ -244,6 +245,7 @@ export const requestApi = async (path: string, init: RequestInit = {}): Promise<
   const debug = isApiDebugEnabled();
   const isProdLike =
     typeof window !== 'undefined' && window.location.hostname.includes('vercel.app');
+  const requestMethod = String(init.method || 'GET').toUpperCase();
 
   for (let i = 0; i < candidates.length; i += 1) {
     const base = candidates[i];
@@ -252,7 +254,7 @@ export const requestApi = async (path: string, init: RequestInit = {}): Promise<
     }
     try {
       const res = await fetch(`${base}${path}`, init);
-      const needRetry = shouldRetryOnFailure(res, i, candidates.length, base);
+      const needRetry = shouldRetryOnFailure(res, i, candidates.length, base, requestMethod);
       trace.push({ base, ok: !needRetry, status: res.status });
       if (debug) {
         console.info('[picky] requestApi attempt', {

@@ -3238,6 +3238,23 @@ export const CreatePoll: React.FC = () => {
           )}
         </div>
 
+        {error ? (
+          <p
+            role="alert"
+            style={{
+              margin: 0,
+              fontSize: '0.78rem',
+              color: 'var(--brand-accent-coral)',
+              padding: '7px 10px',
+              borderRadius: 'var(--radius-sm)',
+              border: '1px solid rgba(239, 68, 68, 0.2)',
+              background: 'rgba(239, 68, 68, 0.12)',
+            }}
+          >
+            {error}
+          </p>
+        ) : null}
+
         <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
           <button
             type="button"

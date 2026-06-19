@@ -157,8 +157,25 @@ const findPollFromLocalCache = (pollId: string): Poll | undefined => {
   return cached.find((poll) => poll.id === pollId);
 };
 
+const isLocalPollFallbackAllowed = () => {
+  if (import.meta.env.VITE_ALLOW_LOCAL_POLL_FALLBACK === 'true') {
+    return true;
+  }
+
+  if (import.meta.env.DEV) {
+    return true;
+  }
+
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  const { hostname } = window.location;
+  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname.endsWith('.local');
+};
+
 const shouldCreateLocalPollFallback = (status: number) => {
-  return status === 404 || status === 405 || status >= 500;
+  return isLocalPollFallbackAllowed() && (status === 404 || status === 405 || status >= 500);
 };
 
 const isPollClosed = (poll: Poll | null | undefined) => {
@@ -429,8 +446,18 @@ export const usePollStore = create<PollState>((set, get) => ({
       const data = ensurePollPayload(await parseApiPayload(res));
       return commitCreatedPoll(data);
     } catch (err: any) {
-      console.info('[picky] falling back to local poll creation', err);
-      return commitCreatedPoll(createLocalPoll(input));
+      if (isLocalPollFallbackAllowed()) {
+        console.info('[picky] falling back to local poll creation', err);
+        return commitCreatedPoll(createLocalPoll(input));
+      }
+
+      set({
+        error:
+          err.message ||
+          '고민을 서버에 저장하지 못했습니다. 잠시 후 다시 시도하거나 관리자에게 문의해 주세요.',
+        isLoading: false,
+      });
+      return null;
     }
   },
 
