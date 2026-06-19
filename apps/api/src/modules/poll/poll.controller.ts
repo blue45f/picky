@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Delete,
   Body,
   Param,
   UsePipes,
@@ -12,7 +13,7 @@ import {
 import { ZodValidationPipe, createZodDto } from 'nestjs-zod';
 import { CreatePollSchema, VoteSchema } from '@picky/shared';
 import { PollService } from './poll.service';
-import { OptionalAuthGuard } from '../auth/auth.guard';
+import { AuthGuard, OptionalAuthGuard } from '../auth/auth.guard';
 
 class CreatePollDto extends createZodDto(CreatePollSchema) {}
 class VoteDto extends createZodDto(VoteSchema) {}
@@ -219,6 +220,12 @@ export class PollController {
   @Post(':id/vote')
   vote(@Param('id') id: string, @Body() dto: VoteDto) {
     return this.pollService.vote(id, dto);
+  }
+
+  @Delete(':id')
+  @UseGuards(AuthGuard)
+  deletePoll(@Param('id') id: string, @Request() req: any) {
+    return this.pollService.deletePoll(id, req.user?.sub ?? null);
   }
 
   private getRequestOrigin(req: any): string {

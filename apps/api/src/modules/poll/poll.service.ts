@@ -1,4 +1,9 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { CreatePollInput, VoteInput, Poll, PollOption, PollComment } from '@picky/shared';
 
@@ -81,6 +86,18 @@ export class PollService {
 
     await this.db.createPoll(newPoll);
     return newPoll;
+  }
+
+  async deletePoll(id: string, userId: string | null): Promise<{ id: string; deleted: true }> {
+    const poll = await this.db.getPollById(id);
+    if (!poll) {
+      throw new NotFoundException(`고민(투표) ID ${id}를 찾을 수 없습니다.`);
+    }
+    if (!userId || !poll.creatorId || poll.creatorId !== userId) {
+      throw new ForbiddenException('내가 만든 고민만 삭제할 수 있습니다.');
+    }
+    await this.db.deletePoll(id);
+    return { id, deleted: true };
   }
 
   async vote(id: string, input: VoteInput): Promise<Poll> {

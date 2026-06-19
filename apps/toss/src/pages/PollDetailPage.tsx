@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@toss/tds-mobile';
 import type { PollOption } from '../shared';
 import { usePollStore } from '../store/usePollStore';
+import { useAuthStore } from '../store/useAuthStore';
 import { useIdentity } from '../store/useIdentity';
 import { rememberRecentPoll } from '../lib/pollHistory';
 import { buildPollResultText, resolvePollShareUrl, sharePoll, copyText } from '../lib/pollShare';
@@ -30,14 +31,16 @@ const maybeRequestReview = () => {
 export function PollDetailPage() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
-  const { currentPoll, isLoading, error, fetchPoll, vote } = usePollStore();
+  const { currentPoll, isLoading, error, fetchPoll, vote, deletePoll } = usePollStore();
   const { displayName, setDisplayName } = useIdentity();
+  const myId = useAuthStore((state) => state.user?.id ?? null);
   const { toast, showToast } = useToast();
 
   const [selectedOptionId, setSelectedOptionId] = useState<number | null>(null);
   const [comment, setComment] = useState('');
   const [voterName, setVoterName] = useState(displayName);
   const [votedOptionId, setVotedOptionId] = useState<number | null>(() => getVotedOptionId(id));
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
     void fetchPoll(id);
@@ -49,6 +52,7 @@ export function PollDetailPage() {
     setVotedOptionId(getVotedOptionId(id));
     setSelectedOptionId(null);
     setComment('');
+    setConfirmDelete(false);
   }, [id]);
 
   const poll = currentPoll && currentPoll.id === id ? currentPoll : null;
@@ -77,6 +81,7 @@ export function PollDetailPage() {
     return top && top.voteCount > 0 ? top.id : null;
   }, [poll, showResults]);
   const leader = poll && showResults && poll.totalVotes > 0 ? leadingOption(poll) : null;
+  const isOwner = Boolean(poll && myId && poll.creatorId === myId);
 
   const handleSelect = (optionId: number) => {
     if (hasVoted || closed) return;
@@ -128,6 +133,25 @@ export function PollDetailPage() {
     const ok = await copyText(buildPollResultText(poll));
     hapticFeedback(ok ? 'tap' : 'error');
     showToast(ok ? '결과를 복사했어요.' : '복사에 실패했어요.');
+  };
+
+  const handleDelete = async () => {
+    if (!poll) return;
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      hapticFeedback('tickWeak');
+      window.setTimeout(() => setConfirmDelete(false), 3000);
+      return;
+    }
+    const ok = await deletePoll(poll.id);
+    if (ok) {
+      hapticFeedback('success');
+      navigate('/', { replace: true });
+    } else {
+      hapticFeedback('error');
+      setConfirmDelete(false);
+      showToast('삭제하지 못했어요.');
+    }
   };
 
   if (isLoading && !poll) {
@@ -333,6 +357,27 @@ export function PollDetailPage() {
           <Button style={{ width: '100%', marginTop: 8 }} variant="weak" onClick={handleCopyResult}>
             결과 복사
           </Button>
+        ) : null}
+        {isOwner ? (
+          <button
+            type="button"
+            className="pressable"
+            onClick={handleDelete}
+            style={{
+              width: '100%',
+              marginTop: 8,
+              minHeight: 52,
+              borderRadius: 14,
+              border: `1px solid ${confirmDelete ? theme.danger : theme.border}`,
+              background: confirmDelete ? theme.dangerSoft : 'transparent',
+              color: theme.danger,
+              fontSize: 15,
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            {confirmDelete ? '한 번 더 누르면 삭제돼요' : '🗑 고민 삭제'}
+          </button>
         ) : null}
       </div>
 

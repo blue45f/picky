@@ -15,6 +15,7 @@ interface PollState {
   fetchPoll: (id: string) => Promise<Poll | null>;
   createPoll: (input: CreatePollInput) => Promise<Poll | null>;
   vote: (id: string, input: VoteInput) => Promise<boolean>;
+  deletePoll: (id: string) => Promise<boolean>;
 }
 
 const LOCAL_POLL_CACHE_KEY = 'picky_local_polls';
@@ -135,6 +136,11 @@ const upsertPollToCache = (poll: Poll, source?: Poll[]) => {
   );
   persistCachedPolls(next);
   return next;
+};
+
+const removePollFromCache = (pollId: string) => {
+  const next = loadCachedPolls().filter((poll) => poll.id !== pollId);
+  persistCachedPolls(next);
 };
 
 const mergePollsWithLocalCache = (remotePolls: Poll[]) => {
@@ -494,6 +500,44 @@ export const usePollStore = create<PollState>((set, get) => ({
       return true;
     } catch (err: any) {
       set({ error: err.message || '에러가 발생했습니다.', isLoading: false });
+      return false;
+    }
+  },
+
+  deletePoll: async (id) => {
+    const dropFromState = () => {
+      removePollFromCache(id);
+      set((state) => ({
+        polls: state.polls.filter((poll) => poll.id !== id),
+        currentPoll: state.currentPoll?.id === id ? null : state.currentPoll,
+        error: null,
+      }));
+    };
+
+    if (id.startsWith('local-')) {
+      dropFromState();
+      return true;
+    }
+
+    set({ error: null });
+    try {
+      const token = getAuthToken();
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+
+      const res = await requestApi(`/polls/${id}`, { method: 'DELETE', headers });
+      if (!res.ok) {
+        const message = await setAuthSessionExpired(res, '고민을 삭제하지 못했습니다.');
+        set({ error: message });
+        return false;
+      }
+
+      dropFromState();
+      return true;
+    } catch (err: any) {
+      set({ error: err.message || '에러가 발생했습니다.' });
       return false;
     }
   },

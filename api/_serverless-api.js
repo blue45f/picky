@@ -279,6 +279,16 @@ var require_database_service = __commonJS({
         nextPolls[idx] = poll;
         await this.commit({ ...this.data, polls: nextPolls });
       }
+      async deletePoll(id) {
+        await this.refresh();
+        const exists = this.data.polls.some((p) => p.id === id);
+        if (!exists) {
+          return false;
+        }
+        const nextPolls = this.data.polls.filter((p) => p.id !== id);
+        await this.commit({ ...this.data, polls: nextPolls });
+        return true;
+      }
       async getUsers() {
         await this.refresh();
         return [...this.data.users];
@@ -1041,6 +1051,17 @@ var require_poll_service = __commonJS({
         await this.db.createPoll(newPoll);
         return newPoll;
       }
+      async deletePoll(id, userId) {
+        const poll = await this.db.getPollById(id);
+        if (!poll) {
+          throw new common_1.NotFoundException(`\uACE0\uBBFC(\uD22C\uD45C) ID ${id}\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.`);
+        }
+        if (!userId || !poll.creatorId || poll.creatorId !== userId) {
+          throw new common_1.ForbiddenException("\uB0B4\uAC00 \uB9CC\uB4E0 \uACE0\uBBFC\uB9CC \uC0AD\uC81C\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.");
+        }
+        await this.db.deletePoll(id);
+        return { id, deleted: true };
+      }
       async vote(id, input) {
         const poll = await this.db.getPollById(id);
         if (!poll) {
@@ -1276,6 +1297,9 @@ var require_poll_controller = __commonJS({
       vote(id, dto) {
         return this.pollService.vote(id, dto);
       }
+      deletePoll(id, req) {
+        return this.pollService.deletePoll(id, req.user?.sub ?? null);
+      }
       getRequestOrigin(req) {
         const proto = (String(req.headers["x-forwarded-proto"] || req.protocol || "https").split(",")[0] ?? "").trim();
         const host = (String(req.headers["x-forwarded-host"] || req.headers.host || "localhost:5173").split(",")[0] ?? "").trim();
@@ -1422,6 +1446,15 @@ var require_poll_controller = __commonJS({
       __metadata("design:paramtypes", [String, VoteDto]),
       __metadata("design:returntype", void 0)
     ], PollController.prototype, "vote", null);
+    __decorate([
+      (0, common_1.Delete)(":id"),
+      (0, common_1.UseGuards)(auth_guard_1.AuthGuard),
+      __param(0, (0, common_1.Param)("id")),
+      __param(1, (0, common_1.Request)()),
+      __metadata("design:type", Function),
+      __metadata("design:paramtypes", [String, Object]),
+      __metadata("design:returntype", void 0)
+    ], PollController.prototype, "deletePoll", null);
     exports2.PollController = PollController = __decorate([
       (0, common_1.Controller)("polls"),
       (0, common_1.UsePipes)(nestjs_zod_1.ZodValidationPipe),

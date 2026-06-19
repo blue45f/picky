@@ -296,6 +296,17 @@ export class DatabaseService implements OnModuleInit {
     await this.commit({ ...this.data, polls: nextPolls });
   }
 
+  async deletePoll(id: string): Promise<boolean> {
+    await this.refresh();
+    const exists = this.data.polls.some((p) => p.id === id);
+    if (!exists) {
+      return false;
+    }
+    const nextPolls = this.data.polls.filter((p) => p.id !== id);
+    await this.commit({ ...this.data, polls: nextPolls });
+    return true;
+  }
+
   async getUsers(): Promise<DatabaseUser[]> {
     await this.refresh();
     return [...this.data.users];
