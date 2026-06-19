@@ -790,6 +790,9 @@ export const PollDetail: React.FC = () => {
     PRESENT_REFRESH_INTERVAL_SECONDS,
   );
   const [isPresentAutoRefreshPaused, setIsPresentAutoRefreshPaused] = useState(false);
+  // 결과 활용 도구는 기본 접힘 + 탭 1개씩만 노출해 첫 화면 정보량을 줄여요.
+  const [toolsExpanded, setToolsExpanded] = useState(false);
+  const [activeToolTab, setActiveToolTab] = useState<string>('audience');
   const hasVoted = currentPoll ? votedHistory[currentPoll.id] !== undefined : false;
 
   // Load local vote history
@@ -2893,39 +2896,142 @@ export const PollDetail: React.FC = () => {
           </section>
         ) : null}
 
-        {!isEmbedMode && !isPresentationMode ? (
-          <AudienceLaunchKit
-            poll={currentPoll}
-            shareUrl={shareUrl}
-            endAtLabel={endAtLabel}
-            resultsVisibilityLabel={RESULTS_VISIBILITY_LABELS[resultsVisibility]}
-            canViewResults={canViewResults}
-          />
-        ) : null}
+        {!isEmbedMode && !isPresentationMode
+          ? (() => {
+              const tools = [
+                { key: 'audience', label: '🚀 공유 준비', available: true },
+                { key: 'followup', label: '🧭 후속 결정', available: canViewResults },
+                { key: 'actions', label: '✅ 액션 아이템', available: canViewResults },
+                { key: 'report', label: '📝 리포트', available: canViewResults },
+                { key: 'facilitation', label: '🎙️ 라이브 진행', available: canViewResults },
+                { key: 'topics', label: '💬 의견 토픽', available: canViewResults },
+              ].filter((tool) => tool.available);
+              const activeTool = tools.some((tool) => tool.key === activeToolTab)
+                ? activeToolTab
+                : tools[0]?.key;
 
-        {canViewResults && !isEmbedMode && !isPresentationMode ? (
-          <DecisionFollowUpPanel poll={currentPoll} shareUrl={shareUrl} pollClosed={pollClosed} />
-        ) : null}
+              return (
+                <section
+                  className="content-card"
+                  style={{
+                    padding: '1.1rem',
+                    display: 'grid',
+                    gap: toolsExpanded ? '1rem' : '0.5rem',
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setToolsExpanded((value) => !value)}
+                    aria-expanded={toolsExpanded}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '0.75rem',
+                      width: '100%',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: 0,
+                      color: 'var(--text-primary)',
+                    }}
+                  >
+                    <span style={{ fontWeight: 800, fontSize: '0.95rem' }}>🧰 결과 활용 도구</span>
+                    <span
+                      style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700 }}
+                    >
+                      {toolsExpanded ? '접기 ▲' : '펼치기 ▼'}
+                    </span>
+                  </button>
 
-        {canViewResults && !isEmbedMode && !isPresentationMode ? (
-          <ActionItemPlanner poll={currentPoll} shareUrl={shareUrl} />
-        ) : null}
+                  {toolsExpanded ? (
+                    <>
+                      <div
+                        role="tablist"
+                        aria-label="결과 활용 도구"
+                        style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}
+                      >
+                        {tools.map((tool) => {
+                          const selected = tool.key === activeTool;
+                          return (
+                            <button
+                              key={tool.key}
+                              type="button"
+                              role="tab"
+                              aria-selected={selected}
+                              onClick={() => setActiveToolTab(tool.key)}
+                              className="ghost-btn"
+                              style={{
+                                fontSize: '0.72rem',
+                                fontWeight: 700,
+                                borderColor: selected
+                                  ? 'var(--brand-primary)'
+                                  : 'var(--bg-card-border)',
+                                color: selected ? 'var(--brand-primary)' : 'var(--text-muted)',
+                                background: selected ? 'rgba(20, 184, 166, 0.08)' : 'transparent',
+                              }}
+                            >
+                              {tool.label}
+                            </button>
+                          );
+                        })}
+                      </div>
 
-        {canViewResults && !isEmbedMode && !isPresentationMode ? (
-          <StakeholderReportBuilder
-            poll={currentPoll}
-            shareUrl={shareUrl}
-            pollClosed={pollClosed}
-          />
-        ) : null}
-
-        {canViewResults && !isEmbedMode && !isPresentationMode ? (
-          <LiveFacilitationConsole poll={currentPoll} shareUrl={shareUrl} pollClosed={pollClosed} />
-        ) : null}
-
-        {canViewResults && !isEmbedMode && !isPresentationMode ? (
-          <OpinionTopicCloud poll={currentPoll} />
-        ) : null}
+                      {activeTool === 'audience' ? (
+                        <AudienceLaunchKit
+                          poll={currentPoll}
+                          shareUrl={shareUrl}
+                          endAtLabel={endAtLabel}
+                          resultsVisibilityLabel={RESULTS_VISIBILITY_LABELS[resultsVisibility]}
+                          canViewResults={canViewResults}
+                        />
+                      ) : null}
+                      {activeTool === 'followup' ? (
+                        <DecisionFollowUpPanel
+                          poll={currentPoll}
+                          shareUrl={shareUrl}
+                          pollClosed={pollClosed}
+                        />
+                      ) : null}
+                      {activeTool === 'actions' ? (
+                        <ActionItemPlanner poll={currentPoll} shareUrl={shareUrl} />
+                      ) : null}
+                      {activeTool === 'report' ? (
+                        <StakeholderReportBuilder
+                          poll={currentPoll}
+                          shareUrl={shareUrl}
+                          pollClosed={pollClosed}
+                        />
+                      ) : null}
+                      {activeTool === 'facilitation' ? (
+                        <LiveFacilitationConsole
+                          poll={currentPoll}
+                          shareUrl={shareUrl}
+                          pollClosed={pollClosed}
+                        />
+                      ) : null}
+                      {activeTool === 'topics' ? <OpinionTopicCloud poll={currentPoll} /> : null}
+                    </>
+                  ) : (
+                    <p
+                      style={{
+                        margin: 0,
+                        fontSize: '0.76rem',
+                        color: 'var(--text-muted)',
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      공유 준비
+                      {canViewResults
+                        ? ' · 후속 결정 · 액션 아이템 · 리포트 · 라이브 진행 · 의견 토픽'
+                        : ''}
+                      을 한 곳에서 펼쳐 볼 수 있어요.
+                    </p>
+                  )}
+                </section>
+              );
+            })()
+          : null}
 
         {!hasVoted && !pollClosed && resultsVisibility === 'always' ? (
           <section
