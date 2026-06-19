@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button, Top } from '@toss/tds-mobile';
 import type { Poll } from '../shared';
 import { usePollStore } from '../store/usePollStore';
+import { useAuthStore } from '../store/useAuthStore';
 import { theme, pageShell, stickyActionBar } from '../theme';
 import { formatNumber, formatRelativeTime, getRemainingMs } from '../lib/format';
 import { isPollClosed, leadingOption, optionPercent } from '../lib/poll';
@@ -230,11 +231,18 @@ function ListSkeleton() {
 export function PollListPage() {
   const navigate = useNavigate();
   const { polls, isLoading, error, fetchPolls } = usePollStore();
+  const myId = useAuthStore((state) => state.user?.id ?? null);
 
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [sortKey, setSortKey] = useState<SortKey>('recent');
+  const [myOnly, setMyOnly] = useState(false);
   const [recent, setRecent] = useState<RecentPollHistoryItem[]>([]);
+
+  const myPollCount = useMemo(
+    () => (myId ? polls.filter((poll) => poll.creatorId === myId).length : 0),
+    [polls, myId],
+  );
 
   useEffect(() => {
     void fetchPolls();
@@ -246,6 +254,7 @@ export function PollListPage() {
   const visiblePolls = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     const filtered = polls.filter((poll) => {
+      if (myOnly && (!myId || poll.creatorId !== myId)) return false;
       const closed = isPollClosed(poll);
       if (statusFilter === 'open' && closed) return false;
       if (statusFilter === 'closed' && !closed) return false;
@@ -274,7 +283,7 @@ export function PollListPage() {
       sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     }
     return sorted;
-  }, [polls, query, statusFilter, sortKey]);
+  }, [polls, query, statusFilter, sortKey, myOnly, myId]);
 
   const goToPoll = (id: string) => {
     hapticFeedback('tickWeak');
@@ -282,7 +291,7 @@ export function PollListPage() {
   };
 
   const isInitialLoading = isLoading && polls.length === 0;
-  const showRecent = recent.length > 0 && !query.trim() && statusFilter === 'all';
+  const showRecent = recent.length > 0 && !query.trim() && statusFilter === 'all' && !myOnly;
 
   return (
     <div style={{ background: theme.bg, minHeight: '100dvh' }}>
@@ -355,31 +364,55 @@ export function PollListPage() {
           />
         </div>
 
-        <div role="group" aria-label="정렬" style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
-          {SORT_OPTIONS.map((option) => {
-            const active = option.value === sortKey;
-            return (
-              <button
-                key={option.value}
-                type="button"
-                className="pressable"
-                aria-pressed={active}
-                onClick={() => setSortKey(option.value)}
-                style={{
-                  padding: '6px 12px',
-                  borderRadius: theme.radiusPill,
-                  border: `1px solid ${active ? theme.accent : theme.border}`,
-                  background: active ? theme.accentSoft : 'transparent',
-                  color: active ? theme.accent : theme.textMuted,
-                  fontSize: 12,
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                }}
-              >
-                {option.label}
-              </button>
-            );
-          })}
+        <div style={{ display: 'flex', gap: 6, marginBottom: 16, alignItems: 'center' }}>
+          <div role="group" aria-label="정렬" style={{ display: 'flex', gap: 6 }}>
+            {SORT_OPTIONS.map((option) => {
+              const active = option.value === sortKey;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  className="pressable"
+                  aria-pressed={active}
+                  onClick={() => setSortKey(option.value)}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: theme.radiusPill,
+                    border: `1px solid ${active ? theme.accent : theme.border}`,
+                    background: active ? theme.accentSoft : 'transparent',
+                    color: active ? theme.accent : theme.textMuted,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+          {myPollCount > 0 ? (
+            <button
+              type="button"
+              className="pressable"
+              aria-pressed={myOnly}
+              onClick={() => setMyOnly((prev) => !prev)}
+              style={{
+                marginLeft: 'auto',
+                padding: '6px 12px',
+                borderRadius: theme.radiusPill,
+                border: `1px solid ${myOnly ? theme.accent : theme.border}`,
+                background: myOnly ? theme.accentSoft : 'transparent',
+                color: myOnly ? theme.accent : theme.textMuted,
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              내 고민 {myPollCount}
+            </button>
+          ) : null}
         </div>
 
         {showRecent ? <RecentStrip items={recent} onSelect={goToPoll} /> : null}
