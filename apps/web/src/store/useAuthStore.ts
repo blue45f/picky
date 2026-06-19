@@ -1,6 +1,9 @@
 import { create } from 'zustand';
 import { parseApiPayload, requestApi } from '../lib/api';
-import { createAuthStoreState, type AuthState } from './authStoreFactory';
+import {
+  createAuthStoreState,
+  type AuthState,
+} from '../../../../packages/client/src/store/authStoreFactory';
 
 export const useAuthStore = create<AuthState>(
   createAuthStoreState({

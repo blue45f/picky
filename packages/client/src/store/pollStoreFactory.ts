@@ -1,6 +1,12 @@
-import type { StateCreator } from 'zustand';
 import type { Poll, CreatePollInput, VoteInput } from '@picky/shared';
 import type { AuthState } from './authStoreFactory';
+
+type StoreSet<T> = (
+  partial: Partial<T> | T | ((state: T) => Partial<T> | T),
+  replace?: false,
+) => void;
+type StoreGet<T> = () => T;
+type StoreStateCreator<T> = (set: StoreSet<T>, get: StoreGet<T>) => T;
 
 export interface PollState {
   polls: Poll[];
@@ -340,7 +346,7 @@ export const createPollStoreState =
     canCreateLocalPollFromStatus,
     canCreateLocalPollFromError,
     canApplyLocalVoteFallback,
-  }: PollStoreFactoryOptions): StateCreator<PollState> =>
+  }: PollStoreFactoryOptions): StoreStateCreator<PollState> =>
   (set, get) => ({
     polls: [],
     currentPoll: null,

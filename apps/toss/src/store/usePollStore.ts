@@ -1,6 +1,9 @@
 import { create } from 'zustand';
 import { parseApiPayload, requestApi } from '../lib/api';
-import { createPollStoreState, type PollState } from '../../../web/src/store/pollStoreFactory';
+import {
+  createPollStoreState,
+  type PollState,
+} from '../../../../packages/client/src/store/pollStoreFactory';
 import { useAuthStore } from './useAuthStore';
 
 const isRetryableLocalPollStatus = (status: number) =>

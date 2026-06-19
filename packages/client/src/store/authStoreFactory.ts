@@ -1,4 +1,3 @@
-import type { StateCreator } from 'zustand';
 import type {
   UserProfile,
   RegisterInput,
@@ -6,6 +5,13 @@ import type {
   GuestRegisterInput,
   AuthResult,
 } from '@picky/shared';
+
+type StoreSet<T> = (
+  partial: Partial<T> | T | ((state: T) => Partial<T> | T),
+  replace?: false,
+) => void;
+type StoreGet<T> = () => T;
+type StoreStateCreator<T> = (set: StoreSet<T>, get: StoreGet<T>) => T;
 
 export interface AuthState {
   user: UserProfile | null;
@@ -264,7 +270,7 @@ export const createAuthStoreState =
     parseApiPayload,
     requestApi,
     tossAppLogin,
-  }: AuthStoreFactoryOptions): StateCreator<AuthState> =>
+  }: AuthStoreFactoryOptions): StoreStateCreator<AuthState> =>
   (set, get) => {
     const token = localStorage.getItem('picky_token');
     const guestName = localStorage.getItem('picky_guest_name') || '';

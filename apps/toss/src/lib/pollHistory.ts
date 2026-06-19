@@ -1,1 +1,1 @@
-export * from '../../../web/src/lib/pollHistory';
+export * from '../../../../packages/client/src/lib/pollHistory';

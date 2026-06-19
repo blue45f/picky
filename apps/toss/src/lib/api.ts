@@ -1,1 +1,1 @@
-export * from '../../../web/src/lib/api';
+export * from '../../../../packages/client/src/lib/api';

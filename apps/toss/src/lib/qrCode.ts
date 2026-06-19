@@ -1,1 +1,1 @@
-export * from '../../../web/src/lib/qrCode';
+export * from '../../../../packages/client/src/lib/qrCode';
