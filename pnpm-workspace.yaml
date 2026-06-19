@@ -10,6 +10,9 @@ allowBuilds:
   esbuild: true
   prisma: true
   protobufjs: true
+auditConfig:
+  ignoreGhsas:
+    - GHSA-2p57-rm9w-gvfp
 minimumReleaseAgeExclude:
   - '@apps-in-toss/analytics@2.9.1'
   - '@apps-in-toss/bridge-core@2.9.1'
@@ -25,3 +28,24 @@ minimumReleaseAgeExclude:
   - '@apps-in-toss/web-config@2.9.1'
   - '@apps-in-toss/web-framework@2.9.1'
   - '@vercel/blob@2.4.1'
+
+overrides:
+  handlebars: '>=4.7.9'
+  multer: '>=2.2.0'
+  undici: '^7.28.0'
+  ws: '>=8.21.0'
+  form-data: '>=4.0.6'
+  hono: '>=4.12.25'
+  find-my-way: '>=8.2.2'
+  '@fastify/middie': '>=9.3.2'
+  fastify: '>=5.7.2'
+  fast-uri: '>=3.1.2'
+  path-to-regexp: '>=6.3.0'
+  serialize-javascript: '>=7.0.3'
+  piscina: '>=4.9.3'
+  drizzle-orm: '>=0.45.2'
+  vitest: '>=4.1.9'
+  '@vitest/coverage-v8': '>=4.1.9'
+  '@vitest/ui': '>=4.1.9'
+  vite: '>=8.0.16'
+  jspdf: '>=4.2.1'

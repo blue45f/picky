@@ -18,6 +18,8 @@
     "lint": "eslint .",
     "lint:strict": "eslint . --max-warnings=0",
     "lint:ci": "pnpm run lint:strict",
+    "audit:security": "pnpm audit --audit-level high --ignore GHSA-2p57-rm9w-gvfp",
+    "lint:security": "pnpm run lint:strict && pnpm run audit:security",
     "format": "prettier --write \"**/*.{ts,tsx,js,json,md,css,yml,yaml}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,json,md,css,yml,yaml}\"",
     "typecheck": "pnpm --filter @picky/shared run build && pnpm -r run typecheck",
@@ -25,7 +27,7 @@
     "check:shared": "node scripts/sync-toss-shared.mjs",
     "sync:toss-shared": "node scripts/sync-toss-shared.mjs --write",
     "verify": "pnpm run check:shared && pnpm run format:check && pnpm run lint:ci && pnpm run typecheck && pnpm run test && pnpm run build",
-    "verify:push": "pnpm run verify",
+    "verify:push": "pnpm run verify && pnpm run lint:security",
     "prepare": "husky"
   },
   "devDependencies": {
