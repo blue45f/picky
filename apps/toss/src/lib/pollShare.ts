@@ -1,4 +1,5 @@
 import type { Poll } from '../shared';
+import { optionPercent, optionsByVotes } from './poll';
 import { shareMessage } from './toss';
 
 const SHARE_PREFIX = '[픽플로우 투표] ';
@@ -48,6 +49,23 @@ export const resolveShareText = (poll: Poll): string => {
 export const sharePoll = async (poll: Poll): Promise<'toss' | 'web-share' | 'clipboard' | null> => {
   const message = `${resolveShareText(poll)}\n${resolvePollShareUrl(poll)}`;
   return shareMessage(message);
+};
+
+/** 득표순 결과를 사람이 읽기 좋은 텍스트로. 공유 링크 포함. */
+export const buildPollResultText = (poll: Poll): string => {
+  const lines = optionsByVotes(poll).map((option, index) => {
+    const percent = optionPercent(option.voteCount, poll.totalVotes);
+    const crown = index === 0 && option.voteCount > 0 ? '👑 ' : '';
+    return `${crown}${option.text} — ${percent}% (${option.voteCount}표)`;
+  });
+  return [
+    `${SHARE_PREFIX}${poll.question}`,
+    `총 ${poll.totalVotes}표`,
+    '',
+    ...lines,
+    '',
+    resolvePollShareUrl(poll),
+  ].join('\n');
 };
 
 export const copyText = async (text: string): Promise<boolean> => {
