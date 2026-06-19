@@ -104,6 +104,30 @@ export function getMiniAppSchemeUri(): string | null {
 }
 
 /**
+ * 진입 스킴(intoss://pickflow/poll/<id> 등)을 앱 내부 경로로 해석.
+ * 딥링크로 들어왔을 때 해당 투표/작성 화면으로 바로 이동시키기 위한 화이트리스트 파서.
+ * @returns 안전한 내부 경로(`/poll/:id` · `/create`) 또는 null
+ */
+export function parseEntryRoute(): string | null {
+  const uri = getMiniAppSchemeUri();
+  if (!uri) {
+    return null;
+  }
+  const match = uri.match(/^[a-z][a-z0-9+.-]*:\/\/[^/?#]+(\/[^?#]*)?/i);
+  const path = (match?.[1] ?? '').replace(/\/+$/, '');
+  if (!path) {
+    return null;
+  }
+  if (/^\/poll\/[A-Za-z0-9_-]+$/.test(path)) {
+    return path;
+  }
+  if (path === '/create') {
+    return path;
+  }
+  return null;
+}
+
+/**
  * 메시지 공유. 토스 네이티브 공유 → navigator.share → 클립보드 순으로 폴백.
  * @returns 공유/복사 성공 여부
  */
