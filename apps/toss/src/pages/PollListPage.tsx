@@ -33,6 +33,7 @@ function PollCard({ poll, index, onClick }: { poll: Poll; index: number; onClick
   const closed = isPollClosed(poll) || (remaining != null && remaining <= 0);
   const voted = hasVotedLocally(poll.id);
   const percent = leading ? optionPercent(leading.voteCount, poll.totalVotes) : 0;
+  const repImage = poll.options.find((option) => option.imageUrl)?.imageUrl ?? null;
 
   return (
     <button
@@ -62,22 +63,43 @@ function PollCard({ poll, index, onClick }: { poll: Poll; index: number; onClick
         </span>
       </div>
 
-      <strong style={{ fontSize: 16, lineHeight: 1.4, display: 'block' }}>{poll.question}</strong>
-      {poll.description ? (
-        <p
-          style={{
-            margin: '6px 0 0',
-            fontSize: 13,
-            color: theme.textMuted,
-            display: '-webkit-box',
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: 'vertical',
-            overflow: 'hidden',
-          }}
-        >
-          {poll.description}
-        </p>
-      ) : null}
+      <div style={{ display: 'flex', gap: 12 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <strong style={{ fontSize: 16, lineHeight: 1.4, display: 'block' }}>
+            {poll.question}
+          </strong>
+          {poll.description ? (
+            <p
+              style={{
+                margin: '6px 0 0',
+                fontSize: 13,
+                color: theme.textMuted,
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+              }}
+            >
+              {poll.description}
+            </p>
+          ) : null}
+        </div>
+        {repImage ? (
+          <img
+            src={repImage}
+            alt=""
+            loading="lazy"
+            style={{
+              flexShrink: 0,
+              width: 64,
+              height: 64,
+              objectFit: 'cover',
+              borderRadius: 10,
+              border: `1px solid ${theme.border}`,
+            }}
+          />
+        ) : null}
+      </div>
 
       {leading ? (
         <div style={{ marginTop: 12 }}>
