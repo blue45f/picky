@@ -30,6 +30,8 @@ import type { Poll } from '@picky/shared';
 import { usePollStore } from '../store/usePollStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { useScrollReveal } from '../hooks/useScrollReveal';
+import { useCountUp } from '../hooks/useCountUp';
 import { buildPollEmbedCode, copyText, resolvePollShareUrl } from '../lib/pollShare';
 import {
   clearRecentPollHistory,
@@ -441,6 +443,39 @@ export const PollList: React.FC = () => {
     fetchPolls();
   }, [fetchPolls]);
 
+  // Keyboard shortcuts — "/" focuses search, "c" opens the create flow, "g"
+  // jumps to the JOIN CODE field. Ignored while typing in an input/textarea so
+  // it never hijacks normal text entry.
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.metaKey || event.ctrlKey || event.altKey) {
+        return;
+      }
+
+      const target = event.target as HTMLElement | null;
+      const tag = target?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable) {
+        return;
+      }
+
+      if (event.key === '/') {
+        event.preventDefault();
+        document.getElementById('poll-search-input')?.focus();
+      } else if (event.key === 'c' || event.key === 'C') {
+        event.preventDefault();
+        navigate('/create');
+      } else if (event.key === 'g' || event.key === 'G') {
+        event.preventDefault();
+        const joinField = document.getElementById('join-code-input');
+        joinField?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        (joinField as HTMLInputElement | null)?.focus();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [navigate]);
+
   useEffect(() => {
     const syncRecentPollHistory = () => {
       setRecentPollHistory(getRecentPollHistory());
@@ -544,6 +579,15 @@ export const PollList: React.FC = () => {
     [polls],
   );
   const openPollCount = useMemo(() => polls.filter((poll) => !isPollClosed(poll)).length, [polls]);
+
+  // Animated hero counters — count up to the live totals once data arrives.
+  const pollsCountDisplay = useCountUp(polls.length);
+  const totalVotesDisplay = useCountUp(totalVotes);
+  const totalCommentsDisplay = useCountUp(totalComments);
+
+  // Scroll-reveal anchors for the page's primary sections.
+  const flowSectionRef = useScrollReveal<HTMLDivElement>();
+  const insightSectionRef = useScrollReveal<HTMLDivElement>();
 
   const activeFilters = useMemo(() => {
     const labels: string[] = [];
@@ -999,78 +1043,126 @@ export const PollList: React.FC = () => {
       style={{ display: 'flex', flexDirection: 'column', gap: '1.4rem' }}
     >
       <div className="hero-shell">
-        <div
-          style={{
-            position: 'absolute',
-            width: '340px',
-            height: '120px',
-            right: '-84px',
-            top: '18px',
-            transform: 'rotate(-18deg)',
-            background:
-              'linear-gradient(90deg, rgba(250, 204, 21, 0), rgba(250, 204, 21, 0.14), rgba(45, 212, 191, 0.1), rgba(250, 204, 21, 0))',
-            pointerEvents: 'none',
-          }}
-        />
+        <div style={{ display: 'grid', gap: '0.95rem', position: 'relative' }}>
+          <span className="hero-live-badge hero-enter" style={{ ['--enter-i' as string]: 0 }}>
+            <span className="hero-live-dot" aria-hidden="true" />
+            지금 {openPollCount}개 투표 진행 중
+          </span>
 
-        <div style={{ display: 'grid', gap: '0.65rem', position: 'relative' }}>
-          <p
-            style={{
-              fontSize: '0.7rem',
-              color: 'var(--brand-accent-gold)',
-              fontWeight: 700,
-              letterSpacing: '0.07em',
-            }}
-          >
-            PICKFLOW NOW
-          </p>
-          <h1
-            style={{
-              fontSize: '1.8rem',
-              fontWeight: 900,
-              color: 'var(--text-primary)',
-              letterSpacing: 0,
-            }}
-          >
-            빠른 의사결정이 필요한 순간을 위한 투표 플랫폼
+          <h1 className="hero-title hero-enter" style={{ ['--enter-i' as string]: 1 }}>
+            고민되는 선택, <span className="hero-accent">링크 하나</span>로 빠르게 물어보세요
           </h1>
-          <p
-            style={{
-              color: 'var(--text-secondary)',
-              maxWidth: '640px',
-              fontSize: '0.89rem',
-              lineHeight: 1.65,
-            }}
-          >
-            일상이나 팀 회의에서 결정이 어려운 항목을 카드로 등록하고, 지인/동료에게 링크를 전달하면
-            바로 의견을 수집할 수 있습니다.
+
+          <p className="hero-lede hero-enter" style={{ ['--enter-i' as string]: 2 }}>
+            점심 메뉴부터 팀 회의 안건까지 — 선택지를 카드로 만들고 지인·동료에게 링크를 보내면 바로
+            의견이 모입니다. 결과는 실시간으로, 결정은 더 가볍게.
           </p>
 
-          <div className="kpi-grid" style={{ marginTop: '0.4rem' }}>
-            <article className="kpi-item">
+          <div
+            className="hero-enter"
+            style={{
+              ['--enter-i' as string]: 3,
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              gap: '0.6rem',
+              marginTop: '0.1rem',
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => navigate('/create')}
+              className="btn-primary hero-cta"
+            >
+              <Plus size={17} />새 고민 만들기
+              <ArrowRight size={16} />
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                document.getElementById('poll-list-anchor')?.scrollIntoView({
+                  behavior: 'smooth',
+                  block: 'start',
+                });
+              }}
+              className="btn-secondary hero-secondary-cta"
+            >
+              <Vote size={16} />
+              둘러보기
+            </button>
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                color: 'var(--text-muted)',
+                fontSize: '0.68rem',
+              }}
+            >
+              <kbd
+                style={{
+                  border: '1px solid var(--bg-card-border-hover)',
+                  borderRadius: '6px',
+                  padding: '1px 6px',
+                  fontFamily: 'var(--font-sans)',
+                  fontSize: '0.66rem',
+                  fontWeight: 800,
+                  color: 'var(--text-secondary)',
+                  background: 'rgba(255,255,255,0.04)',
+                }}
+              >
+                C
+              </kbd>
+              <span>키로 바로 작성</span>
+            </span>
+          </div>
+
+          <div
+            className="kpi-grid hero-enter"
+            style={{ ['--enter-i' as string]: 4, marginTop: '0.5rem' }}
+          >
+            <article
+              className="kpi-item"
+              style={{ ['--kpi-glow' as string]: 'oklch(67% 0.14 165 / 0.12)' }}
+            >
               <span className="segment-title" style={{ fontSize: '0.83rem' }}>
                 지금 운영 중인 고민
               </span>
-              <strong style={{ fontSize: '1.35rem', color: 'var(--brand-primary)' }}>
-                {polls.length}
+              <strong
+                className="kpi-value"
+                style={{ fontSize: '1.6rem', color: 'var(--brand-primary-light)' }}
+              >
+                {pollsCountDisplay}
               </strong>
               <span className="form-note">누적 등록 수</span>
             </article>
-            <article className="kpi-item">
+            <article
+              className="kpi-item"
+              style={{ ['--kpi-glow' as string]: 'oklch(72% 0.15 170 / 0.12)' }}
+            >
               <span className="segment-title" style={{ fontSize: '0.83rem' }}>
                 총 투표 수
               </span>
-              <strong style={{ fontSize: '1.35rem', color: 'var(--brand-accent-teal)' }}>
-                {totalVotes}
+              <strong
+                className="kpi-value"
+                style={{ fontSize: '1.6rem', color: 'var(--brand-accent-teal)' }}
+              >
+                {totalVotesDisplay}
               </strong>
               <span className="form-note">실제 참여 누적 건수</span>
             </article>
-            <article className="kpi-item">
+            <article
+              className="kpi-item"
+              style={{ ['--kpi-glow' as string]: 'oklch(78% 0.14 85 / 0.12)' }}
+            >
               <span className="segment-title" style={{ fontSize: '0.83rem' }}>
                 참여 피드백 수
               </span>
-              <strong style={{ fontSize: '1.35rem', color: 'var(--brand-accent-gold)' }}>
-                {totalComments}
+              <strong
+                className="kpi-value"
+                style={{ fontSize: '1.6rem', color: 'var(--brand-accent-gold)' }}
+              >
+                {totalCommentsDisplay}
               </strong>
               <span className="form-note">코멘트/한마디 건수</span>
             </article>
@@ -1522,6 +1614,7 @@ export const PollList: React.FC = () => {
       </div>
 
       <section
+        ref={flowSectionRef}
         aria-label="의사결정 운영 흐름"
         style={{
           display: 'grid',
@@ -1593,6 +1686,7 @@ export const PollList: React.FC = () => {
             return (
               <article
                 key={card.key}
+                className="press-tile"
                 style={{
                   minWidth: 0,
                   minHeight: '168px',
@@ -1735,6 +1829,7 @@ export const PollList: React.FC = () => {
       </section>
 
       <section
+        ref={insightSectionRef}
         className="content-card"
         style={{
           padding: '1rem',
@@ -1812,6 +1907,7 @@ export const PollList: React.FC = () => {
               <button
                 key={card.key}
                 type="button"
+                className="press-tile"
                 onClick={() => {
                   setSignal(card.signal);
                   setScope('all');
@@ -2173,6 +2269,7 @@ export const PollList: React.FC = () => {
       </section>
 
       <div
+        id="poll-list-anchor"
         className="content-card"
         style={{
           padding: '0.95rem',
@@ -2197,9 +2294,10 @@ export const PollList: React.FC = () => {
             style={{ position: 'absolute', left: '11px', color: 'var(--text-muted)' }}
           />
           <input
+            id="poll-search-input"
             value={searchInput}
             onChange={(event) => setSearchInput(event.target.value)}
-            placeholder="고민 제목/설명/코드를 검색하세요"
+            placeholder="고민 제목/설명/코드 검색 ( / 키 )"
             className="form-input"
             aria-label="고민 검색"
             style={{ paddingLeft: '32px', paddingRight: searchInput ? '34px' : '12px', flex: 1 }}
@@ -2458,7 +2556,9 @@ export const PollList: React.FC = () => {
             justifyItems: 'center',
           }}
         >
-          <Sparkles size={36} style={{ color: 'var(--brand-accent-gold)' }} />
+          <span className="empty-state-icon" aria-hidden="true">
+            <Sparkles size={36} style={{ color: 'var(--brand-accent-gold)' }} />
+          </span>
           <h3 style={{ fontSize: '1rem', fontWeight: 700 }}>
             {scope !== 'all' || normalizedQuery
               ? '조건에 맞는 고민이 없습니다.'
@@ -2478,13 +2578,51 @@ export const PollList: React.FC = () => {
                 ? '비회원으로도 간단히 시작할 수 있습니다. 첫 질문을 등록하고 링크를 공유해보세요.'
                 : '첫 번째 고민을 생성하고 팀/커뮤니티의 판단을 빠르게 받아보세요.'}
           </p>
-          <button
-            onClick={() => navigate('/create')}
-            className="btn-primary"
-            style={{ padding: '10px 20px', fontSize: '0.85rem' }}
+          <div
+            style={{
+              display: 'flex',
+              gap: '0.5rem',
+              flexWrap: 'wrap',
+              justifyContent: 'center',
+            }}
           >
-            첫 고민 작성하러 가기
-          </button>
+            {hasActiveFilters ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setScope('all');
+                  setQuery('');
+                  setSearchInput('');
+                  setSortBy('latest');
+                  setSignal('all');
+                }}
+                className="btn-secondary"
+                style={{
+                  padding: '10px 18px',
+                  fontSize: '0.85rem',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+              >
+                <X size={15} />
+                필터 초기화
+              </button>
+            ) : null}
+            <button
+              onClick={() => navigate('/create')}
+              className="btn-primary"
+              style={{
+                padding: '10px 20px',
+                fontSize: '0.85rem',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '7px',
+              }}
+            >
+              <Plus size={16} />첫 고민 작성하러 가기
+            </button>
+          </div>
         </div>
       ) : (
         <>

@@ -39,6 +39,15 @@
   --focus-ring: 0 0 0 3px rgba(20, 184, 166, 0.16);
 
   --nav-height: 64px;
+
+  /* Motion easing — confident exponential deceleration (no bounce/elastic) */
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Semantic z-index scale */
+  --z-sticky: 60;
+  --z-overlay: 100;
 }
 
 * {
@@ -594,8 +603,9 @@ body.present-mode .page-shell {
 
 .hero-shell {
   position: relative;
+  isolation: isolate;
   overflow: hidden;
-  padding: 1.65rem;
+  padding: clamp(1.5rem, 3.4vw, 2.6rem);
   border-radius: var(--radius-lg);
   background: linear-gradient(
     140deg,
@@ -604,7 +614,296 @@ body.present-mode .page-shell {
     oklch(15% 0.018 205) 100%
   );
   border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    var(--shadow-md),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* Animated aurora accent — drifting brand-hued light behind the hero copy.
+   Sits below content (z -1) and never intercepts pointer events. */
+.hero-shell::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: -40% -10% auto -10%;
+  height: 150%;
+  background:
+    radial-gradient(38% 60% at 18% 22%, oklch(72% 0.15 170 / 0.34), transparent 70%),
+    radial-gradient(34% 56% at 88% 8%, oklch(78% 0.14 85 / 0.26), transparent 68%),
+    radial-gradient(40% 60% at 70% 96%, oklch(64% 0.18 25 / 0.16), transparent 72%);
+  filter: blur(14px);
+  animation: heroAurora 18s var(--ease-out-quart) infinite alternate;
+  pointer-events: none;
+}
+
+/* Fine grid sheen — adds depth without clutter */
+.hero-shell::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background:
+    linear-gradient(transparent 0, transparent calc(100% - 1px), rgba(255, 255, 255, 0.025) 100%),
+    linear-gradient(
+      90deg,
+      transparent 0,
+      transparent calc(100% - 1px),
+      rgba(255, 255, 255, 0.02) 100%
+    );
+  background-size: 44px 44px;
+  mask-image: radial-gradient(120% 120% at 80% 0%, #000 30%, transparent 72%);
+  pointer-events: none;
+}
+
+@keyframes heroAurora {
+  0% {
+    transform: translate3d(-3%, -2%, 0) scale(1.04);
+    opacity: 0.85;
+  }
+  50% {
+    transform: translate3d(2%, 3%, 0) scale(1.12);
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(4%, -1%, 0) scale(1.06);
+    opacity: 0.9;
+  }
+}
+
+/* Hero entrance — staggered rise of headline blocks. Enhances an
+   already-visible default: items start visible, the keyframe just
+   animates them in on first paint. */
+@keyframes heroRise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.hero-enter {
+  animation: heroRise 0.62s var(--ease-out-expo) both;
+  animation-delay: calc(var(--enter-i, 0) * 90ms);
+}
+
+/* Live status pill with a breathing dot */
+.hero-live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  width: fit-content;
+  padding: 5px 11px 5px 9px;
+  border-radius: 999px;
+  border: 1px solid oklch(72% 0.15 170 / 0.32);
+  background: oklch(72% 0.15 170 / 0.09);
+  color: var(--brand-accent-teal);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.hero-live-dot {
+  position: relative;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--brand-accent-teal);
+  box-shadow: 0 0 0 0 oklch(72% 0.15 170 / 0.55);
+  animation: livePulse 2.4s var(--ease-out-quart) infinite;
+}
+
+@keyframes livePulse {
+  0% {
+    box-shadow: 0 0 0 0 oklch(72% 0.15 170 / 0.5);
+  }
+  70% {
+    box-shadow: 0 0 0 7px oklch(72% 0.15 170 / 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 oklch(72% 0.15 170 / 0);
+  }
+}
+
+/* Bold display heading for the hero */
+.hero-title {
+  margin: 0;
+  font-size: clamp(1.85rem, 1rem + 3.4vw, 3.1rem);
+  font-weight: 900;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  text-wrap: balance;
+}
+
+.hero-title .hero-accent {
+  position: relative;
+  color: var(--brand-primary-light);
+  white-space: nowrap;
+}
+
+/* Animated underline sweep beneath the accent words */
+.hero-title .hero-accent::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -0.08em;
+  height: 0.12em;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    var(--brand-accent-teal),
+    var(--brand-accent-gold),
+    var(--brand-accent-coral)
+  );
+  transform: scaleX(0);
+  transform-origin: left;
+  animation: heroUnderline 0.7s var(--ease-out-expo) 0.55s both;
+}
+
+@keyframes heroUnderline {
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.hero-lede {
+  margin: 0;
+  max-width: 60ch;
+  color: var(--text-secondary);
+  font-size: clamp(0.9rem, 0.84rem + 0.3vw, 1.02rem);
+  line-height: 1.65;
+  text-wrap: pretty;
+}
+
+/* Primary hero CTA — confident, single clear action */
+.hero-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  font-size: 0.92rem;
+  font-weight: 800;
+  border-radius: var(--radius-md);
+}
+
+.hero-cta svg:last-child {
+  transition: transform 0.25s var(--ease-out-expo);
+}
+
+.hero-cta:hover:not(:disabled) svg:last-child {
+  transform: translateX(3px);
+}
+
+.hero-secondary-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 12px 16px;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+/* KPI cards lift + accent glow on hover, animated number on enter */
+.kpi-item {
+  position: relative;
+  overflow: hidden;
+  transition:
+    transform 0.28s var(--ease-out-expo),
+    border-color 0.28s var(--ease-out-expo),
+    box-shadow 0.28s var(--ease-out-expo);
+}
+
+.kpi-item::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(120% 80% at 0% 0%, var(--kpi-glow, transparent), transparent 60%);
+  opacity: 0;
+  transition: opacity 0.28s var(--ease-out-expo);
+  pointer-events: none;
+}
+
+.kpi-item:hover {
+  transform: translateY(-3px);
+  border-color: var(--bg-card-border-hover);
+  box-shadow: var(--shadow-md);
+}
+
+.kpi-item:hover::before {
+  opacity: 1;
+}
+
+.kpi-value {
+  font-variant-numeric: tabular-nums;
+  animation: kpiPop 0.5s var(--ease-out-expo) 0.3s both;
+}
+
+@keyframes kpiPop {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Scroll-reveal utility — content is visible by default; when JS attaches
+   .reveal it starts slightly lowered and the IO toggles .is-visible to
+   animate it in. No-JS / headless renders keep .reveal off → fully visible. */
+.reveal {
+  opacity: 0;
+  transform: translateY(20px);
+  transition:
+    opacity 0.6s var(--ease-out-quart),
+    transform 0.6s var(--ease-out-quart);
+  will-change: opacity, transform;
+}
+
+.reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+/* Press feedback for interactive flow/insight tiles */
+.press-tile {
+  transition:
+    transform 0.16s var(--ease-out-expo),
+    border-color 0.22s var(--ease-out-expo),
+    box-shadow 0.22s var(--ease-out-expo),
+    background 0.22s var(--ease-out-expo);
+}
+
+.press-tile:hover {
+  transform: translateY(-2px);
+  border-color: var(--bg-card-border-hover) !important;
   box-shadow: var(--shadow-sm);
+}
+
+.press-tile:active {
+  transform: translateY(0) scale(0.99);
+}
+
+/* Empty-state icon — gentle float so the zero state feels alive, not dead */
+.empty-state-icon {
+  display: inline-flex;
+  animation: emptyFloat 3.6s var(--ease-out-quart) infinite;
+}
+
+@keyframes emptyFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
 }
 
 /* Base Card & Container Elements */
@@ -1408,9 +1707,30 @@ body.present-mode .page-shell {
   .btn-secondary,
   .ghost-btn,
   .animate-slide-up,
-  .skeleton {
+  .skeleton,
+  .hero-shell::before,
+  .hero-shell::after,
+  .hero-enter,
+  .hero-live-dot,
+  .hero-title .hero-accent::after,
+  .kpi-item,
+  .kpi-value,
+  .reveal,
+  .press-tile,
+  .empty-state-icon {
     animation: none !important;
     transition: none !important;
+  }
+
+  /* Reveal content must stay visible without the IO ever firing */
+  .reveal {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  /* Accent underline must still render in its completed state */
+  .hero-title .hero-accent::after {
+    transform: scaleX(1);
   }
 
   .upload-dropzone:hover,
@@ -1418,7 +1738,10 @@ body.present-mode .page-shell {
   .poll-card:hover,
   .choice-card:hover,
   .btn-primary:hover:not(:disabled),
-  .content-card:hover {
+  .content-card:hover,
+  .kpi-item:hover,
+  .press-tile:hover,
+  .press-tile:active {
     transform: none;
   }
 }
