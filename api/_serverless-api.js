@@ -273,8 +273,8 @@ var require_database_service = __commonJS({
         await this.sync();
       }
       async commit(nextState) {
-        this.data = nextState;
         await this.persist(nextState);
+        this.data = nextState;
       }
       async getPolls() {
         await this.refresh();

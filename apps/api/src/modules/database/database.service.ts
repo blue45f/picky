@@ -302,8 +302,8 @@ export class DatabaseService implements OnModuleInit {
   }
 
   private async commit(nextState: DatabaseState) {
-    this.data = nextState;
     await this.persist(nextState);
+    this.data = nextState;
   }
 
   async getPolls(): Promise<Poll[]> {
