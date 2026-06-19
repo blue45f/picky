@@ -42,11 +42,11 @@ export class PollController {
     const poll = await this.pollService.getPoll(id);
     const requestOrigin = this.getRequestOrigin(req);
     const appOrigin = this.getPublicAppOrigin(req);
-    const shareUrl = `${appOrigin}/share/${encodeURIComponent(poll.id)}`;
     const pollUrl = this.resolveSafePollRedirectUrl(
       req,
       `${appOrigin}/poll/${encodeURIComponent(poll.id)}`,
     );
+    const shareUrl = pollUrl;
     const shareImage = this.resolvePollShareImage(poll, requestOrigin, appOrigin);
     const safeShareUrl = this.escapeHtml(shareUrl);
     const safePollUrl = this.escapeHtml(pollUrl);

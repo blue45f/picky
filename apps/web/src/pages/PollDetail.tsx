@@ -43,6 +43,7 @@ import type { Poll, PollResultsVisibility } from '@picky/shared';
 import {
   resolvePollShareUrl,
   buildPollEmbedCode,
+  buildPollShareMessage,
   resolveShareText,
   copyText,
   sharePollToKakao,
@@ -1374,7 +1375,7 @@ export const PollDetail: React.FC = () => {
     } catch (err) {
       console.error('kakao share failed', err);
       try {
-        await copyText(`${resolveShareText(currentPoll)}\n${resolvePollShareUrl(currentPoll)}`);
+        await copyText(buildPollShareMessage(currentPoll));
         setCopiedId(currentPoll.id);
         setCopyMessage('카카오 공유를 열지 못해 링크를 복사했습니다.');
       } catch {
@@ -1390,13 +1391,10 @@ export const PollDetail: React.FC = () => {
       return;
     }
     setCopyMessage('');
-    const url = resolvePollShareUrl(currentPoll);
-    const text = resolveShareText(currentPoll);
+    const shareMessage = buildPollShareMessage(currentPoll);
     try {
       if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
-        // url을 별도 필드로 넘기면 카카오톡이 url+text를 붙여 링크가 깨지므로
-        // URL을 텍스트 끝줄에 둔 단일 text로 공유해요.
-        await navigator.share({ title: currentPoll.question, text: `${text}\n${url}` });
+        await navigator.share({ text: shareMessage });
         return;
       }
     } catch (err) {
@@ -1405,7 +1403,7 @@ export const PollDetail: React.FC = () => {
       }
     }
     try {
-      await copyText(`${text}\n${url}`);
+      await copyText(shareMessage);
       setCopiedId(currentPoll.id);
       setCopyMessage('공유 링크를 복사했어요.');
       setTimeout(() => setCopyMessage(''), 2600);

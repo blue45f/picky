@@ -50,15 +50,13 @@ const getShareOrigin = (): string => {
   return DEFAULT_PUBLIC_ORIGIN;
 };
 
-/** 공유용 절대 URL. 저장된 투표는 서버 OG 페이지(/share/:id), 로컬 투표는 /poll/:id. */
+/** 공유용 절대 URL. 모든 투표는 실제 참여 화면인 /poll/:id로 공유해요. */
 export const resolvePollShareUrl = (poll: Poll | null | undefined): string => {
   const origin = getShareOrigin();
   if (!poll) {
     return origin ?? '/';
   }
-  const path = poll.id.startsWith('local-')
-    ? `/poll/${encodeURIComponent(poll.id)}`
-    : `/share/${encodeURIComponent(poll.id)}`;
+  const path = `/poll/${encodeURIComponent(poll.id)}`;
   return origin ? `${origin}${path}` : path;
 };
 

@@ -199,16 +199,17 @@ export const resolvePollShareUrl = (poll: Poll | null | undefined): string => {
     return getAbsoluteUrl('/');
   }
 
+  const pollPath = `/poll/${encodeURIComponent(poll.id)}`;
   if (!poll.id.startsWith('local-')) {
-    return getShareAbsoluteUrl(`/share/${encodeURIComponent(poll.id)}`);
+    return getShareAbsoluteUrl(pollPath);
   }
 
   const snapshot = buildShareablePollSnapshot(poll);
   if (!snapshot) {
-    return getAbsoluteUrl(`/poll/${encodeURIComponent(poll.id)}`);
+    return getShareAbsoluteUrl(pollPath);
   }
 
-  return getAbsoluteUrl(`/poll/${encodeURIComponent(poll.id)}?snapshot=${snapshot}`);
+  return getShareAbsoluteUrl(`${pollPath}?snapshot=${snapshot}`);
 };
 
 export const resolvePollEmbedUrl = (poll: Poll | null | undefined): string => {
@@ -333,6 +334,10 @@ export const resolveShareText = (poll: Poll): string => {
   return `${SHARE_PREFIX}${poll.question}\n\n결정에 참여하고 의견을 남겨주세요.`;
 };
 
+export const buildPollShareMessage = (poll: Poll): string => {
+  return `${resolveShareText(poll)}\n${resolvePollShareUrl(poll)}`;
+};
+
 export const copyText = async (text: string): Promise<void> => {
   await navigator.clipboard.writeText(text);
 };
@@ -414,12 +419,11 @@ export const getKakaoShareDiagnostics = (poll: Poll): KakaoShareDiagnostics => {
   const imageHostname = imageUrlInfo?.hostname || '';
   const hasKakaoJavascriptKey = Boolean(import.meta.env.VITE_KAKAO_JAVASCRIPT_KEY?.trim());
   const hasPublicHttpsShareUrl = isPublicHttpsUrl(shareUrl);
-  const hasServerOgSharePage =
-    !poll.id.startsWith('local-') && Boolean(shareUrlInfo?.pathname.startsWith('/share/'));
+  const hasPollPageShareUrl = Boolean(shareUrlInfo?.pathname.startsWith('/poll/'));
   const hasPublicHttpsImageUrl = isPublicHttpsUrl(imageUrl);
   const hasUploadedImage = poll.options.some((option) => Boolean(option.imageUrl));
   const hasDataUrlImage = poll.options.some((option) => isDataUrl(option.imageUrl));
-  const canUseScrap = hasKakaoJavascriptKey && hasPublicHttpsShareUrl && hasServerOgSharePage;
+  const canUseScrap = false;
   const items: KakaoShareReadinessItem[] = [
     {
       id: 'javascript-key',
@@ -448,15 +452,15 @@ export const getKakaoShareDiagnostics = (poll: Poll): KakaoShareDiagnostics => {
         : 'VITE_SHARE_BASE_URL 또는 VITE_PUBLIC_APP_URL을 실제 HTTPS 배포 도메인으로 맞추세요.',
     },
     {
-      id: 'og-page',
-      label: '서버 OG 페이지',
-      status: hasServerOgSharePage ? 'passed' : 'warning',
-      passed: hasServerOgSharePage,
+      id: 'poll-page-url',
+      label: '투표 페이지 URL',
+      status: hasPollPageShareUrl ? 'passed' : 'warning',
+      passed: hasPollPageShareUrl,
       blocking: true,
-      help: hasServerOgSharePage
-        ? '/share/:id 페이지가 서버에서 og:title, og:description, og:image를 제공합니다.'
-        : '로컬 스냅샷 투표는 서버가 OG HTML을 만들 수 없어 카카오 미리보기가 제한됩니다.',
-      action: hasServerOgSharePage ? undefined : '저장된 투표의 /share/:id 링크를 공유하세요.',
+      help: hasPollPageShareUrl
+        ? '/poll/:id 실제 투표 페이지 링크를 공유합니다.'
+        : '공유 링크는 실제 참여 화면인 /poll/:id 주소여야 합니다.',
+      action: hasPollPageShareUrl ? undefined : '저장된 투표의 /poll/:id 링크를 공유하세요.',
     },
     {
       id: 'og-image',
@@ -514,7 +518,7 @@ export const sharePollToKakao = async (
 ): Promise<'kakao' | 'web-share' | 'clipboard'> => {
   const kakaoDiagnostics = getKakaoShareDiagnostics(poll);
   const shareUrl = kakaoDiagnostics.shareUrl;
-  const shareText = resolveShareText(poll);
+  const shareMessageText = buildPollShareMessage(poll);
   const kakaoKey = import.meta.env.VITE_KAKAO_JAVASCRIPT_KEY?.trim();
 
   if (kakaoKey && typeof window !== 'undefined') {
@@ -585,15 +589,10 @@ export const sharePollToKakao = async (
   }
 
   if (navigator.share) {
-    // url 필드를 따로 넘기면 일부 앱(카카오톡)이 url+text를 붙여 링크가 깨져요.
-    // URL을 텍스트 맨 끝 줄에 두고 단일 text로 공유해 링크가 온전히 인식되게 해요.
-    await navigator.share({
-      title: poll.question,
-      text: `${shareText}\n${shareUrl}`,
-    });
+    await navigator.share({ text: shareMessageText });
     return 'web-share';
   }
 
-  await copyText(`${shareText}\n${shareUrl}`);
+  await copyText(shareMessageText);
   return 'clipboard';
 };

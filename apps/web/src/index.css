@@ -1437,7 +1437,7 @@ body.present-mode .page-shell {
 }
 
 .animate-slide-up {
-  animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @keyframes skeletonPulse {
@@ -1523,10 +1523,12 @@ body.present-mode .page-shell {
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   z-index: 100;
   padding: 1rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .modal-content {
@@ -1538,6 +1540,8 @@ body.present-mode .page-shell {
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
   width: 100%;
   max-width: 480px;
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
   padding: 24px;
   opacity: 1;
 }
@@ -1588,6 +1592,18 @@ body.present-mode .page-shell {
   .present-stat-grid,
   .present-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .modal-overlay {
+    padding: 0.75rem;
+  }
+
+  .modal-content {
+    max-height: calc(100dvh - 1.5rem);
+    padding: 18px;
+    border-radius: var(--radius-sm);
   }
 }
 
