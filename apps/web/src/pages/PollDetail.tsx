@@ -1382,6 +1382,35 @@ export const PollDetail: React.FC = () => {
     }
   };
 
+  const handleNativeShareClick = async () => {
+    if (!currentPoll) {
+      return;
+    }
+    setCopyMessage('');
+    const url = resolvePollShareUrl(currentPoll);
+    const text = resolveShareText(currentPoll);
+    try {
+      if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+        await navigator.share({ title: currentPoll.question, text, url });
+        return;
+      }
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        return;
+      }
+    }
+    try {
+      await copyText(`${text}\n${url}`);
+      setCopiedId(currentPoll.id);
+      setCopyMessage('공유 링크를 복사했어요.');
+      setTimeout(() => setCopyMessage(''), 2600);
+      setTimeout(() => setCopiedId(null), 2200);
+    } catch {
+      setCopyMessage('공유에 실패했어요. 링크를 직접 복사해 주세요.');
+      setTimeout(() => setCopyMessage(''), 2800);
+    }
+  };
+
   const handleUseAsTemplateClick = () => {
     if (!currentPoll) {
       return;
@@ -5619,6 +5648,26 @@ export const PollDetail: React.FC = () => {
                 {copiedId === currentPoll.id ? <Check size={16} /> : <Copy size={16} />}
               </button>
             </div>
+
+            <button
+              type="button"
+              onClick={handleNativeShareClick}
+              className="btn-primary"
+              style={{
+                width: '100%',
+                padding: '11px',
+                fontSize: '0.85rem',
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                marginBottom: '1rem',
+              }}
+            >
+              <Share2 size={15} />
+              <span>공유하기</span>
+            </button>
 
             <section
               style={{

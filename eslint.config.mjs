@@ -9,6 +9,7 @@ export default ts.config(
       '**/dist/**',
       '**/_dist/**',
       'api/_serverless-api.js',
+      '**/public/sw.js',
       '**/node_modules/**',
       '.vercel/**',
       'dist/**',

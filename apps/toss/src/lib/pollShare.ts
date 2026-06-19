@@ -4,6 +4,21 @@ import { shareMessage } from './toss';
 
 const SHARE_PREFIX = '[픽플로우 투표] ';
 
+// 공유 링크가 외부(토스 밖)에서도 열려야 하므로, 공개 웹 오리진으로 폴백해요.
+// 미니앱 WebView 호스트(*.tossmini.com)나 localhost는 공유 대상이 아니에요.
+const DEFAULT_PUBLIC_ORIGIN = 'https://picky-olive.vercel.app';
+
+const isPublicWebHost = (origin: string): boolean => {
+  try {
+    const { hostname } = new URL(origin);
+    if (hostname === 'localhost' || hostname === '127.0.0.1') return false;
+    if (hostname.endsWith('.tossmini.com')) return false;
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 const normalizeOrigin = (value: string | null | undefined): string | null => {
   const trimmed = value ? value.trim().replace(/\/+$/, '') : '';
   if (!trimmed) {
@@ -21,12 +36,18 @@ const normalizeOrigin = (value: string | null | undefined): string | null => {
 };
 
 /** 외부에서도 열리는 공개 웹 공유 오리진 (picky-olive 등). */
-const getShareOrigin = (): string | null => {
-  return (
+const getShareOrigin = (): string => {
+  const configured =
     normalizeOrigin(import.meta.env.VITE_SHARE_BASE_URL) ||
-    normalizeOrigin(import.meta.env.VITE_PUBLIC_APP_URL) ||
-    (typeof window !== 'undefined' ? window.location.origin : null)
-  );
+    normalizeOrigin(import.meta.env.VITE_PUBLIC_APP_URL);
+  if (configured) {
+    return configured;
+  }
+  const runtime = typeof window !== 'undefined' ? window.location.origin : null;
+  if (runtime && isPublicWebHost(runtime)) {
+    return runtime;
+  }
+  return DEFAULT_PUBLIC_ORIGIN;
 };
 
 /** 공유용 절대 URL. 저장된 투표는 서버 OG 페이지(/share/:id), 로컬 투표는 /poll/:id. */
