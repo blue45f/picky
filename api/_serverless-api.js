@@ -61,7 +61,7 @@ var require_database_service = __commonJS({
       storageKey = "picky:database:v1";
       filePath = path.resolve(process.env.PICKY_DB_PATH?.trim() || (process.env.NODE_ENV === "production" ? "/tmp/picky-db.json" : path.resolve(process.cwd(), "db.json")));
       storageClient = this.createStorageClient();
-      requiresDurableStorage = process.env.NODE_ENV === "production" && process.env.PICKY_ALLOW_EPHEMERAL_STORAGE !== "true";
+      requiresDurableStorage = (process.env.NODE_ENV === "production" || process.env.VERCEL === "1" || Boolean(process.env.VERCEL_ENV)) && process.env.PICKY_ALLOW_EPHEMERAL_STORAGE !== "true";
       data = { polls: [], users: [] };
       initialized = false;
       onModuleInit() {

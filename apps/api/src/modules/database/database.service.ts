@@ -35,7 +35,10 @@ export class DatabaseService implements OnModuleInit {
   );
   private readonly storageClient: DatabaseStorageClient | null = this.createStorageClient();
   private readonly requiresDurableStorage =
-    process.env.NODE_ENV === 'production' && process.env.PICKY_ALLOW_EPHEMERAL_STORAGE !== 'true';
+    (process.env.NODE_ENV === 'production' ||
+      process.env.VERCEL === '1' ||
+      Boolean(process.env.VERCEL_ENV)) &&
+    process.env.PICKY_ALLOW_EPHEMERAL_STORAGE !== 'true';
   private data: DatabaseState = { polls: [], users: [] };
   private initialized = false;
 
