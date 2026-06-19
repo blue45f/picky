@@ -242,15 +242,29 @@ export class DatabaseService implements OnModuleInit {
       return;
     }
 
+    if (this.requiresDurableStorage && !this.storageClient) {
+      throw new ServiceUnavailableException(
+        'Production에는 영속 저장소가 필요합니다. KV_REST_API_URL/KV_REST_API_TOKEN을 설정해 주세요.',
+      );
+    }
+
     try {
       const loaded = await this.loadFromKv();
       if (loaded) {
         this.data = loaded;
       } else {
         this.data = this.loadFromFile();
+        if (this.requiresDurableStorage && this.storageClient) {
+          await this.saveToKv(this.data);
+        }
       }
     } catch (error) {
-      console.error('Failed to initialize database, fallback file storage.', error);
+      console.error('Failed to initialize database.', error);
+      if (this.requiresDurableStorage) {
+        throw new ServiceUnavailableException(
+          '영속 저장소를 초기화하지 못했습니다. Vercel KV/Upstash 연결 상태를 확인해 주세요.',
+        );
+      }
       this.data = this.loadFromFile();
     }
 
@@ -265,9 +279,20 @@ export class DatabaseService implements OnModuleInit {
           this.data = latest;
           return;
         }
-      } catch {
-        // use in-memory as fallback
+      } catch (error) {
+        if (this.requiresDurableStorage) {
+          console.error('Failed to sync durable storage.', error);
+          throw new ServiceUnavailableException(
+            '영속 저장소와 동기화하지 못했습니다. Vercel KV/Upstash 연결 상태를 확인해 주세요.',
+          );
+        }
       }
+    }
+
+    if (this.requiresDurableStorage) {
+      throw new ServiceUnavailableException(
+        'Production에는 영속 저장소가 필요합니다. KV_REST_API_URL/KV_REST_API_TOKEN을 설정해 주세요.',
+      );
     }
   }
 

@@ -227,15 +227,24 @@ var require_database_service = __commonJS({
         if (this.initialized) {
           return;
         }
+        if (this.requiresDurableStorage && !this.storageClient) {
+          throw new common_1.ServiceUnavailableException("Production\uC5D0\uB294 \uC601\uC18D \uC800\uC7A5\uC18C\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4. KV_REST_API_URL/KV_REST_API_TOKEN\uC744 \uC124\uC815\uD574 \uC8FC\uC138\uC694.");
+        }
         try {
           const loaded = await this.loadFromKv();
           if (loaded) {
             this.data = loaded;
           } else {
             this.data = this.loadFromFile();
+            if (this.requiresDurableStorage && this.storageClient) {
+              await this.saveToKv(this.data);
+            }
           }
         } catch (error) {
-          console.error("Failed to initialize database, fallback file storage.", error);
+          console.error("Failed to initialize database.", error);
+          if (this.requiresDurableStorage) {
+            throw new common_1.ServiceUnavailableException("\uC601\uC18D \uC800\uC7A5\uC18C\uB97C \uCD08\uAE30\uD654\uD558\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4. Vercel KV/Upstash \uC5F0\uACB0 \uC0C1\uD0DC\uB97C \uD655\uC778\uD574 \uC8FC\uC138\uC694.");
+          }
           this.data = this.loadFromFile();
         }
         this.initialized = true;
@@ -248,8 +257,15 @@ var require_database_service = __commonJS({
               this.data = latest;
               return;
             }
-          } catch {
+          } catch (error) {
+            if (this.requiresDurableStorage) {
+              console.error("Failed to sync durable storage.", error);
+              throw new common_1.ServiceUnavailableException("\uC601\uC18D \uC800\uC7A5\uC18C\uC640 \uB3D9\uAE30\uD654\uD558\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4. Vercel KV/Upstash \uC5F0\uACB0 \uC0C1\uD0DC\uB97C \uD655\uC778\uD574 \uC8FC\uC138\uC694.");
+            }
           }
+        }
+        if (this.requiresDurableStorage) {
+          throw new common_1.ServiceUnavailableException("Production\uC5D0\uB294 \uC601\uC18D \uC800\uC7A5\uC18C\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4. KV_REST_API_URL/KV_REST_API_TOKEN\uC744 \uC124\uC815\uD574 \uC8FC\uC138\uC694.");
         }
       }
       async refresh() {
