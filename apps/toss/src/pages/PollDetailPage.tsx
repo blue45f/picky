@@ -220,6 +220,21 @@ export function PollDetailPage() {
                   cursor: hasVoted || closed ? 'default' : 'pointer',
                 }}
               >
+                {option.imageUrl ? (
+                  <img
+                    src={option.imageUrl}
+                    alt=""
+                    loading="lazy"
+                    style={{
+                      width: '100%',
+                      maxHeight: 180,
+                      objectFit: 'cover',
+                      borderRadius: 10,
+                      marginBottom: 10,
+                      border: `1px solid ${theme.border}`,
+                    }}
+                  />
+                ) : null}
                 <div
                   style={{
                     display: 'flex',
