@@ -42,8 +42,17 @@ export class DatabaseService implements OnModuleInit {
   private data: DatabaseState = { polls: [], users: [] };
   private initialized = false;
 
-  onModuleInit() {
-    return this.load();
+  async onModuleInit() {
+    try {
+      await this.load();
+    } catch (error) {
+      if (this.requiresDurableStorage) {
+        console.error('Durable storage is not ready. Requests will fail until it is configured.');
+        return;
+      }
+
+      throw error;
+    }
   }
 
   private createStorageClient(): DatabaseStorageClient | null {

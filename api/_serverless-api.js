@@ -64,8 +64,16 @@ var require_database_service = __commonJS({
       requiresDurableStorage = (process.env.NODE_ENV === "production" || process.env.VERCEL === "1" || Boolean(process.env.VERCEL_ENV)) && process.env.PICKY_ALLOW_EPHEMERAL_STORAGE !== "true";
       data = { polls: [], users: [] };
       initialized = false;
-      onModuleInit() {
-        return this.load();
+      async onModuleInit() {
+        try {
+          await this.load();
+        } catch (error) {
+          if (this.requiresDurableStorage) {
+            console.error("Durable storage is not ready. Requests will fail until it is configured.");
+            return;
+          }
+          throw error;
+        }
       }
       createStorageClient() {
         const url = process.env.KV_REST_API_URL?.trim();
