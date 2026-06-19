@@ -24,3 +24,4 @@ minimumReleaseAgeExclude:
   - '@apps-in-toss/web-bridge@2.9.1'
   - '@apps-in-toss/web-config@2.9.1'
   - '@apps-in-toss/web-framework@2.9.1'
+  - '@vercel/blob@2.4.1'

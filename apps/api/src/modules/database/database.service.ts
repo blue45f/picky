@@ -2,6 +2,7 @@ import { Injectable, OnModuleInit, ServiceUnavailableException } from '@nestjs/c
 import * as fs from 'fs';
 import * as path from 'path';
 import { Poll } from '@picky/shared';
+import { get as getBlob, put as putBlob } from '@vercel/blob';
 import { createClient, type VercelKV } from '@vercel/kv';
 
 interface DatabaseState {
@@ -27,6 +28,7 @@ export interface DatabaseUser {
 @Injectable()
 export class DatabaseService implements OnModuleInit {
   private readonly storageKey = 'picky:database:v1';
+  private readonly blobPath = 'picky/database/v1.json';
   private readonly filePath = path.resolve(
     process.env.PICKY_DB_PATH?.trim() ||
       (process.env.NODE_ENV === 'production'
@@ -56,6 +58,10 @@ export class DatabaseService implements OnModuleInit {
   }
 
   private createStorageClient(): DatabaseStorageClient | null {
+    return this.createKvStorageClient() || this.createBlobStorageClient();
+  }
+
+  private createKvStorageClient(): DatabaseStorageClient | null {
     const url = process.env.KV_REST_API_URL?.trim();
     const token = process.env.KV_REST_API_TOKEN?.trim();
     if (!url || !token) {
@@ -67,6 +73,40 @@ export class DatabaseService implements OnModuleInit {
     } catch {
       return null;
     }
+  }
+
+  private createBlobStorageClient(): DatabaseStorageClient | null {
+    const hasReadWriteToken = Boolean(process.env.BLOB_READ_WRITE_TOKEN?.trim());
+    const hasOidcStore = Boolean(
+      process.env.VERCEL_OIDC_TOKEN?.trim() && process.env.BLOB_STORE_ID?.trim(),
+    );
+    if (!hasReadWriteToken && !hasOidcStore) {
+      return null;
+    }
+
+    return {
+      get: async <T = unknown>(_key: string): Promise<T | null> => {
+        const result = await getBlob(this.blobPath, { access: 'private', useCache: false });
+        if (!result || result.statusCode !== 200 || !result.stream) {
+          return null;
+        }
+
+        const text = await new Response(result.stream).text();
+        if (!text.trim()) {
+          return null;
+        }
+
+        return JSON.parse(text) as T;
+      },
+      set: async (_key: string, value: DatabaseState): Promise<unknown> => {
+        return putBlob(this.blobPath, JSON.stringify(value), {
+          access: 'private',
+          allowOverwrite: true,
+          contentType: 'application/json',
+          cacheControlMaxAge: 60,
+        });
+      },
+    };
   }
 
   private createSeedData(): DatabaseState {
@@ -231,7 +271,7 @@ export class DatabaseService implements OnModuleInit {
         console.error('Failed to persist with KV.', error);
         if (this.requiresDurableStorage) {
           throw new ServiceUnavailableException(
-            '영속 저장소에 저장하지 못했습니다. Vercel KV/Upstash 연결 상태를 확인해 주세요.',
+            '영속 저장소에 저장하지 못했습니다. Vercel Blob/KV 연결 상태를 확인해 주세요.',
           );
         }
       }
@@ -239,7 +279,7 @@ export class DatabaseService implements OnModuleInit {
 
     if (this.requiresDurableStorage) {
       throw new ServiceUnavailableException(
-        'Production에는 영속 저장소가 필요합니다. KV_REST_API_URL/KV_REST_API_TOKEN을 설정해 주세요.',
+        'Production에는 영속 저장소가 필요합니다. BLOB_READ_WRITE_TOKEN 또는 KV_REST_API_URL/KV_REST_API_TOKEN을 설정해 주세요.',
       );
     }
 
@@ -253,7 +293,7 @@ export class DatabaseService implements OnModuleInit {
 
     if (this.requiresDurableStorage && !this.storageClient) {
       throw new ServiceUnavailableException(
-        'Production에는 영속 저장소가 필요합니다. KV_REST_API_URL/KV_REST_API_TOKEN을 설정해 주세요.',
+        'Production에는 영속 저장소가 필요합니다. BLOB_READ_WRITE_TOKEN 또는 KV_REST_API_URL/KV_REST_API_TOKEN을 설정해 주세요.',
       );
     }
 
@@ -271,7 +311,7 @@ export class DatabaseService implements OnModuleInit {
       console.error('Failed to initialize database.', error);
       if (this.requiresDurableStorage) {
         throw new ServiceUnavailableException(
-          '영속 저장소를 초기화하지 못했습니다. Vercel KV/Upstash 연결 상태를 확인해 주세요.',
+          '영속 저장소를 초기화하지 못했습니다. Vercel Blob/KV 연결 상태를 확인해 주세요.',
         );
       }
       this.data = this.loadFromFile();
@@ -292,7 +332,7 @@ export class DatabaseService implements OnModuleInit {
         if (this.requiresDurableStorage) {
           console.error('Failed to sync durable storage.', error);
           throw new ServiceUnavailableException(
-            '영속 저장소와 동기화하지 못했습니다. Vercel KV/Upstash 연결 상태를 확인해 주세요.',
+            '영속 저장소와 동기화하지 못했습니다. Vercel Blob/KV 연결 상태를 확인해 주세요.',
           );
         }
       }
@@ -300,7 +340,7 @@ export class DatabaseService implements OnModuleInit {
 
     if (this.requiresDurableStorage) {
       throw new ServiceUnavailableException(
-        'Production에는 영속 저장소가 필요합니다. KV_REST_API_URL/KV_REST_API_TOKEN을 설정해 주세요.',
+        'Production에는 영속 저장소가 필요합니다. BLOB_READ_WRITE_TOKEN 또는 KV_REST_API_URL/KV_REST_API_TOKEN을 설정해 주세요.',
       );
     }
   }

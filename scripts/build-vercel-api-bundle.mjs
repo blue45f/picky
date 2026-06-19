@@ -20,6 +20,7 @@ await build({
     '@nestjs/core',
     '@nestjs/jwt',
     '@nestjs/platform-express',
+    '@vercel/blob',
     '@vercel/kv',
     'compression',
     'helmet',

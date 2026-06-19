@@ -56,9 +56,11 @@ var require_database_service = __commonJS({
     var common_1 = require("@nestjs/common");
     var fs = __importStar(require("fs"));
     var path = __importStar(require("path"));
+    var blob_1 = require("@vercel/blob");
     var kv_1 = require("@vercel/kv");
     var DatabaseService = class DatabaseService {
       storageKey = "picky:database:v1";
+      blobPath = "picky/database/v1.json";
       filePath = path.resolve(process.env.PICKY_DB_PATH?.trim() || (process.env.NODE_ENV === "production" ? "/tmp/picky-db.json" : path.resolve(process.cwd(), "db.json")));
       storageClient = this.createStorageClient();
       requiresDurableStorage = (process.env.NODE_ENV === "production" || process.env.VERCEL === "1" || Boolean(process.env.VERCEL_ENV)) && process.env.PICKY_ALLOW_EPHEMERAL_STORAGE !== "true";
@@ -76,6 +78,9 @@ var require_database_service = __commonJS({
         }
       }
       createStorageClient() {
+        return this.createKvStorageClient() || this.createBlobStorageClient();
+      }
+      createKvStorageClient() {
         const url = process.env.KV_REST_API_URL?.trim();
         const token = process.env.KV_REST_API_TOKEN?.trim();
         if (!url || !token) {
@@ -86,6 +91,34 @@ var require_database_service = __commonJS({
         } catch {
           return null;
         }
+      }
+      createBlobStorageClient() {
+        const hasReadWriteToken = Boolean(process.env.BLOB_READ_WRITE_TOKEN?.trim());
+        const hasOidcStore = Boolean(process.env.VERCEL_OIDC_TOKEN?.trim() && process.env.BLOB_STORE_ID?.trim());
+        if (!hasReadWriteToken && !hasOidcStore) {
+          return null;
+        }
+        return {
+          get: async (_key) => {
+            const result = await (0, blob_1.get)(this.blobPath, { access: "private", useCache: false });
+            if (!result || result.statusCode !== 200 || !result.stream) {
+              return null;
+            }
+            const text = await new Response(result.stream).text();
+            if (!text.trim()) {
+              return null;
+            }
+            return JSON.parse(text);
+          },
+          set: async (_key, value) => {
+            return (0, blob_1.put)(this.blobPath, JSON.stringify(value), {
+              access: "private",
+              allowOverwrite: true,
+              contentType: "application/json",
+              cacheControlMaxAge: 60
+            });
+          }
+        };
       }
       createSeedData() {
         return {
@@ -222,12 +255,12 @@ var require_database_service = __commonJS({
           } catch (error) {
             console.error("Failed to persist with KV.", error);
             if (this.requiresDurableStorage) {
-              throw new common_1.ServiceUnavailableException("\uC601\uC18D \uC800\uC7A5\uC18C\uC5D0 \uC800\uC7A5\uD558\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4. Vercel KV/Upstash \uC5F0\uACB0 \uC0C1\uD0DC\uB97C \uD655\uC778\uD574 \uC8FC\uC138\uC694.");
+              throw new common_1.ServiceUnavailableException("\uC601\uC18D \uC800\uC7A5\uC18C\uC5D0 \uC800\uC7A5\uD558\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4. Vercel Blob/KV \uC5F0\uACB0 \uC0C1\uD0DC\uB97C \uD655\uC778\uD574 \uC8FC\uC138\uC694.");
             }
           }
         }
         if (this.requiresDurableStorage) {
-          throw new common_1.ServiceUnavailableException("Production\uC5D0\uB294 \uC601\uC18D \uC800\uC7A5\uC18C\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4. KV_REST_API_URL/KV_REST_API_TOKEN\uC744 \uC124\uC815\uD574 \uC8FC\uC138\uC694.");
+          throw new common_1.ServiceUnavailableException("Production\uC5D0\uB294 \uC601\uC18D \uC800\uC7A5\uC18C\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4. BLOB_READ_WRITE_TOKEN \uB610\uB294 KV_REST_API_URL/KV_REST_API_TOKEN\uC744 \uC124\uC815\uD574 \uC8FC\uC138\uC694.");
         }
         this.saveToFile(nextState);
       }
@@ -236,7 +269,7 @@ var require_database_service = __commonJS({
           return;
         }
         if (this.requiresDurableStorage && !this.storageClient) {
-          throw new common_1.ServiceUnavailableException("Production\uC5D0\uB294 \uC601\uC18D \uC800\uC7A5\uC18C\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4. KV_REST_API_URL/KV_REST_API_TOKEN\uC744 \uC124\uC815\uD574 \uC8FC\uC138\uC694.");
+          throw new common_1.ServiceUnavailableException("Production\uC5D0\uB294 \uC601\uC18D \uC800\uC7A5\uC18C\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4. BLOB_READ_WRITE_TOKEN \uB610\uB294 KV_REST_API_URL/KV_REST_API_TOKEN\uC744 \uC124\uC815\uD574 \uC8FC\uC138\uC694.");
         }
         try {
           const loaded = await this.loadFromKv();
@@ -251,7 +284,7 @@ var require_database_service = __commonJS({
         } catch (error) {
           console.error("Failed to initialize database.", error);
           if (this.requiresDurableStorage) {
-            throw new common_1.ServiceUnavailableException("\uC601\uC18D \uC800\uC7A5\uC18C\uB97C \uCD08\uAE30\uD654\uD558\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4. Vercel KV/Upstash \uC5F0\uACB0 \uC0C1\uD0DC\uB97C \uD655\uC778\uD574 \uC8FC\uC138\uC694.");
+            throw new common_1.ServiceUnavailableException("\uC601\uC18D \uC800\uC7A5\uC18C\uB97C \uCD08\uAE30\uD654\uD558\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4. Vercel Blob/KV \uC5F0\uACB0 \uC0C1\uD0DC\uB97C \uD655\uC778\uD574 \uC8FC\uC138\uC694.");
           }
           this.data = this.loadFromFile();
         }
@@ -268,12 +301,12 @@ var require_database_service = __commonJS({
           } catch (error) {
             if (this.requiresDurableStorage) {
               console.error("Failed to sync durable storage.", error);
-              throw new common_1.ServiceUnavailableException("\uC601\uC18D \uC800\uC7A5\uC18C\uC640 \uB3D9\uAE30\uD654\uD558\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4. Vercel KV/Upstash \uC5F0\uACB0 \uC0C1\uD0DC\uB97C \uD655\uC778\uD574 \uC8FC\uC138\uC694.");
+              throw new common_1.ServiceUnavailableException("\uC601\uC18D \uC800\uC7A5\uC18C\uC640 \uB3D9\uAE30\uD654\uD558\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4. Vercel Blob/KV \uC5F0\uACB0 \uC0C1\uD0DC\uB97C \uD655\uC778\uD574 \uC8FC\uC138\uC694.");
             }
           }
         }
         if (this.requiresDurableStorage) {
-          throw new common_1.ServiceUnavailableException("Production\uC5D0\uB294 \uC601\uC18D \uC800\uC7A5\uC18C\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4. KV_REST_API_URL/KV_REST_API_TOKEN\uC744 \uC124\uC815\uD574 \uC8FC\uC138\uC694.");
+          throw new common_1.ServiceUnavailableException("Production\uC5D0\uB294 \uC601\uC18D \uC800\uC7A5\uC18C\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4. BLOB_READ_WRITE_TOKEN \uB610\uB294 KV_REST_API_URL/KV_REST_API_TOKEN\uC744 \uC124\uC815\uD574 \uC8FC\uC138\uC694.");
         }
       }
       async refresh() {

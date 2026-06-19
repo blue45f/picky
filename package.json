@@ -48,6 +48,7 @@
     "@nestjs/jwt": "^11.0.2",
     "@nestjs/platform-express": "^11.1.26",
     "@picky/shared": "workspace:*",
+    "@vercel/blob": "^2.4.1",
     "@vercel/kv": "^3.0.0",
     "compression": "^1.8.1",
     "helmet": "^8.2.0",
