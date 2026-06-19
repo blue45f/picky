@@ -1391,7 +1391,9 @@ export const PollDetail: React.FC = () => {
     const text = resolveShareText(currentPoll);
     try {
       if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
-        await navigator.share({ title: currentPoll.question, text, url });
+        // url을 별도 필드로 넘기면 카카오톡이 url+text를 붙여 링크가 깨지므로
+        // URL을 텍스트 끝줄에 둔 단일 text로 공유해요.
+        await navigator.share({ title: currentPoll.question, text: `${text}\n${url}` });
         return;
       }
     } catch (err) {
