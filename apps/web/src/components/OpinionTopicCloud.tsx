@@ -65,22 +65,112 @@ const STOP_WORDS = new Set([
   'because',
 ]);
 
+const KOREAN_SUFFIXES = [
+  '입니다',
+  '합니다',
+  '해요',
+  '네요',
+  '어요',
+  '아요',
+  '으로',
+  '에서',
+  '에게',
+  '보다',
+  '까지',
+  '부터',
+  '처럼',
+  '만큼',
+];
+
+const TOKEN_SEPARATORS = new Set([
+  ',',
+  '.',
+  ';',
+  ':',
+  '!',
+  '?',
+  '(',
+  ')',
+  '[',
+  ']',
+  '{',
+  '}',
+  '"',
+  "'",
+  '“',
+  '”',
+  '‘',
+  '’',
+  '/',
+  '\\',
+  '|',
+]);
+
+const isKeywordChar = (char: string): boolean => {
+  const code = char.codePointAt(0) ?? 0;
+  const isAsciiLetter = code >= 97 && code <= 122;
+  const isDigit = code >= 48 && code <= 57;
+  const isHangulSyllable = code >= 0xac00 && code <= 0xd7a3;
+  return isAsciiLetter || isDigit || isHangulSyllable;
+};
+
+const trimTokenBoundary = (token: string): string => {
+  const chars = Array.from(token.toLowerCase());
+  let start = 0;
+  let end = chars.length;
+
+  while (start < end && !isKeywordChar(chars[start] ?? '')) {
+    start += 1;
+  }
+  while (end > start && !isKeywordChar(chars[end - 1] ?? '')) {
+    end -= 1;
+  }
+
+  return chars.slice(start, end).join('');
+};
+
+const removeKoreanSuffix = (token: string): string => {
+  for (const suffix of KOREAN_SUFFIXES) {
+    if (token.endsWith(suffix)) {
+      return token.slice(0, -suffix.length);
+    }
+  }
+
+  return token;
+};
+
+const splitKeywordTokens = (text: string): string[] => {
+  const tokens: string[] = [];
+  let current = '';
+
+  for (const char of text) {
+    if (char.trim() === '' || TOKEN_SEPARATORS.has(char)) {
+      if (current) {
+        tokens.push(current);
+        current = '';
+      }
+      continue;
+    }
+
+    current += char;
+  }
+
+  if (current) {
+    tokens.push(current);
+  }
+
+  return tokens;
+};
+
 const normalizeToken = (token: string): string => {
-  return token
-    .toLowerCase()
-    .replace(/^[^a-z0-9가-힣]+|[^a-z0-9가-힣]+$/g, '')
-    .replace(
-      /(입니다|합니다|해요|네요|어요|아요|으로|에서|에게|보다|까지|부터|처럼|만큼|으로)$/g,
-      '',
-    );
+  return removeKoreanSuffix(trimTokenBoundary(token));
 };
 
 const extractKeywords = (texts: string[], limit: number): KeywordStat[] => {
   const counts = new Map<string, number>();
 
   texts.forEach((text) => {
-    text
-      .split(/[\s,.;:!?()[\]{}"'“”‘’/\\|]+/)
+    splitKeywordTokens(text)
       .map(normalizeToken)
       .filter((word) => word.length >= 2 && !STOP_WORDS.has(word))
       .forEach((word) => counts.set(word, (counts.get(word) || 0) + 1));

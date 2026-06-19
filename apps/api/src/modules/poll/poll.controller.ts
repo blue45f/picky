@@ -18,6 +18,14 @@ import { AuthGuard, OptionalAuthGuard } from '../auth/auth.guard';
 class CreatePollDto extends createZodDto(CreatePollSchema) {}
 class VoteDto extends createZodDto(VoteSchema) {}
 
+const trimTrailingSlashes = (value: string): string => {
+  let end = value.length;
+  while (end > 0 && value.charCodeAt(end - 1) === 47) {
+    end -= 1;
+  }
+  return end === value.length ? value : value.slice(0, end);
+};
+
 @Controller('polls')
 @UsePipes(ZodValidationPipe)
 export class PollController {
@@ -252,9 +260,7 @@ export class PollController {
   }
 
   private normalizeOrigin(value: unknown): string | null {
-    const raw = String(value || '')
-      .trim()
-      .replace(/\/+$/, '');
+    const raw = trimTrailingSlashes(String(value || '').trim());
     if (!raw) {
       return null;
     }
@@ -359,17 +365,17 @@ export class PollController {
 
   private escapeJsonForHtml(value: unknown): string {
     return JSON.stringify(value)
-      .replace(/&/g, '\\u0026')
-      .replace(/</g, '\\u003c')
-      .replace(/>/g, '\\u003e');
+      .replaceAll('&', '\\u0026')
+      .replaceAll('<', '\\u003c')
+      .replaceAll('>', '\\u003e');
   }
 
   private escapeHtml(value: string): string {
     return value
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#39;');
   }
 }

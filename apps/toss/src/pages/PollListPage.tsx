@@ -365,7 +365,19 @@ export function PollListPage() {
         </div>
 
         <div style={{ display: 'flex', gap: 6, marginBottom: 16, alignItems: 'center' }}>
-          <div role="group" aria-label="정렬" style={{ display: 'flex', gap: 6 }}>
+          <fieldset
+            style={{
+              display: 'flex',
+              gap: 6,
+              border: 0,
+              padding: 0,
+              margin: 0,
+              minInlineSize: 0,
+            }}
+          >
+            <legend style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden' }}>
+              정렬
+            </legend>
             {SORT_OPTIONS.map((option) => {
               const active = option.value === sortKey;
               return (
@@ -390,7 +402,7 @@ export function PollListPage() {
                 </button>
               );
             })}
-          </div>
+          </fieldset>
           {myPollCount > 0 ? (
             <button
               type="button"

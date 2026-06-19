@@ -256,7 +256,7 @@ export function CreatePollPage() {
         />
 
         <div style={labelRowStyle}>
-          <label style={labelStyle}>선택지 * (최소 2개 · 사진 선택)</label>
+          <span style={labelStyle}>선택지 * (최소 2개 · 사진 선택)</span>
           <span style={counterStyle}>
             {filledOptions.length} / 최소 {MIN_OPTIONS}개
           </span>
@@ -361,7 +361,7 @@ export function CreatePollPage() {
                           cursor: 'pointer',
                         }}
                       >
-                        📷 이미지 업로드
+                        <span>📷 이미지 업로드</span>
                         <input
                           type="file"
                           accept="image/*"
@@ -439,7 +439,7 @@ export function CreatePollPage() {
         ) : null}
 
         <div style={labelRowStyle}>
-          <label style={labelStyle}>마감 시간</label>
+          <span style={labelStyle}>마감 시간</span>
           {deadlinePreview ? (
             <Chip tone={isDeadlinePast ? 'danger' : 'gold'}>
               {isDeadlinePast ? '⚠ 지난 시각' : `~ ${deadlinePreview}`}
@@ -483,7 +483,7 @@ export function CreatePollPage() {
           />
         ) : null}
 
-        <label style={{ ...labelStyle, margin: '20px 0 8px' }}>결과 공개 시점</label>
+        <span style={{ ...labelStyle, margin: '20px 0 8px' }}>결과 공개 시점</span>
         <SegmentedControl
           ariaLabel="결과 공개 시점"
           options={RESULT_OPTIONS}

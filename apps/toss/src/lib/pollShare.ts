@@ -8,6 +8,14 @@ const SHARE_PREFIX = '[픽플로우 투표] ';
 // 미니앱 WebView 호스트(*.tossmini.com)나 localhost는 공유 대상이 아니에요.
 const DEFAULT_PUBLIC_ORIGIN = 'https://picky-olive.vercel.app';
 
+const trimTrailingSlashes = (value: string): string => {
+  let end = value.length;
+  while (end > 0 && value.charCodeAt(end - 1) === 47) {
+    end -= 1;
+  }
+  return end === value.length ? value : value.slice(0, end);
+};
+
 const isPublicWebHost = (origin: string): boolean => {
   try {
     const { hostname } = new URL(origin);
@@ -20,7 +28,7 @@ const isPublicWebHost = (origin: string): boolean => {
 };
 
 const normalizeOrigin = (value: string | null | undefined): string | null => {
-  const trimmed = value ? value.trim().replace(/\/+$/, '') : '';
+  const trimmed = value ? trimTrailingSlashes(value.trim()) : '';
   if (!trimmed) {
     return null;
   }
@@ -43,7 +51,8 @@ const getShareOrigin = (): string => {
   if (configured) {
     return configured;
   }
-  const runtime = typeof window !== 'undefined' ? window.location.origin : null;
+  const runtime =
+    typeof globalThis.window !== 'undefined' ? globalThis.window.location.origin : null;
   if (runtime && isPublicWebHost(runtime)) {
     return runtime;
   }

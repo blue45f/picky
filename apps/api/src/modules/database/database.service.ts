@@ -30,10 +30,7 @@ export class DatabaseService implements OnModuleInit {
   private readonly storageKey = 'picky:database:v1';
   private readonly blobPath = 'picky/database/v1.json';
   private readonly filePath = path.resolve(
-    process.env.PICKY_DB_PATH?.trim() ||
-      (process.env.NODE_ENV === 'production'
-        ? '/tmp/picky-db.json'
-        : path.resolve(process.cwd(), 'db.json')),
+    process.env.PICKY_DB_PATH?.trim() || path.resolve(process.cwd(), 'db.json'),
   );
   private readonly storageClient: DatabaseStorageClient | null = this.createStorageClient();
   private readonly requiresDurableStorage =
@@ -87,7 +84,7 @@ export class DatabaseService implements OnModuleInit {
     return {
       get: async <T = unknown>(_key: string): Promise<T | null> => {
         const result = await getBlob(this.blobPath, { access: 'private', useCache: false });
-        if (!result || result.statusCode !== 200 || !result.stream) {
+        if (result?.statusCode !== 200 || !result.stream) {
           return null;
         }
 

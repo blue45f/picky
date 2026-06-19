@@ -6,7 +6,10 @@ const DATA_URL_MAX = 160_000;
 const readFileAsDataUrl = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result ?? ''));
+    reader.onload = () => {
+      const result = reader.result;
+      resolve(typeof result === 'string' ? result : '');
+    };
     reader.onerror = () => reject(new Error('파일을 읽지 못했어요.'));
     reader.readAsDataURL(file);
   });

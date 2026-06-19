@@ -12,11 +12,19 @@ const safeEncode = (value: string): string => encodeURIComponent(value);
 
 const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
+const trimTrailingSlashes = (value: string): string => {
+  let end = value.length;
+  while (end > 0 && value.charCodeAt(end - 1) === 47) {
+    end -= 1;
+  }
+  return end === value.length ? value : value.slice(0, end);
+};
+
 const isDataUrl = (value: string | null | undefined): boolean =>
   Boolean(value?.startsWith('data:'));
 
 const normalizeOrigin = (value: string | null | undefined): string | null => {
-  const trimmed = value ? value.trim().replace(/\/+$/, '') : '';
+  const trimmed = value ? trimTrailingSlashes(value.trim()) : '';
   if (!trimmed) {
     return null;
   }
@@ -229,16 +237,19 @@ export const resolvePollEmbedUrl = (poll: Poll | null | undefined): string => {
   return getAbsoluteUrl(`/embed/${encodeURIComponent(poll.id)}?snapshot=${snapshot}`);
 };
 
+const replaceEvery = (value: string, search: string, replacement: string): string =>
+  value.split(search).join(replacement);
+
 const escapeHtmlAttribute = (value: string): string => {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/"/g, '&quot;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
+  return replaceEvery(
+    replaceEvery(replaceEvery(replaceEvery(value, '&', '&amp;'), '"', '&quot;'), '<', '&lt;'),
+    '>',
+    '&gt;',
+  );
 };
 
 const escapeScriptString = (value: string): string => {
-  return value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  return replaceEvery(replaceEvery(value, '\\', '\\\\'), "'", "\\'");
 };
 
 export type PollEmbedMode = 'standard' | 'compact' | 'popup';

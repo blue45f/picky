@@ -16,7 +16,17 @@ const MODE_LABELS: Record<AuthMode, string> = {
   guest: '비회원 시작',
 };
 
-const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+const isValidEmail = (value: string) => {
+  for (const char of value) {
+    if (char.trim() === '') {
+      return false;
+    }
+  }
+
+  const atIndex = value.indexOf('@');
+  const dotIndex = value.lastIndexOf('.');
+  return atIndex > 0 && dotIndex > atIndex + 1 && dotIndex < value.length - 1;
+};
 
 const resolveMode = (raw: string | undefined): AuthMode => {
   if (raw === 'register' || raw === 'guest') {
@@ -316,7 +326,10 @@ export const AuthPage: React.FC = () => {
                 style={{ display: activeMode === 'login' ? 'grid' : 'none', gap: '0.9rem' }}
               >
                 <div style={{ display: 'grid', gap: '0.35rem' }}>
-                  <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                  <label
+                    htmlFor="auth-login-email"
+                    style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}
+                  >
                     <span
                       style={{
                         marginRight: '0.5rem',
@@ -326,9 +339,10 @@ export const AuthPage: React.FC = () => {
                     >
                       <Mail size={14} />
                     </span>
-                    이메일
+                    <span>이메일</span>
                   </label>
                   <input
+                    id="auth-login-email"
                     type="email"
                     value={email}
                     onChange={(e) => handleEmailInput(e.target.value)}
@@ -343,7 +357,10 @@ export const AuthPage: React.FC = () => {
                   )}
                 </div>
                 <div style={{ display: 'grid', gap: '0.35rem' }}>
-                  <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                  <label
+                    htmlFor="auth-login-password"
+                    style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}
+                  >
                     <span
                       style={{
                         marginRight: '0.5rem',
@@ -353,9 +370,10 @@ export const AuthPage: React.FC = () => {
                     >
                       <Lock size={14} />
                     </span>
-                    비밀번호
+                    <span>비밀번호</span>
                   </label>
                   <input
+                    id="auth-login-password"
                     type="password"
                     value={password}
                     onChange={(e) => handlePasswordInput(e.target.value)}
@@ -376,7 +394,10 @@ export const AuthPage: React.FC = () => {
                 style={{ display: activeMode === 'register' ? 'grid' : 'none', gap: '0.9rem' }}
               >
                 <div style={{ display: 'grid', gap: '0.35rem' }}>
-                  <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                  <label
+                    htmlFor="auth-register-email"
+                    style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}
+                  >
                     <span
                       style={{
                         marginRight: '0.5rem',
@@ -386,9 +407,10 @@ export const AuthPage: React.FC = () => {
                     >
                       <Mail size={14} />
                     </span>
-                    이메일
+                    <span>이메일</span>
                   </label>
                   <input
+                    id="auth-register-email"
                     type="email"
                     value={email}
                     onChange={(e) => handleEmailInput(e.target.value)}
@@ -403,7 +425,10 @@ export const AuthPage: React.FC = () => {
                   )}
                 </div>
                 <div style={{ display: 'grid', gap: '0.35rem' }}>
-                  <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                  <label
+                    htmlFor="auth-register-password"
+                    style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}
+                  >
                     <span
                       style={{
                         marginRight: '0.5rem',
@@ -413,9 +438,10 @@ export const AuthPage: React.FC = () => {
                     >
                       <Lock size={14} />
                     </span>
-                    비밀번호
+                    <span>비밀번호</span>
                   </label>
                   <input
+                    id="auth-register-password"
                     type="password"
                     value={password}
                     onChange={(e) => handlePasswordInput(e.target.value)}
@@ -430,7 +456,10 @@ export const AuthPage: React.FC = () => {
                   )}
                 </div>
                 <div style={{ display: 'grid', gap: '0.35rem' }}>
-                  <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                  <label
+                    htmlFor="auth-register-nickname"
+                    style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}
+                  >
                     <span
                       style={{
                         marginRight: '0.5rem',
@@ -440,9 +469,10 @@ export const AuthPage: React.FC = () => {
                     >
                       <User size={14} />
                     </span>
-                    닉네임
+                    <span>닉네임</span>
                   </label>
                   <input
+                    id="auth-register-nickname"
                     type="text"
                     value={nickname}
                     onChange={(e) => handleNicknameInput(e.target.value)}
@@ -462,7 +492,10 @@ export const AuthPage: React.FC = () => {
                 style={{ display: activeMode === 'guest' ? 'grid' : 'none', gap: '0.9rem' }}
               >
                 <div style={{ display: 'grid', gap: '0.35rem' }}>
-                  <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                  <label
+                    htmlFor="auth-guest-nickname"
+                    style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}
+                  >
                     <span
                       style={{
                         marginRight: '0.5rem',
@@ -472,9 +505,10 @@ export const AuthPage: React.FC = () => {
                     >
                       <Sparkles size={14} />
                     </span>
-                    닉네임
+                    <span>닉네임</span>
                   </label>
                   <input
+                    id="auth-guest-nickname"
                     type="text"
                     value={nickname}
                     onChange={(e) => handleNicknameInput(e.target.value)}

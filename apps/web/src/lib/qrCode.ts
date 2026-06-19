@@ -50,8 +50,10 @@ const encodePayload = (text: string) => {
   }
 
   const codewords = bitsToCodewords(bits);
-  for (let pad = 0xec; codewords.length < QR_DATA_CODEWORDS; pad ^= 0xec ^ 0x11) {
+  let pad = 0xec;
+  while (codewords.length < QR_DATA_CODEWORDS) {
     codewords.push(pad);
+    pad ^= 0xec ^ 0x11;
   }
 
   return codewords;
@@ -67,7 +69,7 @@ const multiplyGalois = (x: number, y: number) => {
 };
 
 const buildReedSolomonDivisor = (degree: number) => {
-  const result = Array(degree).fill(0);
+  const result = new Array(degree).fill(0);
   result[degree - 1] = 1;
   let root = 1;
 
@@ -85,7 +87,7 @@ const buildReedSolomonDivisor = (degree: number) => {
 };
 
 const computeReedSolomonRemainder = (data: number[], divisor: number[]) => {
-  const result = Array(divisor.length).fill(0);
+  const result = new Array(divisor.length).fill(0);
 
   data.forEach((byte) => {
     const factor = byte ^ result.shift()!;
@@ -141,8 +143,8 @@ const addErrorCorrection = (dataCodewords: number[]) => {
 };
 
 const createMatrix = (): QrMatrix => ({
-  modules: Array.from({ length: QR_SIZE }, () => Array(QR_SIZE).fill(false)),
-  isFunction: Array.from({ length: QR_SIZE }, () => Array(QR_SIZE).fill(false)),
+  modules: Array.from({ length: QR_SIZE }, () => new Array(QR_SIZE).fill(false)),
+  isFunction: Array.from({ length: QR_SIZE }, () => new Array(QR_SIZE).fill(false)),
 });
 
 const setFunctionModule = (matrix: QrMatrix, x: number, y: number, isBlack: boolean) => {

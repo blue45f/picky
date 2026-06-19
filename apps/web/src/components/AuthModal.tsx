@@ -11,6 +11,18 @@ interface AuthModalProps {
 
 export type AuthMode = 'login' | 'register' | 'guest';
 
+const isValidEmail = (value: string): boolean => {
+  for (const char of value) {
+    if (char.trim() === '') {
+      return false;
+    }
+  }
+
+  const atIndex = value.indexOf('@');
+  const dotIndex = value.lastIndexOf('.');
+  return atIndex > 0 && dotIndex > atIndex + 1 && dotIndex < value.length - 1;
+};
+
 export const AuthModal: React.FC<AuthModalProps> = ({
   isOpen,
   onClose,
@@ -63,7 +75,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       if (!trimmedEmail) {
         return '이메일은 필수입니다.';
       }
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      if (!isValidEmail(trimmedEmail)) {
         return '올바른 이메일 형식을 입력해 주세요.';
       }
       if (trimmedPassword.length < 6) {
@@ -81,7 +93,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     if (!trimmedEmail) {
       return '이메일은 필수입니다.';
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+    if (!isValidEmail(trimmedEmail)) {
       return '올바른 이메일 형식을 입력해 주세요.';
     }
     if (trimmedPassword.length < 6) {
@@ -178,6 +190,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     onClose();
   };
 
+  const handleBackdropClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (event.target === event.currentTarget) {
+      handleClose();
+    }
+  };
+
   return (
     <div
       style={{
@@ -195,7 +213,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         zIndex: 1000,
         padding: '1rem',
       }}
-      onClick={handleClose}
+      onMouseDown={handleBackdropClick}
     >
       <div
         className="content-card"
@@ -210,7 +228,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           animation: 'scale-up 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
           cursor: 'default',
         }}
-        onClick={(e) => e.stopPropagation()}
       >
         {/* Close Button */}
         <button
@@ -361,6 +378,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           {!isLoginMode && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <label
+                htmlFor="auth-modal-nickname"
                 style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)' }}
               >
                 닉네임
@@ -377,6 +395,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   }}
                 />
                 <input
+                  id="auth-modal-nickname"
                   type="text"
                   placeholder="2자 이상 20자 이하"
                   value={nickname}
@@ -411,6 +430,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <label
+                  htmlFor="auth-modal-email"
                   style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)' }}
                 >
                   이메일 주소
@@ -427,6 +447,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     }}
                   />
                   <input
+                    id="auth-modal-email"
                     type="email"
                     placeholder="example@email.com"
                     value={email}
@@ -457,6 +478,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <label
+                  htmlFor="auth-modal-password"
                   style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)' }}
                 >
                   비밀번호
@@ -473,6 +495,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     }}
                   />
                   <input
+                    id="auth-modal-password"
                     type="password"
                     placeholder="6자 이상 입력"
                     value={password}

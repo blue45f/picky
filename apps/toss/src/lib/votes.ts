@@ -8,7 +8,7 @@ export const getVotedOptionId = (pollId: string): number | null => {
     return null;
   }
   const raw = localStorage.getItem(votedKey(pollId));
-  const parsed = raw == null ? NaN : Number(raw);
+  const parsed = raw == null ? Number.NaN : Number(raw);
   return Number.isFinite(parsed) ? parsed : null;
 };
 

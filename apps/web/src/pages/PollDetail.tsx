@@ -956,6 +956,24 @@ export const PollDetail: React.FC = () => {
     }
 
     document.body.classList.add(isPresentationMode ? 'present-mode' : 'embed-mode');
+    const resolveEmbedTargetOrigin = () => {
+      const configuredOrigin = import.meta.env.VITE_EMBED_PARENT_ORIGIN?.trim();
+      const candidates = [configuredOrigin, document.referrer, window.location.origin];
+
+      for (const candidate of candidates) {
+        if (!candidate) {
+          continue;
+        }
+        try {
+          return new URL(candidate).origin;
+        } catch {
+          continue;
+        }
+      }
+
+      return window.location.origin;
+    };
+    const embedTargetOrigin = resolveEmbedTargetOrigin();
     const emitEmbedHeight = () => {
       if (!isEmbedMode) {
         return;
@@ -966,7 +984,7 @@ export const PollDetail: React.FC = () => {
           type: 'pickflow:embed-resize',
           height: document.documentElement.scrollHeight,
         },
-        '*',
+        embedTargetOrigin,
       );
     };
 
@@ -1306,6 +1324,16 @@ export const PollDetail: React.FC = () => {
     }
   };
 
+  const closeResultImagePreview = () => {
+    setResultImagePreviewUrl('');
+  };
+
+  const handleResultImagePreviewBackdropClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (event.target === event.currentTarget) {
+      closeResultImagePreview();
+    }
+  };
+
   const handleResultImageThemeChange = (nextTheme: ResultImageTheme) => {
     setResultImageTheme(nextTheme);
 
@@ -1468,6 +1496,12 @@ export const PollDetail: React.FC = () => {
       const nextParams = new URLSearchParams(searchParams);
       nextParams.delete('showShare');
       setSearchParams(nextParams);
+    }
+  };
+
+  const handleShareModalBackdropMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (event.target === event.currentTarget) {
+      handleCloseShareModal();
     }
   };
 
@@ -3152,17 +3186,21 @@ export const PollDetail: React.FC = () => {
                 }}
               >
                 <span className="stat-pill">총 {currentPoll.comments.length}개 의견</span>
-                <div
-                  role="group"
-                  aria-label="결과 요약 복사 형식"
+                <fieldset
                   style={{
                     display: 'inline-flex',
                     border: '1px solid var(--bg-card-border)',
                     borderRadius: '999px',
                     overflow: 'hidden',
                     background: 'rgba(255,255,255,0.025)',
+                    padding: 0,
+                    margin: 0,
+                    minInlineSize: 0,
                   }}
                 >
+                  <legend style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden' }}>
+                    결과 요약 복사 형식
+                  </legend>
                   {RESULT_SUMMARY_OPTIONS.map((option) => {
                     const active = resultSummaryMode === option.value;
                     return (
@@ -3188,7 +3226,7 @@ export const PollDetail: React.FC = () => {
                       </button>
                     );
                   })}
-                </div>
+                </fieldset>
                 <button
                   type="button"
                   onClick={handleCopyResultSummaryClick}
@@ -4688,12 +4726,8 @@ export const PollDetail: React.FC = () => {
           </div>
 
           {resultImagePreviewUrl ? (
-            <div className="modal-overlay" onClick={() => setResultImagePreviewUrl('')}>
-              <div
-                className="modal-content animate-slide-up"
-                onClick={(event) => event.stopPropagation()}
-                style={{ maxWidth: '760px' }}
-              >
+            <div className="modal-overlay" onMouseDown={handleResultImagePreviewBackdropClick}>
+              <div className="modal-content animate-slide-up" style={{ maxWidth: '760px' }}>
                 <div
                   style={{
                     display: 'flex',
@@ -4720,7 +4754,7 @@ export const PollDetail: React.FC = () => {
                   </div>
                   <button
                     type="button"
-                    onClick={() => setResultImagePreviewUrl('')}
+                    onClick={closeResultImagePreview}
                     className="ghost-btn"
                     style={{ padding: '6px 10px', fontSize: '0.72rem' }}
                   >
@@ -4870,7 +4904,7 @@ export const PollDetail: React.FC = () => {
                 >
                   <button
                     type="button"
-                    onClick={() => setResultImagePreviewUrl('')}
+                    onClick={closeResultImagePreview}
                     className="btn-secondary"
                     style={{ padding: '8px 12px', fontSize: '0.76rem' }}
                   >
@@ -4935,12 +4969,8 @@ export const PollDetail: React.FC = () => {
 
       {/* Share Modal Backdrop */}
       {showShareModal && (
-        <div className="modal-overlay" onClick={handleCloseShareModal}>
-          <div
-            className="modal-content animate-slide-up"
-            onClick={(e) => e.stopPropagation()}
-            style={{ maxWidth: '520px' }}
-          >
+        <div className="modal-overlay" onMouseDown={handleShareModalBackdropMouseDown}>
+          <div className="modal-content animate-slide-up" style={{ maxWidth: '520px' }}>
             <div style={{ textAlign: 'center', marginBottom: '1.25rem' }}>
               <Sparkles
                 size={32}
@@ -5625,15 +5655,20 @@ export const PollDetail: React.FC = () => {
                 </button>
               </div>
 
-              <div
-                role="group"
-                aria-label="초대 메시지 목적 선택"
+              <fieldset
                 style={{
                   display: 'grid',
                   gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
                   gap: '0.4rem',
+                  border: 0,
+                  padding: 0,
+                  margin: 0,
+                  minInlineSize: 0,
                 }}
               >
+                <legend style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden' }}>
+                  초대 메시지 목적 선택
+                </legend>
                 {INVITE_MESSAGE_TONE_OPTIONS.map((option) => {
                   const active = inviteMessageTone === option.value;
                   return (
@@ -5672,7 +5707,7 @@ export const PollDetail: React.FC = () => {
                     </button>
                   );
                 })}
-              </div>
+              </fieldset>
 
               <textarea
                 readOnly

@@ -103,6 +103,32 @@ export function getMiniAppSchemeUri(): string | null {
   }
 }
 
+const trimTrailingSlashes = (value: string): string => {
+  let end = value.length;
+  while (end > 0 && value.charCodeAt(end - 1) === 47) {
+    end -= 1;
+  }
+  return end === value.length ? value : value.slice(0, end);
+};
+
+const isAllowedPollId = (value: string): boolean => {
+  if (!value) {
+    return false;
+  }
+
+  for (const char of value) {
+    const code = char.charCodeAt(0);
+    const isUppercase = code >= 65 && code <= 90;
+    const isLowercase = code >= 97 && code <= 122;
+    const isDigit = code >= 48 && code <= 57;
+    if (!isUppercase && !isLowercase && !isDigit && char !== '_' && char !== '-') {
+      return false;
+    }
+  }
+
+  return true;
+};
+
 /**
  * 진입 스킴(intoss://pickflow/poll/<id> 등)을 앱 내부 경로로 해석.
  * 딥링크로 들어왔을 때 해당 투표/작성 화면으로 바로 이동시키기 위한 화이트리스트 파서.
@@ -113,12 +139,15 @@ export function parseEntryRoute(): string | null {
   if (!uri) {
     return null;
   }
-  const match = uri.match(/^[a-z][a-z0-9+.-]*:\/\/[^/?#]+(\/[^?#]*)?/i);
-  const path = (match?.[1] ?? '').replace(/\/+$/, '');
-  if (!path) {
+  let path: string;
+  try {
+    path = trimTrailingSlashes(new URL(uri).pathname);
+  } catch {
     return null;
   }
-  if (/^\/poll\/[A-Za-z0-9_-]+$/.test(path)) {
+
+  const pollPrefix = '/poll/';
+  if (path.startsWith(pollPrefix) && isAllowedPollId(path.slice(pollPrefix.length))) {
     return path;
   }
   if (path === '/create') {

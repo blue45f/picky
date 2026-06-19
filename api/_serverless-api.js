@@ -61,7 +61,7 @@ var require_database_service = __commonJS({
     var DatabaseService = class DatabaseService {
       storageKey = "picky:database:v1";
       blobPath = "picky/database/v1.json";
-      filePath = path.resolve(process.env.PICKY_DB_PATH?.trim() || (process.env.NODE_ENV === "production" ? "/tmp/picky-db.json" : path.resolve(process.cwd(), "db.json")));
+      filePath = path.resolve(process.env.PICKY_DB_PATH?.trim() || path.resolve(process.cwd(), "db.json"));
       storageClient = this.createStorageClient();
       requiresDurableStorage = (process.env.NODE_ENV === "production" || process.env.VERCEL === "1" || Boolean(process.env.VERCEL_ENV)) && process.env.PICKY_ALLOW_EPHEMERAL_STORAGE !== "true";
       data = { polls: [], users: [] };
@@ -101,7 +101,7 @@ var require_database_service = __commonJS({
         return {
           get: async (_key) => {
             const result = await (0, blob_1.get)(this.blobPath, { access: "private", useCache: false });
-            if (!result || result.statusCode !== 200 || !result.stream) {
+            if (result?.statusCode !== 200 || !result.stream) {
               return null;
             }
             const text = await new Response(result.stream).text();
@@ -1193,6 +1193,13 @@ var require_poll_controller = __commonJS({
     };
     var VoteDto = class extends (0, nestjs_zod_1.createZodDto)(shared_1.VoteSchema) {
     };
+    var trimTrailingSlashes = (value) => {
+      let end = value.length;
+      while (end > 0 && value.charCodeAt(end - 1) === 47) {
+        end -= 1;
+      }
+      return end === value.length ? value : value.slice(0, end);
+    };
     var PollController = class PollController {
       pollService;
       constructor(pollService) {
@@ -1373,7 +1380,7 @@ var require_poll_controller = __commonJS({
         return this.normalizeOrigin(process.env.PUBLIC_APP_URL || process.env.FRONTEND_URL || process.env.WEB_ORIGIN || process.env.VITE_PUBLIC_APP_URL) || this.getRequestOrigin(req);
       }
       normalizeOrigin(value) {
-        const raw = String(value || "").trim().replace(/\/+$/, "");
+        const raw = trimTrailingSlashes(String(value || "").trim());
         if (!raw) {
           return null;
         }
@@ -1454,10 +1461,10 @@ var require_poll_controller = __commonJS({
         return { mimeType, buffer };
       }
       escapeJsonForHtml(value) {
-        return JSON.stringify(value).replace(/&/g, "\\u0026").replace(/</g, "\\u003c").replace(/>/g, "\\u003e");
+        return JSON.stringify(value).replaceAll("&", "\\u0026").replaceAll("<", "\\u003c").replaceAll(">", "\\u003e");
       }
       escapeHtml(value) {
-        return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+        return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
       }
     };
     exports2.PollController = PollController;
