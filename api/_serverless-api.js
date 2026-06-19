@@ -61,6 +61,7 @@ var require_database_service = __commonJS({
       storageKey = "picky:database:v1";
       filePath = path.resolve(process.env.PICKY_DB_PATH?.trim() || (process.env.NODE_ENV === "production" ? "/tmp/picky-db.json" : path.resolve(process.cwd(), "db.json")));
       storageClient = this.createStorageClient();
+      requiresDurableStorage = process.env.NODE_ENV === "production" && process.env.PICKY_ALLOW_EPHEMERAL_STORAGE !== "true";
       data = { polls: [], users: [] };
       initialized = false;
       onModuleInit() {
@@ -211,8 +212,14 @@ var require_database_service = __commonJS({
             await this.saveToKv(nextState);
             return;
           } catch (error) {
-            console.error("Failed to persist with KV, fallback file storage used.", error);
+            console.error("Failed to persist with KV.", error);
+            if (this.requiresDurableStorage) {
+              throw new common_1.ServiceUnavailableException("\uC601\uC18D \uC800\uC7A5\uC18C\uC5D0 \uC800\uC7A5\uD558\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4. Vercel KV/Upstash \uC5F0\uACB0 \uC0C1\uD0DC\uB97C \uD655\uC778\uD574 \uC8FC\uC138\uC694.");
+            }
           }
+        }
+        if (this.requiresDurableStorage) {
+          throw new common_1.ServiceUnavailableException("Production\uC5D0\uB294 \uC601\uC18D \uC800\uC7A5\uC18C\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4. KV_REST_API_URL/KV_REST_API_TOKEN\uC744 \uC124\uC815\uD574 \uC8FC\uC138\uC694.");
         }
         this.saveToFile(nextState);
       }

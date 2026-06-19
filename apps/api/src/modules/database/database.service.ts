@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleInit, ServiceUnavailableException } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
 import { Poll } from '@picky/shared';
@@ -34,6 +34,8 @@ export class DatabaseService implements OnModuleInit {
         : path.resolve(process.cwd(), 'db.json')),
   );
   private readonly storageClient: DatabaseStorageClient | null = this.createStorageClient();
+  private readonly requiresDurableStorage =
+    process.env.NODE_ENV === 'production' && process.env.PICKY_ALLOW_EPHEMERAL_STORAGE !== 'true';
   private data: DatabaseState = { polls: [], users: [] };
   private initialized = false;
 
@@ -214,8 +216,19 @@ export class DatabaseService implements OnModuleInit {
         await this.saveToKv(nextState);
         return;
       } catch (error) {
-        console.error('Failed to persist with KV, fallback file storage used.', error);
+        console.error('Failed to persist with KV.', error);
+        if (this.requiresDurableStorage) {
+          throw new ServiceUnavailableException(
+            '영속 저장소에 저장하지 못했습니다. Vercel KV/Upstash 연결 상태를 확인해 주세요.',
+          );
+        }
       }
+    }
+
+    if (this.requiresDurableStorage) {
+      throw new ServiceUnavailableException(
+        'Production에는 영속 저장소가 필요합니다. KV_REST_API_URL/KV_REST_API_TOKEN을 설정해 주세요.',
+      );
     }
 
     this.saveToFile(nextState);

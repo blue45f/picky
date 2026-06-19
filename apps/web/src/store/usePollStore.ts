@@ -464,7 +464,10 @@ export const usePollStore = create<PollState>((set, get) => ({
           findPollFromLocalCache(id) ||
           get().currentPoll;
 
-        if (fallbackPoll && res.status === 404) {
+        if (
+          fallbackPoll &&
+          (res.status === 404 || res.status === 405 || res.status >= 500 || id.startsWith('local-'))
+        ) {
           const nextPoll = applyLocalVote(
             fallbackPoll,
             input.optionId,
