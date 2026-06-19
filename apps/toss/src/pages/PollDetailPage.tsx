@@ -5,9 +5,9 @@ import type { PollOption } from '../shared';
 import { usePollStore } from '../store/usePollStore';
 import { useIdentity } from '../store/useIdentity';
 import { rememberRecentPoll } from '../lib/pollHistory';
-import { resolvePollShareUrl, sharePoll, copyText } from '../lib/pollShare';
+import { buildPollResultText, resolvePollShareUrl, sharePoll, copyText } from '../lib/pollShare';
 import { formatNumber } from '../lib/format';
-import { isPollClosed, optionPercent, optionsByVotes } from '../lib/poll';
+import { isPollClosed, leadingOption, optionPercent, optionsByVotes } from '../lib/poll';
 import { getVotedOptionId, rememberVote } from '../lib/votes';
 import { hapticFeedback, requestAppReview } from '../lib/toss';
 import { theme, stickyActionBar } from '../theme';
@@ -76,6 +76,7 @@ export function PollDetailPage() {
     const top = optionsByVotes(poll)[0];
     return top && top.voteCount > 0 ? top.id : null;
   }, [poll, showResults]);
+  const leader = poll && showResults && poll.totalVotes > 0 ? leadingOption(poll) : null;
 
   const handleSelect = (optionId: number) => {
     if (hasVoted || closed) return;
@@ -120,6 +121,13 @@ export function PollDetailPage() {
     const ok = await copyText(resolvePollShareUrl(poll));
     hapticFeedback(ok ? 'tap' : 'error');
     showToast(ok ? '링크를 복사했어요.' : '복사에 실패했어요.');
+  };
+
+  const handleCopyResult = async () => {
+    if (!poll) return;
+    const ok = await copyText(buildPollResultText(poll));
+    hapticFeedback(ok ? 'tap' : 'error');
+    showToast(ok ? '결과를 복사했어요.' : '복사에 실패했어요.');
   };
 
   if (isLoading && !poll) {
@@ -181,6 +189,11 @@ export function PollDetailPage() {
         <p style={{ color: theme.textMuted, fontSize: 13, marginTop: 8 }}>
           총 {formatNumber(poll.totalVotes)}표 · 선택지 {poll.options.length}개
         </p>
+        {leader ? (
+          <p style={{ color: theme.accent, fontSize: 13, fontWeight: 700, marginTop: 6 }}>
+            👑 1위 · {leader.text} ({optionPercent(leader.voteCount, poll.totalVotes)}%)
+          </p>
+        ) : null}
 
         <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>
           {displayOptions.map((option) => {
@@ -301,6 +314,11 @@ export function PollDetailPage() {
             링크 복사
           </Button>
         </div>
+        {showResults ? (
+          <Button style={{ width: '100%', marginTop: 8 }} variant="weak" onClick={handleCopyResult}>
+            결과 복사
+          </Button>
+        ) : null}
       </div>
 
       {!hasVoted && !closed ? (
