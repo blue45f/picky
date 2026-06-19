@@ -585,10 +585,11 @@ export const sharePollToKakao = async (
   }
 
   if (navigator.share) {
+    // url 필드를 따로 넘기면 일부 앱(카카오톡)이 url+text를 붙여 링크가 깨져요.
+    // URL을 텍스트 맨 끝 줄에 두고 단일 text로 공유해 링크가 온전히 인식되게 해요.
     await navigator.share({
       title: poll.question,
-      text: shareText,
-      url: shareUrl,
+      text: `${shareText}\n${shareUrl}`,
     });
     return 'web-share';
   }
