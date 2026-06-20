@@ -26,6 +26,9 @@ const PollDetail = lazy(() =>
 const DesignSystem = lazy(() =>
   import('./pages/DesignSystem').then((m) => ({ default: m.DesignSystem })),
 );
+const SitemapPage = lazy(() =>
+  import('./pages/SitemapPage').then((m) => ({ default: m.SitemapPage })),
+);
 const AuthPage = lazy(() => import('./pages/AuthPage').then((m) => ({ default: m.AuthPage })));
 
 const RouteFallback: React.FC = () => (
@@ -108,6 +111,7 @@ export const App: React.FC = () => {
               <Route path="/" element={<PollList />} />
               <Route path="/create" element={<CreatePoll />} />
               <Route path="/design" element={<DesignSystem />} />
+              <Route path="/sitemap" element={<SitemapPage />} />
               <Route path="/poll/:id" element={<PollDetail />} />
               <Route path="/share/:id" element={<ShareRouteRedirect />} />
               <Route path="/embed/:id" element={<PollDetail />} />
@@ -188,14 +192,14 @@ export const App: React.FC = () => {
                   새 고민 작성
                 </Link>
                 <Link
-                  to="/design"
+                  to="/sitemap"
                   style={{
                     color: 'var(--text-muted)',
                     textDecoration: 'none',
                     fontSize: '0.82rem',
                   }}
                 >
-                  디자인 시스템
+                  사이트맵
                 </Link>
               </div>
             </section>
