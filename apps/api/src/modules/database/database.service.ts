@@ -639,7 +639,6 @@ export class DatabaseService implements OnModuleInit {
       if (newComments.length > 0) {
         await db.insert(schema.pollComments).values(
           newComments.map((c) => ({
-            id: c.id,
             pollId: poll.id,
             voterName: c.voterName,
             comment: c.comment,

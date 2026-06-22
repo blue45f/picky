@@ -214,19 +214,19 @@ const drawFormatBits = (matrix: QrMatrix, mask: number) => {
   const bits = ((data << 10) | remainder) ^ 0x5412;
 
   for (let i = 0; i <= 5; i += 1) {
-    setFunctionModule(matrix, 8, i, getBit(bits, i));
+    setFunctionModule(matrix, 8, i, getBit(bits, 14 - i));
   }
-  setFunctionModule(matrix, 8, 7, getBit(bits, 6));
-  setFunctionModule(matrix, 8, 8, getBit(bits, 7));
-  setFunctionModule(matrix, 7, 8, getBit(bits, 8));
+  setFunctionModule(matrix, 8, 7, getBit(bits, 14 - 6));
+  setFunctionModule(matrix, 8, 8, getBit(bits, 14 - 7));
+  setFunctionModule(matrix, 7, 8, getBit(bits, 14 - 8));
   for (let i = 9; i < 15; i += 1) {
-    setFunctionModule(matrix, 14 - i, 8, getBit(bits, i));
+    setFunctionModule(matrix, 14 - i, 8, getBit(bits, 14 - i));
   }
   for (let i = 0; i < 8; i += 1) {
-    setFunctionModule(matrix, QR_SIZE - 1 - i, 8, getBit(bits, i));
+    setFunctionModule(matrix, QR_SIZE - 1 - i, 8, getBit(bits, 14 - i));
   }
   for (let i = 8; i < 15; i += 1) {
-    setFunctionModule(matrix, 8, QR_SIZE - 15 + i, getBit(bits, i));
+    setFunctionModule(matrix, 8, QR_SIZE - 15 + i, getBit(bits, 14 - i));
   }
   setFunctionModule(matrix, 8, QR_SIZE - 8, true);
 };
