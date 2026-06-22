@@ -4,6 +4,10 @@ import * as path from 'path';
 import { Poll } from '@picky/shared';
 import { get as getBlob, put as putBlob } from '@vercel/blob';
 import { createClient, type VercelKV } from '@vercel/kv';
+import { Pool } from 'pg';
+import { db, pool } from '../../db/index';
+import * as schema from '../../db/schema';
+import { eq, desc, sql } from 'drizzle-orm';
 
 interface DatabaseState {
   polls: Poll[];
@@ -32,6 +36,7 @@ export class DatabaseService implements OnModuleInit {
   private readonly filePath = path.resolve(
     process.env.PICKY_DB_PATH?.trim() || path.resolve(process.cwd(), 'db.json'),
   );
+  private readonly useSqlDb = Boolean(process.env.DATABASE_URL?.trim());
   private readonly storageClient: DatabaseStorageClient | null = this.createStorageClient();
   private readonly requiresDurableStorage =
     (process.env.NODE_ENV === 'production' ||
@@ -42,6 +47,62 @@ export class DatabaseService implements OnModuleInit {
   private initialized = false;
 
   async onModuleInit() {
+    if (this.useSqlDb) {
+      try {
+        await pool.query(`
+          CREATE TABLE IF NOT EXISTS users (
+            id TEXT PRIMARY KEY,
+            email TEXT NOT NULL UNIQUE,
+            password_hash TEXT NOT NULL,
+            salt TEXT NOT NULL,
+            nickname TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT NOW() NOT NULL,
+            is_guest BOOLEAN DEFAULT FALSE NOT NULL
+          );
+        `);
+        await pool.query(`
+          CREATE TABLE IF NOT EXISTS polls (
+            id TEXT PRIMARY KEY,
+            question TEXT NOT NULL,
+            description TEXT,
+            created_at TIMESTAMP DEFAULT NOW() NOT NULL,
+            ends_at TIMESTAMP,
+            total_votes INTEGER DEFAULT 0 NOT NULL,
+            results_visibility TEXT DEFAULT 'afterVote' NOT NULL,
+            creator_id TEXT,
+            creator_is_guest BOOLEAN DEFAULT TRUE NOT NULL,
+            attachments JSONB DEFAULT '[]'::jsonb NOT NULL
+          );
+        `);
+        await pool.query(`
+          CREATE TABLE IF NOT EXISTS poll_options (
+            id SERIAL PRIMARY KEY,
+            poll_id TEXT NOT NULL REFERENCES polls(id) ON DELETE CASCADE,
+            option_index INTEGER NOT NULL,
+            text TEXT NOT NULL,
+            vote_count INTEGER DEFAULT 0 NOT NULL,
+            image_url TEXT
+          );
+        `);
+        await pool.query(`
+          CREATE TABLE IF NOT EXISTS poll_comments (
+            id SERIAL PRIMARY KEY,
+            poll_id TEXT NOT NULL REFERENCES polls(id) ON DELETE CASCADE,
+            voter_name TEXT DEFAULT '익명' NOT NULL,
+            comment TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT NOW() NOT NULL,
+            selected_option_id INTEGER,
+            selected_option_text TEXT
+          );
+        `);
+        console.log('✓ Drizzle PostgreSQL database tables verified/created successfully.');
+      } catch (err) {
+        console.error('Failed to initialize Drizzle tables in PostgreSQL:', err);
+      }
+      this.initialized = true;
+      return;
+    }
+
     try {
       await this.load();
     } catch (error) {
@@ -55,7 +116,76 @@ export class DatabaseService implements OnModuleInit {
   }
 
   private createStorageClient(): DatabaseStorageClient | null {
-    return this.createKvStorageClient() || this.createBlobStorageClient();
+    return (
+      this.createPostgresStorageClient() ||
+      this.createKvStorageClient() ||
+      this.createBlobStorageClient()
+    );
+  }
+
+  private createPostgresStorageClient(): DatabaseStorageClient | null {
+    const databaseUrl = process.env.DATABASE_URL?.trim();
+    if (!databaseUrl) {
+      return null;
+    }
+
+    try {
+      const isLocalhost = databaseUrl.includes('localhost') || databaseUrl.includes('127.0.0.1');
+      const pool = new Pool({
+        connectionString: databaseUrl,
+        ssl: isLocalhost ? false : { rejectUnauthorized: false },
+        max: 8,
+        idleTimeoutMillis: 10000,
+        connectionTimeoutMillis: 5000,
+      });
+
+      return {
+        get: async <T = unknown>(key: string): Promise<T | null> => {
+          try {
+            await pool.query(`
+              CREATE TABLE IF NOT EXISTS picky_storage (
+                key VARCHAR(255) PRIMARY KEY,
+                value JSONB NOT NULL
+              );
+            `);
+            const res = await pool.query('SELECT value FROM picky_storage WHERE key = $1', [key]);
+            if (res.rows.length === 0) {
+              return null;
+            }
+            return res.rows[0].value as T;
+          } catch (error) {
+            console.error('Failed to read from PostgreSQL database:', error);
+            return null;
+          }
+        },
+        set: async (key: string, value: DatabaseState): Promise<unknown> => {
+          try {
+            await pool.query(`
+              CREATE TABLE IF NOT EXISTS picky_storage (
+                key VARCHAR(255) PRIMARY KEY,
+                value JSONB NOT NULL
+              );
+            `);
+            await pool.query(
+              `
+              INSERT INTO picky_storage (key, value)
+              VALUES ($1, $2)
+              ON CONFLICT (key) DO UPDATE
+              SET value = EXCLUDED.value
+            `,
+              [key, JSON.stringify(value)],
+            );
+            return true;
+          } catch (error) {
+            console.error('Failed to write to PostgreSQL database:', error);
+            throw error;
+          }
+        },
+      };
+    } catch (error) {
+      console.error('Failed to initialize PostgreSQL connection pool:', error);
+      return null;
+    }
   }
 
   private createKvStorageClient(): DatabaseStorageClient | null {
@@ -353,16 +483,124 @@ export class DatabaseService implements OnModuleInit {
   }
 
   async getPolls(): Promise<Poll[]> {
+    if (this.useSqlDb) {
+      const rows = await db.query.polls.findMany({
+        orderBy: [desc(schema.polls.createdAt)],
+        with: {
+          options: {
+            orderBy: (opt, { asc }) => [asc(opt.optionIndex)],
+          },
+          comments: {
+            orderBy: (cmt, { asc }) => [asc(cmt.createdAt)],
+          },
+        },
+      });
+      return rows.map((r) => ({
+        id: r.id,
+        question: r.question,
+        description: r.description,
+        createdAt: r.createdAt.toISOString(),
+        endsAt: r.endsAt ? r.endsAt.toISOString() : null,
+        totalVotes: r.totalVotes,
+        resultsVisibility: r.resultsVisibility as any,
+        creatorId: r.creatorId,
+        creatorIsGuest: r.creatorIsGuest,
+        attachments: r.attachments as any,
+        options: r.options.map((o) => ({
+          id: o.optionIndex,
+          text: o.text,
+          voteCount: o.voteCount,
+          imageUrl: o.imageUrl,
+        })),
+        comments: r.comments.map((c) => ({
+          id: c.id,
+          voterName: c.voterName,
+          comment: c.comment,
+          createdAt: c.createdAt.toISOString(),
+          selectedOptionId: c.selectedOptionId || undefined,
+          selectedOptionText: c.selectedOptionText || undefined,
+        })),
+      }));
+    }
+
     await this.refresh();
     return [...this.data.polls];
   }
 
   async getPollById(id: string): Promise<Poll | undefined> {
+    if (this.useSqlDb) {
+      const r = await db.query.polls.findFirst({
+        where: eq(schema.polls.id, id),
+        with: {
+          options: {
+            orderBy: (opt, { asc }) => [asc(opt.optionIndex)],
+          },
+          comments: {
+            orderBy: (cmt, { asc }) => [asc(cmt.createdAt)],
+          },
+        },
+      });
+      if (!r) return undefined;
+      return {
+        id: r.id,
+        question: r.question,
+        description: r.description,
+        createdAt: r.createdAt.toISOString(),
+        endsAt: r.endsAt ? r.endsAt.toISOString() : null,
+        totalVotes: r.totalVotes,
+        resultsVisibility: r.resultsVisibility as any,
+        creatorId: r.creatorId,
+        creatorIsGuest: r.creatorIsGuest,
+        attachments: r.attachments as any,
+        options: r.options.map((o) => ({
+          id: o.optionIndex,
+          text: o.text,
+          voteCount: o.voteCount,
+          imageUrl: o.imageUrl,
+        })),
+        comments: r.comments.map((c) => ({
+          id: c.id,
+          voterName: c.voterName,
+          comment: c.comment,
+          createdAt: c.createdAt.toISOString(),
+          selectedOptionId: c.selectedOptionId || undefined,
+          selectedOptionText: c.selectedOptionText || undefined,
+        })),
+      };
+    }
+
     await this.refresh();
     return this.data.polls.find((p) => p.id === id);
   }
 
   async createPoll(poll: Poll) {
+    if (this.useSqlDb) {
+      await db.insert(schema.polls).values({
+        id: poll.id,
+        question: poll.question,
+        description: poll.description,
+        createdAt: new Date(poll.createdAt),
+        endsAt: poll.endsAt ? new Date(poll.endsAt) : null,
+        totalVotes: poll.totalVotes,
+        resultsVisibility: poll.resultsVisibility || 'afterVote',
+        creatorId: poll.creatorId,
+        creatorIsGuest: poll.creatorIsGuest ?? true,
+        attachments: poll.attachments as any,
+      });
+      if (poll.options && poll.options.length > 0) {
+        await db.insert(schema.pollOptions).values(
+          poll.options.map((opt) => ({
+            pollId: poll.id,
+            optionIndex: opt.id,
+            text: opt.text,
+            voteCount: opt.voteCount,
+            imageUrl: opt.imageUrl,
+          })),
+        );
+      }
+      return;
+    }
+
     await this.refresh();
     const next = {
       ...this.data,
@@ -372,6 +610,48 @@ export class DatabaseService implements OnModuleInit {
   }
 
   async updatePoll(poll: Poll) {
+    if (this.useSqlDb) {
+      await db
+        .update(schema.polls)
+        .set({
+          totalVotes: poll.totalVotes,
+        })
+        .where(eq(schema.polls.id, poll.id));
+
+      for (const opt of poll.options) {
+        await db
+          .update(schema.pollOptions)
+          .set({
+            voteCount: opt.voteCount,
+          })
+          .where(
+            sql`${schema.pollOptions.pollId} = ${poll.id} AND ${schema.pollOptions.optionIndex} = ${opt.id}`,
+          );
+      }
+
+      const existingComments = await db
+        .select({ id: schema.pollComments.id })
+        .from(schema.pollComments)
+        .where(eq(schema.pollComments.pollId, poll.id));
+      const existingIds = new Set(existingComments.map((c) => c.id));
+
+      const newComments = poll.comments.filter((c) => !existingIds.has(c.id));
+      if (newComments.length > 0) {
+        await db.insert(schema.pollComments).values(
+          newComments.map((c) => ({
+            id: c.id,
+            pollId: poll.id,
+            voterName: c.voterName,
+            comment: c.comment,
+            createdAt: new Date(c.createdAt),
+            selectedOptionId: c.selectedOptionId || null,
+            selectedOptionText: c.selectedOptionText || null,
+          })),
+        );
+      }
+      return;
+    }
+
     await this.refresh();
     const nextPolls = [...this.data.polls];
     const idx = nextPolls.findIndex((p) => p.id === poll.id);
@@ -384,6 +664,11 @@ export class DatabaseService implements OnModuleInit {
   }
 
   async deletePoll(id: string): Promise<boolean> {
+    if (this.useSqlDb) {
+      await db.delete(schema.polls).where(eq(schema.polls.id, id));
+      return true;
+    }
+
     await this.refresh();
     const exists = this.data.polls.some((p) => p.id === id);
     if (!exists) {
@@ -395,22 +680,83 @@ export class DatabaseService implements OnModuleInit {
   }
 
   async getUsers(): Promise<DatabaseUser[]> {
+    if (this.useSqlDb) {
+      const rows = await db.select().from(schema.users);
+      return rows.map((u) => ({
+        id: u.id,
+        email: u.email,
+        passwordHash: u.passwordHash,
+        salt: u.salt,
+        nickname: u.nickname,
+        createdAt: u.createdAt.toISOString(),
+        isGuest: u.isGuest,
+      }));
+    }
+
     await this.refresh();
     return [...this.data.users];
   }
 
   async getUserByEmail(email: string): Promise<DatabaseUser | undefined> {
+    if (this.useSqlDb) {
+      const target = this.sanitizeEmails(email);
+      const rows = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.email, target))
+        .limit(1);
+      const u = rows[0];
+      if (!u) return undefined;
+      return {
+        id: u.id,
+        email: u.email,
+        passwordHash: u.passwordHash,
+        salt: u.salt,
+        nickname: u.nickname,
+        createdAt: u.createdAt.toISOString(),
+        isGuest: u.isGuest,
+      };
+    }
+
     const target = this.sanitizeEmails(email);
     await this.refresh();
     return this.data.users.find((u) => this.sanitizeEmails(u.email) === target);
   }
 
   async getUserById(id: string): Promise<DatabaseUser | undefined> {
+    if (this.useSqlDb) {
+      const rows = await db.select().from(schema.users).where(eq(schema.users.id, id)).limit(1);
+      const u = rows[0];
+      if (!u) return undefined;
+      return {
+        id: u.id,
+        email: u.email,
+        passwordHash: u.passwordHash,
+        salt: u.salt,
+        nickname: u.nickname,
+        createdAt: u.createdAt.toISOString(),
+        isGuest: u.isGuest,
+      };
+    }
+
     await this.refresh();
     return this.data.users.find((u) => u.id === id);
   }
 
   async createUser(user: DatabaseUser) {
+    if (this.useSqlDb) {
+      await db.insert(schema.users).values({
+        id: user.id,
+        email: this.sanitizeEmails(user.email),
+        passwordHash: user.passwordHash,
+        salt: user.salt,
+        nickname: user.nickname,
+        createdAt: new Date(user.createdAt),
+        isGuest: user.isGuest,
+      });
+      return;
+    }
+
     await this.refresh();
     const next = {
       ...this.data,
