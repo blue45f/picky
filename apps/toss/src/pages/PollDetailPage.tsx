@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@toss/tds-mobile';
-import type { PollOption } from '../shared';
+import type { PollComment, PollOption } from '../shared';
 import { usePollStore } from '../store/usePollStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useIdentity } from '../store/useIdentity';
@@ -315,7 +315,7 @@ export function PollDetailPage() {
               의견 {formatNumber(poll.comments.length)}개
             </h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {poll.comments.map((c) => (
+              {poll.comments.map((c: PollComment) => (
                 <div
                   key={c.id}
                   style={{

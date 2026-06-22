@@ -202,7 +202,7 @@ const createLocalPoll = (input: CreatePollInput, user: AuthState['user']): Poll 
     id: `local-${localIdBase}`,
     question: input.question,
     description: input.description || null,
-    options: input.options.map((option, index) => ({
+    options: input.options.map((option: (typeof input.options)[number], index) => ({
       id: index + 1,
       text: option.text,
       voteCount: 0,
