@@ -73,8 +73,16 @@ describe('PollDetailView full render (verif)', () => {
     }
 
     // capture static HTML to scratch for verification evidence (durable proof)
-    const scratchDir =
-      '/var/folders/xp/79glmmbj6970d74hvkgd4pg00000gp/T/grok-goal-98785c18098b/implementer';
-    writeFileSync(join(scratchDir, 'poll-detail-view-rendered.html'), html);
+    try {
+      const scratchDir =
+        '/var/folders/xp/79glmmbj6970d74hvkgd4pg00000gp/T/grok-goal-98785c18098b/implementer';
+      writeFileSync(join(scratchDir, 'poll-detail-view-rendered.html'), html);
+    } catch {
+      try {
+        writeFileSync(join('.', 'poll-detail-view-rendered.html'), html);
+      } catch {
+        // ignore
+      }
+    }
   });
 });
