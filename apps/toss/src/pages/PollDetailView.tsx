@@ -6,6 +6,7 @@ import { theme, stickyActionBar } from '../theme';
 import { AppBar, Chip, ProgressBar } from '../components/ui';
 import { CountdownChip } from '../components/Countdown';
 import { PollShareQrSection } from '../components/PollShareQrSection';
+import { isInToss } from '../lib/toss';
 
 interface PollDetailViewProps {
   poll: Poll | null;
@@ -429,7 +430,13 @@ export function PollDetailView(props: PollDetailViewProps) {
             >
               QR 태그 스캔 또는 링크 공유로 친구를 초대하세요
             </div>
-            {shareUrl ? <PollShareQrSection shareUrl={shareUrl} onCopyLink={onCopy} /> : null}
+            {shareUrl ? (
+              <PollShareQrSection
+                shareUrl={shareUrl}
+                qrUrl={isInToss() ? `intoss://pickflow/poll/${poll.id}` : shareUrl}
+                onCopyLink={onCopy}
+              />
+            ) : null}
           </div>
         </div>
       </div>

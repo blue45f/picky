@@ -2456,7 +2456,7 @@ export const PollDetail: React.FC = () => {
       >
         {!isEmbedMode ? (
           <section
-            className="share-strip"
+            className="share-strip desktop-only"
             style={{
               display: 'grid',
               gridTemplateColumns: 'minmax(0, 1fr) auto',

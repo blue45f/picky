@@ -3,6 +3,7 @@ import { theme } from '../theme';
 
 interface PollShareQrSectionProps {
   shareUrl: string;
+  qrUrl?: string;
   onCopyLink?: () => void;
 }
 
@@ -11,8 +12,8 @@ interface PollShareQrSectionProps {
  * Renders the "QR 태그" label + large scannable img using the shipped buildQrSvgDataUri,
  * plus optional link copy button. Used by PollDetailPage.
  */
-export function PollShareQrSection({ shareUrl, onCopyLink }: PollShareQrSectionProps) {
-  const qrDataUri = buildQrSvgDataUri(shareUrl);
+export function PollShareQrSection({ shareUrl, qrUrl, onCopyLink }: PollShareQrSectionProps) {
+  const qrDataUri = buildQrSvgDataUri(qrUrl || shareUrl);
   if (!qrDataUri) {
     return null;
   }
