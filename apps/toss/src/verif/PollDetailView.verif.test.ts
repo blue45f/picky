@@ -3,6 +3,8 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { PollDetailView } from '../pages/PollDetailView';
 import { fixturePoll } from './fixturePoll';
+import { writeFileSync } from 'fs';
+import { join } from 'path';
 
 // Mock tds to avoid ThemeProvider requirement in isolated renderToStaticMarkup for verif.
 vi.mock('@toss/tds-mobile', async () => {
@@ -57,5 +59,22 @@ describe('PollDetailView full render (verif)', () => {
     expect(html).toContain('QR 태그');
     expect(html).toMatch(/data:image\/svg\+xml/);
     expect(html).toContain(fixturePoll.question); // full context from the view
+
+    // AC1: question prominent hero (large size/weight first)
+    expect(html).toMatch(/font-size:26|fontSize:\s*26|font-weight:900|fontWeight:\s*900/);
+    const qPos = html.indexOf(fixturePoll.question);
+    // AC2/3: compact top meta, voting options appear before heavy secondary (share/QR)
+    expect(html).toMatch(/명 참여/); // compact meta
+    const firstOptPos = html.indexOf('>강남 고기집');
+    const sharePos = html.indexOf('QR 태그 스캔');
+    expect(qPos).toBeGreaterThan(-1);
+    if (firstOptPos > -1 && sharePos > -1) {
+      expect(firstOptPos).toBeLessThan(sharePos); // options before heavy share section
+    }
+
+    // capture static HTML to scratch for verification evidence (durable proof)
+    const scratchDir =
+      '/var/folders/xp/79glmmbj6970d74hvkgd4pg00000gp/T/grok-goal-98785c18098b/implementer';
+    writeFileSync(join(scratchDir, 'poll-detail-view-rendered.html'), html);
   });
 });

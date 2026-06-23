@@ -120,32 +120,57 @@ export function PollDetailView(props: PollDetailViewProps) {
       />
 
       <div style={{ maxWidth: 520, margin: '0 auto', padding: '0 20px 140px' }}>
-        <h1 style={{ fontSize: 22, lineHeight: 1.4, margin: '12px 0 8px', fontWeight: 800 }}>
+        {/* Hero main issue question - stands out first like NatePan main post for eye-catch on mobile */}
+        <h1
+          style={{
+            fontSize: 26,
+            lineHeight: 1.35,
+            margin: '8px 0 12px',
+            fontWeight: 900,
+            color: theme.text,
+            letterSpacing: '-0.3px',
+          }}
+        >
           {poll.question}
         </h1>
         {poll.description ? (
           <p
             style={{
               color: theme.textMuted,
-              fontSize: 14,
-              lineHeight: 1.6,
-              margin: '8px 0',
-              opacity: 0.9,
+              fontSize: 13,
+              lineHeight: 1.5,
+              margin: '0 0 8px',
+              opacity: 0.85,
+              // compact: limit height to reduce top text dominance
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
             }}
           >
             {poll.description}
           </p>
         ) : null}
-        <p style={{ color: theme.textFaint, fontSize: 13, marginTop: 8 }}>
-          벌써 {formatNumber(totalVotes)}명이 함께 고민하고 있어요! 🌟
-        </p>
-        {leader ? (
-          <p style={{ color: theme.accent, fontSize: 13, fontWeight: 700, marginTop: 6 }}>
-            👑 가장 많은 선택 · {leader.text} ({optionPercent(leader.voteCount, totalVotes)}%)
-          </p>
-        ) : null}
+        {/* Compact single-line meta (stats + leader) to save space vs voting content */}
+        <div
+          style={{
+            color: theme.textFaint,
+            fontSize: 12,
+            marginBottom: 12,
+            display: 'flex',
+            gap: 8,
+            flexWrap: 'wrap',
+          }}
+        >
+          <span>🗳️ {formatNumber(totalVotes)}명 참여</span>
+          {leader ? (
+            <span>
+              👑 {leader.text} ({optionPercent(leader.voteCount, totalVotes)}%)
+            </span>
+          ) : null}
+        </div>
 
-        <div style={{ marginTop: 24, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
           {displayOptions.map((option) => {
             const percent = optionPercent(option.voteCount, totalVotes);
             const selected = selectedOptionId === option.id;
@@ -275,7 +300,7 @@ export function PollDetailView(props: PollDetailViewProps) {
         )}
 
         {comments.length > 0 ? (
-          <section style={{ marginTop: 36 }}>
+          <section style={{ marginTop: 16 }}>
             <h2 style={{ fontSize: 14, fontWeight: 700, color: theme.textMuted, marginBottom: 12 }}>
               의견 {formatNumber(comments.length)}개 💬
             </h2>
@@ -322,7 +347,7 @@ export function PollDetailView(props: PollDetailViewProps) {
 
         <div
           style={{
-            marginTop: 32,
+            marginTop: 16,
             padding: 18,
             background: theme.surface,
             backdropFilter: 'blur(20px)',
@@ -422,9 +447,7 @@ export function PollDetailView(props: PollDetailViewProps) {
               disabled={selectedOptionId == null}
               onClick={onVote}
             >
-              {selectedOptionId == null
-                ? '마음에 드는 선택지를 골라주세요 👇'
-                : '투표 완료하기! 🗳️'}
+              {selectedOptionId == null ? '마음 가는 거 골라보세요 👇' : '투표 완료하기! 🗳️'}
             </Button>
           </div>
         </div>
