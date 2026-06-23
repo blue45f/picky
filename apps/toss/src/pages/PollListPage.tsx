@@ -11,21 +11,23 @@ import { hasVotedLocally } from '../lib/votes';
 import { hapticFeedback } from '../lib/toss';
 import { getRecentPollHistory, type RecentPollHistoryItem } from '../lib/pollHistory';
 import { Chip, ProgressBar, SegmentedControl, Skeleton } from '../components/ui';
-import { CountdownChip, useCountdown } from '../components/Countdown';
+import { useCountdown } from '../components/Countdown';
+import { WelcomeSplash } from '../components/WelcomeSplash';
+import { triggerParticleBurst } from '../lib/particles';
 
 type StatusFilter = 'all' | 'open' | 'closed';
 type SortKey = 'recent' | 'popular' | 'closing';
 
 const FILTER_OPTIONS = [
-  { value: 'all', label: '전체' },
-  { value: 'open', label: '진행중' },
-  { value: 'closed', label: '마감' },
+  { value: 'all', label: '전체 🥑' },
+  { value: 'open', label: '진행중 🔥' },
+  { value: 'closed', label: '마감 ⏰' },
 ] as const satisfies ReadonlyArray<{ value: StatusFilter; label: string }>;
 
 const SORT_OPTIONS = [
-  { value: 'recent', label: '최신순' },
-  { value: 'popular', label: '인기순' },
-  { value: 'closing', label: '마감임박' },
+  { value: 'recent', label: '최신순 ⚡️' },
+  { value: 'popular', label: '인기순 🌟' },
+  { value: 'closing', label: '마감임박 ⌛️' },
 ] as const satisfies ReadonlyArray<{ value: SortKey; label: string }>;
 
 function PollCard({ poll, index, onClick }: { poll: Poll; index: number; onClick: () => void }) {
@@ -35,6 +37,25 @@ function PollCard({ poll, index, onClick }: { poll: Poll; index: number; onClick
   const voted = hasVotedLocally(poll.id);
   const percent = leading ? optionPercent(leading.voteCount, poll.totalVotes) : 0;
   const repImage = poll.options.find((option) => option.imageUrl)?.imageUrl ?? null;
+
+  const metaText = useMemo(() => {
+    const parts = [];
+    if (closed) {
+      parts.push('투표 마감됨');
+    } else if (remaining != null) {
+      const hours = Math.floor(remaining / 3600000);
+      const mins = Math.floor((remaining % 3600000) / 60000);
+      if (hours > 0) {
+        parts.push(`${hours}시간 ${mins}분 남음`);
+      } else if (mins > 0) {
+        parts.push(`${mins}분 남음`);
+      } else {
+        parts.push('곧 마감!');
+      }
+    }
+    parts.push(formatRelativeTime(poll.createdAt));
+    return parts.join(' · ');
+  }, [closed, remaining, poll.createdAt]);
 
   return (
     <button
@@ -46,27 +67,54 @@ function PollCard({ poll, index, onClick }: { poll: Poll; index: number; onClick
         width: '100%',
         textAlign: 'left',
         background: theme.surface,
-        border: `1px solid ${theme.border}`,
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
         borderRadius: theme.radius,
-        padding: 18,
-        marginBottom: 12,
+        padding: '22px 20px',
+        marginBottom: 14,
         color: theme.text,
+        border: `1px solid ${theme.border}`,
         cursor: 'pointer',
-        animationDelay: `${Math.min(index, 8) * 45}ms`,
+        animationDelay: `${Math.min(index, 8) * 75}ms`, // 젤리팝 팅-팅-팅 타이밍을 더 명확하게 조절
+        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+        position: 'relative',
+        overflow: 'hidden',
       }}
     >
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
-        <Chip tone={closed ? 'muted' : 'accent'}>{closed ? '마감' : '진행중'}</Chip>
-        {voted ? <Chip tone="gold">✓ 참여함</Chip> : null}
-        {!closed ? <CountdownChip remaining={remaining} /> : null}
-        <span style={{ fontSize: 12, color: theme.textMuted, alignSelf: 'center' }}>
-          {formatRelativeTime(poll.createdAt)}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          marginBottom: 8,
+          fontSize: 12,
+          color: theme.textMuted,
+        }}
+      >
+        {voted && (
+          <span
+            style={{
+              color: theme.gold,
+              fontWeight: 700,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 2,
+            }}
+          >
+            ✓ 참여 완료! 🌟
+          </span>
+        )}
+        {voted && <span>·</span>}
+        <span style={{ color: closed ? theme.textFaint : theme.accent, fontWeight: 600 }}>
+          {closed ? '마감됨' : '진행중'}
         </span>
+        <span>·</span>
+        <span>{metaText}</span>
       </div>
 
-      <div style={{ display: 'flex', gap: 12 }}>
+      <div style={{ display: 'flex', gap: 14 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <strong style={{ fontSize: 16, lineHeight: 1.4, display: 'block' }}>
+          <strong style={{ fontSize: 17, lineHeight: 1.4, display: 'block', fontWeight: 700 }}>
             {poll.question}
           </strong>
           {poll.description ? (
@@ -76,7 +124,7 @@ function PollCard({ poll, index, onClick }: { poll: Poll; index: number; onClick
                 fontSize: 13,
                 color: theme.textMuted,
                 display: '-webkit-box',
-                WebkitLineClamp: 2,
+                WebkitLineClamp: 1,
                 WebkitBoxOrient: 'vertical',
                 overflow: 'hidden',
               }}
@@ -92,43 +140,50 @@ function PollCard({ poll, index, onClick }: { poll: Poll; index: number; onClick
             loading="lazy"
             style={{
               flexShrink: 0,
-              width: 64,
-              height: 64,
+              width: 58,
+              height: 58,
               objectFit: 'cover',
-              borderRadius: 10,
-              border: `1px solid ${theme.border}`,
+              borderRadius: theme.radiusSm,
+              border: `1px solid rgba(255,255,255,0.06)`,
             }}
           />
         ) : null}
       </div>
 
       {leading ? (
-        <div style={{ marginTop: 12 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, gap: 12 }}>
+        <div
+          style={{
+            marginTop: 14,
+            background: 'rgba(255,255,255,0.03)',
+            padding: '12px 14px',
+            borderRadius: 14,
+            border: `1px solid rgba(255,255,255,0.02)`,
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, gap: 12 }}>
             <span
               style={{
-                color: theme.text,
+                color: theme.textMuted,
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
+                fontWeight: 600,
               }}
             >
-              {leading.text}
+              📊 {leading.text}
             </span>
             <span style={{ color: theme.accent, fontWeight: 700, flexShrink: 0 }}>{percent}%</span>
           </div>
-          <div style={{ marginTop: 6 }}>
-            <ProgressBar percent={percent} />
+          <div style={{ marginTop: 8 }}>
+            <ProgressBar percent={percent} height={6} />
           </div>
         </div>
       ) : null}
 
-      <div
-        style={{ marginTop: 12, fontSize: 12, color: theme.textMuted, display: 'flex', gap: 12 }}
-      >
-        <span>🗳️ {formatNumber(poll.totalVotes)}표</span>
-        <span>💬 의견 {poll.comments.length}개</span>
-        <span>· 선택지 {poll.options.length}개</span>
+      <div style={{ marginTop: 14, fontSize: 11, color: theme.textFaint, display: 'flex', gap: 8 }}>
+        <span>🗳️ {formatNumber(poll.totalVotes)}명이 고민을 나누는 중</span>
+        <span>·</span>
+        <span>💬 한마디 {poll.comments.length}개</span>
       </div>
     </button>
   );
@@ -145,14 +200,14 @@ function RecentStrip({
     return null;
   }
   return (
-    <section style={{ marginBottom: 16 }}>
-      <h2 style={{ fontSize: 13, fontWeight: 700, color: theme.textMuted, margin: '0 0 8px' }}>
-        최근 본 고민
+    <section style={{ marginBottom: 24 }}>
+      <h2 style={{ fontSize: 13, fontWeight: 700, color: theme.textMuted, margin: '0 0 12px' }}>
+        최근 둘러본 고민 🧐
       </h2>
       <div
         style={{
           display: 'flex',
-          gap: 8,
+          gap: 12,
           overflowX: 'auto',
           paddingBottom: 4,
           margin: '0 -20px',
@@ -160,7 +215,7 @@ function RecentStrip({
           scrollbarWidth: 'none',
         }}
       >
-        {items.map((item) => (
+        {items.map((item, idx) => (
           <button
             key={item.id}
             type="button"
@@ -168,18 +223,23 @@ function RecentStrip({
             onClick={() => onSelect(item.id)}
             style={{
               flexShrink: 0,
-              width: 188,
+              width: 176,
               textAlign: 'left',
-              background: theme.surfaceAlt,
-              border: `1px solid ${theme.border}`,
+              background: theme.surface,
+              backdropFilter: 'blur(20px)',
+              WebkitBackdropFilter: 'blur(20px)',
               borderRadius: theme.radiusSm,
-              padding: 12,
+              padding: 14,
               color: theme.text,
+              border: `1px solid ${theme.border}`,
+              boxShadow: '0 4px 16px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.03)',
               cursor: 'pointer',
+              animation: 'pf-jelly-pop 0.6s cubic-bezier(0.34, 1.76, 0.64, 1) both',
+              animationDelay: `${idx * 60}ms`,
             }}
           >
-            <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
-              {item.hasVoted ? <Chip tone="gold">참여함</Chip> : <Chip tone="muted">봤음</Chip>}
+            <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+              {item.hasVoted ? <Chip tone="gold">참여완료</Chip> : <Chip tone="muted">들러봄</Chip>}
             </div>
             <span
               style={{
@@ -190,11 +250,12 @@ function RecentStrip({
                 WebkitLineClamp: 2,
                 WebkitBoxOrient: 'vertical',
                 overflow: 'hidden',
+                height: '2.8em',
               }}
             >
               {item.question}
             </span>
-            <div style={{ marginTop: 8, fontSize: 11, color: theme.textMuted }}>
+            <div style={{ marginTop: 8, fontSize: 11, color: theme.textFaint }}>
               🗳️ {formatNumber(item.totalVotes)} · 💬 {item.commentCount}
             </div>
           </button>
@@ -212,10 +273,10 @@ function ListSkeleton() {
           key={key}
           style={{
             background: theme.surface,
-            border: `1px solid ${theme.border}`,
             borderRadius: theme.radius,
-            padding: 18,
+            padding: 20,
             marginBottom: 12,
+            border: `1px solid ${theme.border}`,
           }}
         >
           <Skeleton width={72} height={20} radius={999} />
@@ -238,6 +299,7 @@ export function PollListPage() {
   const [sortKey, setSortKey] = useState<SortKey>('recent');
   const [myOnly, setMyOnly] = useState(false);
   const [recent, setRecent] = useState<RecentPollHistoryItem[]>([]);
+  const [showSortMenu, setShowSortMenu] = useState(false);
 
   const myPollCount = useMemo(
     () => (myId ? polls.filter((poll) => poll.creatorId === myId).length : 0),
@@ -294,60 +356,112 @@ export function PollListPage() {
   const showRecent = recent.length > 0 && !query.trim() && statusFilter === 'all' && !myOnly;
 
   return (
-    <div style={{ background: theme.bg, minHeight: '100dvh' }}>
-      <Top
-        title={<Top.TitleParagraph size={22}>픽플로우</Top.TitleParagraph>}
-        subtitleBottom={
-          <Top.SubtitleParagraph size={15}>고민을 투표로 빠르게 결정</Top.SubtitleParagraph>
-        }
-      />
+    <div style={{ minHeight: '100dvh' }}>
+      <WelcomeSplash />
+      <div style={{ position: 'relative' }}>
+        <Top
+          title={
+            <div
+              onClick={(e) => {
+                hapticFeedback('success');
+                triggerParticleBurst(e.clientX, e.clientY, { count: 20 });
+              }}
+              style={{ display: 'inline-flex', cursor: 'pointer', userSelect: 'none' }}
+            >
+              <Top.TitleParagraph
+                size={22}
+                style={{
+                  fontWeight: 800,
+                  position: 'relative',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                }}
+              >
+                픽플로우 🥑
+                <span
+                  className="sparkle-icon"
+                  style={{ top: -6, left: -14, fontSize: 16, animationDelay: '0.1s' }}
+                >
+                  ✦
+                </span>
+                <span
+                  className="sparkle-icon"
+                  style={{
+                    top: -14,
+                    right: 12,
+                    fontSize: 13,
+                    animationDelay: '0.6s',
+                    color: theme.gold,
+                  }}
+                >
+                  ✨
+                </span>
+                <span
+                  className="sparkle-icon"
+                  style={{ bottom: -4, right: -12, fontSize: 14, animationDelay: '1.2s' }}
+                >
+                  ✦
+                </span>
+              </Top.TitleParagraph>
+            </div>
+          }
+          subtitleBottom={
+            <Top.SubtitleParagraph size={15} style={{ opacity: 0.85 }}>
+              친구들과 나누는 까다로운 결정!
+            </Top.SubtitleParagraph>
+          }
+        />
+      </div>
 
       <div style={pageShell}>
         {polls.length > 0 ? (
           <div
             style={{
               display: 'flex',
-              gap: 16,
+              gap: 12,
               marginBottom: 14,
               fontSize: 13,
               color: theme.textMuted,
             }}
           >
             <span>
-              <strong style={{ color: theme.text }}>{formatNumber(polls.length)}</strong>개 고민
+              고민 <strong style={{ color: theme.text }}>{formatNumber(polls.length)}</strong>개
             </span>
             <span>
-              <strong style={{ color: theme.text }}>{formatNumber(totalVotes)}</strong>표 참여
+              참여 <strong style={{ color: theme.text }}>{formatNumber(totalVotes)}</strong>명
             </span>
           </div>
         ) : null}
 
-        <div style={{ position: 'relative', marginBottom: 12 }}>
+        <div style={{ position: 'relative', marginBottom: 18 }}>
           <input
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="고민 검색"
+            placeholder="어떤 고민이 있으신가요? 🔍"
             aria-label="고민 검색"
             style={{
               width: '100%',
-              background: theme.surface,
+              background: 'rgba(255,255,255,0.03)',
+              backdropFilter: 'blur(16px)',
+              WebkitBackdropFilter: 'blur(16px)',
               border: `1px solid ${theme.border}`,
               borderRadius: theme.radiusSm,
               color: theme.text,
-              padding: '11px 14px 11px 38px',
+              padding: '12px 14px 12px 38px',
               fontSize: 14,
               outline: 'none',
+              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.02)',
             }}
           />
           <span
             aria-hidden
             style={{
               position: 'absolute',
-              left: 13,
+              left: 14,
               top: '50%',
               transform: 'translateY(-50%)',
-              fontSize: 15,
+              fontSize: 14,
               opacity: 0.6,
             }}
           >
@@ -355,76 +469,125 @@ export function PollListPage() {
           </span>
         </div>
 
-        <div style={{ marginBottom: 10 }}>
-          <SegmentedControl
-            ariaLabel="상태 필터"
-            options={FILTER_OPTIONS}
-            value={statusFilter}
-            onChange={setStatusFilter}
-          />
-        </div>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 18,
+          }}
+        >
+          <div style={{ flex: 1, marginRight: 8 }}>
+            <SegmentedControl
+              ariaLabel="상태 필터"
+              options={FILTER_OPTIONS}
+              value={statusFilter}
+              onChange={setStatusFilter}
+            />
+          </div>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            {myPollCount > 0 && (
+              <button
+                type="button"
+                className="pressable"
+                onClick={() => setMyOnly((prev) => !prev)}
+                style={{
+                  padding: '8px 14px',
+                  borderRadius: 14,
+                  background: myOnly ? theme.accentSoft : 'rgba(255,255,255,0.04)',
+                  backdropFilter: 'blur(16px)',
+                  WebkitBackdropFilter: 'blur(16px)',
+                  color: myOnly ? theme.accent : theme.textMuted,
+                  fontSize: 13,
+                  fontWeight: 700,
+                  border: `1px solid ${myOnly ? theme.accent : theme.border}`,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.02)',
+                }}
+              >
+                내 고민 🙋
+              </button>
+            )}
 
-        <div style={{ display: 'flex', gap: 6, marginBottom: 16, alignItems: 'center' }}>
-          <fieldset
-            style={{
-              display: 'flex',
-              gap: 6,
-              border: 0,
-              padding: 0,
-              margin: 0,
-              minInlineSize: 0,
-            }}
-          >
-            <legend style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden' }}>
-              정렬
-            </legend>
-            {SORT_OPTIONS.map((option) => {
-              const active = option.value === sortKey;
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  className="pressable"
-                  aria-pressed={active}
-                  onClick={() => setSortKey(option.value)}
-                  style={{
-                    padding: '6px 12px',
-                    borderRadius: theme.radiusPill,
-                    border: `1px solid ${active ? theme.accent : theme.border}`,
-                    background: active ? theme.accentSoft : 'transparent',
-                    color: active ? theme.accent : theme.textMuted,
-                    fontSize: 12,
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                  }}
-                >
-                  {option.label}
-                </button>
-              );
-            })}
-          </fieldset>
-          {myPollCount > 0 ? (
-            <button
-              type="button"
-              className="pressable"
-              aria-pressed={myOnly}
-              onClick={() => setMyOnly((prev) => !prev)}
-              style={{
-                marginLeft: 'auto',
-                padding: '6px 12px',
-                borderRadius: theme.radiusPill,
-                border: `1px solid ${myOnly ? theme.accent : theme.border}`,
-                background: myOnly ? theme.accentSoft : 'transparent',
-                color: myOnly ? theme.accent : theme.textMuted,
-                fontSize: 12,
-                fontWeight: 700,
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              내 고민 {myPollCount}
-            </button>
-          ) : null}
+            <div style={{ position: 'relative' }}>
+              <button
+                type="button"
+                className="pressable"
+                onClick={() => setShowSortMenu(!showSortMenu)}
+                style={{
+                  padding: '8px 14px',
+                  borderRadius: 14,
+                  background: 'rgba(255,255,255,0.04)',
+                  backdropFilter: 'blur(16px)',
+                  WebkitBackdropFilter: 'blur(16px)',
+                  color: theme.textMuted,
+                  fontSize: 13,
+                  fontWeight: 700,
+                  border: `1px solid ${theme.border}`,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  whiteSpace: 'nowrap',
+                  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.02)',
+                }}
+              >
+                <span>{SORT_OPTIONS.find((o) => o.value === sortKey)?.label.split(' ')[0]}</span>
+                <span style={{ fontSize: 10, opacity: 0.7 }}>▼</span>
+              </button>
+              {showSortMenu && (
+                <>
+                  <div
+                    onClick={() => setShowSortMenu(false)}
+                    style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10 }}
+                  />
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: 'calc(100% + 6px)',
+                      right: 0,
+                      background: theme.surfaceStrong,
+                      borderRadius: 14,
+                      border: `1px solid ${theme.border}`,
+                      boxShadow: '0 12px 36px rgba(0,0,0,0.4)',
+                      padding: 6,
+                      zIndex: 11,
+                      minWidth: 110,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 2,
+                    }}
+                  >
+                    {SORT_OPTIONS.map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => {
+                          setSortKey(option.value);
+                          setShowSortMenu(false);
+                        }}
+                        style={{
+                          padding: '8px 12px',
+                          borderRadius: 8,
+                          background: option.value === sortKey ? theme.accentSoft : 'transparent',
+                          color: option.value === sortKey ? theme.accent : theme.text,
+                          fontSize: 13,
+                          fontWeight: option.value === sortKey ? 700 : 500,
+                          border: 'none',
+                          textAlign: 'left',
+                          cursor: 'pointer',
+                          width: '100%',
+                        }}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
         </div>
 
         {showRecent ? <RecentStrip items={recent} onSelect={goToPoll} /> : null}
@@ -435,23 +598,27 @@ export function PollListPage() {
           <div style={{ textAlign: 'center', padding: '32px 0', color: theme.danger }}>
             <p style={{ fontSize: 14 }}>{error}</p>
             <Button style={{ marginTop: 12 }} variant="weak" onClick={() => void fetchPolls()}>
-              다시 시도
+              다시 시도하기 🔄
             </Button>
           </div>
         ) : null}
 
         {!isInitialLoading && polls.length > 0 && visiblePolls.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '40px 0', color: theme.textMuted }}>
-            <p style={{ fontSize: 15 }}>조건에 맞는 고민이 없어요.</p>
-            <p style={{ fontSize: 13 }}>검색어나 필터를 바꿔 보세요.</p>
+            <p style={{ fontSize: 15 }}>앗, 조건에 맞는 고민을 찾지 못했어요 😢</p>
+            <p style={{ fontSize: 13 }}>다른 검색어를 입력하거나 필터를 변경해 보세요!</p>
           </div>
         ) : null}
 
         {!isInitialLoading && polls.length === 0 && !error ? (
           <div style={{ textAlign: 'center', padding: '56px 0', color: theme.textMuted }}>
-            <div style={{ fontSize: 40, marginBottom: 8 }}>🗳️</div>
-            <p style={{ fontSize: 15, color: theme.text }}>아직 등록된 고민이 없어요.</p>
-            <p style={{ fontSize: 13 }}>첫 번째 고민을 투표로 만들어 보세요!</p>
+            <div style={{ fontSize: 44, marginBottom: 12 }}>🥑</div>
+            <p style={{ fontSize: 16, color: theme.text, fontWeight: 700 }}>
+              아직 등록된 고민이 없어요.
+            </p>
+            <p style={{ fontSize: 13, marginTop: 4 }}>
+              가장 먼저 재미있는 고민 투표를 만들어볼까요? 🚀
+            </p>
           </div>
         ) : null}
 
@@ -463,13 +630,17 @@ export function PollListPage() {
       <div style={stickyActionBar}>
         <div style={{ maxWidth: 520, margin: '0 auto' }}>
           <Button
-            style={{ width: '100%' }}
+            style={{
+              width: '100%',
+              borderRadius: 16,
+              boxShadow: '0 8px 24px rgba(19, 194, 163, 0.25)',
+            }}
             onClick={() => {
               hapticFeedback('tap');
               navigate('/create');
             }}
           >
-            새 고민 만들기
+            새 고민 작성하기 ✍️
           </Button>
         </div>
       </div>

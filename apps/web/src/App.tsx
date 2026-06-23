@@ -13,6 +13,7 @@ import {
 import { Heart } from 'lucide-react';
 import { Navbar } from './components/Navbar';
 import { RouteAnnouncer } from './components/layout/RouteAnnouncer';
+import { IntroSplashScreen } from './components/IntroSplashScreen';
 import { useAuthStore } from './store/useAuthStore';
 
 // 라우트 단위 코드 스플리팅 — 초기 번들에서 무거운 페이지(작성/디자인 등)를 분리해요.
@@ -88,6 +89,7 @@ export const App: React.FC = () => {
 
   return (
     <BrowserRouter>
+      <IntroSplashScreen />
       <div
         style={{
           minHeight: '100vh',
@@ -203,7 +205,7 @@ export const App: React.FC = () => {
                 </Link>
               </div>
             </section>
-            <p>© {new Date().getFullYear()} pickflow. All rights reserved.</p>
+            <p>© {new Date().getFullYear()} pickflow (Beta). All rights reserved.</p>
             <p
               style={{
                 display: 'inline-flex',

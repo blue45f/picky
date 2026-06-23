@@ -1,11 +1,11 @@
-/** 픽플로우 브랜드 토큰 (다크 + 에메랄드). */
+/** 픽플로우 브랜드 토큰 (다크 + 에메랄드 + 글래스모피즘 기반 프리미엄 UI 적용). */
 export const theme = {
-  bg: '#061411',
-  surface: '#0c1f1a',
-  surfaceAlt: '#102a23',
-  surfaceStrong: '#143329',
-  border: 'rgba(255, 255, 255, 0.08)',
-  borderStrong: 'rgba(255, 255, 255, 0.16)',
+  bg: '#05100e',
+  surface: 'rgba(12, 31, 26, 0.72)', // 영롱한 반투명 글래스
+  surfaceAlt: 'rgba(16, 42, 35, 0.88)',
+  surfaceStrong: 'rgba(20, 51, 41, 0.95)',
+  border: 'rgba(255, 255, 255, 0.05)', // 은은한 흰색 오버레이
+  borderStrong: 'rgba(255, 255, 255, 0.12)',
   text: '#f4fbf8',
   textMuted: '#9fb4ad',
   textFaint: '#6c857d',
@@ -19,10 +19,10 @@ export const theme = {
   warning: '#fbbf24',
   danger: '#ff6b6b',
   dangerSoft: 'rgba(255, 107, 107, 0.14)',
-  track: 'rgba(255, 255, 255, 0.08)',
+  track: 'rgba(255, 255, 255, 0.06)',
   overlay: 'rgba(0, 0, 0, 0.82)',
-  radius: 16,
-  radiusSm: 12,
+  radius: 22,
+  radiusSm: 16,
   radiusPill: 999,
 } as const;
 
