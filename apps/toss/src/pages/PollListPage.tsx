@@ -12,7 +12,6 @@ import { hapticFeedback } from '../lib/toss';
 import { getRecentPollHistory, type RecentPollHistoryItem } from '../lib/pollHistory';
 import { Chip, ProgressBar, SegmentedControl, Skeleton } from '../components/ui';
 import { useCountdown } from '../components/Countdown';
-import { WelcomeSplash } from '../components/WelcomeSplash';
 import { triggerParticleBurst } from '../lib/particles';
 
 type StatusFilter = 'all' | 'open' | 'closed';
@@ -299,7 +298,6 @@ export function PollListPage() {
   const [sortKey, setSortKey] = useState<SortKey>('recent');
   const [myOnly, setMyOnly] = useState(false);
   const [recent, setRecent] = useState<RecentPollHistoryItem[]>([]);
-  const [showSortMenu, setShowSortMenu] = useState(false);
 
   const myPollCount = useMemo(
     () => (myId ? polls.filter((poll) => poll.creatorId === myId).length : 0),
@@ -357,7 +355,6 @@ export function PollListPage() {
 
   return (
     <div style={{ minHeight: '100dvh' }}>
-      <WelcomeSplash />
       <div style={{ position: 'relative' }}>
         <Top
           title={
@@ -407,7 +404,7 @@ export function PollListPage() {
           }
           subtitleBottom={
             <Top.SubtitleParagraph size={15} style={{ opacity: 0.85 }}>
-              친구들과 나누는 까다로운 결정!
+              QR 태그로 친구들과 바로 고민 투표 ⚡️
             </Top.SubtitleParagraph>
           }
         />
@@ -449,6 +446,7 @@ export function PollListPage() {
               borderRadius: theme.radiusSm,
               color: theme.text,
               padding: '12px 14px 12px 38px',
+              paddingRight: query ? 38 : 14,
               fontSize: 14,
               outline: 'none',
               boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.02)',
@@ -467,127 +465,71 @@ export function PollListPage() {
           >
             🔍
           </span>
+          {query ? (
+            <button
+              type="button"
+              aria-label="검색어 지우기"
+              onClick={() => setQuery('')}
+              style={{
+                position: 'absolute',
+                right: 10,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                background: 'none',
+                border: 'none',
+                fontSize: 16,
+                color: theme.textFaint,
+                cursor: 'pointer',
+                padding: 4,
+              }}
+            >
+              ✕
+            </button>
+          ) : null}
         </div>
 
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: 18,
-          }}
-        >
-          <div style={{ flex: 1, marginRight: 8 }}>
+        {/* 직관적 필터: 상태 + 정렬을 SegmentedControl로 통일해 한눈에 선택 가능하게 (드롭다운 제거로 단순화) */}
+        <div style={{ marginBottom: 12 }}>
+          <SegmentedControl
+            ariaLabel="상태 필터"
+            options={FILTER_OPTIONS}
+            value={statusFilter}
+            onChange={setStatusFilter}
+          />
+        </div>
+        <div style={{ marginBottom: 18, display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div style={{ flex: 1 }}>
             <SegmentedControl
-              ariaLabel="상태 필터"
-              options={FILTER_OPTIONS}
-              value={statusFilter}
-              onChange={setStatusFilter}
+              ariaLabel="정렬 방식"
+              options={SORT_OPTIONS}
+              value={sortKey}
+              onChange={setSortKey}
             />
           </div>
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-            {myPollCount > 0 && (
-              <button
-                type="button"
-                className="pressable"
-                onClick={() => setMyOnly((prev) => !prev)}
-                style={{
-                  padding: '8px 14px',
-                  borderRadius: 14,
-                  background: myOnly ? theme.accentSoft : 'rgba(255,255,255,0.04)',
-                  backdropFilter: 'blur(16px)',
-                  WebkitBackdropFilter: 'blur(16px)',
-                  color: myOnly ? theme.accent : theme.textMuted,
-                  fontSize: 13,
-                  fontWeight: 700,
-                  border: `1px solid ${myOnly ? theme.accent : theme.border}`,
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.02)',
-                }}
-              >
-                내 고민 🙋
-              </button>
-            )}
-
-            <div style={{ position: 'relative' }}>
-              <button
-                type="button"
-                className="pressable"
-                onClick={() => setShowSortMenu(!showSortMenu)}
-                style={{
-                  padding: '8px 14px',
-                  borderRadius: 14,
-                  background: 'rgba(255,255,255,0.04)',
-                  backdropFilter: 'blur(16px)',
-                  WebkitBackdropFilter: 'blur(16px)',
-                  color: theme.textMuted,
-                  fontSize: 13,
-                  fontWeight: 700,
-                  border: `1px solid ${theme.border}`,
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 4,
-                  whiteSpace: 'nowrap',
-                  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.02)',
-                }}
-              >
-                <span>{SORT_OPTIONS.find((o) => o.value === sortKey)?.label.split(' ')[0]}</span>
-                <span style={{ fontSize: 10, opacity: 0.7 }}>▼</span>
-              </button>
-              {showSortMenu && (
-                <>
-                  <div
-                    onClick={() => setShowSortMenu(false)}
-                    style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10 }}
-                  />
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: 'calc(100% + 6px)',
-                      right: 0,
-                      background: theme.surfaceStrong,
-                      borderRadius: 14,
-                      border: `1px solid ${theme.border}`,
-                      boxShadow: '0 12px 36px rgba(0,0,0,0.4)',
-                      padding: 6,
-                      zIndex: 11,
-                      minWidth: 110,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 2,
-                    }}
-                  >
-                    {SORT_OPTIONS.map((option) => (
-                      <button
-                        key={option.value}
-                        type="button"
-                        onClick={() => {
-                          setSortKey(option.value);
-                          setShowSortMenu(false);
-                        }}
-                        style={{
-                          padding: '8px 12px',
-                          borderRadius: 8,
-                          background: option.value === sortKey ? theme.accentSoft : 'transparent',
-                          color: option.value === sortKey ? theme.accent : theme.text,
-                          fontSize: 13,
-                          fontWeight: option.value === sortKey ? 700 : 500,
-                          border: 'none',
-                          textAlign: 'left',
-                          cursor: 'pointer',
-                          width: '100%',
-                        }}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
+          {myPollCount > 0 && (
+            <button
+              type="button"
+              className="pressable"
+              onClick={() => setMyOnly((prev) => !prev)}
+              aria-pressed={myOnly}
+              style={{
+                padding: '8px 14px',
+                borderRadius: 14,
+                background: myOnly ? theme.accentSoft : 'rgba(255,255,255,0.04)',
+                backdropFilter: 'blur(16px)',
+                WebkitBackdropFilter: 'blur(16px)',
+                color: myOnly ? theme.accent : theme.textMuted,
+                fontSize: 13,
+                fontWeight: 700,
+                border: `1px solid ${myOnly ? theme.accent : theme.border}`,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.02)',
+              }}
+            >
+              내 고민 🙋
+            </button>
+          )}
         </div>
 
         {showRecent ? <RecentStrip items={recent} onSelect={goToPoll} /> : null}

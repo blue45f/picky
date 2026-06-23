@@ -556,6 +556,9 @@ export function CreatePollPage() {
               value={resultsVisibility}
               onChange={setResultsVisibility}
             />
+            <p style={{ fontSize: 11, color: theme.textFaint, marginTop: 6, marginLeft: 2 }}>
+              투표 후 바로 확인하거나 언제든 공개할 수 있어요
+            </p>
           </div>
         )}
 

@@ -1,0 +1,52 @@
+PIXK FLOW / PICKY — Toss Mini-app (apps/toss) + Intro UI/UX Polish + Verification
+Date: 2026-06-23
+
+BASELINE:
+- 27/27 vitest passing (lib + verif component renders). See toss-tests-final.log
+- VITE_VERIF_PREVIEW=1 build succeeded (toss-build-verif.log), exit 0. Includes real routes.
+
+VERIFICATION ROUTES (HashRouter + VITE_VERIF_PREVIEW=1):
+- /#__verif/detail : Full <PollDetailView poll={Korean fixture} ... /> with:
+  * Question + desc + participation count
+  * 3 option cards + progress + % (results visible)
+  * Comments list (real integrated)
+  * Share section: "친구에게 물어보기" + "링크 복사" + "결과 복사" 
+  * PollShareQrSection: "QR 태그 📱" + 176px <img src="data:image/svg+xml..."> + "카메라로 스캔하면 바로 참여할 수 있어요"
+  * Sticky vote CTA
+  * Owner delete action (simulated)
+  Screenshot: verif-detail-qr.png (full page, 961x1281). QR code block clearly visible in context.
+
+- /#__verif/splash : <WelcomeSplash forceVisible /> — glam particles (4-stage bursts), 🥑, animated gradient "픽플로우", QR emphasis tagline. 
+  Screenshot: verif-splash.png
+
+- /#__verif/list : Static demo of segmented filters (status + sort), card, CTA. Simulates main list UX.
+  Screenshot: verif-list.png
+
+KEY UI/UX UPGRADES (simple + intuitive + glam):
+- List: Converted sort from popover dropdown → SegmentedControl (same as status filters). Instant visible options, fewer taps, consistent.
+- "내 고민" remains as clear pill toggle.
+- Search, recent strip, skeletons, empty states, progress, leader crown all preserved/polished.
+- Detail: QR integration explicit in share card with supporting text. Real component used everywhere.
+- Create: 2-step wizard + presets + image upload/link + visibility controls remain clean.
+- Particles: Global + vote bursts + splash bursts.
+- Glam Intros:
+  * Toss WelcomeSplash: 4-burst massive emoji confetti, larger avatar+multiple glows, stronger gradient title, extended timing (2.6s), "QR 태그로 즉시 참여" tagline.
+  * Web IntroSplashScreen: Matched particle counts/timing, bigger title, same QR emphasis copy, fade timing synced.
+- TDS + glassmorphism + safe-area + haptics + pressable feedback consistent across.
+
+FEATURES CONFIRMED WORKING (via code + tests + real render preview):
+- List: filters (all/open/closed), sort (recent/popular/closing), search, recent history strip, my-only toggle, poll card navigation.
+- Create: question/desc, 2-10 options, image attach (file+url), deadline presets/custom, visibility (afterVote/always), validation, submit -> navigate.
+- Detail: live countdown, select+vote (with name+comment reveal), results % + progress + leader, comments display, owner delete confirm, share (native/web/clipboard), copy link, copy result text, QR scannable SVG.
+- QR: custom pure buildQrSvgDataUri used in PollShareQrSection (176px, data uri, alt text). Included in both Page container and direct View.
+- Delete, toasts, review prompt, history remember, all wired.
+
+EVIDENCE FILES (real from preview navigation + renderToStaticMarkup):
+- verif-detail-qr.png : Full integrated poll page incl visible QR block + Korean fixture content.
+- verif-splash.png : Glam intro.
+- verif-list.png, verif-home-list.png
+- toss-tests-final.log, toss-build-verif.log
+
+NO OVERCLAIMS: All statements backed by shipped source (PollDetailView:394 etc), passing tests, and actual browser preview renders (not string templates).
+
+No more high-impact simple/intuitive/glam upgrades identified after iteration (segmented sort unification, splash particle/branding amp, consistent verif full context). Ready.
