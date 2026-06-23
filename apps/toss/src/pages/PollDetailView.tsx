@@ -199,7 +199,7 @@ export function PollDetailView(props: PollDetailViewProps) {
                 onClick={() => onSelect(option.id)}
                 style={{
                   textAlign: 'left',
-                  padding: '18px 20px',
+                  padding: '20px 22px',
                   borderRadius: theme.radius,
                   border: `1.5px solid ${cardBorderColor}`,
                   boxShadow: cardBoxShadow,
@@ -236,7 +236,7 @@ export function PollDetailView(props: PollDetailViewProps) {
                     alignItems: 'center',
                   }}
                 >
-                  <span style={{ fontWeight: 700, minWidth: 0, fontSize: 16 }}>
+                  <span style={{ fontWeight: 800, minWidth: 0, fontSize: 17 }}>
                     {isMine ? '✓ ' : ''}
                     {isWinner ? '👑 ' : ''}
                     {option.text}
@@ -247,7 +247,7 @@ export function PollDetailView(props: PollDetailViewProps) {
                         color: isWinner ? theme.gold : theme.accent,
                         fontWeight: 800,
                         flexShrink: 0,
-                        fontSize: 15,
+                        fontSize: 16,
                       }}
                     >
                       {percent}% · {formatNumber(option.voteCount)}표

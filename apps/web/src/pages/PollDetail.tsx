@@ -2172,6 +2172,7 @@ export const PollDetail: React.FC = () => {
       {/* Prominent QR for mobile scanning - makes QR actually usable on web site */}
       {shareUrl && participationQrUrl && (
         <div
+          className="desktop-only"
           style={{
             padding: '1rem',
             background: 'var(--bg-card)',
@@ -2234,6 +2235,7 @@ export const PollDetail: React.FC = () => {
       )}
 
       <section
+        className="desktop-only"
         style={{
           border: '1px solid rgba(45, 212, 191, 0.18)',
           borderRadius: 'var(--radius-sm)',

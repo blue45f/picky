@@ -580,6 +580,16 @@ export const PollList: React.FC = () => {
   );
   const openPollCount = useMemo(() => polls.filter((poll) => !isPollClosed(poll)).length, [polls]);
 
+  const hotPoll = useMemo(() => {
+    const activePolls = polls.filter((p) => !isPollClosed(p));
+    if (activePolls.length === 0) return null;
+    return activePolls.reduce((prev, current) => {
+      const prevScore = prev.totalVotes + prev.comments.length * 3;
+      const currentScore = current.totalVotes + current.comments.length * 3;
+      return currentScore > prevScore ? current : prev;
+    });
+  }, [polls]);
+
   // Animated hero counters — count up to the live totals once data arrives.
   const pollsCountDisplay = useCountUp(polls.length);
   const totalVotesDisplay = useCountUp(totalVotes);
@@ -1053,7 +1063,7 @@ export const PollList: React.FC = () => {
             고민되는 선택, <span className="hero-accent">링크 하나</span>로 빠르게 물어보세요
           </h1>
 
-          <p className="hero-lede hero-enter" style={{ ['--enter-i' as string]: 2 }}>
+          <p className="hero-lede hero-enter desktop-only" style={{ ['--enter-i' as string]: 2 }}>
             점심 메뉴부터 팀 회의 안건까지 — 선택지를 카드로 만들고 지인·동료에게 링크를 보내면 바로
             의견이 모입니다. 결과는 실시간으로, 결정은 더 가볍게.
           </p>
@@ -1116,6 +1126,124 @@ export const PollList: React.FC = () => {
               <span>키로 바로 작성</span>
             </span>
           </div>
+
+          {hotPoll && (
+            <div
+              className="hot-poll-card hero-enter"
+              style={{
+                ['--enter-i' as string]: 3.5,
+                cursor: 'pointer',
+                padding: '1.25rem',
+                borderRadius: '16px',
+                background:
+                  'linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(45, 212, 191, 0.08) 100%)',
+                border: '1.5px solid rgba(99, 102, 241, 0.3)',
+                boxShadow: '0 8px 32px rgba(99, 102, 241, 0.12)',
+                display: 'grid',
+                gap: '0.65rem',
+                position: 'relative',
+                overflow: 'hidden',
+                marginTop: '0.4rem',
+                maxWidth: '620px',
+              }}
+              onClick={() => {
+                setCurrentPoll(hotPoll);
+                navigate(`/poll/${hotPoll.id}`);
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span
+                  style={{
+                    background: 'var(--brand-accent-coral)',
+                    color: '#fff',
+                    padding: '2px 8px',
+                    borderRadius: '999px',
+                    fontSize: '0.68rem',
+                    fontWeight: 800,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '3px',
+                  }}
+                >
+                  <Sparkles size={11} />
+                  실시간 핫 고민 🔥
+                </span>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                  {hotPoll.totalVotes}명 참여 중
+                </span>
+              </div>
+              <h3
+                style={{
+                  margin: 0,
+                  fontSize: '1.1rem',
+                  fontWeight: 900,
+                  color: 'var(--text-primary)',
+                  lineHeight: 1.4,
+                }}
+              >
+                {hotPoll.question}
+              </h3>
+              {hotPoll.description && (
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: '0.8rem',
+                    color: 'var(--text-secondary)',
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                    lineHeight: 1.45,
+                  }}
+                >
+                  {hotPoll.description}
+                </p>
+              )}
+
+              <div style={{ display: 'grid', gap: '0.45rem', marginTop: '0.2rem' }}>
+                {hotPoll.options.slice(0, 2).map((opt) => {
+                  const pct =
+                    hotPoll.totalVotes > 0
+                      ? Math.round((opt.voteCount / hotPoll.totalVotes) * 100)
+                      : 0;
+                  return (
+                    <div key={opt.id} style={{ display: 'grid', gap: '2px' }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          fontSize: '0.72rem',
+                          color: 'var(--text-secondary)',
+                        }}
+                      >
+                        <span style={{ fontWeight: 600 }}>{opt.text}</span>
+                        <span style={{ fontWeight: 800, color: 'var(--brand-accent-teal)' }}>
+                          {pct}%
+                        </span>
+                      </div>
+                      <div
+                        style={{
+                          height: '4px',
+                          background: 'rgba(255,255,255,0.06)',
+                          borderRadius: '999px',
+                          overflow: 'hidden',
+                        }}
+                      >
+                        <div
+                          style={{
+                            height: '100%',
+                            width: `${pct}%`,
+                            background: 'var(--brand-accent-teal)',
+                            borderRadius: '999px',
+                          }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <div
             className="kpi-grid hero-enter"
@@ -1313,6 +1441,7 @@ export const PollList: React.FC = () => {
               </div>
 
               <div
+                className="horizontal-scroll-mobile"
                 style={{
                   display: 'grid',
                   gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
@@ -1480,6 +1609,7 @@ export const PollList: React.FC = () => {
               </div>
 
               <div
+                className="horizontal-scroll-mobile"
                 style={{
                   display: 'grid',
                   gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
@@ -1615,6 +1745,7 @@ export const PollList: React.FC = () => {
 
       <section
         ref={flowSectionRef}
+        className="desktop-only"
         aria-label="의사결정 운영 흐름"
         style={{
           display: 'grid',
@@ -1830,7 +1961,7 @@ export const PollList: React.FC = () => {
 
       <section
         ref={insightSectionRef}
-        className="content-card"
+        className="content-card desktop-only"
         style={{
           padding: '1rem',
           display: 'grid',
@@ -1973,7 +2104,7 @@ export const PollList: React.FC = () => {
       </section>
 
       <section
-        className="content-card"
+        className="content-card desktop-only"
         style={{
           padding: '1rem',
           display: 'grid',
@@ -2135,7 +2266,7 @@ export const PollList: React.FC = () => {
       </section>
 
       <section
-        className="content-card"
+        className="content-card desktop-only"
         style={{
           padding: '1rem',
           display: 'grid',
@@ -2635,11 +2766,6 @@ export const PollList: React.FC = () => {
               const endAtLabel = formatPollEndAt(poll);
               const resultsVisibilityLabel = getPollResultsVisibilityLabel(poll);
               const attachmentCount = poll.attachments?.length || 0;
-              const topOptions = [...poll.options]
-                .sort((a, b) => b.voteCount - a.voteCount)
-                .slice(0, 2)
-                .map((option) => option.text)
-                .join(' / ');
               const compactDescription =
                 poll.description && poll.description.length > 84
                   ? `${poll.description.slice(0, 81)}...`
@@ -2763,13 +2889,44 @@ export const PollList: React.FC = () => {
 
                   <div
                     style={{
-                      fontSize: isCompact ? '0.68rem' : '0.72rem',
-                      color: 'var(--text-secondary)',
-                      marginBottom: '0.66rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      flexWrap: 'wrap',
+                      marginTop: '0.5rem',
+                      marginBottom: '0.6rem',
                     }}
                   >
-                    <strong style={{ color: 'var(--text-primary)' }}>현재 상위 선택지:</strong>{' '}
-                    {topOptions || '아직 등록된 선택지가 없습니다'}
+                    <span
+                      style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600 }}
+                    >
+                      상위 선택지:
+                    </span>
+                    {poll.options.length > 0 ? (
+                      [...poll.options]
+                        .sort((a, b) => b.voteCount - a.voteCount)
+                        .slice(0, 2)
+                        .map((opt) => (
+                          <span
+                            key={opt.id}
+                            style={{
+                              background: 'rgba(255, 255, 255, 0.05)',
+                              border: '1px solid rgba(255, 255, 255, 0.08)',
+                              borderRadius: '8px',
+                              padding: '3px 8px',
+                              fontSize: '0.72rem',
+                              color: 'var(--text-secondary)',
+                              fontWeight: 700,
+                            }}
+                          >
+                            {opt.text}
+                          </span>
+                        ))
+                    ) : (
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                        등록 없음
+                      </span>
+                    )}
                   </div>
 
                   <div className="poll-card-meta-strip">

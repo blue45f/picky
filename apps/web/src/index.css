@@ -2027,4 +2027,47 @@ body.present-mode .page-shell {
   .topbar-shell {
     padding: 0.6rem 0.85rem !important;
   }
+
+  .desktop-only {
+    display: none !important;
+  }
+
+  .horizontal-scroll-mobile {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    white-space: nowrap !important;
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+    gap: 0.65rem !important;
+    padding: 0.2rem 0 !important;
+    margin: 0 -1rem !important;
+    padding: 0 1rem 0.4rem !important;
+  }
+  .horizontal-scroll-mobile::-webkit-scrollbar {
+    display: none !important;
+  }
+  .horizontal-scroll-mobile > article {
+    flex-shrink: 0 !important;
+    width: 210px !important;
+  }
+
+  /* 더 큼직하고 시인성이 좋은 텍스트와 레이아웃 */
+  .poll-card h3 {
+    font-size: 1.18rem !important;
+    font-weight: 900 !important;
+    line-height: 1.4 !important;
+    margin-bottom: 0.55rem !important;
+  }
+  .poll-card p {
+    font-size: 0.86rem !important;
+    line-height: 1.5 !important;
+  }
+
+  .hot-poll-card {
+    padding: 1.35rem !important;
+  }
+  .hot-poll-card h3 {
+    font-size: 1.25rem !important;
+  }
 }

@@ -69,7 +69,7 @@ function PollCard({ poll, index, onClick }: { poll: Poll; index: number; onClick
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
         borderRadius: theme.radius,
-        padding: '22px 20px',
+        padding: '24px 20px',
         marginBottom: 14,
         color: theme.text,
         border: `1px solid ${theme.border}`,
@@ -113,7 +113,7 @@ function PollCard({ poll, index, onClick }: { poll: Poll; index: number; onClick
 
       <div style={{ display: 'flex', gap: 14 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <strong style={{ fontSize: 17, lineHeight: 1.4, display: 'block', fontWeight: 700 }}>
+          <strong style={{ fontSize: 18, lineHeight: 1.4, display: 'block', fontWeight: 800 }}>
             {poll.question}
           </strong>
           {poll.description ? (
@@ -311,6 +311,16 @@ export function PollListPage() {
 
   const totalVotes = useMemo(() => polls.reduce((sum, poll) => sum + poll.totalVotes, 0), [polls]);
 
+  const hotPoll = useMemo(() => {
+    const activePolls = polls.filter((p) => !isPollClosed(p));
+    if (activePolls.length === 0) return null;
+    return activePolls.reduce((prev, current) => {
+      const prevScore = prev.totalVotes + prev.comments.length * 3;
+      const currentScore = current.totalVotes + current.comments.length * 3;
+      return currentScore > prevScore ? current : prev;
+    });
+  }, [polls]);
+
   const visiblePolls = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     const filtered = polls.filter((poll) => {
@@ -429,6 +439,120 @@ export function PollListPage() {
             </span>
           </div>
         ) : null}
+
+        {hotPoll && !query.trim() && statusFilter === 'all' && !myOnly && (
+          <button
+            type="button"
+            className="pressable"
+            onClick={() => goToPoll(hotPoll.id)}
+            style={{
+              display: 'block',
+              width: '100%',
+              textAlign: 'left',
+              background:
+                'linear-gradient(135deg, rgba(49, 130, 246, 0.16) 0%, rgba(45, 212, 191, 0.08) 100%)',
+              borderRadius: theme.radius,
+              padding: '24px 20px',
+              marginBottom: 20,
+              color: theme.text,
+              border: `1.5px solid rgba(49, 130, 246, 0.35)`,
+              cursor: 'pointer',
+              boxShadow:
+                '0 8px 32px rgba(49, 130, 246, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+              position: 'relative',
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                marginBottom: 10,
+                fontSize: 12,
+              }}
+            >
+              <span
+                style={{
+                  background: theme.accent,
+                  color: theme.accentInk,
+                  padding: '2px 8px',
+                  borderRadius: '999px',
+                  fontWeight: 800,
+                  fontSize: 11,
+                }}
+              >
+                실시간 인기 고민 🔥
+              </span>
+              <span style={{ color: theme.textMuted }}>
+                🗳️ {formatNumber(hotPoll.totalVotes)}명 참여 중
+              </span>
+            </div>
+
+            <strong
+              style={{
+                fontSize: 19,
+                lineHeight: 1.4,
+                display: 'block',
+                fontWeight: 800,
+                color: theme.text,
+              }}
+            >
+              {hotPoll.question}
+            </strong>
+
+            {hotPoll.description && (
+              <p
+                style={{
+                  margin: '8px 0 0',
+                  fontSize: 13,
+                  color: theme.textMuted,
+                  display: '-webkit-box',
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden',
+                  lineHeight: 1.45,
+                }}
+              >
+                {hotPoll.description}
+              </p>
+            )}
+
+            {(() => {
+              const leadingOpt = leadingOption(hotPoll);
+              if (!leadingOpt) return null;
+              const pct = optionPercent(leadingOpt.voteCount, hotPoll.totalVotes);
+              return (
+                <div
+                  style={{
+                    marginTop: 16,
+                    background: 'rgba(255,255,255,0.03)',
+                    padding: '12px 14px',
+                    borderRadius: 14,
+                    border: `1px solid rgba(255,255,255,0.02)`,
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      fontSize: 12,
+                      gap: 12,
+                    }}
+                  >
+                    <span style={{ color: theme.textMuted, fontWeight: 600 }}>
+                      📊 1위: {leadingOpt.text}
+                    </span>
+                    <span style={{ color: theme.accent, fontWeight: 700 }}>{pct}%</span>
+                  </div>
+                  <div style={{ marginTop: 8 }}>
+                    <ProgressBar percent={pct} height={6} />
+                  </div>
+                </div>
+              );
+            })()}
+          </button>
+        )}
 
         <div style={{ position: 'relative', marginBottom: 18 }}>
           <input
