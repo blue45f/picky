@@ -50,16 +50,18 @@ describe('buildQrSvgDataUri', () => {
 // Drive the *shipped* PollShareQrSection (extracted real component) render path for QR.
 // This test uses the real component directly (lightweight, no heavy page-wide mocks or stores).
 describe('PollShareQrSection (real shipped component render)', () => {
-  it('renders QR 태그 label and data:image/svg <img> (176px) using the shipped buildQrSvgDataUri', () => {
+  it('renders QR 태그 label and data:image/svg <img> (240px) using the shipped buildQrSvgDataUri', () => {
     const shareUrl = 'https://picky-olive.vercel.app/poll/fixture123';
     const html = renderToStaticMarkup(React.createElement(PollShareQrSection, { shareUrl }));
 
     expect(html).toContain('QR 태그');
     expect(html).toMatch(/<img[^>]+src="data:image\/svg\+xml;charset=utf-8,[^"]*"/);
-    // The component renders size via style object (becomes width:176px etc in static html)
-    expect(html).toMatch(/width:\s*176/);
-    expect(html).toMatch(/height:\s*176/);
-    expect(html).toContain('카메라로 스캔하면 바로 참여할 수 있어요');
+    // The component renders size via style object (becomes width:240px etc in static html)
+    expect(html).toMatch(/width:\s*240/);
+    expect(html).toMatch(/height:\s*240/);
+    expect(html).toContain(
+      '카메라로 스캔하면 웹에서 열리고, Toss 앱이 있으면 앱으로 이동할 수 있어요',
+    );
   });
 });
 

@@ -159,7 +159,17 @@ export function App() {
                   confirmDelete={false}
                   onDelete={() => {}}
                   remaining={null}
-                  shareUrl={'https://picky-olive.vercel.app/poll/' + fixturePoll.id}
+                  shareUrl={(() => {
+                    // Use snapshot so that scanning this demo QR on mobile actually loads the full poll (no backend needed)
+                    try {
+                      const snap = btoa(
+                        encodeURIComponent(JSON.stringify({ version: 1, poll: fixturePoll })),
+                      );
+                      return `https://picky-olive.vercel.app/poll/${fixturePoll.id}?snapshot=${encodeURIComponent(snap)}`;
+                    } catch {
+                      return 'https://picky-olive.vercel.app/poll/' + fixturePoll.id;
+                    }
+                  })()}
                   onShare={() => {}}
                   onCopy={() => {}}
                   onCopyResult={() => {}}

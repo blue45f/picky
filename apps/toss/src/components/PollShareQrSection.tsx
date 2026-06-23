@@ -63,17 +63,30 @@ export function PollShareQrSection({ shareUrl, onCopyLink }: PollShareQrSectionP
         src={qrDataUri}
         alt="투표 QR 코드"
         style={{
-          width: 176,
-          height: 176,
+          width: 240,
+          height: 240,
           background: '#fff',
-          borderRadius: 12,
-          padding: 10,
+          borderRadius: 16,
+          padding: 12,
           border: `1px solid ${theme.border}`,
-          boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
+          boxShadow: '0 6px 20px rgba(0,0,0,0.25)',
+          imageRendering: 'pixelated',
         }}
       />
       <div style={{ fontSize: 11, color: theme.textFaint, marginTop: 6 }}>
-        카메라로 스캔하면 바로 참여할 수 있어요
+        카메라로 스캔하면 웹에서 열리고, Toss 앱이 있으면 앱으로 이동할 수 있어요
+      </div>
+      {/* Fallback visible link for mobile tap/long-press when camera scan is tricky */}
+      <div
+        style={{
+          fontSize: 10,
+          color: theme.textFaint,
+          marginTop: 4,
+          wordBreak: 'break-all',
+          opacity: 0.7,
+        }}
+      >
+        {shareUrl}
       </div>
     </div>
   );

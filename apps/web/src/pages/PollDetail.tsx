@@ -708,6 +708,8 @@ export const PollDetail: React.FC = () => {
   const isEmbedMode = location.pathname.startsWith('/embed/');
   const isPresentationMode = location.pathname.startsWith('/present/');
 
+  const tossDeepLink = id ? `intoss://pickflow/poll/${encodeURIComponent(id)}` : null;
+
   const currentPoll = usePollStore((state) => state.currentPoll);
   const isLoading = usePollStore((state) => state.isLoading);
   const error = usePollStore((state) => state.error);
@@ -2110,12 +2112,13 @@ export const PollDetail: React.FC = () => {
                     src={participationQrUrl}
                     alt={`${currentPoll.question} 참여 QR 코드`}
                     style={{
-                      width: 'min(100%, 220px)',
+                      width: 'min(100%, 280px)',
                       aspectRatio: '1 / 1',
                       borderRadius: '18px',
                       background: '#fff',
                       padding: '0.55rem',
                       boxShadow: '0 16px 42px rgba(0, 0, 0, 0.32)',
+                      imageRendering: 'pixelated',
                     }}
                   />
                 ) : (
@@ -2134,6 +2137,16 @@ export const PollDetail: React.FC = () => {
                 )}
                 <strong>{currentPoll.id}</strong>
                 <p className="present-share-url">{shareUrl}</p>
+                <div
+                  style={{
+                    fontSize: '0.65rem',
+                    color: 'var(--text-muted)',
+                    marginTop: '-4px',
+                    wordBreak: 'break-all',
+                  }}
+                >
+                  모바일 카메라로 위 QR을 스캔하세요
+                </div>
                 <button
                   type="button"
                   onClick={() => handleCopyLinkClick(currentPoll.id)}
@@ -2156,6 +2169,70 @@ export const PollDetail: React.FC = () => {
       className="animate-slide-up"
       style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}
     >
+      {/* Prominent QR for mobile scanning - makes QR actually usable on web site */}
+      {shareUrl && participationQrUrl && (
+        <div
+          style={{
+            padding: '1rem',
+            background: 'var(--bg-card)',
+            borderRadius: 'var(--radius-md)',
+            border: '1px solid var(--border)',
+            textAlign: 'center',
+          }}
+        >
+          <div
+            style={{
+              fontSize: '0.8rem',
+              fontWeight: 700,
+              marginBottom: 8,
+              color: 'var(--text-muted)',
+            }}
+          >
+            QR 태그 📱 — 모바일에서 스캔해서 참여하세요
+          </div>
+          <img
+            src={participationQrUrl}
+            alt="참여 QR 코드"
+            style={{
+              width: 200,
+              height: 200,
+              background: '#fff',
+              borderRadius: 12,
+              padding: 8,
+              border: '1px solid var(--border)',
+              display: 'block',
+              margin: '0 auto',
+            }}
+          />
+          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 8 }}>
+            스캔하면 이 페이지로 이동합니다
+          </div>
+          {tossDeepLink && (
+            <a
+              href={tossDeepLink}
+              style={{
+                display: 'inline-block',
+                marginTop: 8,
+                fontSize: '0.75rem',
+                color: '#13c2a3',
+                fontWeight: 600,
+                textDecoration: 'none',
+              }}
+              onClick={() => {
+                // Attempt to open in-app; if fails, browser falls back to href
+                try {
+                  window.location.href = tossDeepLink;
+                } catch {
+                  // ignore - let default link behavior handle it
+                }
+              }}
+            >
+              또는 Toss 인앱에서 열기 →
+            </a>
+          )}
+        </div>
+      )}
+
       <section
         style={{
           border: '1px solid rgba(45, 212, 191, 0.18)',
@@ -2225,6 +2302,39 @@ export const PollDetail: React.FC = () => {
             공유 정보 보기
           </button>
         </div>
+
+        {/* Mobile + Toss in-app support: when QR scanned on mobile, this page opens in browser.
+            Offer quick jump to Toss mini-app deep link. */}
+        {tossDeepLink && (
+          <div
+            style={{
+              textAlign: 'center',
+              padding: '12px',
+              background: 'rgba(19, 194, 163, 0.1)',
+              border: '1px solid rgba(19, 194, 163, 0.3)',
+              borderRadius: 12,
+              marginBottom: 8,
+            }}
+          >
+            <a
+              href={tossDeepLink}
+              style={{
+                color: '#13c2a3',
+                fontWeight: 700,
+                fontSize: '0.95rem',
+                textDecoration: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+              }}
+            >
+              📱 Toss 인앱에서 바로 열기
+            </a>
+            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 4 }}>
+              Toss 앱이 설치된 모바일에서 스캔하면 앱으로 이동할 수 있어요
+            </div>
+          </div>
+        )}
 
         <div
           style={{
@@ -2369,12 +2479,13 @@ export const PollDetail: React.FC = () => {
                   src={participationQrUrl}
                   alt={`${currentPoll.question} 참여 QR 코드`}
                   style={{
-                    width: '58px',
-                    height: '58px',
+                    width: '72px',
+                    height: '72px',
                     borderRadius: '12px',
                     padding: '5px',
                     background: '#fff',
                     flexShrink: 0,
+                    imageRendering: 'pixelated',
                   }}
                 />
               ) : (
