@@ -891,4 +891,26 @@ export class DatabaseService implements OnModuleInit {
     };
     await this.commit(next);
   }
+
+  /** 회원 탈퇴 — 사용자의 고민을 익명화(creator 해제)해 토론은 보존하고 계정을 삭제한다. */
+  async deleteUser(userId: string) {
+    if (this.useSqlDb) {
+      await db
+        .update(schema.polls)
+        .set({ creatorId: null, creatorIsGuest: true })
+        .where(eq(schema.polls.creatorId, userId));
+      await db.delete(schema.users).where(eq(schema.users.id, userId));
+      return;
+    }
+
+    await this.refresh();
+    const next = {
+      ...this.data,
+      polls: this.data.polls.map((p) =>
+        p.creatorId === userId ? { ...p, creatorId: null, creatorIsGuest: true } : p,
+      ),
+      users: this.data.users.filter((u) => u.id !== userId),
+    };
+    await this.commit(next);
+  }
 }

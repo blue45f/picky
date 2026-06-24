@@ -348,6 +348,25 @@ export const Navbar: React.FC = () => {
                 </button>
               )}
 
+              <Link
+                to="/account"
+                className="desktop-auth-action"
+                style={{
+                  background: 'none',
+                  border: '1px solid var(--bg-card-border)',
+                  color: 'var(--text-muted)',
+                  textDecoration: 'none',
+                  fontSize: '0.75rem',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  borderRadius: '8px',
+                  padding: '8px 12px',
+                }}
+              >
+                <User size={14} />내 계정
+              </Link>
+
               <button
                 onClick={handleLogout}
                 className="desktop-auth-action"
@@ -599,21 +618,40 @@ export const Navbar: React.FC = () => {
               </Link>
             ) : null}
             {user ? (
-              <button
-                type="button"
-                onClick={handleLogout}
-                style={{
-                  marginTop: '0.15rem',
-                  textAlign: 'left',
-                  background: 'transparent',
-                  color: 'var(--text-secondary)',
-                  border: '1px dashed var(--bg-card-border)',
-                  borderRadius: '8px',
-                  padding: '10px 12px',
-                }}
-              >
-                로그아웃
-              </button>
+              <>
+                <Link
+                  to="/account"
+                  onClick={() => setMobileOpen(false)}
+                  style={{
+                    textDecoration: 'none',
+                    color: 'var(--text-primary)',
+                    border: '1px solid var(--bg-card-border)',
+                    borderRadius: '8px',
+                    padding: '10px 12px',
+                    fontSize: '0.85rem',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <User size={14} /> 내 계정
+                </Link>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  style={{
+                    marginTop: '0.15rem',
+                    textAlign: 'left',
+                    background: 'transparent',
+                    color: 'var(--text-secondary)',
+                    border: '1px dashed var(--bg-card-border)',
+                    borderRadius: '8px',
+                    padding: '10px 12px',
+                  }}
+                >
+                  로그아웃
+                </button>
+              </>
             ) : (
               <>
                 <Link

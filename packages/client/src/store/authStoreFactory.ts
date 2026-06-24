@@ -35,6 +35,7 @@ export interface AuthState {
    */
   ensureIdentity: () => Promise<boolean>;
   logout: () => void;
+  deleteAccount: () => Promise<boolean>;
   fetchMe: () => Promise<void>;
   setGuestName: (name: string) => void;
   clearError: () => void;
@@ -518,6 +519,41 @@ export const createAuthStoreState =
           validationErrors: {},
           needsReauth: false,
         });
+      },
+
+      deleteAccount: async () => {
+        const { token } = get();
+        if (!token) {
+          return false;
+        }
+        set({ isLoading: true, error: null });
+        try {
+          const res = await requestApi('/auth/account', {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (!res.ok) {
+            set({ isLoading: false, error: '회원 탈퇴에 실패했어요. 잠시 후 다시 시도해 주세요.' });
+            return false;
+          }
+          // 탈퇴 성공 — 로컬 인증 정보 정리(로그아웃과 동일).
+          localStorage.removeItem('picky_token');
+          localStorage.removeItem('picky_guest_name');
+          persistUser(null);
+          set({
+            user: null,
+            token: null,
+            guestName: '',
+            error: null,
+            validationErrors: {},
+            needsReauth: false,
+            isLoading: false,
+          });
+          return true;
+        } catch {
+          set({ isLoading: false, error: '회원 탈퇴 중 문제가 발생했어요.' });
+          return false;
+        }
       },
 
       fetchMe: async () => {

@@ -36,6 +36,7 @@ const SitemapPage = lazy(() =>
 );
 const AuthPage = lazy(() => import('./pages/AuthPage').then((m) => ({ default: m.AuthPage })));
 const LegalPage = lazy(() => import('./pages/LegalPage').then((m) => ({ default: m.LegalPage })));
+const Account = lazy(() => import('./pages/Account'));
 
 const RouteFallback: React.FC = () => (
   <div aria-busy="true" aria-live="polite" style={{ display: 'grid', gap: '1rem' }}>
@@ -125,6 +126,7 @@ export const App: React.FC = () => {
               <Route path="/poll/:id/edit" element={<EditPoll />} />
               <Route path="/admin" element={<Admin />} />
               <Route path="/support" element={<Support />} />
+              <Route path="/account" element={<Account />} />
               <Route path="/share/:id" element={<ShareRouteRedirect />} />
               <Route path="/embed/:id" element={<PollDetail />} />
               <Route path="/present/:id" element={<PollDetail />} />

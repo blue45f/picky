@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, UseGuards, Request, UsePipes } from '@nestjs/common';
+import { Controller, Post, Get, Delete, Body, UseGuards, Request, UsePipes } from '@nestjs/common';
 import { ZodValidationPipe, createZodDto } from 'nestjs-zod';
 import {
   RegisterSchema,
@@ -54,5 +54,12 @@ export class AuthController {
     // req.user has payload: { sub: string, email: string, nickname: string }
     const user = await this.authService.validateUser(req.user);
     return user;
+  }
+
+  // 회원 탈퇴 — 본인 계정 삭제. 작성한 고민은 익명화(creatorId 해제)해 토론은 보존한다.
+  @Delete('account')
+  @UseGuards(AuthGuard)
+  async deleteAccount(@Request() req: any) {
+    return this.authService.deleteAccount(req.user.sub);
   }
 }

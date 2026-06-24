@@ -322,4 +322,14 @@ export class AuthService {
       isAdmin: isAdminEmail(payload.email),
     };
   }
+
+  /** 회원 탈퇴 — 본인 계정 삭제. 작성한 고민은 익명화되어 보존된다. */
+  async deleteAccount(userId: string): Promise<{ deleted: true }> {
+    const user = await this.db.getUserById(userId);
+    if (!user) {
+      throw new BadRequestException('이미 탈퇴했거나 존재하지 않는 계정입니다.');
+    }
+    await this.db.deleteUser(userId);
+    return { deleted: true };
+  }
 }
