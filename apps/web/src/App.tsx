@@ -31,6 +31,7 @@ const SitemapPage = lazy(() =>
   import('./pages/SitemapPage').then((m) => ({ default: m.SitemapPage })),
 );
 const AuthPage = lazy(() => import('./pages/AuthPage').then((m) => ({ default: m.AuthPage })));
+const LegalPage = lazy(() => import('./pages/LegalPage').then((m) => ({ default: m.LegalPage })));
 
 const RouteFallback: React.FC = () => (
   <div aria-busy="true" aria-live="polite" style={{ display: 'grid', gap: '1rem' }}>
@@ -120,6 +121,7 @@ export const App: React.FC = () => {
               <Route path="/present/:id" element={<PollDetail />} />
               <Route path="/auth" element={<Navigate to="/auth/login" replace />} />
               <Route path="/auth/:mode" element={<AuthPage />} />
+              <Route path="/legal/:doc" element={<LegalPage />} />
               <Route path="*" element={<PollList />} />
             </Routes>
           </Suspense>
@@ -216,6 +218,20 @@ export const App: React.FC = () => {
               에이치준랩스 · 대표 김희준 · 사업자등록번호 355-07-03473
               <br />
               서울특별시 송파구 가락로34길 13, 101호 · 정보통신업(응용 소프트웨어 개발·공급)
+            </p>
+            <p style={{ display: 'flex', gap: '14px', justifyContent: 'center', flexWrap: 'wrap' }}>
+              <Link
+                to="/legal/terms"
+                style={{ color: 'var(--text-secondary)', textDecoration: 'none', fontWeight: 700 }}
+              >
+                이용약관
+              </Link>
+              <Link
+                to="/legal/privacy"
+                style={{ color: 'var(--text-secondary)', textDecoration: 'none', fontWeight: 700 }}
+              >
+                개인정보처리방침
+              </Link>
             </p>
             <p>© {new Date().getFullYear()} 에이치준랩스 · pickflow. All rights reserved.</p>
             <p
