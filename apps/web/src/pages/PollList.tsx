@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Calendar,
@@ -362,7 +362,19 @@ export const PollList: React.FC = () => {
   const [recentPollHistory, setRecentPollHistory] = useState(() => getRecentPollHistory());
   const [pinnedPollIds, setPinnedPollIds] = useState<string[]>(() => loadPinnedPollIds());
 
+  // URL↔필터 상태 동기화 레이스 가드: state→URL 으로 우리가 직접 쓴 쿼리스트링을 기록해두고,
+  // URL→state 효과가 "자기 자신이 쓴 변경"을 외부 변경으로 오인해 기본값으로 되돌리지 않게 한다.
+  // (이게 없으면 비기본 필터 적용 시 signal/sort/scope 가 무한 핑퐁하며 리렌더 폭주)
+  const lastSyncedSearchRef = useRef<string | null>(null);
+
   useEffect(() => {
+    const currentSearch = searchParams.toString();
+    // 우리가 방금 setSearchParams 로 쓴 값이면(=외부 내비게이션 아님) 되돌리기 금지.
+    if (currentSearch === lastSyncedSearchRef.current) {
+      return;
+    }
+    lastSyncedSearchRef.current = currentSearch;
+
     const nextQuery = (searchParams.get('q') || '').trim();
     const nextSort = searchParams.get('sort');
     const nextScope = searchParams.get('scope');
@@ -435,7 +447,10 @@ export const PollList: React.FC = () => {
       next.set('signal', signal);
     }
 
-    if (next.toString() !== searchParams.toString()) {
+    const nextSearch = next.toString();
+    if (nextSearch !== searchParams.toString()) {
+      // 우리가 쓰는 값임을 기록해, URL→state 효과가 이걸 외부 변경으로 오인하지 않게 한다.
+      lastSyncedSearchRef.current = nextSearch;
       setSearchParams(next, { replace: true });
     }
   }, [query, sortBy, scope, signal, userId, searchParams, setSearchParams]);

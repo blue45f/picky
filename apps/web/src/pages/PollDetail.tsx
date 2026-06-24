@@ -708,8 +708,6 @@ export const PollDetail: React.FC = () => {
   const isEmbedMode = location.pathname.startsWith('/embed/');
   const isPresentationMode = location.pathname.startsWith('/present/');
 
-  const tossDeepLink = id ? `intoss://pickflow/poll/${encodeURIComponent(id)}` : null;
-
   const currentPoll = usePollStore((state) => state.currentPoll);
   const isLoading = usePollStore((state) => state.isLoading);
   const error = usePollStore((state) => state.error);
@@ -2208,29 +2206,6 @@ export const PollDetail: React.FC = () => {
           <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 8 }}>
             스캔하면 이 페이지로 이동합니다
           </div>
-          {tossDeepLink && (
-            <a
-              href={tossDeepLink}
-              style={{
-                display: 'inline-block',
-                marginTop: 8,
-                fontSize: '0.75rem',
-                color: '#13c2a3',
-                fontWeight: 600,
-                textDecoration: 'none',
-              }}
-              onClick={() => {
-                // Attempt to open in-app; if fails, browser falls back to href
-                try {
-                  window.location.href = tossDeepLink;
-                } catch {
-                  // ignore - let default link behavior handle it
-                }
-              }}
-            >
-              또는 Toss 인앱에서 열기 →
-            </a>
-          )}
         </div>
       )}
 
@@ -2304,39 +2279,6 @@ export const PollDetail: React.FC = () => {
             공유 정보 보기
           </button>
         </div>
-
-        {/* Mobile + Toss in-app support: when QR scanned on mobile, this page opens in browser.
-            Offer quick jump to Toss mini-app deep link. */}
-        {tossDeepLink && (
-          <div
-            style={{
-              textAlign: 'center',
-              padding: '12px',
-              background: 'rgba(19, 194, 163, 0.1)',
-              border: '1px solid rgba(19, 194, 163, 0.3)',
-              borderRadius: 12,
-              marginBottom: 8,
-            }}
-          >
-            <a
-              href={tossDeepLink}
-              style={{
-                color: '#13c2a3',
-                fontWeight: 700,
-                fontSize: '0.95rem',
-                textDecoration: 'none',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-              }}
-            >
-              📱 Toss 인앱에서 바로 열기
-            </a>
-            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 4 }}>
-              Toss 앱이 설치된 모바일에서 스캔하면 앱으로 이동할 수 있어요
-            </div>
-          </div>
-        )}
 
         <div
           style={{
