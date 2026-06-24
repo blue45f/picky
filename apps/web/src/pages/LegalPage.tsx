@@ -134,7 +134,7 @@ export const LegalPage: React.FC = () => {
   useDocumentTitle(title);
 
   return (
-    <main className="page-shell" style={{ display: 'grid', gap: '1.2rem', maxWidth: '760px' }}>
+    <div className="page-shell" style={{ display: 'grid', gap: '1.2rem', maxWidth: '760px' }}>
       <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
         <Link
           to="/legal/terms"
@@ -215,7 +215,7 @@ export const LegalPage: React.FC = () => {
       >
         ← 홈으로
       </Link>
-    </main>
+    </div>
   );
 };
 

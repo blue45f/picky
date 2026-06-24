@@ -235,6 +235,7 @@ export function ParticipantPreviewPanel({
           }}
         >
           <div
+            className="preview-phone-dark"
             style={{
               borderRadius: '20px',
               overflow: 'hidden',

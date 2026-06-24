@@ -206,9 +206,11 @@ export const AuthPage: React.FC = () => {
     width: '100%',
     padding: '10px 12px',
     borderRadius: '10px',
+    // 입력칸 배경은 항상 다크라, 텍스트도 테마와 무관하게 밝은색으로 고정해야
+    // 라이트 모드에서 입력값이 안 보이지 않는다(대비 AA).
     backgroundColor: 'oklch(11% 0.015 260)',
     border: '1px solid var(--bg-card-border)',
-    color: 'var(--text-primary)',
+    color: '#f1faf7',
     fontSize: '0.9rem',
     fontFamily: 'var(--font-sans)',
   };

@@ -67,6 +67,7 @@ export const SnsPreviewCard: React.FC<SnsPreviewCardProps> = ({
               justifyContent: 'center',
               fontSize: '0.75rem',
               fontWeight: 800,
+              color: '#ffffff',
             }}
           >
             PF
@@ -342,7 +343,7 @@ export const SnsPreviewCard: React.FC<SnsPreviewCardProps> = ({
             {title}
           </strong>
         </div>
-        <span style={{ fontSize: '0.65rem', color: '#3b82f6', fontWeight: 700 }}>
+        <span style={{ fontSize: '0.65rem', color: '#1d4ed8', fontWeight: 700 }}>
           고민 투표 공유
         </span>
         <div

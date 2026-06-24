@@ -2290,3 +2290,16 @@ body.present-mode .page-shell {
     animation: none;
   }
 }
+
+/* 작성 페이지 참가자 미리보기 미니폰은 항상 다크 배경(#061411)이라, 라이트 모드에서 테마
+   텍스트 변수가 어두워져 보이지 않던 문제를 막기 위해 내부 토큰을 다크값으로 고정한다.
+   (CSS 커스텀 프로퍼티는 상속되므로 하위 전체에 적용 — 대비 AA 충족) */
+.preview-phone-dark {
+  --text-primary: #f1faf7;
+  --text-secondary: #cfe0db;
+  --text-muted: #a4b8b2;
+  --brand-accent-teal: #34d8b4;
+  --brand-accent-gold: #f2cf52;
+  --brand-accent-coral: #ff8a8f;
+  --bg-card-border: rgba(255, 255, 255, 0.12);
+}
