@@ -205,7 +205,19 @@ export const App: React.FC = () => {
                 </Link>
               </div>
             </section>
-            <p>© {new Date().getFullYear()} pickflow (Beta). All rights reserved.</p>
+            <p
+              style={{
+                lineHeight: 1.7,
+                fontSize: '0.72rem',
+                color: 'var(--text-muted)',
+                textAlign: 'center',
+              }}
+            >
+              에이치준랩스 · 대표 김희준 · 사업자등록번호 355-07-03473
+              <br />
+              서울특별시 송파구 가락로34길 13, 101호 · 정보통신업(응용 소프트웨어 개발·공급)
+            </p>
+            <p>© {new Date().getFullYear()} 에이치준랩스 · pickflow. All rights reserved.</p>
             <p
               style={{
                 display: 'inline-flex',
