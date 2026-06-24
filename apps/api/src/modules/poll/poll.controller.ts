@@ -14,13 +14,14 @@ import {
   Res,
 } from '@nestjs/common';
 import { ZodValidationPipe, createZodDto } from 'nestjs-zod';
-import { CreatePollSchema, UpdatePollSchema, VoteSchema } from '@picky/shared';
+import { CreateCommentSchema, CreatePollSchema, UpdatePollSchema, VoteSchema } from '@picky/shared';
 import { PollService } from './poll.service';
 import { AuthGuard, OptionalAuthGuard } from '../auth/auth.guard';
 
 class CreatePollDto extends createZodDto(CreatePollSchema) {}
 class UpdatePollDto extends createZodDto(UpdatePollSchema) {}
 class VoteDto extends createZodDto(VoteSchema) {}
+class CreateCommentDto extends createZodDto(CreateCommentSchema) {}
 
 const trimTrailingSlashes = (value: string): string => {
   let end = value.length;
@@ -232,6 +233,11 @@ export class PollController {
   @Post(':id/vote')
   vote(@Param('id') id: string, @Body() dto: VoteDto) {
     return this.pollService.vote(id, dto);
+  }
+
+  @Post(':id/comments')
+  addComment(@Param('id') id: string, @Body() dto: CreateCommentDto) {
+    return this.pollService.addComment(id, dto);
   }
 
   @Patch(':id')

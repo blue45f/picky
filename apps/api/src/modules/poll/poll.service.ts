@@ -9,6 +9,7 @@ import {
   CreatePollInput,
   UpdatePollInput,
   VoteInput,
+  CreateCommentInput,
   Poll,
   PollOption,
   PollComment,
@@ -308,6 +309,39 @@ export class PollService {
       };
       poll.comments.push(newComment);
     }
+
+    await this.db.updatePoll(poll);
+    return poll;
+  }
+
+  /** 한마디(댓글)·답글 작성 — 투표와 무관. parentId가 있으면 해당 댓글의 답글. */
+  async addComment(id: string, input: CreateCommentInput): Promise<Poll> {
+    const poll = await this.db.getPollById(id);
+    if (!poll) {
+      throw new NotFoundException(`고민(투표) ID ${id}를 찾을 수 없습니다.`);
+    }
+
+    let parentId: number | null = input.parentId ?? null;
+    if (parentId != null) {
+      const parent = poll.comments.find((c) => c.id === parentId);
+      if (!parent) {
+        throw new BadRequestException('답글을 달 한마디를 찾을 수 없습니다.');
+      }
+      // 2단 초과 중첩 방지 — 답글의 답글은 최상위 부모로 승격(1-depth 트리 유지).
+      if (parent.parentId != null) {
+        parentId = parent.parentId;
+      }
+    }
+
+    const commentId = poll.comments.reduce((max, c) => Math.max(max, c.id), 0) + 1;
+    const newComment: PollComment = {
+      id: commentId,
+      voterName: input.voterName?.trim() ? input.voterName.trim() : '익명',
+      comment: input.comment.trim(),
+      createdAt: new Date().toISOString(),
+      parentId,
+    };
+    poll.comments.push(newComment);
 
     await this.db.updatePoll(poll);
     return poll;

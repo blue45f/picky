@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Button } from '@toss/tds-mobile';
 import type { Poll, PollComment, PollOption } from '../shared';
 import { MASCOT, VOICE } from '../shared';
@@ -35,6 +36,8 @@ interface PollDetailViewProps {
   onEdit?: () => void;
   /** 댓글 삭제(소유자/어드민). 미전달 시 댓글 삭제 버튼 미노출. */
   onDeleteComment?: (commentId: number) => void;
+  /** 답글(대댓글) 작성. 미전달 시 답글 UI 미노출. */
+  onAddReply?: (parentId: number, text: string) => Promise<void> | void;
   remaining: number | null;
   shareUrl: string;
   onShare: () => void;
@@ -288,20 +291,25 @@ function CommentCard(
     comment: PollComment;
     canManage: boolean;
     onDelete?: (commentId: number) => void;
+    onReply?: () => void;
+    isReply?: boolean;
   }>,
 ) {
-  const { comment: c, canManage, onDelete } = props;
+  const { comment: c, canManage, onDelete, onReply, isReply = false } = props;
   const showDelete = canManage && Boolean(onDelete);
   return (
     <div
       style={{
-        background: theme.surface,
+        background: isReply ? 'rgba(255,255,255,0.04)' : theme.surface,
         backdropFilter: 'blur(8px)',
         WebkitBackdropFilter: 'blur(8px)',
         borderRadius: theme.radiusSm,
-        padding: '12px 16px',
+        padding: isReply ? '10px 14px' : '12px 16px',
+        marginLeft: isReply ? 22 : 0,
         border: `1px solid ${theme.border}`,
-        boxShadow: '0 4px 16px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.03)',
+        boxShadow: isReply
+          ? 'none'
+          : '0 4px 16px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.03)',
       }}
     >
       <div
@@ -323,6 +331,11 @@ function CommentCard(
             whiteSpace: 'nowrap',
           }}
         >
+          {isReply ? (
+            <span aria-hidden style={{ color: theme.textFaint, marginRight: 4 }}>
+              ↳
+            </span>
+          ) : null}
           {c.voterName}
         </strong>
         <div
@@ -348,6 +361,25 @@ function CommentCard(
       <p style={{ margin: '6px 0 0', fontSize: 14, lineHeight: 1.5, color: theme.text }}>
         {c.comment}
       </p>
+      {onReply && !isReply ? (
+        <button
+          type="button"
+          className="pressable"
+          onClick={onReply}
+          style={{
+            marginTop: 8,
+            background: 'none',
+            border: 'none',
+            color: theme.accent,
+            fontSize: 13,
+            fontWeight: 700,
+            cursor: 'pointer',
+            padding: 0,
+          }}
+        >
+          답글 달기 💬
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -357,12 +389,33 @@ function CommentsSection(
     comments: PollComment[];
     canManage: boolean;
     onDeleteComment?: (commentId: number) => void;
+    onAddReply?: (parentId: number, text: string) => Promise<void> | void;
   }>,
 ) {
-  const { comments, canManage, onDeleteComment } = props;
+  const { comments, canManage, onDeleteComment, onAddReply } = props;
+  const [replyingTo, setReplyingTo] = useState<number | null>(null);
+  const [replyText, setReplyText] = useState('');
   if (comments.length === 0) {
     return null;
   }
+
+  const topLevel = comments.filter((c) => c.parentId == null);
+  const repliesByParent = new Map<number, PollComment[]>();
+  for (const c of comments) {
+    if (c.parentId != null) {
+      const arr = repliesByParent.get(c.parentId) ?? [];
+      arr.push(c);
+      repliesByParent.set(c.parentId, arr);
+    }
+  }
+
+  const submitReply = async (parentId: number) => {
+    const text = replyText.trim();
+    if (!text || !onAddReply) return;
+    await onAddReply(parentId, text);
+    setReplyText('');
+    setReplyingTo(null);
+  };
   return (
     <section style={{ marginTop: 16 }}>
       <h2
@@ -382,8 +435,74 @@ function CommentsSection(
         친구들 한마디 {formatNumber(comments.length)}개
       </h2>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {comments.map((c) => (
-          <CommentCard key={c.id} comment={c} canManage={canManage} onDelete={onDeleteComment} />
+        {topLevel.map((c) => (
+          <div key={c.id} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <CommentCard
+              comment={c}
+              canManage={canManage}
+              onDelete={onDeleteComment}
+              onReply={
+                onAddReply
+                  ? () => {
+                      setReplyingTo((prev) => (prev === c.id ? null : c.id));
+                      setReplyText('');
+                    }
+                  : undefined
+              }
+            />
+            {(repliesByParent.get(c.id) ?? []).map((r) => (
+              <CommentCard
+                key={r.id}
+                comment={r}
+                canManage={canManage}
+                onDelete={onDeleteComment}
+                isReply
+              />
+            ))}
+            {replyingTo === c.id ? (
+              <div style={{ display: 'flex', gap: 8, marginLeft: 22 }}>
+                <input
+                  type="text"
+                  value={replyText}
+                  onChange={(e) => setReplyText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') void submitReply(c.id);
+                  }}
+                  placeholder="따뜻한 답글을 남겨요 💬"
+                  maxLength={100}
+                  aria-label="답글 입력"
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    padding: '10px 14px',
+                    borderRadius: theme.radiusSm,
+                    border: `1px solid ${theme.borderStrong}`,
+                    background: theme.surface,
+                    color: theme.text,
+                    fontSize: 14,
+                  }}
+                />
+                <button
+                  type="button"
+                  className="pressable"
+                  onClick={() => void submitReply(c.id)}
+                  style={{
+                    flexShrink: 0,
+                    padding: '10px 16px',
+                    borderRadius: theme.radiusSm,
+                    border: 'none',
+                    background: theme.accent,
+                    color: theme.accentInk,
+                    fontSize: 14,
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                  }}
+                >
+                  등록
+                </button>
+              </div>
+            ) : null}
+          </div>
         ))}
       </div>
     </section>
@@ -809,6 +928,7 @@ export function PollDetailView(props: Readonly<PollDetailViewProps>) {
     onDelete,
     onEdit,
     onDeleteComment,
+    onAddReply,
     remaining,
     shareUrl,
     onShare,
@@ -880,6 +1000,7 @@ export function PollDetailView(props: Readonly<PollDetailViewProps>) {
           comments={comments}
           canManage={canManage}
           onDeleteComment={onDeleteComment}
+          onAddReply={onAddReply}
         />
 
         <ShareSection

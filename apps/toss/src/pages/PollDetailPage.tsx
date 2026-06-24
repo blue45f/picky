@@ -34,7 +34,7 @@ export function PollDetailPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const urlCode = searchParams.get('code') ?? undefined;
-  const { currentPoll, isLoading, error, fetchPoll, vote, deletePoll, deleteComment } =
+  const { currentPoll, isLoading, error, fetchPoll, vote, deletePoll, deleteComment, addComment } =
     usePollStore();
   const { displayName, setDisplayName } = useIdentity();
   const myId = useAuthStore((state) => state.user?.id ?? null);
@@ -168,6 +168,22 @@ export function PollDetailPage() {
     }
   };
 
+  const handleAddReply = async (parentId: number, text: string) => {
+    if (!poll) return;
+    const result = await addComment(poll.id, {
+      comment: text,
+      parentId,
+      voterName: voterName.trim() || null,
+    });
+    if (result) {
+      hapticFeedback('success');
+      showToast('답글을 남겼어요 💬');
+    } else {
+      hapticFeedback('error');
+      showToast('답글 등록에 실패했어요 😢');
+    }
+  };
+
   const handleDelete = async () => {
     if (!poll) return;
     if (!confirmDelete) {
@@ -267,6 +283,7 @@ export function PollDetailPage() {
       onDelete={handleDelete}
       onEdit={handleEdit}
       onDeleteComment={handleDeleteComment}
+      onAddReply={handleAddReply}
       remaining={remaining}
       shareUrl={shareUrl}
       onShare={handleShare}

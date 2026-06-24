@@ -1,4 +1,10 @@
-import type { Poll, CreatePollInput, UpdatePollInput, VoteInput } from '@picky/shared';
+import type {
+  Poll,
+  CreatePollInput,
+  UpdatePollInput,
+  VoteInput,
+  CreateCommentInput,
+} from '@picky/shared';
 import type { AuthState } from './authStoreFactory';
 
 type StoreSet<T> = (
@@ -23,6 +29,7 @@ export interface PollState {
   vote: (id: string, input: VoteInput) => Promise<boolean>;
   deletePoll: (id: string) => Promise<boolean>;
   deleteComment: (id: string, commentId: number) => Promise<boolean>;
+  addComment: (id: string, input: CreateCommentInput) => Promise<Poll | null>;
 }
 
 interface PollAuthStore {
@@ -703,6 +710,40 @@ export const createPollStoreState =
       } catch (err: any) {
         set({ error: err.message || '에러가 발생했습니다.' });
         return false;
+      }
+    },
+
+    addComment: async (id, input) => {
+      set({ error: null });
+      try {
+        const token = getAuthToken(useAuthStore);
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (token) {
+          headers.Authorization = `Bearer ${token}`;
+        }
+
+        const res = await requestApi(`/polls/${id}/comments`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(input),
+        });
+        if (!res.ok) {
+          const errData = await parseApiPayload(res);
+          set({ error: resolvePollErrorMessage(errData, '한마디 등록에 실패했습니다.') });
+          return null;
+        }
+
+        const data = ensurePollPayload(await parseApiPayload(res));
+        upsertPollToCache(data, get().polls);
+        set((state) => ({
+          currentPoll: state.currentPoll?.id === id ? data : state.currentPoll,
+          polls: state.polls.map((poll) => (poll.id === id ? data : poll)),
+          error: null,
+        }));
+        return data;
+      } catch (err: any) {
+        set({ error: err.message || '에러가 발생했습니다.' });
+        return null;
       }
     },
   });

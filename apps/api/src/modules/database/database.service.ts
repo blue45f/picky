@@ -694,6 +694,7 @@ export class DatabaseService implements OnModuleInit {
             createdAt: new Date(c.createdAt),
             selectedOptionId: c.selectedOptionId || null,
             selectedOptionText: c.selectedOptionText || null,
+            parentId: c.parentId ?? null,
           })),
         );
       }

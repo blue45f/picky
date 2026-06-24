@@ -131,6 +131,16 @@ export const VoteSchema = z.object({
 
 export type VoteInput = z.infer<typeof VoteSchema>;
 
+/** 한마디(댓글)·답글 작성 입력. 투표와 무관하게 댓글/대댓글을 달 수 있다. */
+export const CreateCommentSchema = z.object({
+  comment: z.string().trim().min(1, '한마디를 입력해 주세요.').max(100, '한마디는 최대 100자예요.'),
+  voterName: z.string().trim().max(20, '닉네임은 최대 20자예요.').optional().nullable(),
+  /** 대댓글: 답글을 달 부모 댓글 id. 최상위 댓글이면 생략. */
+  parentId: z.number().int().positive().optional().nullable(),
+});
+
+export type CreateCommentInput = z.infer<typeof CreateCommentSchema>;
+
 export interface PollOption {
   id: number;
   text: string;
