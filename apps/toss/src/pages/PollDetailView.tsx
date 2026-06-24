@@ -257,6 +257,62 @@ function OptionList(
   );
 }
 
+/** 투표 후 '나는 다수파/소수파' 사회적 비교 배지 — 기존 % 데이터만 재활용한다. */
+function SocialComparisonBadge(
+  props: Readonly<{ options: PollOption[]; votedOptionId: number | null; totalVotes: number }>,
+) {
+  const { options, votedOptionId, totalVotes } = props;
+  if (votedOptionId == null || totalVotes < 1) {
+    return null;
+  }
+  const voted = options.find((o) => o.id === votedOptionId);
+  if (!voted) {
+    return null;
+  }
+  const percent = optionPercent(voted.voteCount, totalVotes);
+  const topVote = options.reduce((max, o) => Math.max(max, o.voteCount), 0);
+  const isMajority = voted.voteCount === topVote && voted.voteCount > 0;
+  const avg = 100 / Math.max(1, options.length);
+  const isMinority = !isMajority && percent < avg;
+
+  let emoji = '🙌';
+  let title = `전체의 ${percent}%가 나와 같은 선택을 했어요`;
+  let gold = false;
+  if (isMajority) {
+    emoji = '👑';
+    title = '다수파예요! 가장 많은 사람들과 같은 선택';
+    gold = true;
+  } else if (isMinority) {
+    emoji = '🦄';
+    title = `희귀 취향! 단 ${percent}%만 고른 소수파의 멋`;
+  }
+
+  return (
+    <div
+      style={{
+        marginTop: 14,
+        padding: '14px 16px',
+        borderRadius: theme.radiusSm,
+        background: gold ? theme.goldSoft : theme.accentSoft,
+        border: `1px solid ${gold ? 'rgba(244,197,96,0.3)' : 'rgba(19,194,163,0.3)'}`,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+      }}
+    >
+      <span aria-hidden style={{ fontSize: 28, flexShrink: 0 }}>
+        {emoji}
+      </span>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: 14.5, fontWeight: 800, color: theme.text }}>{title}</div>
+        <div style={{ fontSize: 12.5, color: theme.textMuted, marginTop: 2 }}>
+          내 선택: {voted.text}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CommentDeleteButton(props: Readonly<{ onClick: () => void }>) {
   const { onClick } = props;
   return (
@@ -985,6 +1041,14 @@ export function PollDetailView(props: Readonly<PollDetailViewProps>) {
           disabled={hasVoted || closed}
           onSelect={onSelect}
         />
+
+        {showResults ? (
+          <SocialComparisonBadge
+            options={displayOptions}
+            votedOptionId={votedOptionId}
+            totalVotes={totalVotes}
+          />
+        ) : null}
 
         {!hasVoted && !closed && (
           <CommentDraftFields
