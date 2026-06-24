@@ -2095,12 +2095,14 @@ body.present-mode .page-shell {
     border-radius: 16px !important;
   }
 
-  /* 폼 요소 둥글게 + 16px(모바일 가독성 & iOS 포커스 자동확대 방지) */
+  /* 폼 요소 둥글게 + 16px(모바일 가독성 & iOS 포커스 자동확대 방지).
+     padding 은 세로만 지정 — 가로를 덮으면 검색창의 아이콘 여백(inline paddingLeft)이
+     사라져 돋보기 아이콘과 placeholder 가 겹친다. */
   .form-input,
   textarea,
   select {
     border-radius: 14px !important;
-    padding: 13px 15px !important;
+    padding-block: 13px !important;
     font-size: 16px !important;
     background-color: rgba(255, 255, 255, 0.03) !important;
     border: 1px solid rgba(255, 255, 255, 0.08) !important;
@@ -2257,4 +2259,34 @@ body.present-mode .page-shell {
 .poll-card a {
   position: relative;
   z-index: 2;
+}
+
+/* 브랜드 마크 클릭 시 통통 튀는 젤리 바운스(토스 타이틀의 즐거운 피드백을 웹에도).
+   클릭마다 key 가 바뀌어 재마운트되며 애니메이션이 재생된다. */
+@keyframes brandBounce {
+  0% {
+    transform: scale(1);
+  }
+  28% {
+    transform: scale(0.86) rotate(-4deg);
+  }
+  55% {
+    transform: scale(1.12) rotate(3deg);
+  }
+  78% {
+    transform: scale(0.97) rotate(-1deg);
+  }
+  100% {
+    transform: scale(1) rotate(0);
+  }
+}
+.brand-bounce {
+  display: inline-flex;
+  transform-origin: center;
+  animation: brandBounce 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .brand-bounce {
+    animation: none;
+  }
 }

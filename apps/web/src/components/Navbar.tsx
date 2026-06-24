@@ -22,6 +22,8 @@ export const Navbar: React.FC = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [joinCodeInput, setJoinCodeInput] = useState('');
   const [joinCodeError, setJoinCodeError] = useState('');
+  // 브랜드 마크 클릭 시 통통 바운스 재생용 카운터(클릭마다 증가 → 아보카도 재마운트).
+  const [brandPop, setBrandPop] = useState(0);
 
   const showAuthErrorHint = !!needsReauth;
 
@@ -108,6 +110,7 @@ export const Navbar: React.FC = () => {
       >
         <Link
           to="/"
+          onClick={() => setBrandPop((prev) => prev + 1)}
           style={{
             textDecoration: 'none',
             color: 'var(--text-primary)',
@@ -126,7 +129,9 @@ export const Navbar: React.FC = () => {
               gap: '5px',
             }}
           >
-            <span aria-hidden="true">🥑</span>
+            <span key={brandPop} className="brand-bounce" aria-hidden="true">
+              🥑
+            </span>
             <span
               style={{
                 letterSpacing: 0,
