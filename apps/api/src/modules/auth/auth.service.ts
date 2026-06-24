@@ -5,9 +5,9 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import * as crypto from 'crypto';
-import * as https from 'https';
-import * as fs from 'fs';
+import * as crypto from 'node:crypto';
+import * as https from 'node:https';
+import * as fs from 'node:fs';
 import { DatabaseService, DatabaseUser } from '../database/database.service';
 import {
   RegisterInput,

@@ -18,11 +18,11 @@ const isLocalPollFallbackAllowed = () => {
     return true;
   }
 
-  if (typeof window === 'undefined') {
+  if (typeof globalThis.window === 'undefined') {
     return false;
   }
 
-  const { hostname } = window.location;
+  const { hostname } = globalThis.location;
   return hostname === 'localhost' || hostname === '127.0.0.1' || hostname.endsWith('.local');
 };
 

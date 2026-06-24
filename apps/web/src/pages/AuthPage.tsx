@@ -1,8 +1,7 @@
 import type { FormEvent } from 'react';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, LogIn, UserPlus } from 'lucide-react';
-import { Mail, Lock, User, Play, Sparkles } from 'lucide-react';
+import { ArrowLeft, LogIn, UserPlus, Mail, Lock, User, Play, Sparkles } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import * as Tabs from '@radix-ui/react-tabs';
 import { useAuthStore } from '../store/useAuthStore';
@@ -33,6 +32,82 @@ const resolveMode = (raw: string | undefined): AuthMode => {
     return raw;
   }
   return 'login';
+};
+
+const validateNickname = (nickname: string): string | null => {
+  const trimmedNickname = nickname.trim();
+  if (!trimmedNickname) {
+    return '닉네임은 필수입니다.';
+  }
+  if (trimmedNickname.length < 2 || trimmedNickname.length > 20) {
+    return '닉네임은 2자 이상 20자 이하로 입력해 주세요.';
+  }
+  return null;
+};
+
+const validateEmailAndPassword = (email: string, password: string): string | null => {
+  const trimmedEmail = email.trim();
+  const trimmedPassword = password.trim();
+
+  if (!trimmedEmail) {
+    return '이메일은 필수입니다.';
+  }
+  if (!isValidEmail(trimmedEmail)) {
+    return '올바른 이메일 형식을 입력해 주세요.';
+  }
+  if (trimmedPassword.length < 6) {
+    return '비밀번호는 6자 이상이어야 합니다.';
+  }
+  return null;
+};
+
+const resolveAuthFormError = (
+  activeMode: AuthMode,
+  email: string,
+  password: string,
+  nickname: string,
+): string | null => {
+  if (activeMode === 'guest') {
+    return validateNickname(nickname);
+  }
+
+  if (activeMode === 'register') {
+    return validateEmailAndPassword(email, password) ?? validateNickname(nickname);
+  }
+
+  return validateEmailAndPassword(email, password);
+};
+
+const AuthModeTrigger = (
+  props: Readonly<{ value: AuthMode; label: string; activeMode: AuthMode }>,
+) => {
+  const isActive = props.activeMode === props.value;
+  return (
+    <Tabs.Trigger
+      value={props.value}
+      style={{
+        border: 'none',
+        background: 'transparent',
+        padding: '0.6rem',
+        color: isActive ? 'var(--brand-primary)' : 'var(--text-muted)',
+        borderBottom: isActive ? '2px solid var(--brand-primary)' : '2px solid transparent',
+        fontWeight: isActive ? 700 : 500,
+        cursor: 'pointer',
+      }}
+    >
+      {props.label}
+    </Tabs.Trigger>
+  );
+};
+
+const AuthSubmitIcon = (props: Readonly<{ activeMode: AuthMode }>) => {
+  if (props.activeMode === 'login') {
+    return <LogIn size={15} />;
+  }
+  if (props.activeMode === 'register') {
+    return <UserPlus size={15} />;
+  }
+  return <Sparkles size={15} />;
 };
 
 export const AuthPage: React.FC = () => {
@@ -72,55 +147,7 @@ export const AuthPage: React.FC = () => {
     clearValidationErrors();
   }, [mode, guestName, clearError, clearValidationErrors]);
 
-  const resolveFormError = () => {
-    if (activeMode === 'guest') {
-      const trimmedNickname = nickname.trim();
-      if (!trimmedNickname) {
-        return '닉네임은 필수입니다.';
-      }
-      if (trimmedNickname.length < 2 || trimmedNickname.length > 20) {
-        return '닉네임은 2자 이상 20자 이하로 입력해 주세요.';
-      }
-      return null;
-    }
-
-    if (activeMode === 'register') {
-      const trimmedEmail = email.trim();
-      const trimmedPassword = password.trim();
-      const trimmedNickname = nickname.trim();
-
-      if (!trimmedEmail) {
-        return '이메일은 필수입니다.';
-      }
-      if (!isValidEmail(trimmedEmail)) {
-        return '올바른 이메일 형식을 입력해 주세요.';
-      }
-      if (trimmedPassword.length < 6) {
-        return '비밀번호는 6자 이상이어야 합니다.';
-      }
-      if (!trimmedNickname) {
-        return '닉네임은 필수입니다.';
-      }
-      if (trimmedNickname.length < 2 || trimmedNickname.length > 20) {
-        return '닉네임은 2자 이상 20자 이하로 입력해 주세요.';
-      }
-      return null;
-    }
-
-    const trimmedEmail = email.trim();
-    const trimmedPassword = password.trim();
-
-    if (!trimmedEmail) {
-      return '이메일은 필수입니다.';
-    }
-    if (!isValidEmail(trimmedEmail)) {
-      return '올바른 이메일 형식을 입력해 주세요.';
-    }
-    if (trimmedPassword.length < 6) {
-      return '비밀번호는 6자 이상이어야 합니다.';
-    }
-    return null;
-  };
+  const resolveFormError = () => resolveAuthFormError(activeMode, email, password, nickname);
 
   const authError = error || formError;
 
@@ -269,57 +296,9 @@ export const AuthPage: React.FC = () => {
                 marginBottom: '1rem',
               }}
             >
-              <Tabs.Trigger
-                value="login"
-                style={{
-                  border: 'none',
-                  background: 'transparent',
-                  padding: '0.6rem',
-                  color: activeMode === 'login' ? 'var(--brand-primary)' : 'var(--text-muted)',
-                  borderBottom:
-                    activeMode === 'login'
-                      ? '2px solid var(--brand-primary)'
-                      : '2px solid transparent',
-                  fontWeight: activeMode === 'login' ? 700 : 500,
-                  cursor: 'pointer',
-                }}
-              >
-                로그인
-              </Tabs.Trigger>
-              <Tabs.Trigger
-                value="register"
-                style={{
-                  border: 'none',
-                  background: 'transparent',
-                  padding: '0.6rem',
-                  color: activeMode === 'register' ? 'var(--brand-primary)' : 'var(--text-muted)',
-                  borderBottom:
-                    activeMode === 'register'
-                      ? '2px solid var(--brand-primary)'
-                      : '2px solid transparent',
-                  fontWeight: activeMode === 'register' ? 700 : 500,
-                  cursor: 'pointer',
-                }}
-              >
-                회원가입
-              </Tabs.Trigger>
-              <Tabs.Trigger
-                value="guest"
-                style={{
-                  border: 'none',
-                  background: 'transparent',
-                  padding: '0.6rem',
-                  color: activeMode === 'guest' ? 'var(--brand-primary)' : 'var(--text-muted)',
-                  borderBottom:
-                    activeMode === 'guest'
-                      ? '2px solid var(--brand-primary)'
-                      : '2px solid transparent',
-                  fontWeight: activeMode === 'guest' ? 700 : 500,
-                  cursor: 'pointer',
-                }}
-              >
-                비회원
-              </Tabs.Trigger>
+              <AuthModeTrigger value="login" label="로그인" activeMode={activeMode} />
+              <AuthModeTrigger value="register" label="회원가입" activeMode={activeMode} />
+              <AuthModeTrigger value="guest" label="비회원" activeMode={activeMode} />
             </Tabs.List>
 
             <form onSubmit={handleSubmit}>
@@ -552,13 +531,7 @@ export const AuthPage: React.FC = () => {
                   gap: '0.5rem',
                 }}
               >
-                {activeMode === 'login' ? (
-                  <LogIn size={15} />
-                ) : activeMode === 'register' ? (
-                  <UserPlus size={15} />
-                ) : (
-                  <Sparkles size={15} />
-                )}
+                <AuthSubmitIcon activeMode={activeMode} />
                 {isLoading ? '처리 중…' : MODE_LABELS[activeMode]}
               </button>
             </form>

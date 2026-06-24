@@ -167,9 +167,9 @@ export const LegalPage: React.FC = () => {
             style={{ padding: '1rem', display: 'grid', gap: '0.4rem' }}
           >
             <h2 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 800 }}>{section.heading}</h2>
-            {section.body.map((line, index) => (
+            {section.body.map((line) => (
               <p
-                key={index}
+                key={`${section.heading}::${line}`}
                 style={{
                   margin: 0,
                   fontSize: '0.86rem',

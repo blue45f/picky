@@ -6,7 +6,8 @@
     <title>pickflow</title>
     <script>
       (function () {
-        var fallbackPath = window.location.pathname + window.location.search + window.location.hash;
+        var fallbackPath =
+          globalThis.location.pathname + globalThis.location.search + globalThis.location.hash;
 
         if (!fallbackPath || fallbackPath === '/404.html') {
           return;
@@ -14,7 +15,7 @@
 
         var encoded = encodeURIComponent(fallbackPath);
         var target = '/?__fallback=' + encoded;
-        window.location.replace(target);
+        globalThis.location.replace(target);
       })();
     </script>
   </head>

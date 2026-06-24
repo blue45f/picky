@@ -1,11 +1,11 @@
 import { buildQrSvgDataUri } from '../lib/qrCode';
 import { theme } from '../theme';
 
-interface PollShareQrSectionProps {
+type PollShareQrSectionProps = Readonly<{
   shareUrl: string;
   qrUrl?: string;
   onCopyLink?: () => void;
-}
+}>;
 
 /**
  * Extracted, self-contained QR share block for verifiability.

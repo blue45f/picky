@@ -127,11 +127,11 @@ export class PollService {
     poll.totalVotes += 1;
 
     // Add comment if present
-    if (input.comment && input.comment.trim()) {
+    if (input.comment?.trim()) {
       const commentId = poll.comments.length + 1;
       const newComment: PollComment = {
         id: commentId,
-        voterName: input.voterName && input.voterName.trim() ? input.voterName.trim() : '익명',
+        voterName: input.voterName?.trim() ? input.voterName.trim() : '익명',
         comment: input.comment.trim(),
         createdAt: new Date().toISOString(),
         selectedOptionId: input.optionId,

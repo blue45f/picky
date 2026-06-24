@@ -20,7 +20,7 @@ class VoteDto extends createZodDto(VoteSchema) {}
 
 const trimTrailingSlashes = (value: string): string => {
   let end = value.length;
-  while (end > 0 && value.charCodeAt(end - 1) === 47) {
+  while (end > 0 && value.codePointAt(end - 1) === 47) {
     end -= 1;
   }
   return end === value.length ? value : value.slice(0, end);
@@ -260,7 +260,7 @@ export class PollController {
   }
 
   private normalizeOrigin(value: unknown): string | null {
-    const raw = trimTrailingSlashes(String(value || '').trim());
+    const raw = trimTrailingSlashes((typeof value === 'string' ? value : '').trim());
     if (!raw) {
       return null;
     }
@@ -340,7 +340,7 @@ export class PollController {
   }
 
   private resolveDataImageMimeType(value: string): string | null {
-    const match = value.match(/^data:(image\/(?:png|jpe?g|webp));base64,/);
+    const match = /^data:(image\/(?:png|jpe?g|webp));base64,/.exec(value);
     if (!match) {
       return null;
     }
@@ -349,7 +349,7 @@ export class PollController {
   }
 
   private parseDataImage(value: string): { mimeType: string; buffer: Buffer } | null {
-    const match = value.match(/^data:(image\/(?:png|jpe?g|webp));base64,([A-Za-z0-9+/=]+)$/);
+    const match = /^data:(image\/(?:png|jpe?g|webp));base64,([A-Za-z0-9+/=]+)$/.exec(value);
     if (!match) {
       return null;
     }
@@ -365,9 +365,9 @@ export class PollController {
 
   private escapeJsonForHtml(value: unknown): string {
     return JSON.stringify(value)
-      .replaceAll('&', '\\u0026')
-      .replaceAll('<', '\\u003c')
-      .replaceAll('>', '\\u003e');
+      .replaceAll('&', String.raw`\u0026`)
+      .replaceAll('<', String.raw`\u003c`)
+      .replaceAll('>', String.raw`\u003e`);
   }
 
   private escapeHtml(value: string): string {

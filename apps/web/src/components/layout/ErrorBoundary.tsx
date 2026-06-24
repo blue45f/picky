@@ -27,7 +27,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     console.error('[picky] Unhandled render error:', error, info.componentStack);
   }
 
-  private handleReset = (): void => {
+  private readonly handleReset = (): void => {
     this.props.onReset?.();
     this.setState({ error: null });
   };
@@ -61,7 +61,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
               type="button"
               className="btn-secondary"
               onClick={() => {
-                window.location.href = '/';
+                globalThis.location.href = '/';
               }}
             >
               홈으로

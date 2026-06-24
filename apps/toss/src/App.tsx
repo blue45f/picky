@@ -43,11 +43,11 @@ function GlobalParticleCanvas() {
     let active = true;
 
     const handleResize = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
+      canvas.width = globalThis.innerWidth;
+      canvas.height = globalThis.innerHeight;
     };
     handleResize();
-    window.addEventListener('resize', handleResize);
+    globalThis.addEventListener('resize', handleResize);
 
     const animate = () => {
       if (!active) return;
@@ -98,7 +98,7 @@ function GlobalParticleCanvas() {
 
     return () => {
       active = false;
-      window.removeEventListener('resize', handleResize);
+      globalThis.removeEventListener('resize', handleResize);
     };
   }, []);
 
@@ -106,6 +106,7 @@ function GlobalParticleCanvas() {
     <canvas
       ref={canvasRef}
       aria-hidden="true"
+      tabIndex={-1}
       style={{
         position: 'fixed',
         inset: 0,
@@ -120,7 +121,7 @@ export function App() {
   const init = useIdentity((state) => state.init);
 
   useEffect(() => {
-    void init();
+    init().catch(() => {});
   }, [init]);
 
   // 라우터 규칙을 일반 웹(BrowserRouter)과 통일해 클린 경로(/poll/:id) 사용.
@@ -221,7 +222,7 @@ export function App() {
                     <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
                       {['전체 🥑', '진행중 🔥', '마감 ⏰'].map((l, i) => (
                         <span
-                          key={i}
+                          key={l}
                           style={{
                             padding: '6px 14px',
                             borderRadius: 999,

@@ -44,12 +44,12 @@ interface PollStoreFactoryOptions {
 const LOCAL_POLL_CACHE_KEY = 'picky_local_polls';
 
 const loadCachedPolls = (): Poll[] => {
-  if (typeof window === 'undefined') {
+  if (typeof globalThis.window === 'undefined') {
     return [];
   }
 
   try {
-    const raw = window.localStorage.getItem(LOCAL_POLL_CACHE_KEY);
+    const raw = globalThis.localStorage.getItem(LOCAL_POLL_CACHE_KEY);
     if (!raw) {
       return [];
     }
@@ -140,13 +140,13 @@ const loadCachedPolls = (): Poll[] => {
 };
 
 const persistCachedPolls = (polls: Poll[]) => {
-  if (typeof window === 'undefined') {
+  if (typeof globalThis.window === 'undefined') {
     return;
   }
 
   try {
     const compacted = polls.slice(0, 300);
-    window.localStorage.setItem(LOCAL_POLL_CACHE_KEY, JSON.stringify(compacted));
+    globalThis.localStorage.setItem(LOCAL_POLL_CACHE_KEY, JSON.stringify(compacted));
   } catch {
     // intentionally ignore
   }
@@ -338,6 +338,20 @@ const setAuthSessionExpired = async (
 const getAuthToken = (useAuthStore: PollAuthStore) =>
   useAuthStore.getState().token || localStorage.getItem('picky_token');
 
+const excludePollById = (polls: Poll[], pollId: string): Poll[] =>
+  polls.filter((poll) => poll.id !== pollId);
+
+const replacePollById = (polls: Poll[], pollId: string, replacement: Poll): Poll[] =>
+  polls.map((poll) => (poll.id === pollId ? replacement : poll));
+
+const buildPollRemovalUpdate =
+  (pollId: string) =>
+  (state: PollState): Partial<PollState> => ({
+    polls: excludePollById(state.polls, pollId),
+    currentPoll: state.currentPoll?.id === pollId ? null : state.currentPoll,
+    error: null,
+  });
+
 export const createPollStoreState =
   ({
     parseApiPayload,
@@ -438,7 +452,7 @@ export const createPollStoreState =
     createPoll: async (input) => {
       set({ isLoading: true, error: null });
       const commitCreatedPoll = (data: Poll) => {
-        const nextPolls = [data, ...get().polls.filter((poll) => poll.id !== data.id)];
+        const nextPolls = [data, ...excludePollById(get().polls, data.id)];
         upsertPollToCache(data, nextPolls);
         set({ polls: nextPolls, currentPoll: data, isLoading: false, error: null });
         return data;
@@ -534,7 +548,7 @@ export const createPollStoreState =
               upsertPollToCache(nextPoll, get().polls);
               set((state) => ({
                 currentPoll: nextPoll,
-                polls: [nextPoll, ...state.polls.filter((poll) => poll.id !== nextPoll.id)],
+                polls: [nextPoll, ...excludePollById(state.polls, nextPoll.id)],
                 isLoading: false,
               }));
               return true;
@@ -552,7 +566,7 @@ export const createPollStoreState =
         const data = ensurePollPayload(await parseApiPayload(res));
         set((state) => ({
           currentPoll: data,
-          polls: state.polls.map((p) => (p.id === id ? data : p)),
+          polls: replacePollById(state.polls, id, data),
           isLoading: false,
         }));
         return true;
@@ -565,11 +579,7 @@ export const createPollStoreState =
     deletePoll: async (id) => {
       const dropFromState = () => {
         removePollFromCache(id);
-        set((state) => ({
-          polls: state.polls.filter((poll) => poll.id !== id),
-          currentPoll: state.currentPoll?.id === id ? null : state.currentPoll,
-          error: null,
-        }));
+        set(buildPollRemovalUpdate(id));
       };
 
       if (id.startsWith('local-')) {

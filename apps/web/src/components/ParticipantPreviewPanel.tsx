@@ -21,14 +21,14 @@ type PreviewAttachment = {
   size: number;
 };
 
-type ParticipantPreviewPanelProps = {
+type ParticipantPreviewPanelProps = Readonly<{
   question: string;
   description: string;
   options: PreviewOption[];
   attachments: PreviewAttachment[];
   endsAtLocal: string;
   resultsVisibility: 'afterVote' | 'always';
-};
+}>;
 
 const formatDeadline = (value: string): string => {
   if (!value) {
@@ -80,26 +80,43 @@ export function ParticipantPreviewPanel({
       20,
       110,
     );
-    const effortLabel = estimatedSeconds <= 40 ? '낮음' : estimatedSeconds <= 70 ? '보통' : '높음';
+    let effortLabel: string;
+    if (estimatedSeconds <= 40) {
+      effortLabel = '낮음';
+    } else if (estimatedSeconds <= 70) {
+      effortLabel = '보통';
+    } else {
+      effortLabel = '높음';
+    }
+
+    let questionHelp: string;
+    if (normalizedQuestion.length < 8) {
+      questionHelp = '참가자가 맥락을 이해하기엔 질문이 짧습니다.';
+    } else if (normalizedQuestion.length > 90) {
+      questionHelp = '모바일에서 질문이 길게 느껴질 수 있습니다.';
+    } else {
+      questionHelp = '모바일 첫 화면에서 바로 이해할 수 있습니다.';
+    }
+
+    let optionScanHelp: string;
+    if (hasDuplicateOptions) {
+      optionScanHelp = '중복 선택지가 있어 참가자가 헷갈릴 수 있습니다.';
+    } else if (filledOptions.length > 6) {
+      optionScanHelp = '선택지가 많아 단톡방 즉시 응답에는 부담이 있습니다.';
+    } else {
+      optionScanHelp = '선택지를 빠르게 비교할 수 있습니다.';
+    }
+
     const readinessItems = [
       {
         label: '질문 명확성',
         passed: normalizedQuestion.length >= 8 && normalizedQuestion.length <= 90,
-        help:
-          normalizedQuestion.length < 8
-            ? '참가자가 맥락을 이해하기엔 질문이 짧습니다.'
-            : normalizedQuestion.length > 90
-              ? '모바일에서 질문이 길게 느껴질 수 있습니다.'
-              : '모바일 첫 화면에서 바로 이해할 수 있습니다.',
+        help: questionHelp,
       },
       {
         label: '선택지 스캔',
         passed: filledOptions.length >= 2 && filledOptions.length <= 6 && !hasDuplicateOptions,
-        help: hasDuplicateOptions
-          ? '중복 선택지가 있어 참가자가 헷갈릴 수 있습니다.'
-          : filledOptions.length > 6
-            ? '선택지가 많아 단톡방 즉시 응답에는 부담이 있습니다.'
-            : '선택지를 빠르게 비교할 수 있습니다.',
+        help: optionScanHelp,
       },
       {
         label: '결정 맥락',
@@ -131,6 +148,15 @@ export function ParticipantPreviewPanel({
           { index: 0, text: '첫 번째 선택지', imageUrl: '' },
           { index: 1, text: '두 번째 선택지', imageUrl: '' },
         ];
+
+  let readinessColor: string;
+  if (preview.readinessScore >= 80) {
+    readinessColor = 'var(--brand-accent-teal)';
+  } else if (preview.readinessScore >= 60) {
+    readinessColor = 'var(--brand-accent-gold)';
+  } else {
+    readinessColor = 'var(--brand-accent-coral)';
+  }
 
   return (
     <section
@@ -201,12 +227,7 @@ export function ParticipantPreviewPanel({
           </span>
           <strong
             style={{
-              color:
-                preview.readinessScore >= 80
-                  ? 'var(--brand-accent-teal)'
-                  : preview.readinessScore >= 60
-                    ? 'var(--brand-accent-gold)'
-                    : 'var(--brand-accent-coral)',
+              color: readinessColor,
               fontSize: '1.12rem',
             }}
           >

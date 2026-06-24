@@ -23,11 +23,11 @@ type FollowUpAction = {
   icon: 'target' | 'runoff' | 'discussion' | 'ready';
 };
 
-type DecisionFollowUpPanelProps = {
+type DecisionFollowUpPanelProps = Readonly<{
   poll: Poll;
   shareUrl: string;
   pollClosed: boolean;
-};
+}>;
 
 const formatPercent = (value: number): string => `${Math.max(0, Math.min(100, value))}%`;
 
@@ -62,43 +62,159 @@ const getDecisionIcon = (icon: FollowUpAction['icon']) => {
   return <Target size={14} />;
 };
 
+type DecisionStats = {
+  comments: NonNullable<Poll['comments']>;
+  leader: Poll['options'][number] | null;
+  runnerUp: Poll['options'][number] | null;
+  totalVotes: number;
+  minimumVotes: number;
+  leaderShare: number;
+  voteGap: number;
+  voteGapShare: number;
+  feedbackRate: number;
+  lowSample: boolean;
+  closeRace: boolean;
+  lowDiscussion: boolean;
+  closingSoon: boolean;
+};
+
+const computeDecisionStats = (poll: Poll, pollClosed: boolean): DecisionStats => {
+  const comments = poll.comments || [];
+  const sortedOptions = [...poll.options].sort((a, b) => b.voteCount - a.voteCount);
+  const leader = sortedOptions[0] || null;
+  const runnerUp = sortedOptions[1] || null;
+  const totalVotes = poll.totalVotes || 0;
+  const minimumVotes = Math.max(7, poll.options.length * 3);
+  const leaderShare =
+    totalVotes > 0 && leader ? Math.round((leader.voteCount / totalVotes) * 100) : 0;
+  const voteGap = leader ? leader.voteCount - (runnerUp?.voteCount || 0) : 0;
+  const voteGapShare = totalVotes > 0 ? Math.round((voteGap / totalVotes) * 100) : 0;
+  const feedbackRate = totalVotes > 0 ? Math.round((comments.length / totalVotes) * 100) : 0;
+  const lowSample = totalVotes < minimumVotes;
+  const closeRace = totalVotes > 0 && Boolean(runnerUp) && (voteGap <= 1 || voteGapShare <= 12);
+  const lowDiscussion = totalVotes >= 3 && feedbackRate < 25;
+  const deadlineTime = poll.endsAt ? new Date(poll.endsAt).getTime() : null;
+  const hasValidDeadline = typeof deadlineTime === 'number' && Number.isFinite(deadlineTime);
+  const timeUntilDeadline = hasValidDeadline ? deadlineTime - Date.now() : null;
+  const closingSoon =
+    !pollClosed &&
+    typeof timeUntilDeadline === 'number' &&
+    timeUntilDeadline > 0 &&
+    timeUntilDeadline <= 6 * 60 * 60 * 1000;
+
+  return {
+    comments,
+    leader,
+    runnerUp,
+    totalVotes,
+    minimumVotes,
+    leaderShare,
+    voteGap,
+    voteGapShare,
+    feedbackRate,
+    lowSample,
+    closeRace,
+    lowDiscussion,
+    closingSoon,
+  };
+};
+
+const resolveDecisionState = (stats: DecisionStats): DecisionState => {
+  if (!stats.leader || stats.totalVotes === 0 || stats.lowSample) {
+    return 'collect';
+  }
+  if (stats.closeRace) {
+    return 'runoff';
+  }
+  if (stats.lowDiscussion) {
+    return 'discussion';
+  }
+  return 'ready';
+};
+
+const resolveDeadlineCopy = (
+  poll: Poll,
+  pollClosed: boolean,
+  closingSoon: boolean,
+): { value: string; help: string } => {
+  if (pollClosed) {
+    return {
+      value: '마감됨',
+      help: '마감된 투표라 후속 공지나 실행 액션으로 전환하기 좋습니다.',
+    };
+  }
+  if (closingSoon) {
+    return {
+      value: '임박',
+      help: '마감이 임박했습니다. 마지막 리마인더를 보내기 좋은 시점입니다.',
+    };
+  }
+  return {
+    value: '진행 중',
+    help: `현재 마감 상태: ${formatDeadline(poll.endsAt)}`,
+  };
+};
+
+const buildRiskItems = (
+  stats: DecisionStats,
+  deadline: { value: string; help: string },
+): Array<{ label: string; value: string; active: boolean; help: string }> => {
+  const { lowSample, closeRace, lowDiscussion, closingSoon, minimumVotes, totalVotes } = stats;
+  return [
+    {
+      label: '표본',
+      value: lowSample ? '보강 필요' : '충분',
+      active: lowSample,
+      help: lowSample
+        ? `최소 ${minimumVotes}명 기준까지 ${Math.max(minimumVotes - totalVotes, 0)}명 더 필요합니다.`
+        : '현재 표본은 기본 의사결정 기준을 충족했습니다.',
+    },
+    {
+      label: '접전',
+      value: closeRace ? '결선 권장' : '격차 확보',
+      active: closeRace,
+      help: closeRace
+        ? '상위 선택지 차이가 작아 바로 확정하면 반발이나 재논의가 생길 수 있습니다.'
+        : '상위 선택지 사이에 해석 가능한 격차가 있습니다.',
+    },
+    {
+      label: '의견',
+      value: lowDiscussion ? '근거 부족' : '근거 확보',
+      active: lowDiscussion,
+      help: lowDiscussion
+        ? '선택 이유가 부족해 결과 공지나 회의록 근거가 약할 수 있습니다.'
+        : '댓글이 결과 해석을 보강하고 있습니다.',
+    },
+    {
+      label: '마감',
+      value: deadline.value,
+      active: closingSoon,
+      help: deadline.help,
+    },
+  ];
+};
+
 export function DecisionFollowUpPanel({ poll, shareUrl, pollClosed }: DecisionFollowUpPanelProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const decision = useMemo(() => {
-    const comments = poll.comments || [];
-    const sortedOptions = [...poll.options].sort((a, b) => b.voteCount - a.voteCount);
-    const leader = sortedOptions[0] || null;
-    const runnerUp = sortedOptions[1] || null;
-    const totalVotes = poll.totalVotes || 0;
-    const minimumVotes = Math.max(7, poll.options.length * 3);
-    const leaderShare =
-      totalVotes > 0 && leader ? Math.round((leader.voteCount / totalVotes) * 100) : 0;
-    const voteGap = leader ? leader.voteCount - (runnerUp?.voteCount || 0) : 0;
-    const voteGapShare = totalVotes > 0 ? Math.round((voteGap / totalVotes) * 100) : 0;
-    const feedbackRate = totalVotes > 0 ? Math.round((comments.length / totalVotes) * 100) : 0;
-    const lowSample = totalVotes < minimumVotes;
-    const closeRace = totalVotes > 0 && Boolean(runnerUp) && (voteGap <= 1 || voteGapShare <= 12);
-    const lowDiscussion = totalVotes >= 3 && feedbackRate < 25;
-    const deadlineTime = poll.endsAt ? new Date(poll.endsAt).getTime() : null;
-    const hasValidDeadline = typeof deadlineTime === 'number' && Number.isFinite(deadlineTime);
-    const timeUntilDeadline = hasValidDeadline ? deadlineTime - Date.now() : null;
-    const closingSoon =
-      !pollClosed &&
-      typeof timeUntilDeadline === 'number' &&
-      timeUntilDeadline > 0 &&
-      timeUntilDeadline <= 6 * 60 * 60 * 1000;
+    const stats = computeDecisionStats(poll, pollClosed);
+    const {
+      comments,
+      leader,
+      runnerUp,
+      totalVotes,
+      minimumVotes,
+      leaderShare,
+      voteGap,
+      voteGapShare,
+      feedbackRate,
+      closingSoon,
+    } = stats;
 
-    let state: DecisionState = 'ready';
-    if (!leader || totalVotes === 0 || lowSample) {
-      state = 'collect';
-    } else if (closeRace) {
-      state = 'runoff';
-    } else if (lowDiscussion) {
-      state = 'discussion';
-    }
+    const state = resolveDecisionState(stats);
 
     const sampleScore = Math.min(35, Math.round((totalVotes / minimumVotes) * 35));
-    const marginScore = !runnerUp ? 30 : Math.min(30, Math.round((voteGapShare / 30) * 30));
+    const marginScore = runnerUp ? Math.min(30, Math.round((voteGapShare / 30) * 30)) : 30;
     const discussionScore = Math.min(25, Math.round((feedbackRate / 35) * 25));
     const closureScore = pollClosed ? 10 : 5;
     const confidenceScore = Math.min(
@@ -172,50 +288,9 @@ export function DecisionFollowUpPanel({ poll, shareUrl, pollClosed }: DecisionFo
       },
     ];
 
-    const recommendedActionId =
-      state === 'ready'
-        ? 'ready'
-        : state === 'runoff'
-          ? 'runoff'
-          : state === 'discussion'
-            ? 'discussion'
-            : 'collect';
-    const riskItems = [
-      {
-        label: '표본',
-        value: lowSample ? '보강 필요' : '충분',
-        active: lowSample,
-        help: lowSample
-          ? `최소 ${minimumVotes}명 기준까지 ${Math.max(minimumVotes - totalVotes, 0)}명 더 필요합니다.`
-          : '현재 표본은 기본 의사결정 기준을 충족했습니다.',
-      },
-      {
-        label: '접전',
-        value: closeRace ? '결선 권장' : '격차 확보',
-        active: closeRace,
-        help: closeRace
-          ? '상위 선택지 차이가 작아 바로 확정하면 반발이나 재논의가 생길 수 있습니다.'
-          : '상위 선택지 사이에 해석 가능한 격차가 있습니다.',
-      },
-      {
-        label: '의견',
-        value: lowDiscussion ? '근거 부족' : '근거 확보',
-        active: lowDiscussion,
-        help: lowDiscussion
-          ? '선택 이유가 부족해 결과 공지나 회의록 근거가 약할 수 있습니다.'
-          : '댓글이 결과 해석을 보강하고 있습니다.',
-      },
-      {
-        label: '마감',
-        value: pollClosed ? '마감됨' : closingSoon ? '임박' : '진행 중',
-        active: closingSoon,
-        help: pollClosed
-          ? '마감된 투표라 후속 공지나 실행 액션으로 전환하기 좋습니다.'
-          : closingSoon
-            ? '마감이 임박했습니다. 마지막 리마인더를 보내기 좋은 시점입니다.'
-            : `현재 마감 상태: ${formatDeadline(poll.endsAt)}`,
-      },
-    ];
+    const recommendedActionId: FollowUpAction['id'] = state;
+    const deadline = resolveDeadlineCopy(poll, pollClosed, closingSoon);
+    const riskItems = buildRiskItems(stats, deadline);
 
     return {
       actions,
@@ -239,7 +314,7 @@ export function DecisionFollowUpPanel({ poll, shareUrl, pollClosed }: DecisionFo
     try {
       await copyText(action.body);
       setCopiedId(action.id);
-      window.setTimeout(() => setCopiedId(null), 2200);
+      globalThis.setTimeout(() => setCopiedId(null), 2200);
     } catch (err) {
       console.error('decision follow-up copy failed', err);
     }

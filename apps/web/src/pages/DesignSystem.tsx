@@ -203,10 +203,14 @@ export const DesignSystem: React.FC = () => {
   const [copyKey, setCopyKey] = useState<string>('');
   const [ctaMode, setCtaMode] = useState<'text' | 'loading'>('text');
 
+  const clearCopyKey = (key: string) => {
+    setCopyKey((current) => (current === key ? '' : current));
+  };
+
   const copyCode = (key: string, text: string) => {
     navigator.clipboard?.writeText(text).finally(() => {
       setCopyKey(key);
-      setTimeout(() => setCopyKey((current) => (current === key ? '' : current)), 1400);
+      setTimeout(() => clearCopyKey(key), 1400);
     });
   };
 

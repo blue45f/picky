@@ -18,11 +18,11 @@ export function Chip({
   children,
   tone = 'muted',
   style,
-}: {
+}: Readonly<{
   children: ReactNode;
   tone?: ChipTone;
   style?: CSSProperties;
-}) {
+}>) {
   return (
     <span
       style={{
@@ -50,18 +50,21 @@ export function ProgressBar({
   tone = 'accent',
   height = 10,
   track = theme.track,
-}: {
+}: Readonly<{
   percent: number;
   tone?: 'accent' | 'gold' | 'muted';
   height?: number;
   track?: string;
-}) {
+}>) {
   const clamped = Math.max(0, Math.min(100, percent));
-  const fill =
-    tone === 'gold' ? theme.gold : tone === 'muted' ? 'rgba(255,255,255,0.28)' : theme.accent;
+  let fill: string = theme.accent;
+  if (tone === 'gold') {
+    fill = theme.gold;
+  } else if (tone === 'muted') {
+    fill = 'rgba(255,255,255,0.28)';
+  }
   return (
     <div
-      role="presentation"
       style={{
         height,
         borderRadius: RADIUS.pill,
@@ -94,12 +97,12 @@ export function SegmentedControl<T extends string>({
   value,
   onChange,
   ariaLabel,
-}: {
+}: Readonly<{
   options: ReadonlyArray<SegmentOption<T>>;
   value: T;
   onChange: (next: T) => void;
   ariaLabel?: string;
-}) {
+}>) {
   return (
     <div
       role="radiogroup"
@@ -149,12 +152,12 @@ export function Skeleton({
   height = 16,
   radius = 8,
   style,
-}: {
+}: Readonly<{
   width?: number | string;
   height?: number | string;
   radius?: number;
   style?: CSSProperties;
-}) {
+}>) {
   return (
     <span
       aria-hidden
@@ -169,11 +172,11 @@ export function AppBar({
   title,
   onBack,
   right,
-}: {
+}: Readonly<{
   title?: ReactNode;
   onBack?: () => void;
   right?: ReactNode;
-}) {
+}>) {
   return (
     <header
       style={{

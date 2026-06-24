@@ -13,10 +13,10 @@ import {
 import type { Poll } from '@picky/shared';
 import { copyText } from '../lib/pollShare';
 
-type ActionItemPlannerProps = {
+type ActionItemPlannerProps = Readonly<{
   poll: Poll;
   shareUrl: string;
-};
+}>;
 
 type ActionStep = {
   id: string;
@@ -32,10 +32,10 @@ const getLocalDateValue = (offsetDays: number): string => {
 
 const escapeIcsText = (value: string): string => {
   return value
-    .replace(/\\/g, '\\\\')
-    .replace(/,/g, '\\,')
-    .replace(/;/g, '\\;')
-    .replace(/\n/g, '\\n');
+    .replace(/\\/g, String.raw`\\`)
+    .replace(/,/g, String.raw`\,`)
+    .replace(/;/g, String.raw`\;`)
+    .replace(/\n/g, String.raw`\n`);
 };
 
 const formatIcsDate = (dateValue: string): string => {
@@ -198,7 +198,7 @@ export function ActionItemPlanner({ poll, shareUrl }: ActionItemPlannerProps) {
     try {
       await copyText(plan.markdown);
       setCopied(true);
-      window.setTimeout(() => setCopied(false), 2200);
+      globalThis.setTimeout(() => setCopied(false), 2200);
     } catch (err) {
       console.error('action plan copy failed', err);
     }
@@ -211,6 +211,7 @@ export function ActionItemPlanner({ poll, shareUrl }: ActionItemPlannerProps) {
     const endDate = nextDate.toISOString().slice(0, 10).replace(/-/g, '');
     const uid = `pickflow-${poll.id}-${dateStamp}@pickflow.local`;
     const description = `${plan.markdown}\n\n${plan.announcement}`;
+    const summaryText = `[pickflow] ${poll.question} 후속 점검`;
     const ics = [
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
@@ -222,7 +223,7 @@ export function ActionItemPlanner({ poll, shareUrl }: ActionItemPlannerProps) {
       `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').split('.')[0]}Z`,
       `DTSTART;VALUE=DATE:${dateStamp}`,
       `DTEND;VALUE=DATE:${endDate}`,
-      `SUMMARY:${escapeIcsText(`[pickflow] ${poll.question} 후속 점검`)}`,
+      `SUMMARY:${escapeIcsText(summaryText)}`,
       `DESCRIPTION:${escapeIcsText(description)}`,
       `URL:${escapeIcsText(shareUrl)}`,
       'END:VEVENT',
@@ -231,7 +232,7 @@ export function ActionItemPlanner({ poll, shareUrl }: ActionItemPlannerProps) {
 
     downloadTextFile(`pickflow-${poll.id}-action-plan.ics`, ics, 'text/calendar;charset=utf-8');
     setDownloaded(true);
-    window.setTimeout(() => setDownloaded(false), 2200);
+    globalThis.setTimeout(() => setDownloaded(false), 2200);
   };
 
   return (

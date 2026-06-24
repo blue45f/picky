@@ -28,12 +28,12 @@ const isRecentPollHistoryItem = (value: unknown): value is RecentPollHistoryItem
 };
 
 const readRecentPollHistory = (): RecentPollHistoryItem[] => {
-  if (typeof window === 'undefined') {
+  if (typeof globalThis.window === 'undefined') {
     return [];
   }
 
   try {
-    const raw = window.localStorage.getItem(RECENT_POLL_HISTORY_KEY);
+    const raw = globalThis.localStorage.getItem(RECENT_POLL_HISTORY_KEY);
     if (!raw) {
       return [];
     }
@@ -50,11 +50,11 @@ const readRecentPollHistory = (): RecentPollHistoryItem[] => {
 };
 
 const writeRecentPollHistory = (items: RecentPollHistoryItem[]) => {
-  if (typeof window === 'undefined') {
+  if (typeof globalThis.window === 'undefined') {
     return;
   }
 
-  window.localStorage.setItem(
+  globalThis.localStorage.setItem(
     RECENT_POLL_HISTORY_KEY,
     JSON.stringify(items.slice(0, MAX_RECENT_POLLS)),
   );

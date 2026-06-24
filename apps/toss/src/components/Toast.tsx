@@ -4,20 +4,20 @@ import { theme } from '../theme';
 /** 일시적 토스트 메시지 상태 훅. */
 export function useToast() {
   const [toast, setToast] = useState<string | null>(null);
-  const timerRef = useRef<number | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showToast = useCallback((message: string, duration = 2000) => {
     setToast(message);
     if (timerRef.current != null) {
-      window.clearTimeout(timerRef.current);
+      globalThis.clearTimeout(timerRef.current);
     }
-    timerRef.current = window.setTimeout(() => setToast(null), duration);
+    timerRef.current = globalThis.setTimeout(() => setToast(null), duration);
   }, []);
 
   useEffect(
     () => () => {
       if (timerRef.current != null) {
-        window.clearTimeout(timerRef.current);
+        globalThis.clearTimeout(timerRef.current);
       }
     },
     [],
@@ -30,10 +30,10 @@ export function useToast() {
 export function Toast({
   message,
   bottom = 'calc(96px + env(safe-area-inset-bottom))',
-}: {
+}: Readonly<{
   message: string | null;
   bottom?: string;
-}) {
+}>) {
   if (!message) {
     return null;
   }

@@ -15,11 +15,11 @@ import { copyText } from '../lib/pollShare';
 
 type ReportAudience = 'decision' | 'participants' | 'retrospective';
 
-type StakeholderReportBuilderProps = {
+type StakeholderReportBuilderProps = Readonly<{
   poll: Poll;
   shareUrl: string;
   pollClosed: boolean;
-};
+}>;
 
 type ReportAudienceConfig = {
   id: ReportAudience;
@@ -227,7 +227,7 @@ export function StakeholderReportBuilder({
     try {
       await copyText(report.reportText);
       setCopied(true);
-      window.setTimeout(() => setCopied(false), 2200);
+      globalThis.setTimeout(() => setCopied(false), 2200);
     } catch (err) {
       console.error('stakeholder report copy failed', err);
     }

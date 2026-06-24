@@ -11,13 +11,13 @@ type LaunchKitVariant = {
   body: string;
 };
 
-type AudienceLaunchKitProps = {
+type AudienceLaunchKitProps = Readonly<{
   poll: Poll;
   shareUrl: string;
   endAtLabel: string;
   resultsVisibilityLabel: string;
   canViewResults: boolean;
-};
+}>;
 
 const getJoinCode = (poll: Poll): string => {
   const explicitCode = String((poll as Poll & { joinCode?: string }).joinCode || '').trim();
@@ -100,7 +100,7 @@ export function AudienceLaunchKit({
     try {
       await copyText(variant.body);
       setCopiedVariantId(variant.id);
-      window.setTimeout(() => setCopiedVariantId(null), 2200);
+      globalThis.setTimeout(() => setCopiedVariantId(null), 2200);
     } catch (err) {
       console.error('launch kit copy failed', err);
     }
@@ -114,7 +114,7 @@ export function AudienceLaunchKit({
     try {
       await copyText(body);
       setCopiedVariantId('all');
-      window.setTimeout(() => setCopiedVariantId(null), 2200);
+      globalThis.setTimeout(() => setCopiedVariantId(null), 2200);
     } catch (err) {
       console.error('launch kit copy all failed', err);
     }

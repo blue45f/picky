@@ -122,7 +122,7 @@ export const RegisterSchema = z
   })
   .superRefine((value, ctx) => {
     const resolved = value.nickname ?? value.name;
-    if (!resolved || !resolved.trim()) {
+    if (!resolved?.trim()) {
       ctx.addIssue({
         code: 'custom',
         message: '닉네임은 최소 2자 이상이어야 합니다.',

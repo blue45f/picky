@@ -1,9 +1,9 @@
 import { useEffect, useRef } from 'react';
 
 const prefersReducedMotion = () =>
-  typeof window !== 'undefined' &&
-  typeof window.matchMedia === 'function' &&
-  window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  typeof globalThis.window !== 'undefined' &&
+  typeof globalThis.matchMedia === 'function' &&
+  globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /**
  * Progressive scroll-reveal: attaches `.reveal` to already-visible content and
@@ -32,9 +32,9 @@ export const useScrollReveal = <T extends HTMLElement>() => {
 
     // Already on-screen at mount (above the fold) → reveal on next frame so the
     // transition runs from the hidden start state instead of snapping.
-    const raf = window.requestAnimationFrame(() => {
+    const raf = globalThis.requestAnimationFrame(() => {
       const rect = node.getBoundingClientRect();
-      if (rect.top < window.innerHeight && rect.bottom > 0) {
+      if (rect.top < globalThis.innerHeight && rect.bottom > 0) {
         node.classList.add('is-visible');
       }
     });
@@ -54,7 +54,7 @@ export const useScrollReveal = <T extends HTMLElement>() => {
     observer.observe(node);
 
     return () => {
-      window.cancelAnimationFrame(raf);
+      globalThis.cancelAnimationFrame(raf);
       observer.disconnect();
     };
   }, []);

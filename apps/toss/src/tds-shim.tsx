@@ -11,21 +11,20 @@ const ACCENT_INK = '#041412';
 
 export function TDSMobileAITProvider({
   children,
-}: {
+}: Readonly<{
   children: ReactNode;
-  brandPrimaryColor?: string;
-}) {
+}>) {
   return <>{children}</>;
 }
 
-interface ButtonProps {
+type ButtonProps = Readonly<{
   children?: ReactNode;
   onClick?: () => void;
   style?: CSSProperties;
-  variant?: 'weak' | string;
+  variant?: 'weak' | (string & {});
   loading?: boolean;
   disabled?: boolean;
-}
+}>;
 
 export function Button({ children, onClick, style, variant, loading, disabled }: ButtonProps) {
   const weak = variant === 'weak';
@@ -53,11 +52,14 @@ export function Button({ children, onClick, style, variant, loading, disabled }:
   );
 }
 
-function TitleParagraph({ children, size = 22 }: { children: ReactNode; size?: number }) {
+function TitleParagraph({ children, size = 22 }: Readonly<{ children: ReactNode; size?: number }>) {
   return <strong style={{ fontSize: size, fontWeight: 800, display: 'block' }}>{children}</strong>;
 }
 
-function SubtitleParagraph({ children, size = 15 }: { children: ReactNode; size?: number }) {
+function SubtitleParagraph({
+  children,
+  size = 15,
+}: Readonly<{ children: ReactNode; size?: number }>) {
   return (
     <span style={{ fontSize: size, color: '#9fb4ad', display: 'block', marginTop: 6 }}>
       {children}

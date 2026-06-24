@@ -49,7 +49,7 @@ export class ErrorBoundary extends Component<Props, State> {
         <p style={{ color: theme.textMuted, fontSize: 14, margin: 0 }}>{this.state.message}</p>
         <button
           type="button"
-          onClick={() => window.location.reload()}
+          onClick={() => globalThis.location.reload()}
           style={{
             marginTop: 8,
             minHeight: 44,

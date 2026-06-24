@@ -69,7 +69,9 @@ export function hapticFeedback(type: HapticFeedbackType): void {
     return;
   }
   try {
-    void generateHapticFeedback({ type });
+    generateHapticFeedback({ type }).catch(() => {
+      // 미지원 디바이스/환경은 조용히 무시
+    });
   } catch {
     // 미지원 디바이스/환경은 조용히 무시
   }
@@ -105,7 +107,7 @@ export function getMiniAppSchemeUri(): string | null {
 
 const trimTrailingSlashes = (value: string): string => {
   let end = value.length;
-  while (end > 0 && value.charCodeAt(end - 1) === 47) {
+  while (end > 0 && value.codePointAt(end - 1) === 47) {
     end -= 1;
   }
   return end === value.length ? value : value.slice(0, end);
@@ -117,7 +119,7 @@ const isAllowedPollId = (value: string): boolean => {
   }
 
   for (const char of value) {
-    const code = char.charCodeAt(0);
+    const code = char.codePointAt(0) ?? 0;
     const isUppercase = code >= 65 && code <= 90;
     const isLowercase = code >= 97 && code <= 122;
     const isDigit = code >= 48 && code <= 57;

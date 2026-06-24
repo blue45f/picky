@@ -24,18 +24,24 @@ const DEADLINE_BUFFER_MS = 60_000;
 type DeadlinePreset = 'none' | '6h' | '1d' | '3d' | '1w' | 'custom';
 
 interface OptionDraft {
+  id: string;
   text: string;
   imageUrl: string | null;
 }
 
-const emptyOption = (): OptionDraft => ({ text: '', imageUrl: null });
+let optionIdSeq = 0;
+const emptyOption = (): OptionDraft => ({
+  id: `opt-${(optionIdSeq += 1)}`,
+  text: '',
+  imageUrl: null,
+});
 
 const DEADLINE_PRESETS = [
   { value: 'none', label: '마감 없음 🌈', ms: 0 },
-  { value: '6h', label: '6시간 ⏰', ms: 6 * 3600_000 },
-  { value: '1d', label: '1일 📅', ms: 24 * 3600_000 },
-  { value: '3d', label: '3일 ⌛️', ms: 3 * 24 * 3600_000 },
-  { value: '1w', label: '1주 🗓️', ms: 7 * 24 * 3600_000 },
+  { value: '6h', label: '6시간 ⏰', ms: 6 * 3_600_000 },
+  { value: '1d', label: '1일 📅', ms: 24 * 3_600_000 },
+  { value: '3d', label: '3일 ⌛️', ms: 3 * 24 * 3_600_000 },
+  { value: '1w', label: '1주 🗓️', ms: 7 * 24 * 3_600_000 },
   { value: 'custom', label: '직접 선택 ✏️', ms: -1 },
 ] as const satisfies ReadonlyArray<{ value: DeadlinePreset; label: string; ms: number }>;
 
@@ -86,6 +92,703 @@ const counterStyle: React.CSSProperties = {
   fontSize: 13,
   color: theme.textFaint,
 };
+
+function AdvancedSettings(
+  props: Readonly<{
+    deadlinePreset: DeadlinePreset;
+    deadlinePreview: string | null;
+    isDeadlinePast: boolean;
+    customDeadline: string;
+    minCustom: string;
+    resultsVisibility: PollResultsVisibility;
+    onSelectPreset: (value: DeadlinePreset) => void;
+    onCustomDeadlineChange: (value: string) => void;
+    onResultsVisibilityChange: (value: PollResultsVisibility) => void;
+  }>,
+) {
+  const {
+    deadlinePreset,
+    deadlinePreview,
+    isDeadlinePast,
+    customDeadline,
+    minCustom,
+    resultsVisibility,
+    onSelectPreset,
+    onCustomDeadlineChange,
+    onResultsVisibilityChange,
+  } = props;
+  return (
+    <>
+      <div style={{ ...labelRowStyle, marginTop: 0 }}>
+        <span style={labelStyle}>언제 마감할까요? ⏰</span>
+        {deadlinePreview ? (
+          <Chip tone={isDeadlinePast ? 'danger' : 'gold'}>
+            {isDeadlinePast ? '⚠ 지난 시각이에요' : `~ ${deadlinePreview}`}
+          </Chip>
+        ) : null}
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        {DEADLINE_PRESETS.map((preset) => {
+          const active = preset.value === deadlinePreset;
+          return (
+            <button
+              key={preset.value}
+              type="button"
+              className="pressable"
+              aria-pressed={active}
+              onClick={() => onSelectPreset(preset.value)}
+              style={{
+                minHeight: 40,
+                padding: '8px 16px',
+                borderRadius: theme.radiusPill,
+                border: `1px solid ${active ? 'rgba(19,194,163,0.3)' : 'rgba(255,255,255,0.04)'}`,
+                background: active ? theme.accentSoft : 'rgba(255,255,255,0.02)',
+                backdropFilter: 'blur(16px)',
+                WebkitBackdropFilter: 'blur(16px)',
+                color: active ? theme.accent : theme.textMuted,
+                fontSize: 13.5,
+                fontWeight: 700,
+                cursor: 'pointer',
+                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.01)',
+              }}
+            >
+              {preset.label}
+            </button>
+          );
+        })}
+      </div>
+      {deadlinePreset === 'custom' ? (
+        <input
+          type="datetime-local"
+          value={customDeadline}
+          min={minCustom}
+          onChange={(e) => onCustomDeadlineChange(e.target.value)}
+          style={{ ...fieldStyle, marginTop: 10, colorScheme: 'dark' }}
+          aria-label="마감 시간 직접 선택"
+        />
+      ) : null}
+
+      <span style={{ ...labelStyle, display: 'block', margin: '24px 0 8px' }}>
+        결과는 언제 보여줄까요? 👀
+      </span>
+      <SegmentedControl
+        ariaLabel="결과 공개 시점"
+        options={RESULT_OPTIONS}
+        value={resultsVisibility}
+        onChange={onResultsVisibilityChange}
+      />
+      <p style={{ fontSize: 13, color: theme.textFaint, marginTop: 8, marginLeft: 2 }}>
+        투표 후 바로 확인하거나 언제든 공개할 수 있어요
+      </p>
+    </>
+  );
+}
+
+function Step1Form(
+  props: Readonly<{
+    question: string;
+    description: string;
+    categoryId: string | null;
+    advancedOpen: boolean;
+    advancedSettings: React.ReactNode;
+    onQuestionChange: (value: string) => void;
+    onDescriptionChange: (value: string) => void;
+    onToggleCategory: (id: string) => void;
+    onToggleAdvanced: () => void;
+  }>,
+) {
+  const {
+    question,
+    description,
+    categoryId,
+    advancedOpen,
+    advancedSettings,
+    onQuestionChange,
+    onDescriptionChange,
+    onToggleCategory,
+    onToggleAdvanced,
+  } = props;
+  return (
+    <div className="rise" key="step1">
+      <p
+        style={{
+          fontSize: 14,
+          color: theme.textMuted,
+          lineHeight: 1.5,
+          margin: '16px 0 4px',
+        }}
+      >
+        먼저 <strong style={{ color: theme.text }}>고민거리</strong>만 적어주세요. 선택지는 다음
+        단계에서 채워요 🥑
+      </p>
+      <div style={labelRowStyle}>
+        <label style={labelStyle} htmlFor="poll-question">
+          풀고 싶은 고민 💬
+        </label>
+        <span style={counterStyle}>
+          {question.length}/{QUESTION_MAX}
+        </span>
+      </div>
+      <input
+        id="poll-question"
+        style={fieldStyle}
+        value={question}
+        maxLength={QUESTION_MAX}
+        placeholder="어떤 까다로운 고민이 있으신가요? 🤔"
+        onChange={(e) => onQuestionChange(e.target.value)}
+      />
+
+      <div style={labelRowStyle}>
+        <label style={labelStyle} htmlFor="poll-desc">
+          상세 설명 💡
+        </label>
+        <span style={counterStyle}>
+          {description.length}/{DESC_MAX}
+        </span>
+      </div>
+      <textarea
+        id="poll-desc"
+        style={{ ...fieldStyle, minHeight: 120, resize: 'vertical' }}
+        value={description}
+        maxLength={DESC_MAX}
+        placeholder="친구들이 더 잘 고를 수 있게 힌트를 주세요! (선택) 💡"
+        onChange={(e) => onDescriptionChange(e.target.value)}
+      />
+
+      <span style={{ ...labelStyle, margin: '20px 0 8px' }}>어떤 고민인가요? 🏷️ (선택)</span>
+      <fieldset
+        aria-label="고민 카테고리 선택"
+        style={{
+          display: 'flex',
+          gap: 8,
+          overflowX: 'auto',
+          padding: 0,
+          paddingBottom: 4,
+          margin: 0,
+          minWidth: 0,
+          border: 0,
+          WebkitOverflowScrolling: 'touch',
+          scrollbarWidth: 'none',
+        }}
+      >
+        {POLL_CATEGORIES.map((category) => {
+          const active = categoryId === category.id;
+          return (
+            <button
+              key={category.id}
+              type="button"
+              className="pressable"
+              aria-pressed={active}
+              onClick={() => onToggleCategory(category.id)}
+              style={{
+                flexShrink: 0,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                minHeight: 40,
+                padding: '8px 16px',
+                borderRadius: theme.radiusPill,
+                border: `1px solid ${active ? category.color : 'rgba(255,255,255,0.04)'}`,
+                background: active ? `${category.color}26` : 'rgba(255,255,255,0.02)',
+                color: active ? category.color : theme.textMuted,
+                fontSize: 13.5,
+                fontWeight: 700,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <span aria-hidden>{category.emoji}</span>
+              {category.label}
+            </button>
+          );
+        })}
+      </fieldset>
+
+      {/* 접이식 고급 옵션 — 마감/결과공개를 1단계에서 미리 정해 단계 왕복을 줄여요 */}
+      <button
+        type="button"
+        className="pressable"
+        aria-expanded={advancedOpen}
+        onClick={onToggleAdvanced}
+        style={{
+          width: '100%',
+          marginTop: 28,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 8,
+          padding: '14px 16px',
+          borderRadius: theme.radiusSm,
+          border: `1px solid ${theme.border}`,
+          background: 'rgba(255,255,255,0.02)',
+          color: theme.text,
+          fontSize: 14,
+          fontWeight: 700,
+          cursor: 'pointer',
+        }}
+      >
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+          <span>⚙️ 마감·결과 공개 설정</span>
+          <span style={{ fontSize: 12.5, fontWeight: 600, color: theme.textFaint }}>
+            {advancedOpen ? '' : '(선택)'}
+          </span>
+        </span>
+        <span
+          aria-hidden
+          style={{
+            fontSize: 13,
+            color: theme.textMuted,
+            transition: 'transform 0.25s ease',
+            transform: advancedOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+          }}
+        >
+          ▾
+        </span>
+      </button>
+      <div
+        className="disclosure-enter"
+        style={{
+          maxHeight: advancedOpen ? 520 : 0,
+          opacity: advancedOpen ? 1 : 0,
+          overflow: 'hidden',
+          marginTop: advancedOpen ? 16 : 0,
+        }}
+      >
+        {advancedSettings}
+      </div>
+    </div>
+  );
+}
+
+function OptionImageEditor(
+  props: Readonly<{
+    index: number;
+    imageUrl: string | null;
+    linkDraft: string;
+    onImageFile: (index: number, file: File) => void;
+    onLinkDraftChange: (index: number, value: string) => void;
+    onApplyLink: (index: number) => void;
+    onClearImage: (index: number) => void;
+  }>,
+) {
+  const { index, imageUrl, linkDraft, onImageFile, onLinkDraftChange, onApplyLink, onClearImage } =
+    props;
+  return (
+    <div
+      style={{
+        marginTop: 10,
+        padding: 12,
+        background: theme.surfaceAlt,
+        borderRadius: 12,
+        border: `1px solid rgba(255,255,255,0.04)`,
+      }}
+    >
+      {imageUrl ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <img
+            src={imageUrl}
+            alt=""
+            style={{
+              width: 52,
+              height: 52,
+              objectFit: 'cover',
+              borderRadius: 8,
+              border: '1px solid rgba(255,255,255,0.08)',
+            }}
+          />
+          <span style={{ flex: 1, fontSize: 13, color: theme.textMuted }}>사진 추가됨 🖼️</span>
+          <button
+            type="button"
+            className="pressable"
+            onClick={() => onClearImage(index)}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: theme.danger,
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: 'pointer',
+              padding: 0,
+            }}
+          >
+            삭제
+          </button>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gap: 8 }}>
+          <label
+            className="pressable"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6,
+              padding: '10px',
+              borderRadius: 10,
+              background: 'rgba(255, 255, 255, 0.05)',
+              color: theme.text,
+              fontWeight: 700,
+              fontSize: 13,
+              cursor: 'pointer',
+            }}
+          >
+            <span>📷 사진 올리기</span>
+            <input
+              type="file"
+              accept="image/*"
+              style={{ display: 'none' }}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  onImageFile(index, file);
+                }
+                e.target.value = '';
+              }}
+            />
+          </label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input
+              style={{
+                ...fieldStyle,
+                background: 'rgba(255,255,255,0.02)',
+                border: `1px solid rgba(255,255,255,0.04)`,
+                fontSize: 13,
+              }}
+              value={linkDraft}
+              placeholder="또는 이미지 인터넷 주소(URL)"
+              inputMode="url"
+              aria-label={`선택지 ${index + 1} 이미지 링크`}
+              onChange={(e) => onLinkDraftChange(index, e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  onApplyLink(index);
+                }
+              }}
+            />
+            <button
+              type="button"
+              className="pressable"
+              onClick={() => onApplyLink(index)}
+              style={{
+                flexShrink: 0,
+                padding: '0 14px',
+                borderRadius: 10,
+                background: theme.accentSoft,
+                color: theme.accent,
+                fontWeight: 700,
+                fontSize: 13,
+                border: `1px solid rgba(19,194,163,0.2)`,
+                cursor: 'pointer',
+              }}
+            >
+              추가
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function OptionCard(
+  props: Readonly<{
+    option: OptionDraft;
+    index: number;
+    editorOpen: boolean;
+    canRemove: boolean;
+    linkDraft: string;
+    onTextChange: (index: number, value: string) => void;
+    onToggleEditor: (index: number) => void;
+    onRemove: (index: number) => void;
+    onImageFile: (index: number, file: File) => void;
+    onLinkDraftChange: (index: number, value: string) => void;
+    onApplyLink: (index: number) => void;
+    onClearImage: (index: number) => void;
+  }>,
+) {
+  const {
+    option,
+    index,
+    editorOpen,
+    canRemove,
+    linkDraft,
+    onTextChange,
+    onToggleEditor,
+    onRemove,
+    onImageFile,
+    onLinkDraftChange,
+    onApplyLink,
+    onClearImage,
+  } = props;
+  return (
+    <div
+      style={{
+        background: theme.surface,
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        border: `1px solid ${theme.border}`,
+        boxShadow: '0 4px 16px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.03)',
+        padding: 14,
+        borderRadius: theme.radiusSm,
+      }}
+    >
+      <div style={{ display: 'flex', gap: 8 }}>
+        <input
+          style={{
+            ...fieldStyle,
+            background: 'rgba(255,255,255,0.02)',
+            border: `1px solid rgba(255,255,255,0.04)`,
+          }}
+          value={option.text}
+          maxLength={OPTION_MAX}
+          placeholder={`선택지 ${index + 1} ✏️`}
+          aria-label={`선택지 ${index + 1}`}
+          onChange={(e) => onTextChange(index, e.target.value)}
+        />
+        <button
+          type="button"
+          className="pressable"
+          aria-label={`선택지 ${index + 1} 사진`}
+          aria-pressed={editorOpen}
+          onClick={() => onToggleEditor(index)}
+          style={{
+            ...squareBtnStyle,
+            color: option.imageUrl ? theme.accent : theme.textMuted,
+            border: `1px solid rgba(255,255,255,0.05)`,
+          }}
+        >
+          📷
+        </button>
+        {canRemove ? (
+          <button
+            type="button"
+            className="pressable"
+            aria-label={`선택지 ${index + 1} 삭제`}
+            onClick={() => onRemove(index)}
+            style={{
+              ...squareBtnStyle,
+              color: theme.textMuted,
+              border: `1px solid rgba(255,255,255,0.05)`,
+            }}
+          >
+            ✕
+          </button>
+        ) : null}
+      </div>
+
+      {editorOpen && (
+        <OptionImageEditor
+          index={index}
+          imageUrl={option.imageUrl}
+          linkDraft={linkDraft}
+          onImageFile={onImageFile}
+          onLinkDraftChange={onLinkDraftChange}
+          onApplyLink={onApplyLink}
+          onClearImage={onClearImage}
+        />
+      )}
+    </div>
+  );
+}
+
+function Step2Form(
+  props: Readonly<{
+    question: string;
+    options: OptionDraft[];
+    filledOptionCount: number;
+    openImageIndex: number | null;
+    linkDrafts: Record<number, string>;
+    deadlineSummary: string;
+    onQuestionChange: (value: string) => void;
+    onTextChange: (index: number, value: string) => void;
+    onToggleEditor: (index: number) => void;
+    onRemove: (index: number) => void;
+    onImageFile: (index: number, file: File) => void;
+    onLinkDraftChange: (index: number, value: string) => void;
+    onApplyLink: (index: number) => void;
+    onClearImage: (index: number) => void;
+    onAddOption: () => void;
+    onEditAdvanced: () => void;
+  }>,
+) {
+  const {
+    question,
+    options,
+    filledOptionCount,
+    openImageIndex,
+    linkDrafts,
+    deadlineSummary,
+    onQuestionChange,
+    onTextChange,
+    onToggleEditor,
+    onRemove,
+    onImageFile,
+    onLinkDraftChange,
+    onApplyLink,
+    onClearImage,
+    onAddOption,
+    onEditAdvanced,
+  } = props;
+  return (
+    <div className="rise" key="step2">
+      <p
+        style={{
+          fontSize: 14,
+          color: theme.textMuted,
+          lineHeight: 1.5,
+          margin: '16px 0 12px',
+        }}
+      >
+        친구들이 고를 <strong style={{ color: theme.text }}>선택지</strong>를 채워주세요. 사진을
+        곁들이면 더 즐거워요 📷
+      </p>
+
+      <div style={labelRowStyle}>
+        <label style={labelStyle} htmlFor="poll-question-2">
+          고민 다시 보기 💬
+        </label>
+        <span style={counterStyle}>
+          {question.length}/{QUESTION_MAX}
+        </span>
+      </div>
+      <input
+        id="poll-question-2"
+        style={fieldStyle}
+        value={question}
+        maxLength={QUESTION_MAX}
+        placeholder="어떤 까다로운 고민이 있으신가요? 🤔"
+        aria-label="고민 질문 수정"
+        onChange={(e) => onQuestionChange(e.target.value)}
+      />
+
+      <div style={labelRowStyle}>
+        <span style={labelStyle}>투표지 만들기 🎨</span>
+        <span style={counterStyle}>
+          {filledOptionCount} / 최소 {MIN_OPTIONS}개
+        </span>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {options.map((opt, index) => (
+          <OptionCard
+            key={opt.id}
+            option={opt}
+            index={index}
+            editorOpen={openImageIndex === index || Boolean(opt.imageUrl)}
+            canRemove={options.length > MIN_OPTIONS}
+            linkDraft={linkDrafts[index] ?? ''}
+            onTextChange={onTextChange}
+            onToggleEditor={onToggleEditor}
+            onRemove={onRemove}
+            onImageFile={onImageFile}
+            onLinkDraftChange={onLinkDraftChange}
+            onApplyLink={onApplyLink}
+            onClearImage={onClearImage}
+          />
+        ))}
+      </div>
+
+      {options.length < MAX_OPTIONS ? (
+        <button
+          type="button"
+          className="pressable"
+          onClick={onAddOption}
+          style={{
+            width: '100%',
+            padding: '12px',
+            borderRadius: 16,
+            border: `1.5px dashed ${theme.border}`,
+            background: 'rgba(255,255,255,0.01)',
+            backdropFilter: 'blur(16px)',
+            WebkitBackdropFilter: 'blur(16px)',
+            color: theme.accent,
+            fontWeight: 700,
+            fontSize: 14,
+            cursor: 'pointer',
+            marginTop: 10,
+          }}
+        >
+          + 선택지 추가하기 ✏️
+        </button>
+      ) : null}
+
+      {/* 1단계에서 고급 옵션을 건드리지 않았을 때만, 2단계에서도 빠르게 펼칠 수 있게 안내 */}
+      <button
+        type="button"
+        className="pressable"
+        onClick={onEditAdvanced}
+        style={{
+          width: '100%',
+          marginTop: 18,
+          padding: '12px 16px',
+          borderRadius: theme.radiusSm,
+          border: `1px solid ${theme.border}`,
+          background: 'rgba(255,255,255,0.02)',
+          color: theme.textMuted,
+          fontSize: 13.5,
+          fontWeight: 700,
+          cursor: 'pointer',
+          textAlign: 'left',
+        }}
+      >
+        ⚙️ 마감·결과 공개 <span style={{ color: theme.accent }}>{deadlineSummary}</span>{' '}
+        <span style={{ color: theme.textFaint, fontWeight: 600 }}>· 바꾸기</span>
+      </button>
+    </div>
+  );
+}
+
+function SubmitBar(
+  props: Readonly<{
+    step: 1 | 2;
+    question: string;
+    canSubmit: boolean;
+    isLoading: boolean;
+    onNext: () => void;
+    onPrev: () => void;
+    onSubmit: () => void;
+  }>,
+) {
+  const { step, question, canSubmit, isLoading, onNext, onPrev, onSubmit } = props;
+  return (
+    <div style={stickyActionBar}>
+      <div style={{ maxWidth: 520, margin: '0 auto', display: 'flex', gap: 10 }}>
+        {step === 1 ? (
+          <Button
+            style={{
+              width: '100%',
+              borderRadius: 16,
+              boxShadow: '0 8px 24px rgba(19, 194, 163, 0.25)',
+            }}
+            disabled={question.trim().length < 2}
+            onClick={onNext}
+          >
+            다음 단계로 ➔
+          </Button>
+        ) : (
+          <>
+            <Button variant="weak" style={{ flex: 1, borderRadius: 16 }} onClick={onPrev}>
+              이전 단계 👈
+            </Button>
+            <Button
+              style={{
+                flex: 2,
+                borderRadius: 16,
+                boxShadow: '0 8px 24px rgba(19, 194, 163, 0.25)',
+              }}
+              loading={isLoading}
+              disabled={!canSubmit}
+              onClick={onSubmit}
+            >
+              친구들에게 물어보기! 🚀
+            </Button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export function CreatePollPage() {
   const navigate = useNavigate();
@@ -234,70 +937,47 @@ export function CreatePollPage() {
     }
   };
 
-  const advancedSettings = (
-    <>
-      <div style={{ ...labelRowStyle, marginTop: 0 }}>
-        <span style={labelStyle}>언제 마감할까요? ⏰</span>
-        {deadlinePreview ? (
-          <Chip tone={isDeadlinePast ? 'danger' : 'gold'}>
-            {isDeadlinePast ? '⚠ 지난 시각이에요' : `~ ${deadlinePreview}`}
-          </Chip>
-        ) : null}
-      </div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-        {DEADLINE_PRESETS.map((preset) => {
-          const active = preset.value === deadlinePreset;
-          return (
-            <button
-              key={preset.value}
-              type="button"
-              className="pressable"
-              aria-pressed={active}
-              onClick={() => selectDeadlinePreset(preset.value)}
-              style={{
-                minHeight: 40,
-                padding: '8px 16px',
-                borderRadius: theme.radiusPill,
-                border: `1px solid ${active ? 'rgba(19,194,163,0.3)' : 'rgba(255,255,255,0.04)'}`,
-                background: active ? theme.accentSoft : 'rgba(255,255,255,0.02)',
-                backdropFilter: 'blur(16px)',
-                WebkitBackdropFilter: 'blur(16px)',
-                color: active ? theme.accent : theme.textMuted,
-                fontSize: 13.5,
-                fontWeight: 700,
-                cursor: 'pointer',
-                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.01)',
-              }}
-            >
-              {preset.label}
-            </button>
-          );
-        })}
-      </div>
-      {deadlinePreset === 'custom' ? (
-        <input
-          type="datetime-local"
-          value={customDeadline}
-          min={minCustom}
-          onChange={(e) => handleCustomDeadlineChange(e.target.value)}
-          style={{ ...fieldStyle, marginTop: 10, colorScheme: 'dark' }}
-          aria-label="마감 시간 직접 선택"
-        />
-      ) : null}
+  const resultVisibilityLabel = resultsVisibility === 'always' ? '항상 공개' : '투표하고 보기';
+  const deadlineSummary = endsAtIso ? `~ ${deadlinePreview}` : resultVisibilityLabel;
 
-      <span style={{ ...labelStyle, display: 'block', margin: '24px 0 8px' }}>
-        결과는 언제 보여줄까요? 👀
-      </span>
-      <SegmentedControl
-        ariaLabel="결과 공개 시점"
-        options={RESULT_OPTIONS}
-        value={resultsVisibility}
-        onChange={setResultsVisibility}
-      />
-      <p style={{ fontSize: 13, color: theme.textFaint, marginTop: 8, marginLeft: 2 }}>
-        투표 후 바로 확인하거나 언제든 공개할 수 있어요
-      </p>
-    </>
+  const toggleCategory = (id: string) => {
+    hapticFeedback('tickWeak');
+    setCategoryId((prev) => (prev === id ? null : id));
+  };
+  const toggleAdvanced = () => {
+    hapticFeedback('tickWeak');
+    setAdvancedOpen((prev) => !prev);
+  };
+  const toggleImageEditor = (index: number) =>
+    setOpenImageIndex((prev) => (prev === index ? null : index));
+  const changeLinkDraft = (index: number, value: string) =>
+    setLinkDrafts((prev) => ({ ...prev, [index]: value }));
+  const editAdvancedFromStep2 = () => {
+    hapticFeedback('tickWeak');
+    setStep(1);
+    setAdvancedOpen(true);
+  };
+  const goNext = () => {
+    hapticFeedback('tap');
+    setStep(2);
+  };
+  const goPrev = () => {
+    hapticFeedback('tap');
+    setStep(1);
+  };
+
+  const advancedSettings = (
+    <AdvancedSettings
+      deadlinePreset={deadlinePreset}
+      deadlinePreview={deadlinePreview}
+      isDeadlinePast={isDeadlinePast}
+      customDeadline={customDeadline}
+      minCustom={minCustom}
+      resultsVisibility={resultsVisibility}
+      onSelectPreset={selectDeadlinePreset}
+      onCustomDeadlineChange={handleCustomDeadlineChange}
+      onResultsVisibilityChange={setResultsVisibility}
+    />
   );
 
   return (
@@ -321,440 +1001,36 @@ export function CreatePollPage() {
 
       <div style={{ maxWidth: 520, margin: '0 auto', padding: '0 20px 140px' }}>
         {step === 1 ? (
-          <div className="rise" key="step1">
-            <p
-              style={{
-                fontSize: 14,
-                color: theme.textMuted,
-                lineHeight: 1.5,
-                margin: '16px 0 4px',
-              }}
-            >
-              먼저 <strong style={{ color: theme.text }}>고민거리</strong>만 적어주세요. 선택지는
-              다음 단계에서 채워요 🥑
-            </p>
-            <div style={labelRowStyle}>
-              <label style={labelStyle} htmlFor="poll-question">
-                풀고 싶은 고민 💬
-              </label>
-              <span style={counterStyle}>
-                {question.length}/{QUESTION_MAX}
-              </span>
-            </div>
-            <input
-              id="poll-question"
-              style={fieldStyle}
-              value={question}
-              maxLength={QUESTION_MAX}
-              placeholder="어떤 까다로운 고민이 있으신가요? 🤔"
-              onChange={(e) => setQuestion(e.target.value)}
-            />
-
-            <div style={labelRowStyle}>
-              <label style={labelStyle} htmlFor="poll-desc">
-                상세 설명 💡
-              </label>
-              <span style={counterStyle}>
-                {description.length}/{DESC_MAX}
-              </span>
-            </div>
-            <textarea
-              id="poll-desc"
-              style={{ ...fieldStyle, minHeight: 120, resize: 'vertical' }}
-              value={description}
-              maxLength={DESC_MAX}
-              placeholder="친구들이 더 잘 고를 수 있게 힌트를 주세요! (선택) 💡"
-              onChange={(e) => setDescription(e.target.value)}
-            />
-
-            <span style={{ ...labelStyle, margin: '20px 0 8px' }}>어떤 고민인가요? 🏷️ (선택)</span>
-            <div
-              role="group"
-              aria-label="고민 카테고리 선택"
-              style={{
-                display: 'flex',
-                gap: 8,
-                overflowX: 'auto',
-                paddingBottom: 4,
-                WebkitOverflowScrolling: 'touch',
-                scrollbarWidth: 'none',
-              }}
-            >
-              {POLL_CATEGORIES.map((category) => {
-                const active = categoryId === category.id;
-                return (
-                  <button
-                    key={category.id}
-                    type="button"
-                    className="pressable"
-                    aria-pressed={active}
-                    onClick={() => {
-                      hapticFeedback('tickWeak');
-                      setCategoryId((prev) => (prev === category.id ? null : category.id));
-                    }}
-                    style={{
-                      flexShrink: 0,
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 6,
-                      minHeight: 40,
-                      padding: '8px 16px',
-                      borderRadius: theme.radiusPill,
-                      border: `1px solid ${active ? category.color : 'rgba(255,255,255,0.04)'}`,
-                      background: active ? `${category.color}26` : 'rgba(255,255,255,0.02)',
-                      color: active ? category.color : theme.textMuted,
-                      fontSize: 13.5,
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    <span aria-hidden>{category.emoji}</span>
-                    {category.label}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* 접이식 고급 옵션 — 마감/결과공개를 1단계에서 미리 정해 단계 왕복을 줄여요 */}
-            <button
-              type="button"
-              className="pressable"
-              aria-expanded={advancedOpen}
-              onClick={() => {
-                hapticFeedback('tickWeak');
-                setAdvancedOpen((prev) => !prev);
-              }}
-              style={{
-                width: '100%',
-                marginTop: 28,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: 8,
-                padding: '14px 16px',
-                borderRadius: theme.radiusSm,
-                border: `1px solid ${theme.border}`,
-                background: 'rgba(255,255,255,0.02)',
-                color: theme.text,
-                fontSize: 14,
-                fontWeight: 700,
-                cursor: 'pointer',
-              }}
-            >
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                ⚙️ 마감·결과 공개 설정
-                <span style={{ fontSize: 12.5, fontWeight: 600, color: theme.textFaint }}>
-                  {advancedOpen ? '' : '(선택)'}
-                </span>
-              </span>
-              <span
-                aria-hidden
-                style={{
-                  fontSize: 13,
-                  color: theme.textMuted,
-                  transition: 'transform 0.25s ease',
-                  transform: advancedOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-                }}
-              >
-                ▾
-              </span>
-            </button>
-            <div
-              className="disclosure-enter"
-              style={{
-                maxHeight: advancedOpen ? 520 : 0,
-                opacity: advancedOpen ? 1 : 0,
-                overflow: 'hidden',
-                marginTop: advancedOpen ? 16 : 0,
-              }}
-            >
-              {advancedSettings}
-            </div>
-          </div>
+          <Step1Form
+            question={question}
+            description={description}
+            categoryId={categoryId}
+            advancedOpen={advancedOpen}
+            advancedSettings={advancedSettings}
+            onQuestionChange={setQuestion}
+            onDescriptionChange={setDescription}
+            onToggleCategory={toggleCategory}
+            onToggleAdvanced={toggleAdvanced}
+          />
         ) : (
-          <div className="rise" key="step2">
-            <p
-              style={{
-                fontSize: 14,
-                color: theme.textMuted,
-                lineHeight: 1.5,
-                margin: '16px 0 12px',
-              }}
-            >
-              친구들이 고를 <strong style={{ color: theme.text }}>선택지</strong>를 채워주세요.
-              사진을 곁들이면 더 즐거워요 📷
-            </p>
-
-            <div style={labelRowStyle}>
-              <label style={labelStyle} htmlFor="poll-question-2">
-                고민 다시 보기 💬
-              </label>
-              <span style={counterStyle}>
-                {question.length}/{QUESTION_MAX}
-              </span>
-            </div>
-            <input
-              id="poll-question-2"
-              style={fieldStyle}
-              value={question}
-              maxLength={QUESTION_MAX}
-              placeholder="어떤 까다로운 고민이 있으신가요? 🤔"
-              aria-label="고민 질문 수정"
-              onChange={(e) => setQuestion(e.target.value)}
-            />
-
-            <div style={labelRowStyle}>
-              <span style={labelStyle}>투표지 만들기 🎨</span>
-              <span style={counterStyle}>
-                {filledOptions.length} / 최소 {MIN_OPTIONS}개
-              </span>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {options.map((opt, index) => {
-                const editorOpen = openImageIndex === index || Boolean(opt.imageUrl);
-                return (
-                  <div
-                    key={index}
-                    style={{
-                      background: theme.surface,
-                      backdropFilter: 'blur(20px)',
-                      WebkitBackdropFilter: 'blur(20px)',
-                      border: `1px solid ${theme.border}`,
-                      boxShadow:
-                        '0 4px 16px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.03)',
-                      padding: 14,
-                      borderRadius: theme.radiusSm,
-                    }}
-                  >
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <input
-                        style={{
-                          ...fieldStyle,
-                          background: 'rgba(255,255,255,0.02)',
-                          border: `1px solid rgba(255,255,255,0.04)`,
-                        }}
-                        value={opt.text}
-                        maxLength={OPTION_MAX}
-                        placeholder={`선택지 ${index + 1} ✏️`}
-                        aria-label={`선택지 ${index + 1}`}
-                        onChange={(e) => updateOptionText(index, e.target.value)}
-                      />
-                      <button
-                        type="button"
-                        className="pressable"
-                        aria-label={`선택지 ${index + 1} 사진`}
-                        aria-pressed={editorOpen}
-                        onClick={() => setOpenImageIndex((prev) => (prev === index ? null : index))}
-                        style={{
-                          ...squareBtnStyle,
-                          color: opt.imageUrl ? theme.accent : theme.textMuted,
-                          border: `1px solid rgba(255,255,255,0.05)`,
-                        }}
-                      >
-                        📷
-                      </button>
-                      {options.length > MIN_OPTIONS ? (
-                        <button
-                          type="button"
-                          className="pressable"
-                          aria-label={`선택지 ${index + 1} 삭제`}
-                          onClick={() => removeOption(index)}
-                          style={{
-                            ...squareBtnStyle,
-                            color: theme.textMuted,
-                            border: `1px solid rgba(255,255,255,0.05)`,
-                          }}
-                        >
-                          ✕
-                        </button>
-                      ) : null}
-                    </div>
-
-                    {editorOpen && (
-                      <div
-                        style={{
-                          marginTop: 10,
-                          padding: 12,
-                          background: theme.surfaceAlt,
-                          borderRadius: 12,
-                          border: `1px solid rgba(255,255,255,0.04)`,
-                        }}
-                      >
-                        {opt.imageUrl ? (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                            <img
-                              src={opt.imageUrl}
-                              alt=""
-                              style={{
-                                width: 52,
-                                height: 52,
-                                objectFit: 'cover',
-                                borderRadius: 8,
-                                border: '1px solid rgba(255,255,255,0.08)',
-                              }}
-                            />
-                            <span style={{ flex: 1, fontSize: 13, color: theme.textMuted }}>
-                              사진 추가됨 🖼️
-                            </span>
-                            <button
-                              type="button"
-                              className="pressable"
-                              onClick={() => setOptionImage(index, null)}
-                              style={{
-                                background: 'none',
-                                border: 'none',
-                                color: theme.danger,
-                                fontSize: 13,
-                                fontWeight: 700,
-                                cursor: 'pointer',
-                                padding: 0,
-                              }}
-                            >
-                              삭제
-                            </button>
-                          </div>
-                        ) : (
-                          <div style={{ display: 'grid', gap: 8 }}>
-                            <label
-                              className="pressable"
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: 6,
-                                padding: '10px',
-                                borderRadius: 10,
-                                background: 'rgba(255, 255, 255, 0.05)',
-                                color: theme.text,
-                                fontWeight: 700,
-                                fontSize: 13,
-                                cursor: 'pointer',
-                              }}
-                            >
-                              <span>📷 사진 올리기</span>
-                              <input
-                                type="file"
-                                accept="image/*"
-                                style={{ display: 'none' }}
-                                onChange={(e) => {
-                                  const file = e.target.files?.[0];
-                                  if (file) {
-                                    void handleImageFile(index, file);
-                                  }
-                                  e.target.value = '';
-                                }}
-                              />
-                            </label>
-                            <div style={{ display: 'flex', gap: 8 }}>
-                              <input
-                                style={{
-                                  ...fieldStyle,
-                                  background: 'rgba(255,255,255,0.02)',
-                                  border: `1px solid rgba(255,255,255,0.04)`,
-                                  fontSize: 13,
-                                }}
-                                value={linkDrafts[index] ?? ''}
-                                placeholder="또는 이미지 인터넷 주소(URL)"
-                                inputMode="url"
-                                aria-label={`선택지 ${index + 1} 이미지 링크`}
-                                onChange={(e) =>
-                                  setLinkDrafts((prev) => ({ ...prev, [index]: e.target.value }))
-                                }
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                    e.preventDefault();
-                                    applyImageLink(index);
-                                  }
-                                }}
-                              />
-                              <button
-                                type="button"
-                                className="pressable"
-                                onClick={() => applyImageLink(index)}
-                                style={{
-                                  flexShrink: 0,
-                                  padding: '0 14px',
-                                  borderRadius: 10,
-                                  background: theme.accentSoft,
-                                  color: theme.accent,
-                                  fontWeight: 700,
-                                  fontSize: 13,
-                                  border: `1px solid rgba(19,194,163,0.2)`,
-                                  cursor: 'pointer',
-                                }}
-                              >
-                                추가
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            {options.length < MAX_OPTIONS ? (
-              <button
-                type="button"
-                className="pressable"
-                onClick={addOption}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  borderRadius: 16,
-                  border: `1.5px dashed ${theme.border}`,
-                  background: 'rgba(255,255,255,0.01)',
-                  backdropFilter: 'blur(16px)',
-                  WebkitBackdropFilter: 'blur(16px)',
-                  color: theme.accent,
-                  fontWeight: 700,
-                  fontSize: 14,
-                  cursor: 'pointer',
-                  marginTop: 10,
-                }}
-              >
-                + 선택지 추가하기 ✏️
-              </button>
-            ) : null}
-
-            {/* 1단계에서 고급 옵션을 건드리지 않았을 때만, 2단계에서도 빠르게 펼칠 수 있게 안내 */}
-            <button
-              type="button"
-              className="pressable"
-              onClick={() => {
-                hapticFeedback('tickWeak');
-                setStep(1);
-                setAdvancedOpen(true);
-              }}
-              style={{
-                width: '100%',
-                marginTop: 18,
-                padding: '12px 16px',
-                borderRadius: theme.radiusSm,
-                border: `1px solid ${theme.border}`,
-                background: 'rgba(255,255,255,0.02)',
-                color: theme.textMuted,
-                fontSize: 13.5,
-                fontWeight: 700,
-                cursor: 'pointer',
-                textAlign: 'left',
-              }}
-            >
-              ⚙️ 마감·결과 공개{' '}
-              <span style={{ color: theme.accent }}>
-                {endsAtIso
-                  ? `~ ${deadlinePreview}`
-                  : resultsVisibility === 'always'
-                    ? '항상 공개'
-                    : '투표하고 보기'}
-              </span>{' '}
-              <span style={{ color: theme.textFaint, fontWeight: 600 }}>· 바꾸기</span>
-            </button>
-          </div>
+          <Step2Form
+            question={question}
+            options={options}
+            filledOptionCount={filledOptions.length}
+            openImageIndex={openImageIndex}
+            linkDrafts={linkDrafts}
+            deadlineSummary={deadlineSummary}
+            onQuestionChange={setQuestion}
+            onTextChange={updateOptionText}
+            onToggleEditor={toggleImageEditor}
+            onRemove={removeOption}
+            onImageFile={(index, file) => void handleImageFile(index, file)}
+            onLinkDraftChange={changeLinkDraft}
+            onApplyLink={applyImageLink}
+            onClearImage={(index) => setOptionImage(index, null)}
+            onAddOption={addOption}
+            onEditAdvanced={editAdvancedFromStep2}
+          />
         )}
 
         {error ? (
@@ -764,51 +1040,15 @@ export function CreatePollPage() {
         ) : null}
       </div>
 
-      <div style={stickyActionBar}>
-        <div style={{ maxWidth: 520, margin: '0 auto', display: 'flex', gap: 10 }}>
-          {step === 1 ? (
-            <Button
-              style={{
-                width: '100%',
-                borderRadius: 16,
-                boxShadow: '0 8px 24px rgba(19, 194, 163, 0.25)',
-              }}
-              disabled={question.trim().length < 2}
-              onClick={() => {
-                hapticFeedback('tap');
-                setStep(2);
-              }}
-            >
-              다음 단계로 ➔
-            </Button>
-          ) : (
-            <>
-              <Button
-                variant="weak"
-                style={{ flex: 1, borderRadius: 16 }}
-                onClick={() => {
-                  hapticFeedback('tap');
-                  setStep(1);
-                }}
-              >
-                이전 단계 👈
-              </Button>
-              <Button
-                style={{
-                  flex: 2,
-                  borderRadius: 16,
-                  boxShadow: '0 8px 24px rgba(19, 194, 163, 0.25)',
-                }}
-                loading={isLoading}
-                disabled={!canSubmit}
-                onClick={handleSubmit}
-              >
-                친구들에게 물어보기! 🚀
-              </Button>
-            </>
-          )}
-        </div>
-      </div>
+      <SubmitBar
+        step={step}
+        question={question}
+        canSubmit={canSubmit}
+        isLoading={isLoading}
+        onNext={goNext}
+        onPrev={goPrev}
+        onSubmit={handleSubmit}
+      />
     </div>
   );
 }

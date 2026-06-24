@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 
 const prefersReducedMotion = () =>
-  typeof window !== 'undefined' &&
-  typeof window.matchMedia === 'function' &&
-  window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  typeof globalThis.window !== 'undefined' &&
+  typeof globalThis.matchMedia === 'function' &&
+  globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 // ease-out-expo — matches the design system's confident deceleration curve.
 const easeOutExpo = (t: number) => (t === 1 ? 1 : 1 - Math.pow(2, -10 * t));

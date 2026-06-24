@@ -24,8 +24,8 @@ const maybeRequestReview = () => {
     return;
   }
   localStorage.setItem(REVIEW_ASKED_KEY, '1');
-  window.setTimeout(() => {
-    void requestAppReview();
+  globalThis.setTimeout(() => {
+    requestAppReview().catch(() => {});
   }, 1200);
 };
 
@@ -44,7 +44,7 @@ export function PollDetailPage() {
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
-    void fetchPoll(id);
+    fetchPoll(id).catch(() => {});
   }, [id, fetchPoll]);
 
   useEffect(() => {
@@ -69,10 +69,10 @@ export function PollDetailPage() {
     }
   }, [poll, id, votedOptionId]);
 
-  const displayOptions = useMemo<PollOption[]>(
-    () => (poll ? (showResults ? optionsByVotes(poll) : poll.options) : []),
-    [poll, showResults],
-  );
+  const displayOptions = useMemo<PollOption[]>(() => {
+    if (!poll) return [];
+    return showResults ? optionsByVotes(poll) : poll.options;
+  }, [poll, showResults]);
   const winnerId = useMemo(() => {
     if (!poll || !showResults || poll.totalVotes === 0) return null;
     const top = optionsByVotes(poll)[0];
@@ -105,10 +105,10 @@ export function PollDetailPage() {
       setVotedOptionId(selectedOptionId);
       setComment('');
       hapticFeedback('success');
-      window.setTimeout(() => hapticFeedback('confetti'), 90);
+      globalThis.setTimeout(() => hapticFeedback('confetti'), 90);
 
       // 하단 투표 버튼 위치 근처에서 꽃가루 뿜어져 나오는 극적인 연출
-      triggerParticleBurst(window.innerWidth / 2, window.innerHeight - 80, {
+      triggerParticleBurst(globalThis.innerWidth / 2, globalThis.innerHeight - 80, {
         count: 45,
         charSet: ['🥑', '✨', '✦', '🌟', '💖', '🎉', '💚', '💛', '🌸'],
         speedMultiplier: 1.4,
@@ -148,7 +148,7 @@ export function PollDetailPage() {
     if (!confirmDelete) {
       setConfirmDelete(true);
       hapticFeedback('tickWeak');
-      window.setTimeout(() => setConfirmDelete(false), 3000);
+      globalThis.setTimeout(() => setConfirmDelete(false), 3000);
       return;
     }
     const ok = await deletePoll(poll.id);
@@ -219,7 +219,7 @@ export function PollDetailPage() {
   );
 }
 
-function CenterMessage({ children }: { children: React.ReactNode }) {
+function CenterMessage({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <div
       style={{

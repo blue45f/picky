@@ -5,35 +5,35 @@ const CACHE = 'pickflow-static-v1';
 const APP_SHELL = '/';
 const PRECACHE = ['/', '/manifest.webmanifest', '/pwa-192.png', '/pwa-512.png', '/og-default.svg'];
 
-self.addEventListener('install', (event) => {
+globalThis.addEventListener('install', (event) => {
   event.waitUntil(
     caches
       .open(CACHE)
       .then((cache) => cache.addAll(PRECACHE))
       .catch(() => undefined)
-      .then(() => self.skipWaiting()),
+      .then(() => globalThis.skipWaiting()),
   );
 });
 
-self.addEventListener('activate', (event) => {
+globalThis.addEventListener('activate', (event) => {
   event.waitUntil(
     caches
       .keys()
       .then((keys) =>
         Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key))),
       )
-      .then(() => self.clients.claim()),
+      .then(() => globalThis.clients.claim()),
   );
 });
 
-self.addEventListener('fetch', (event) => {
+globalThis.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET') {
     return;
   }
 
   const url = new URL(request.url);
-  if (url.origin !== self.location.origin) {
+  if (url.origin !== globalThis.location.origin) {
     return;
   }
   // API와 서버 렌더 OG 페이지는 항상 네트워크에서 (캐시 금지)

@@ -2,9 +2,9 @@ import React, { useEffect, useRef, useState } from 'react';
 
 // 파티클 연출용 난수 — crypto.getRandomValues로 S2245(PRNG) 룰을 충족하고, 미지원 환경에서만 폴백해요.
 const secureRandom = () => {
-  if (typeof window !== 'undefined' && window.crypto) {
+  if (typeof globalThis.window !== 'undefined' && globalThis.crypto) {
     const array = new Uint32Array(1);
-    window.crypto.getRandomValues(array);
+    globalThis.crypto.getRandomValues(array);
     return (array[0] ?? 0) / 4294967296; // 2^32 → [0, 1)
   }
   return 0.5;
@@ -12,7 +12,7 @@ const secureRandom = () => {
 
 export const IntroSplashScreen: React.FC = () => {
   const [isVisible, setIsVisible] = useState(() => {
-    if (typeof window !== 'undefined') {
+    if (typeof globalThis.window !== 'undefined') {
       return !sessionStorage.getItem('has-seen-picky-intro');
     }
     return true;
@@ -43,16 +43,16 @@ export const IntroSplashScreen: React.FC = () => {
     if (!ctx) return;
 
     let animationFrameId: number;
-    let width = (canvas.width = window.innerWidth);
-    let height = (canvas.height = window.innerHeight);
+    let width = (canvas.width = globalThis.innerWidth);
+    let height = (canvas.height = globalThis.innerHeight);
 
     const handleResize = () => {
       if (!canvas) return;
-      width = canvas.width = window.innerWidth;
-      height = canvas.height = window.innerHeight;
+      width = canvas.width = globalThis.innerWidth;
+      height = canvas.height = globalThis.innerHeight;
     };
 
-    window.addEventListener('resize', handleResize);
+    globalThis.addEventListener('resize', handleResize);
 
     const particles: Array<{
       x: number;
@@ -202,7 +202,7 @@ export const IntroSplashScreen: React.FC = () => {
       cancelAnimationFrame(animationFrameId);
       clearTimeout(extra);
       clearTimeout(extra2);
-      window.removeEventListener('resize', handleResize);
+      globalThis.removeEventListener('resize', handleResize);
     };
   }, [isVisible]);
 

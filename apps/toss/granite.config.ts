@@ -7,7 +7,7 @@ export default defineConfig({
   brand: {
     displayName: '픽플로우', // 콘솔에 등록한 한글 앱 이름
     primaryColor: '#13C2A3', // 픽플로우 브랜드 에메랄드 액센트
-    // TODO: 콘솔 > 앱 정보에서 업로드한 로고 이미지 URL(우클릭 → 링크 복사)로 교체하세요.
+    // 브랜드 로고. 콘솔에 등록한 앱 아이콘과 동일한 공개 이미지 URL을 사용해요.
     icon: 'https://picky-olive.vercel.app/og-default.png',
   },
   web: {

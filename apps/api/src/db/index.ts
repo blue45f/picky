@@ -1,7 +1,7 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
-import { existsSync } from 'fs';
-import * as path from 'path';
+import { existsSync } from 'node:fs';
+import * as path from 'node:path';
 import * as schema from './schema';
 
 // Local development: load environment variables from .env or .env.local if not already set.

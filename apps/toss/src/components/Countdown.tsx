@@ -17,15 +17,15 @@ export function useCountdown(endsAt: string | null | undefined): number | null {
       return;
     }
 
-    const timer = window.setInterval(() => {
+    const timer = globalThis.setInterval(() => {
       const next = getRemainingMs(endsAt);
       setRemaining(next);
       if (next != null && next <= 0) {
-        window.clearInterval(timer);
+        globalThis.clearInterval(timer);
       }
     }, 1000);
 
-    return () => window.clearInterval(timer);
+    return () => globalThis.clearInterval(timer);
   }, [endsAt]);
 
   return remaining;
@@ -35,7 +35,7 @@ export function useCountdown(endsAt: string | null | undefined): number | null {
  * 마감 카운트다운 배지. 부모가 틱하는 `remaining`을 받아 표시만 해요(자체 타이머 없음).
  * 마감 없음/경과 시 null을 반환하므로 '진행중/마감' 상태 배지와 모순되지 않아요.
  */
-export function CountdownChip({ remaining }: { remaining: number | null }) {
+export function CountdownChip({ remaining }: Readonly<{ remaining: number | null }>) {
   if (remaining == null || remaining <= 0) {
     return null;
   }

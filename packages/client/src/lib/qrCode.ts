@@ -282,6 +282,53 @@ const shouldMask = (x: number, y: number) => {
   return (x + y) % 2 === 0;
 };
 
+const placeCodewordColumnPair = (
+  moduleRow: boolean[],
+  functionRow: boolean[],
+  codewords: number[],
+  right: number,
+  y: number,
+  startBitIndex: number,
+): number => {
+  let bitIndex = startBitIndex;
+  for (let column = 0; column < 2; column += 1) {
+    const x = right - column;
+    if (functionRow[x]) {
+      continue;
+    }
+
+    const codeword = codewords[bitIndex >>> 3] || 0;
+    let isBlack = ((codeword >>> (7 - (bitIndex & 7))) & 1) !== 0;
+    if (shouldMask(x, y)) {
+      isBlack = !isBlack;
+    }
+    moduleRow[x] = isBlack;
+    bitIndex += 1;
+  }
+  return bitIndex;
+};
+
+const drawCodewordColumn = (
+  matrix: QrMatrix,
+  codewords: number[],
+  right: number,
+  startBitIndex: number,
+): number => {
+  let bitIndex = startBitIndex;
+  for (let vertical = 0; vertical < QR_SIZE; vertical += 1) {
+    const upward = ((right + 1) & 2) === 0;
+    const y = upward ? QR_SIZE - 1 - vertical : vertical;
+    const moduleRow = matrix.modules[y];
+    const functionRow = matrix.isFunction[y];
+    if (!moduleRow || !functionRow) {
+      continue;
+    }
+
+    bitIndex = placeCodewordColumnPair(moduleRow, functionRow, codewords, right, y, bitIndex);
+  }
+  return bitIndex;
+};
+
 const drawCodewords = (matrix: QrMatrix, codewords: number[]) => {
   let bitIndex = 0;
 
@@ -290,30 +337,7 @@ const drawCodewords = (matrix: QrMatrix, codewords: number[]) => {
       right -= 1;
     }
 
-    for (let vertical = 0; vertical < QR_SIZE; vertical += 1) {
-      const upward = ((right + 1) & 2) === 0;
-      const y = upward ? QR_SIZE - 1 - vertical : vertical;
-      const moduleRow = matrix.modules[y];
-      const functionRow = matrix.isFunction[y];
-      if (!moduleRow || !functionRow) {
-        continue;
-      }
-
-      for (let column = 0; column < 2; column += 1) {
-        const x = right - column;
-        if (functionRow[x]) {
-          continue;
-        }
-
-        const codeword = codewords[bitIndex >>> 3] || 0;
-        let isBlack = ((codeword >>> (7 - (bitIndex & 7))) & 1) !== 0;
-        if (shouldMask(x, y)) {
-          isBlack = !isBlack;
-        }
-        moduleRow[x] = isBlack;
-        bitIndex += 1;
-      }
-    }
+    bitIndex = drawCodewordColumn(matrix, codewords, right, bitIndex);
   }
 };
 

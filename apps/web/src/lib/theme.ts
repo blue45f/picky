@@ -7,7 +7,7 @@ const THEME_COLOR: Record<Theme, string> = { dark: '#061411', light: '#f4f7f7' }
 
 function applyTheme(theme: Theme) {
   if (typeof document === 'undefined') return;
-  document.documentElement.setAttribute('data-theme', theme);
+  document.documentElement.dataset.theme = theme;
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute('content', THEME_COLOR[theme]);
 }

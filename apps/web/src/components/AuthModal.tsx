@@ -2,12 +2,12 @@ import React, { useEffect, useRef, useState } from 'react';
 import { X, Mail, Lock, User, LogIn, UserPlus, UserCog, AlertCircle } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 
-interface AuthModalProps {
+type AuthModalProps = Readonly<{
   isOpen: boolean;
   onClose: () => void;
   initialMode?: AuthMode;
   subTitle?: string;
-}
+}>;
 
 export type AuthMode = 'login' | 'register' | 'guest';
 
@@ -22,6 +22,187 @@ const isValidEmail = (value: string): boolean => {
   const dotIndex = value.lastIndexOf('.');
   return atIndex > 0 && dotIndex > atIndex + 1 && dotIndex < value.length - 1;
 };
+
+const validateNickname = (trimmedNickname: string): string | null => {
+  if (!trimmedNickname) {
+    return '닉네임은 필수입니다.';
+  }
+  if (trimmedNickname.length < 2 || trimmedNickname.length > 20) {
+    return '닉네임은 2자 이상 20자 이하로 입력해 주세요.';
+  }
+  return null;
+};
+
+const validateCredentials = (trimmedEmail: string, trimmedPassword: string): string | null => {
+  if (!trimmedEmail) {
+    return '이메일은 필수입니다.';
+  }
+  if (!isValidEmail(trimmedEmail)) {
+    return '올바른 이메일 형식을 입력해 주세요.';
+  }
+  if (trimmedPassword.length < 6) {
+    return '비밀번호는 6자 이상이어야 합니다.';
+  }
+  return null;
+};
+
+const getModalTitle = (mode: AuthMode): string => {
+  if (mode === 'login') {
+    return '피키가 기다렸어요! 🥑';
+  }
+  if (mode === 'register') {
+    return '픽플로우 회원가입';
+  }
+  return '비회원 빠른 시작';
+};
+
+const getDefaultSubTitle = (mode: AuthMode): string => {
+  if (mode === 'login') {
+    return '고민을 올리고 SNS 투표 링크를 발급받으세요';
+  }
+  if (mode === 'register') {
+    return '가입하면 만든 고민과 투표 결과를 한곳에 모아둘 수 있어요';
+  }
+  return '닉네임만으로 바로 이용을 시작하세요';
+};
+
+function SubmitLabel({ mode, isLoading }: Readonly<{ mode: AuthMode; isLoading: boolean }>) {
+  if (isLoading) {
+    return <>처리 중...</>;
+  }
+  if (mode === 'login') {
+    return (
+      <>
+        <LogIn size={16} />
+        <span>로그인하기</span>
+      </>
+    );
+  }
+  if (mode === 'register') {
+    return (
+      <>
+        <UserPlus size={16} />
+        <span>회원가입 완료</span>
+      </>
+    );
+  }
+  return (
+    <>
+      <UserCog size={16} />
+      <span>비회원으로 시작</span>
+    </>
+  );
+}
+
+const fieldErrorStyle = {
+  color: 'var(--brand-accent-coral)',
+  margin: '0.25rem 0 0',
+  fontSize: '0.72rem',
+} as const;
+
+const fieldIconStyle = {
+  position: 'absolute',
+  left: '12px',
+  top: '50%',
+  transform: 'translateY(-50%)',
+  color: 'var(--text-muted)',
+} as const;
+
+const fieldLabelStyle = {
+  fontSize: '0.75rem',
+  fontWeight: 700,
+  color: 'var(--text-secondary)',
+} as const;
+
+function NicknameField({
+  nickname,
+  fieldError,
+  onChange,
+}: Readonly<{
+  nickname: string;
+  fieldError?: string;
+  onChange: (value: string) => void;
+}>) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+      <label htmlFor="auth-modal-nickname" style={fieldLabelStyle}>
+        닉네임
+      </label>
+      <div style={{ position: 'relative' }}>
+        <User size={16} style={fieldIconStyle} />
+        <input
+          id="auth-modal-nickname"
+          type="text"
+          placeholder="2자 이상 20자 이하"
+          value={nickname}
+          onChange={(e) => onChange(e.target.value)}
+          maxLength={20}
+          className="form-input"
+          style={{ paddingLeft: '36px' }}
+        />
+        {fieldError ? <p style={fieldErrorStyle}>{fieldError}</p> : null}
+      </div>
+    </div>
+  );
+}
+
+function CredentialFields({
+  email,
+  password,
+  emailError,
+  passwordError,
+  onEmailChange,
+  onPasswordChange,
+}: Readonly<{
+  email: string;
+  password: string;
+  emailError?: string;
+  passwordError?: string;
+  onEmailChange: (value: string) => void;
+  onPasswordChange: (value: string) => void;
+}>) {
+  return (
+    <>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        <label htmlFor="auth-modal-email" style={fieldLabelStyle}>
+          이메일 주소
+        </label>
+        <div style={{ position: 'relative' }}>
+          <Mail size={16} style={fieldIconStyle} />
+          <input
+            id="auth-modal-email"
+            type="email"
+            placeholder="example@email.com"
+            value={email}
+            onChange={(e) => onEmailChange(e.target.value)}
+            className="form-input"
+            style={{ paddingLeft: '36px' }}
+          />
+          {emailError ? <p style={fieldErrorStyle}>{emailError}</p> : null}
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        <label htmlFor="auth-modal-password" style={fieldLabelStyle}>
+          비밀번호
+        </label>
+        <div style={{ position: 'relative' }}>
+          <Lock size={16} style={fieldIconStyle} />
+          <input
+            id="auth-modal-password"
+            type="password"
+            placeholder="6자 이상 입력"
+            value={password}
+            onChange={(e) => onPasswordChange(e.target.value)}
+            className="form-input"
+            style={{ paddingLeft: '36px' }}
+          />
+          {passwordError ? <p style={fieldErrorStyle}>{passwordError}</p> : null}
+        </div>
+      </div>
+    </>
+  );
+}
 
 export const AuthModal: React.FC<AuthModalProps> = ({
   isOpen,
@@ -68,45 +249,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     const trimmedNickname = nickname.trim();
 
     if (isGuestMode) {
-      if (!trimmedNickname) {
-        return '닉네임은 필수입니다.';
-      }
-      if (trimmedNickname.length < 2 || trimmedNickname.length > 20) {
-        return '닉네임은 2자 이상 20자 이하로 입력해 주세요.';
-      }
-      return null;
+      return validateNickname(trimmedNickname);
     }
 
     if (isRegisterMode) {
-      if (!trimmedEmail) {
-        return '이메일은 필수입니다.';
-      }
-      if (!isValidEmail(trimmedEmail)) {
-        return '올바른 이메일 형식을 입력해 주세요.';
-      }
-      if (trimmedPassword.length < 6) {
-        return '비밀번호는 6자 이상이어야 합니다.';
-      }
-      if (!trimmedNickname) {
-        return '닉네임은 필수입니다.';
-      }
-      if (trimmedNickname.length < 2 || trimmedNickname.length > 20) {
-        return '닉네임은 2자 이상 20자 이하로 입력해 주세요.';
-      }
-      return null;
+      return (
+        validateCredentials(trimmedEmail, trimmedPassword) ?? validateNickname(trimmedNickname)
+      );
     }
 
-    if (!trimmedEmail) {
-      return '이메일은 필수입니다.';
-    }
-    if (!isValidEmail(trimmedEmail)) {
-      return '올바른 이메일 형식을 입력해 주세요.';
-    }
-    if (trimmedPassword.length < 6) {
-      return '비밀번호는 6자 이상이어야 합니다.';
-    }
-
-    return null;
+    return validateCredentials(trimmedEmail, trimmedPassword);
   };
 
   useEffect(() => {
@@ -249,6 +401,28 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
+  const handleBackdropKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.target !== event.currentTarget) {
+      return;
+    }
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      handleClose();
+    }
+  };
+
+  const modalTitle = getModalTitle(mode);
+  const defaultSubTitle = getDefaultSubTitle(mode);
+
+  const handleFieldChange = (setter: (value: string) => void) => (value: string) => {
+    setter(value);
+    clearError();
+    setFormError('');
+    if (Object.keys(validationErrors).length > 0) {
+      clearValidationErrors();
+    }
+  };
+
   return (
     <div
       style={{
@@ -267,7 +441,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         padding: '1rem',
       }}
       onMouseDown={handleBackdropClick}
-      role="presentation"
+      onKeyDown={handleBackdropKeyDown}
+      role="button"
+      tabIndex={-1}
+      aria-label="모달 닫기"
     >
       <div
         ref={modalRef}
@@ -331,19 +508,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               letterSpacing: 0,
             }}
           >
-            {isLoginMode
-              ? '피키가 기다렸어요! 🥑'
-              : isRegisterMode
-                ? '픽플로우 회원가입'
-                : '비회원 빠른 시작'}
+            {modalTitle}
           </h2>
           <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-            {subTitle ??
-              (isLoginMode
-                ? '고민을 올리고 SNS 투표 링크를 발급받으세요'
-                : isRegisterMode
-                  ? '가입하면 만든 고민과 투표 결과를 한곳에 모아둘 수 있어요'
-                  : '닉네임만으로 바로 이용을 시작하세요')}
+            {subTitle ?? defaultSubTitle}
           </p>
         </div>
 
@@ -441,154 +609,22 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}
         >
           {!isLoginMode && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <label
-                htmlFor="auth-modal-nickname"
-                style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)' }}
-              >
-                닉네임
-              </label>
-              <div style={{ position: 'relative' }}>
-                <User
-                  size={16}
-                  style={{
-                    position: 'absolute',
-                    left: '12px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    color: 'var(--text-muted)',
-                  }}
-                />
-                <input
-                  id="auth-modal-nickname"
-                  type="text"
-                  placeholder="2자 이상 20자 이하"
-                  value={nickname}
-                  onChange={(e) => {
-                    setNickname(e.target.value);
-                    clearError();
-                    setFormError('');
-                    if (Object.keys(validationErrors).length > 0) {
-                      clearValidationErrors();
-                    }
-                  }}
-                  maxLength={20}
-                  className="form-input"
-                  style={{ paddingLeft: '36px' }}
-                />
-                {getFieldError('nickname') ? (
-                  <p
-                    style={{
-                      color: 'var(--brand-accent-coral)',
-                      margin: '0.25rem 0 0',
-                      fontSize: '0.72rem',
-                    }}
-                  >
-                    {getFieldError('nickname')}
-                  </p>
-                ) : null}
-              </div>
-            </div>
+            <NicknameField
+              nickname={nickname}
+              fieldError={getFieldError('nickname')}
+              onChange={handleFieldChange(setNickname)}
+            />
           )}
 
           {!isGuestMode && (
-            <>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label
-                  htmlFor="auth-modal-email"
-                  style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)' }}
-                >
-                  이메일 주소
-                </label>
-                <div style={{ position: 'relative' }}>
-                  <Mail
-                    size={16}
-                    style={{
-                      position: 'absolute',
-                      left: '12px',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      color: 'var(--text-muted)',
-                    }}
-                  />
-                  <input
-                    id="auth-modal-email"
-                    type="email"
-                    placeholder="example@email.com"
-                    value={email}
-                    onChange={(e) => {
-                      setEmail(e.target.value);
-                      clearError();
-                      setFormError('');
-                      if (Object.keys(validationErrors).length > 0) {
-                        clearValidationErrors();
-                      }
-                    }}
-                    className="form-input"
-                    style={{ paddingLeft: '36px' }}
-                  />
-                  {getFieldError('email') ? (
-                    <p
-                      style={{
-                        color: 'var(--brand-accent-coral)',
-                        margin: '0.25rem 0 0',
-                        fontSize: '0.72rem',
-                      }}
-                    >
-                      {getFieldError('email')}
-                    </p>
-                  ) : null}
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label
-                  htmlFor="auth-modal-password"
-                  style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)' }}
-                >
-                  비밀번호
-                </label>
-                <div style={{ position: 'relative' }}>
-                  <Lock
-                    size={16}
-                    style={{
-                      position: 'absolute',
-                      left: '12px',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      color: 'var(--text-muted)',
-                    }}
-                  />
-                  <input
-                    id="auth-modal-password"
-                    type="password"
-                    placeholder="6자 이상 입력"
-                    value={password}
-                    onChange={(e) => {
-                      setPassword(e.target.value);
-                      clearError();
-                      setFormError('');
-                      if (Object.keys(validationErrors).length > 0) {
-                        clearValidationErrors();
-                      }
-                    }}
-                    className="form-input"
-                    style={{ paddingLeft: '36px' }}
-                  />
-                  {getFieldError('password') ? (
-                    <p
-                      style={{
-                        color: 'var(--brand-accent-coral)',
-                        margin: '0.25rem 0 0',
-                        fontSize: '0.72rem',
-                      }}
-                    >
-                      {getFieldError('password')}
-                    </p>
-                  ) : null}
-                </div>
-              </div>
-            </>
+            <CredentialFields
+              email={email}
+              password={password}
+              emailError={getFieldError('email')}
+              passwordError={getFieldError('password')}
+              onEmailChange={handleFieldChange(setEmail)}
+              onPasswordChange={handleFieldChange(setPassword)}
+            />
           )}
 
           <button
@@ -605,24 +641,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               marginTop: '0.5rem',
             }}
           >
-            {isLoading ? (
-              '처리 중...'
-            ) : isLoginMode ? (
-              <>
-                <LogIn size={16} />
-                <span>로그인하기</span>
-              </>
-            ) : isRegisterMode ? (
-              <>
-                <UserPlus size={16} />
-                <span>회원가입 완료</span>
-              </>
-            ) : (
-              <>
-                <UserCog size={16} />
-                <span>비회원으로 시작</span>
-              </>
-            )}
+            <SubmitLabel mode={mode} isLoading={isLoading} />
           </button>
         </form>
       </div>

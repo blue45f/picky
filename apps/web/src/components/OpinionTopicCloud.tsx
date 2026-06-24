@@ -16,9 +16,9 @@ type OptionKeywordGroup = {
   keywords: KeywordStat[];
 };
 
-type OpinionTopicCloudProps = {
+type OpinionTopicCloudProps = Readonly<{
   poll: Poll;
-};
+}>;
 
 const STOP_WORDS = new Set([
   '그리고',
@@ -252,7 +252,7 @@ export function OpinionTopicCloud({ poll }: OpinionTopicCloudProps) {
     try {
       await copyText(topicData.summaryText);
       setCopied(true);
-      window.setTimeout(() => setCopied(false), 2200);
+      globalThis.setTimeout(() => setCopied(false), 2200);
     } catch (err) {
       console.error('opinion topic summary copy failed', err);
     }
@@ -361,6 +361,8 @@ export function OpinionTopicCloud({ poll }: OpinionTopicCloudProps) {
                 'var(--text-primary)',
                 'var(--brand-primary)',
               ];
+              const rotateByThird = index % 3 === 1 ? '1deg' : '0deg';
+              const rotation = index % 3 === 0 ? '-2deg' : rotateByThird;
 
               return (
                 <span
@@ -375,7 +377,7 @@ export function OpinionTopicCloud({ poll }: OpinionTopicCloudProps) {
                     fontWeight: 900,
                     lineHeight: 1,
                     opacity: 0.78 + keyword.weight * 0.22,
-                    transform: `rotate(${index % 3 === 0 ? '-2deg' : index % 3 === 1 ? '1deg' : '0deg'})`,
+                    transform: `rotate(${rotation})`,
                   }}
                 >
                   {keyword.word}

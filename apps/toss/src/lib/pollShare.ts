@@ -10,7 +10,7 @@ const DEFAULT_PUBLIC_ORIGIN = 'https://picky-olive.vercel.app';
 
 const trimTrailingSlashes = (value: string): string => {
   let end = value.length;
-  while (end > 0 && value.charCodeAt(end - 1) === 47) {
+  while (end > 0 && value.codePointAt(end - 1) === 47) {
     end -= 1;
   }
   return end === value.length ? value : value.slice(0, end);
@@ -51,8 +51,7 @@ const getShareOrigin = (): string => {
   if (configured) {
     return configured;
   }
-  const runtime =
-    typeof globalThis.window !== 'undefined' ? globalThis.window.location.origin : null;
+  const runtime = globalThis.window === undefined ? null : globalThis.window.location.origin;
   if (runtime && isPublicWebHost(runtime)) {
     return runtime;
   }

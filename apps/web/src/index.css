@@ -579,7 +579,7 @@ body.present-mode .page-shell {
 .featured-comment p {
   margin: 0;
   color: var(--text-secondary);
-  font-size: 0.78rem;
+  font-size: 0.82rem;
   line-height: 1.56;
 }
 
@@ -981,6 +981,12 @@ body.present-mode .page-shell {
     transform 0.28s var(--ease-out-expo),
     border-color 0.28s var(--ease-out-expo),
     box-shadow 0.28s var(--ease-out-expo);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--bg-card-border);
+  background: var(--bg-card);
+  padding: 0.85rem 0.9rem;
+  display: grid;
+  gap: 2px;
 }
 
 .kpi-item::before {
@@ -1126,15 +1132,6 @@ body.present-mode .page-shell {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.75rem;
-}
-
-.kpi-item {
-  border-radius: var(--radius-md);
-  border: 1px solid var(--bg-card-border);
-  background: var(--bg-card);
-  padding: 0.85rem 0.9rem;
-  display: grid;
-  gap: 2px;
 }
 
 .quality-grid {
@@ -1615,8 +1612,8 @@ body.present-mode .page-shell {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 30px;
+  height: 30px;
   border: 1px solid var(--bg-card-border);
   border-radius: 999px;
   color: var(--text-muted);
@@ -1984,7 +1981,8 @@ body.present-mode .page-shell {
   transform: translateY(-50%);
   background: transparent;
   border: none;
-  padding: 0;
+  padding: 6px;
+  margin: -6px;
   color: var(--text-muted);
   cursor: pointer;
 }
@@ -2188,8 +2186,11 @@ body.present-mode .page-shell {
     padding: 1.15rem !important;
   }
 
+  /* 탭 타깃 — 선택지/버튼 손가락에 맞게 키움 (≥48px) */
   .choice-card {
-    border-radius: 16px !important;
+    min-height: 56px !important;
+    padding: 15px 16px !important;
+    border-radius: 18px !important;
   }
 
   /* 폼 요소 둥글게 + 16px(모바일 가독성 & iOS 포커스 자동확대 방지).
@@ -2273,12 +2274,6 @@ body.present-mode .page-shell {
     font-size: 1rem !important;
   }
 
-  /* 탭 타깃 — 선택지/버튼 손가락에 맞게 키움 (≥48px) */
-  .choice-card {
-    min-height: 56px !important;
-    padding: 15px 16px !important;
-    border-radius: 18px !important;
-  }
   .btn-primary,
   .btn-secondary,
   .hero-cta,
@@ -2307,19 +2302,6 @@ body.present-mode .page-shell {
 .featured-comment footer,
 .embed-preview-options > span {
   font-size: 0.76rem;
-}
-.featured-comment p {
-  font-size: 0.82rem;
-}
-
-/* 아이콘 버튼 터치 타깃 — 삭제/지우기 X 등은 시각 크기는 작게 두되 히트 영역을 넓힌다. */
-.upload-preview button {
-  width: 30px;
-  height: 30px;
-}
-.text-inline-action {
-  padding: 6px;
-  margin: -6px;
 }
 
 /* 친근한 '톡' 누름 피드백 — 주요 인터랙션을 살짝 눌렀다 통통 돌아오게(귀여운 촉감).

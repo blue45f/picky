@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import type { NavigateFunction } from 'react-router-dom';
 import {
   Calendar,
   FileText,
@@ -27,6 +28,7 @@ import {
   Trash2,
   Pin,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import type { Poll } from '@picky/shared';
 import { MASCOT, VOICE, categoryMeta } from '@picky/shared';
 import { usePollStore } from '../store/usePollStore';
@@ -59,12 +61,12 @@ const PINNED_POLLS_STORAGE_KEY = 'picky_pinned_poll_ids_v1'; // gitleaks:allow �
 const MAX_PINNED_POLLS = 6;
 
 const loadPinnedPollIds = (): string[] => {
-  if (typeof window === 'undefined') {
+  if (typeof globalThis.window === 'undefined') {
     return [];
   }
 
   try {
-    const raw = window.localStorage.getItem(PINNED_POLLS_STORAGE_KEY);
+    const raw = globalThis.localStorage.getItem(PINNED_POLLS_STORAGE_KEY);
     const parsed = raw ? JSON.parse(raw) : [];
     return Array.isArray(parsed)
       ? parsed.filter((item): item is string => typeof item === 'string').slice(0, MAX_PINNED_POLLS)
@@ -75,11 +77,11 @@ const loadPinnedPollIds = (): string[] => {
 };
 
 const savePinnedPollIds = (pollIds: string[]) => {
-  if (typeof window === 'undefined') {
+  if (typeof globalThis.window === 'undefined') {
     return;
   }
 
-  window.localStorage.setItem(
+  globalThis.localStorage.setItem(
     PINNED_POLLS_STORAGE_KEY,
     JSON.stringify(pollIds.slice(0, MAX_PINNED_POLLS)),
   );
@@ -319,6 +321,18 @@ const getCreatorLabel = (creatorId?: string | null, creatorIsGuest?: boolean) =>
   return '비회원 작성';
 };
 
+const resolveEmptyStateHint = (hasActiveFilters: boolean, isGuestUser: boolean) => {
+  if (hasActiveFilters) {
+    return '검색어나 필터를 바꿔서 다시 찾아볼까요?';
+  }
+
+  if (isGuestUser) {
+    return '비회원으로도 바로 시작할 수 있어요. 첫 고민을 올리고 친구들에게 링크로 물어보세요 🥑';
+  }
+
+  return '첫 고민을 올리고 친구·동료에게 링크로 빠르게 물어보세요 🥑';
+};
+
 const sortOptions: { value: SortMode; label: string }[] = [
   { value: 'latest', label: '최신순' },
   { value: 'popular', label: '투표 많은순' },
@@ -342,6 +356,1452 @@ const signalOptions: { value: SignalMode; label: string }[] = [
   { value: 'closed', label: '마감' },
 ];
 type ViewMode = 'stack' | 'compact';
+
+function PollCardActions(
+  props: Readonly<{
+    poll: Poll;
+    isCompact: boolean;
+    copiedPollId: string | null;
+    handleGotoPoll: (event: React.MouseEvent<HTMLButtonElement>, pollId: string) => void;
+    handleCopyPollLink: (
+      event: React.MouseEvent<HTMLButtonElement>,
+      pollId: string,
+    ) => Promise<void>;
+    handleCopyPollEmbed: (
+      event: React.MouseEvent<HTMLButtonElement>,
+      pollId: string,
+    ) => Promise<void>;
+  }>,
+) {
+  const { poll, isCompact, copiedPollId, handleGotoPoll, handleCopyPollLink, handleCopyPollEmbed } =
+    props;
+  const linkCopied = copiedPollId === poll.id;
+  const embedCopied = copiedPollId === `embed-${poll.id}`;
+
+  return (
+    <>
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: '0.5rem',
+          borderTop: '1px solid rgba(255, 255, 255, 0.06)',
+          paddingTop: '0.75rem',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            gap: '0.9rem',
+            fontSize: '0.74rem',
+            color: 'var(--text-muted)',
+          }}
+        >
+          <span
+            style={{
+              display: 'inline-flex',
+              gap: '5px',
+              alignItems: 'center',
+              color: 'var(--text-secondary)',
+            }}
+          >
+            <Vote size={12} />
+            <strong style={{ color: 'var(--text-primary)' }}>{poll.totalVotes}</strong> 투표
+          </span>
+          <span
+            style={{
+              display: 'inline-flex',
+              gap: '5px',
+              alignItems: 'center',
+              color: 'var(--text-secondary)',
+            }}
+          >
+            <MessageSquare size={12} />
+            <strong style={{ color: 'var(--text-primary)' }}>{poll.comments.length}</strong> 의견
+          </span>
+        </div>
+
+        <button
+          type="button"
+          onClick={(event) => handleGotoPoll(event, poll.id)}
+          className="btn-primary"
+          style={{
+            fontSize: isCompact ? '0.66rem' : '0.7rem',
+            padding: '7px 13px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px',
+          }}
+        >
+          <span>투표하기</span>
+          <ArrowRight size={13} />
+        </button>
+        <button
+          type="button"
+          onClick={(event) => handleCopyPollLink(event, poll.id)}
+          className="ghost-btn"
+          style={{
+            fontSize: isCompact ? '0.64rem' : '0.68rem',
+            padding: isCompact ? '5px 9px' : '6px 10px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px',
+          }}
+          title={`${poll.id} 링크 복사`}
+        >
+          {linkCopied ? <Check size={12} /> : <Copy size={12} />}
+          <span>{linkCopied ? '복사 완료' : '공유 복사'}</span>
+          <Link size={11} />
+        </button>
+        <button
+          type="button"
+          onClick={(event) => handleCopyPollEmbed(event, poll.id)}
+          className="ghost-btn"
+          style={{
+            fontSize: isCompact ? '0.64rem' : '0.68rem',
+            padding: isCompact ? '5px 9px' : '6px 10px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px',
+          }}
+          title={`${poll.id} 임베드 코드 복사`}
+        >
+          {embedCopied ? <Check size={12} /> : <Code2 size={12} />}
+          <span>{embedCopied ? '복사 완료' : '임베드'}</span>
+        </button>
+      </div>
+      {linkCopied || embedCopied ? (
+        <p
+          style={{
+            margin: 0,
+            marginTop: '6px',
+            fontSize: '0.64rem',
+            color: 'var(--brand-accent-teal)',
+            fontWeight: 700,
+          }}
+        >
+          {linkCopied ? '링크가 복사되었습니다.' : '임베드 코드가 복사되었습니다.'}
+        </p>
+      ) : null}
+    </>
+  );
+}
+
+function PollCardDescription(props: Readonly<{ poll: Poll; isCompact: boolean }>) {
+  const { poll, isCompact } = props;
+  if (!poll.description) {
+    return null;
+  }
+
+  const compactDescription =
+    poll.description.length > 84 ? `${poll.description.slice(0, 81)}...` : poll.description;
+
+  return (
+    <p
+      style={{
+        color: 'var(--text-secondary)',
+        fontSize: isCompact ? '0.74rem' : '0.825rem',
+        marginBottom: '0.6rem',
+        display: isCompact ? 'block' : '-webkit-box',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        WebkitLineClamp: isCompact ? 1 : 2,
+        WebkitBoxOrient: 'vertical',
+        lineHeight: 1.56,
+      }}
+    >
+      {isCompact ? compactDescription : poll.description}
+    </p>
+  );
+}
+
+function PollCard(
+  props: Readonly<{
+    poll: Poll;
+    userId?: string;
+    viewMode: ViewMode;
+    copiedPollId: string | null;
+    setCurrentPoll: (poll: Poll | null) => void;
+    navigate: NavigateFunction;
+    handleGotoPoll: (event: React.MouseEvent<HTMLButtonElement>, pollId: string) => void;
+    handleCopyPollLink: (
+      event: React.MouseEvent<HTMLButtonElement>,
+      pollId: string,
+    ) => Promise<void>;
+    handleCopyPollEmbed: (
+      event: React.MouseEvent<HTMLButtonElement>,
+      pollId: string,
+    ) => Promise<void>;
+  }>,
+) {
+  const {
+    poll,
+    userId,
+    viewMode,
+    copiedPollId,
+    setCurrentPoll,
+    navigate,
+    handleGotoPoll,
+    handleCopyPollLink,
+    handleCopyPollEmbed,
+  } = props;
+  const creatorLabel = getCreatorLabel(poll.creatorId, poll.creatorIsGuest);
+  // Poll 타입에 categoryId 가 아직 없지만 런타임 데이터엔 실릴 수 있어 방어적으로 읽는다.
+  const pollCategory = categoryMeta((poll as { categoryId?: string | null }).categoryId);
+  const isMine = userId && poll.creatorId === userId;
+  const isCompact = viewMode === 'compact';
+  const signalLabel = getPollSignalLabel(poll);
+  const endAtLabel = formatPollEndAt(poll);
+  const resultsVisibilityLabel = getPollResultsVisibilityLabel(poll);
+  const attachmentCount = poll.attachments?.length || 0;
+
+  return (
+    <article
+      className="poll-card"
+      style={{
+        textAlign: 'left',
+        padding: isCompact ? '1.05rem' : '1.25rem',
+        width: '100%',
+        border: isMine ? '1px solid rgba(99, 102, 241, 0.45)' : undefined,
+      }}
+    >
+      {/* 카드 전체를 덮는 접근성 내비 버튼(키보드+마우스). 내부 액션 버튼은
+          .poll-card 의 z-index 규칙으로 이 오버레이 위에 떠서 따로 동작한다. */}
+      <button
+        type="button"
+        className="poll-card-open"
+        aria-label={`${poll.question} 투표 페이지로 이동`}
+        onClick={() => {
+          setCurrentPoll(poll);
+          navigate(`/poll/${poll.id}`);
+        }}
+      />
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: '0.8rem',
+          flexWrap: 'wrap',
+          marginBottom: '0.7rem',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            gap: '0.35rem',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+          }}
+        >
+          <span className="floating-tag">POLL #{poll.id}</span>
+          {pollCategory ? (
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                fontSize: '0.62rem',
+                fontWeight: 800,
+                color: pollCategory.color,
+                backgroundColor: `${pollCategory.color}1f`,
+                border: `1px solid ${pollCategory.color}55`,
+                padding: '2px 8px',
+                borderRadius: '999px',
+              }}
+            >
+              <span aria-hidden="true">{pollCategory.emoji}</span>
+              {pollCategory.label}
+            </span>
+          ) : null}
+          <span
+            style={{
+              fontSize: '0.62rem',
+              color: 'var(--text-muted)',
+              border: '1px solid var(--bg-card-border)',
+              padding: '2px 8px',
+              borderRadius: '999px',
+              fontWeight: 600,
+            }}
+          >
+            {creatorLabel}
+          </span>
+          <span
+            style={{
+              fontSize: '0.62rem',
+              border: '1px solid',
+              padding: '2px 8px',
+              borderRadius: '999px',
+              fontWeight: 700,
+              ...getPollSignalStyle(signalLabel),
+            }}
+          >
+            {signalLabel}
+          </span>
+        </div>
+
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            fontSize: '0.64rem',
+            color: 'var(--text-muted)',
+          }}
+        >
+          <Calendar size={12} />
+          <span>
+            {new Date(poll.createdAt).toLocaleDateString([], {
+              year: '2-digit',
+              month: 'short',
+              day: 'numeric',
+            })}
+          </span>
+        </div>
+      </div>
+
+      <h3
+        style={{
+          color: 'var(--text-primary)',
+          fontSize: isCompact ? '1rem' : '1.06rem',
+          fontWeight: 800,
+          letterSpacing: 0,
+          lineHeight: 1.45,
+          marginBottom: '0.4rem',
+        }}
+      >
+        {poll.question}
+      </h3>
+
+      <PollCardDescription poll={poll} isCompact={isCompact} />
+
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          flexWrap: 'wrap',
+          marginTop: '0.5rem',
+          marginBottom: '0.6rem',
+        }}
+      >
+        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+          상위 선택지:
+        </span>
+        {poll.options.length > 0 ? (
+          [...poll.options]
+            .sort((a, b) => b.voteCount - a.voteCount)
+            .slice(0, 2)
+            .map((opt) => (
+              <span
+                key={opt.id}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  borderRadius: '8px',
+                  padding: '3px 8px',
+                  fontSize: '0.72rem',
+                  color: 'var(--text-secondary)',
+                  fontWeight: 700,
+                }}
+              >
+                {opt.text}
+              </span>
+            ))
+        ) : (
+          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>등록 없음</span>
+        )}
+      </div>
+
+      <div className="poll-card-meta-strip">
+        <span>
+          <TimerReset size={12} />
+          {endAtLabel}
+        </span>
+        <span>
+          <Eye size={12} />
+          {resultsVisibilityLabel}
+        </span>
+        {attachmentCount > 0 ? (
+          <span style={{ color: 'var(--brand-accent-gold)' }}>
+            <FileText size={12} />
+            참고자료 {attachmentCount}개
+          </span>
+        ) : null}
+      </div>
+
+      <PollCardActions
+        poll={poll}
+        isCompact={isCompact}
+        copiedPollId={copiedPollId}
+        handleGotoPoll={handleGotoPoll}
+        handleCopyPollLink={handleCopyPollLink}
+        handleCopyPollEmbed={handleCopyPollEmbed}
+      />
+    </article>
+  );
+}
+
+type OperatorFlowCard = Readonly<{
+  key: string;
+  step: string;
+  label: string;
+  title: string;
+  metric: string;
+  help: string;
+  actionLabel: string;
+  icon: LucideIcon;
+  tone: string;
+}>;
+
+type OperatorChip = Readonly<{ label: string; icon: LucideIcon }>;
+
+type OperatorInsightCard = Readonly<{
+  key: string;
+  label: string;
+  value: string;
+  help: string;
+  signal: SignalMode;
+  icon: LucideIcon;
+  tone: string;
+}>;
+
+type OperatorRecommendationCard = Readonly<{
+  key: string;
+  eyebrow: string;
+  title: string;
+  help: string;
+  poll: Poll | null;
+  emptyTitle: string;
+  emptyHelp: string;
+  icon: LucideIcon;
+  tone: string;
+}>;
+
+type OperatorQueueItem = Readonly<{
+  key: string;
+  label: string;
+  count: number;
+  help: string;
+  signal: SignalMode;
+  icon: LucideIcon;
+  tone: string;
+}>;
+
+function OperatorToolsPanel(
+  props: Readonly<{
+    visible: boolean;
+    flowSectionRef: React.RefObject<HTMLDivElement | null>;
+    insightSectionRef: React.RefObject<HTMLDivElement | null>;
+    navigate: NavigateFunction;
+    setSignal: (signal: SignalMode) => void;
+    setScope: (scope: ScopeMode) => void;
+    setSortBy: (sort: SortMode) => void;
+    setCurrentPoll: (poll: Poll | null) => void;
+    openPollCount: number;
+    signal: SignalMode;
+    decisionFlowCards: ReadonlyArray<OperatorFlowCard>;
+    launchSurfaceChips: ReadonlyArray<OperatorChip>;
+    operatorInsightCards: ReadonlyArray<OperatorInsightCard>;
+    recommendationCards: ReadonlyArray<OperatorRecommendationCard>;
+    liveQueueItems: ReadonlyArray<OperatorQueueItem>;
+  }>,
+) {
+  const {
+    visible,
+    flowSectionRef,
+    insightSectionRef,
+    navigate,
+    setSignal,
+    setScope,
+    setSortBy,
+    setCurrentPoll,
+    openPollCount,
+    signal,
+    decisionFlowCards,
+    launchSurfaceChips,
+    operatorInsightCards,
+    recommendationCards,
+    liveQueueItems,
+  } = props;
+  if (!visible) {
+    return null;
+  }
+
+  return (
+    <>
+      <section
+        ref={flowSectionRef}
+        className="desktop-only"
+        aria-label="의사결정 운영 흐름"
+        style={{
+          display: 'grid',
+          gap: '0.85rem',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-end',
+            gap: '0.9rem',
+            flexWrap: 'wrap',
+          }}
+        >
+          <div style={{ display: 'grid', gap: '0.25rem' }}>
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                color: 'var(--brand-accent-teal)',
+                fontSize: '0.68rem',
+                fontWeight: 900,
+                letterSpacing: '0.05em',
+              }}
+            >
+              <Sparkles size={13} />
+              결정 흐름
+            </span>
+            <h2
+              style={{
+                margin: 0,
+                color: 'var(--text-primary)',
+                fontSize: '1rem',
+                fontWeight: 900,
+              }}
+            >
+              생성부터 후속 결정까지 한 번에 이어지는 운영 흐름
+            </h2>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate('/create')}
+            className="btn-primary"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '8px 12px',
+              fontSize: '0.75rem',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <Plus size={14} />새 투표 만들기
+          </button>
+        </div>
+
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
+            gap: '0.7rem',
+          }}
+        >
+          {decisionFlowCards.map((card) => {
+            const FlowIcon = card.icon;
+
+            return (
+              <article
+                key={card.key}
+                className="press-tile"
+                style={{
+                  minWidth: 0,
+                  minHeight: '168px',
+                  display: 'grid',
+                  gap: '0.55rem',
+                  alignContent: 'start',
+                  border: '1px solid var(--bg-card-border)',
+                  borderRadius: 'var(--radius-sm)',
+                  background: 'rgba(255,255,255,0.028)',
+                  padding: '0.88rem',
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: '0.6rem',
+                  }}
+                >
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      color: card.tone,
+                      fontSize: '0.68rem',
+                      fontWeight: 900,
+                    }}
+                  >
+                    <FlowIcon size={14} />
+                    {card.label}
+                  </span>
+                  <span
+                    style={{
+                      border: '1px solid rgba(255,255,255,0.08)',
+                      borderRadius: '999px',
+                      color: 'var(--text-muted)',
+                      padding: '2px 7px',
+                      fontSize: '0.62rem',
+                      fontWeight: 900,
+                    }}
+                  >
+                    {card.step}
+                  </span>
+                </div>
+                <strong
+                  style={{
+                    color: 'var(--text-primary)',
+                    fontSize: '0.98rem',
+                    lineHeight: 1.32,
+                  }}
+                >
+                  {card.title}
+                </strong>
+                <span
+                  style={{
+                    color: card.tone,
+                    fontSize: '0.8rem',
+                    fontWeight: 900,
+                  }}
+                >
+                  {card.metric}
+                </span>
+                <p
+                  style={{
+                    margin: 0,
+                    color: 'var(--text-secondary)',
+                    fontSize: '0.7rem',
+                    lineHeight: 1.48,
+                  }}
+                >
+                  {card.help}
+                </p>
+                <button
+                  type="button"
+                  className="ghost-btn"
+                  onClick={() => {
+                    if (card.key === 'create') {
+                      navigate('/create');
+                      return;
+                    }
+                    if (card.key === 'launch') {
+                      document.getElementById('join-code-input')?.focus();
+                      return;
+                    }
+                    if (card.key === 'live') {
+                      setSignal('all');
+                      setScope('all');
+                      return;
+                    }
+                    setSortBy('popular');
+                  }}
+                  style={{
+                    justifySelf: 'start',
+                    alignSelf: 'end',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    padding: '5px 9px',
+                    fontSize: '0.66rem',
+                    marginTop: 'auto',
+                  }}
+                >
+                  {card.actionLabel}
+                  <ArrowRight size={12} />
+                </button>
+              </article>
+            );
+          })}
+        </div>
+
+        <div
+          style={{
+            display: 'flex',
+            gap: '0.45rem',
+            flexWrap: 'wrap',
+          }}
+          aria-label="배포 및 분석 채널"
+        >
+          {launchSurfaceChips.map((chip) => {
+            const ChipIcon = chip.icon;
+
+            return (
+              <span
+                key={chip.label}
+                className="stat-pill"
+                style={{
+                  color: 'var(--text-secondary)',
+                  borderColor: 'rgba(45, 212, 191, 0.18)',
+                  background: 'rgba(45, 212, 191, 0.045)',
+                }}
+              >
+                <ChipIcon size={12} />
+                {chip.label}
+              </span>
+            );
+          })}
+        </div>
+      </section>
+
+      <section
+        ref={insightSectionRef}
+        className="content-card desktop-only"
+        style={{
+          padding: '1rem',
+          display: 'grid',
+          gap: '0.85rem',
+          cursor: 'default',
+          borderColor: 'rgba(45, 212, 191, 0.16)',
+          background:
+            'linear-gradient(135deg, rgba(45, 212, 191, 0.045), rgba(250, 204, 21, 0.025))',
+        }}
+        aria-label="투표 운영 인사이트"
+      >
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            gap: '0.85rem',
+            flexWrap: 'wrap',
+          }}
+        >
+          <div style={{ display: 'grid', gap: '0.22rem' }}>
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                color: 'var(--brand-accent-teal)',
+                fontSize: '0.68rem',
+                fontWeight: 900,
+                letterSpacing: '0.05em',
+              }}
+            >
+              <Sparkles size={13} />
+              실시간 운영
+            </span>
+            <h2
+              style={{
+                margin: 0,
+                color: 'var(--text-primary)',
+                fontSize: '0.98rem',
+                fontWeight: 900,
+              }}
+            >
+              공유 후 응답 흐름 한눈에 보기
+            </h2>
+          </div>
+          <span
+            style={{
+              border: '1px solid rgba(45, 212, 191, 0.26)',
+              borderRadius: '999px',
+              color: 'var(--brand-accent-teal)',
+              background: 'rgba(45, 212, 191, 0.07)',
+              padding: '5px 10px',
+              fontSize: '0.68rem',
+              fontWeight: 900,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            열린 투표 {openPollCount}개
+          </span>
+        </div>
+
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
+            gap: '0.65rem',
+          }}
+        >
+          {operatorInsightCards.map((card) => {
+            const CardIcon = card.icon;
+
+            return (
+              <button
+                key={card.key}
+                type="button"
+                className="press-tile"
+                onClick={() => {
+                  setSignal(card.signal);
+                  setScope('all');
+                }}
+                style={{
+                  border: '1px solid rgba(255, 255, 255, 0.09)',
+                  borderRadius: 'var(--radius-sm)',
+                  background: 'var(--bg-card)',
+                  color: 'var(--text-primary)',
+                  padding: '0.82rem',
+                  display: 'grid',
+                  gap: '0.42rem',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  minHeight: '132px',
+                }}
+              >
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    color: card.tone,
+                    fontSize: '0.68rem',
+                    fontWeight: 900,
+                  }}
+                >
+                  <CardIcon size={14} />
+                  {card.label}
+                </span>
+                <strong
+                  style={{
+                    color: 'var(--text-primary)',
+                    fontSize: '1.28rem',
+                    lineHeight: 1.1,
+                  }}
+                >
+                  {card.value}
+                </strong>
+                <span
+                  style={{
+                    color: 'var(--text-secondary)',
+                    fontSize: '0.68rem',
+                    lineHeight: 1.45,
+                  }}
+                >
+                  {card.help}
+                </span>
+                <span
+                  style={{
+                    color: card.tone,
+                    fontSize: '0.64rem',
+                    fontWeight: 900,
+                    marginTop: 'auto',
+                  }}
+                >
+                  관련 투표 보기
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      <section
+        className="content-card desktop-only"
+        style={{
+          padding: '1rem',
+          display: 'grid',
+          gap: '0.85rem',
+          cursor: 'default',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            gap: '0.85rem',
+            flexWrap: 'wrap',
+          }}
+        >
+          <div style={{ display: 'grid', gap: '0.2rem' }}>
+            <h2
+              style={{
+                margin: 0,
+                color: 'var(--text-primary)',
+                fontSize: '0.96rem',
+                fontWeight: 900,
+              }}
+            >
+              지금 참여하면 좋은 고민
+            </h2>
+            <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.76rem' }}>
+              참여 대기, 접전, 피드백 활발 상태를 기준으로 바로 들어갈 투표를 추천합니다.
+            </p>
+          </div>
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
+              color: 'var(--brand-accent-teal)',
+              border: '1px solid rgba(45, 212, 191, 0.28)',
+              borderRadius: '999px',
+              background: 'rgba(45, 212, 191, 0.08)',
+              padding: '5px 10px',
+              fontSize: '0.68rem',
+              fontWeight: 900,
+            }}
+          >
+            <Sparkles size={13} />
+            실시간 인기
+          </span>
+        </div>
+
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
+            gap: '0.7rem',
+          }}
+        >
+          {recommendationCards.map((card) => {
+            const CardIcon = card.icon;
+            const poll = card.poll;
+            return (
+              <article
+                key={card.key}
+                style={{
+                  minWidth: 0,
+                  display: 'grid',
+                  gap: '0.55rem',
+                  alignContent: 'start',
+                  border: '1px solid var(--bg-card-border)',
+                  borderRadius: 'var(--radius-sm)',
+                  background: poll ? 'rgba(255,255,255,0.025)' : 'rgba(250, 204, 21, 0.035)',
+                  padding: '0.85rem',
+                }}
+              >
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    color: card.tone,
+                    fontSize: '0.66rem',
+                    fontWeight: 900,
+                    letterSpacing: '0.05em',
+                  }}
+                >
+                  <CardIcon size={13} />
+                  {card.eyebrow}
+                </span>
+                <strong
+                  style={{
+                    color: 'var(--text-primary)',
+                    fontSize: '0.9rem',
+                    lineHeight: 1.38,
+                    overflowWrap: 'anywhere',
+                  }}
+                >
+                  {poll ? poll.question : card.emptyTitle}
+                </strong>
+                <p
+                  style={{
+                    margin: 0,
+                    color: 'var(--text-muted)',
+                    fontSize: '0.7rem',
+                    lineHeight: 1.45,
+                    display: '-webkit-box',
+                    overflow: 'hidden',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                  }}
+                >
+                  {poll ? card.help : card.emptyHelp}
+                </p>
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: '0.4rem',
+                    flexWrap: 'wrap',
+                    color: 'var(--text-muted)',
+                    fontSize: '0.66rem',
+                  }}
+                >
+                  {poll ? (
+                    <>
+                      <span className="stat-pill">{poll.totalVotes}표</span>
+                      <span className="stat-pill">{poll.comments.length}의견</span>
+                      <span className="stat-pill">{formatPollEndAt(poll)}</span>
+                    </>
+                  ) : (
+                    <span className="stat-pill">새 투표 생성 추천</span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (poll) {
+                      setCurrentPoll(poll);
+                      navigate(`/poll/${poll.id}`);
+                      return;
+                    }
+                    navigate('/create');
+                  }}
+                  className="ghost-btn"
+                  style={{
+                    justifySelf: 'start',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    padding: '6px 10px',
+                    fontSize: '0.7rem',
+                  }}
+                >
+                  {poll ? '바로 참여' : '새 고민 작성'}
+                  <ArrowRight size={13} />
+                </button>
+              </article>
+            );
+          })}
+        </div>
+      </section>
+
+      <section
+        className="content-card desktop-only"
+        style={{
+          padding: '1rem',
+          display: 'grid',
+          gap: '0.85rem',
+          cursor: 'default',
+          borderColor: 'rgba(45, 212, 191, 0.18)',
+          background: 'rgba(45, 212, 191, 0.035)',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            gap: '0.85rem',
+            flexWrap: 'wrap',
+          }}
+        >
+          <div style={{ display: 'grid', gap: '0.2rem' }}>
+            <h2
+              style={{
+                margin: 0,
+                color: 'var(--text-primary)',
+                fontSize: '0.96rem',
+                fontWeight: 900,
+              }}
+            >
+              라이브 응답 큐
+            </h2>
+            <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.76rem' }}>
+              현재 목록에서 먼저 처리해야 할 투표 상태를 한눈에 보고 바로 필터링합니다.
+            </p>
+          </div>
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
+              color: 'var(--brand-accent-teal)',
+              border: '1px solid rgba(45, 212, 191, 0.28)',
+              borderRadius: '999px',
+              background: 'rgba(45, 212, 191, 0.08)',
+              padding: '5px 10px',
+              fontSize: '0.68rem',
+              fontWeight: 900,
+            }}
+          >
+            <Eye size={13} />
+            {openPollCount}개 진행 중
+          </span>
+        </div>
+
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+            gap: '0.6rem',
+          }}
+        >
+          {liveQueueItems.map((item) => {
+            const QueueIcon = item.icon;
+            const active = signal === item.signal;
+            const disabled = item.key !== 'all' && item.count === 0;
+            let queueStatusLabel = '필터 적용';
+            if (active) {
+              queueStatusLabel = '적용 중';
+            } else if (disabled) {
+              queueStatusLabel = '대기 중';
+            }
+
+            return (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => {
+                  if (!disabled) {
+                    setSignal(item.signal);
+                  }
+                }}
+                aria-pressed={active}
+                disabled={disabled}
+                style={{
+                  minWidth: 0,
+                  textAlign: 'left',
+                  display: 'grid',
+                  gap: '0.42rem',
+                  border: active
+                    ? '1px solid rgba(45, 212, 191, 0.46)'
+                    : '1px solid var(--bg-card-border)',
+                  borderRadius: 'var(--radius-sm)',
+                  background: active ? 'rgba(45, 212, 191, 0.1)' : 'rgba(255,255,255,0.025)',
+                  padding: '0.75rem',
+                  color: disabled ? 'var(--text-muted)' : 'var(--text-primary)',
+                  cursor: disabled ? 'not-allowed' : 'pointer',
+                  opacity: disabled ? 0.58 : 1,
+                  fontFamily: 'var(--font-sans)',
+                }}
+              >
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    color: item.tone,
+                    fontSize: '0.68rem',
+                    fontWeight: 900,
+                  }}
+                >
+                  <QueueIcon size={13} />
+                  {item.label}
+                </span>
+                <strong style={{ fontSize: '1.28rem', lineHeight: 1, color: item.tone }}>
+                  {item.count}
+                </strong>
+                <small
+                  style={{ color: 'var(--text-muted)', fontSize: '0.66rem', lineHeight: 1.42 }}
+                >
+                  {item.help}
+                </small>
+                <span
+                  style={{
+                    justifySelf: 'start',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    borderRadius: '999px',
+                    padding: '3px 8px',
+                    color: active ? 'var(--brand-accent-teal)' : 'var(--text-secondary)',
+                    fontSize: '0.62rem',
+                    fontWeight: 900,
+                  }}
+                >
+                  {queueStatusLabel}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+    </>
+  );
+}
+
+function QuickSeedChips(
+  props: Readonly<{
+    normalizedQuery: string;
+    scope: ScopeMode;
+    quickSeeds: ReadonlyArray<string>;
+    setSearchInput: (value: string) => void;
+  }>,
+) {
+  const { normalizedQuery, scope, quickSeeds, setSearchInput } = props;
+  if (normalizedQuery || scope !== 'all') {
+    return null;
+  }
+
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.45rem' }}>
+      <span
+        style={{
+          fontSize: '0.68rem',
+          color: 'var(--text-muted)',
+          display: 'inline-flex',
+          alignItems: 'center',
+        }}
+      >
+        빠른 검색:
+      </span>
+      {quickSeeds.map((seed) => (
+        <button
+          key={seed}
+          type="button"
+          onClick={() => setSearchInput(seed)}
+          className="ghost-inline"
+          style={{
+            padding: '4px 8px',
+            borderRadius: '999px',
+            border: '1px solid var(--bg-card-border)',
+            color: 'var(--text-muted)',
+            fontSize: '0.68rem',
+          }}
+        >
+          {seed}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function ActiveFiltersBar(
+  props: Readonly<{
+    hasActiveFilters: boolean;
+    activeFilters: ReadonlyArray<string>;
+    onResetFilters: () => void;
+  }>,
+) {
+  const { hasActiveFilters, activeFilters, onResetFilters } = props;
+  if (!hasActiveFilters) {
+    return null;
+  }
+
+  return (
+    <div className="content-card" style={{ padding: '0.65rem 0.9rem' }}>
+      <p
+        style={{
+          margin: 0,
+          fontSize: '0.72rem',
+          color: 'var(--text-secondary)',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '6px',
+          flexWrap: 'wrap',
+        }}
+      >
+        <SlidersHorizontal size={12} />
+        <strong style={{ color: 'var(--text-primary)' }}>활성 필터:</strong>
+        {activeFilters.join(' / ')}
+        <button
+          type="button"
+          onClick={onResetFilters}
+          style={{
+            marginLeft: 'auto',
+            border: '1px solid var(--bg-card-border)',
+            background: 'transparent',
+            color: 'var(--text-muted)',
+            borderRadius: '999px',
+            fontSize: '0.66rem',
+            padding: '4px 8px',
+            cursor: 'pointer',
+          }}
+        >
+          초기화
+        </button>
+      </p>
+    </div>
+  );
+}
+
+function PollResultsRegion(
+  props: Readonly<{
+    isLoading: boolean;
+    visiblePolls: Poll[];
+    hasActiveFilters: boolean;
+    emptyStateHint: string;
+    query: string;
+    userId?: string;
+    viewMode: ViewMode;
+    copiedPollId: string | null;
+    navigate: NavigateFunction;
+    onResetFilters: () => void;
+    setCurrentPoll: (poll: Poll | null) => void;
+    handleGotoPoll: (event: React.MouseEvent<HTMLButtonElement>, pollId: string) => void;
+    handleCopyPollLink: (
+      event: React.MouseEvent<HTMLButtonElement>,
+      pollId: string,
+    ) => Promise<void>;
+    handleCopyPollEmbed: (
+      event: React.MouseEvent<HTMLButtonElement>,
+      pollId: string,
+    ) => Promise<void>;
+  }>,
+) {
+  const {
+    isLoading,
+    visiblePolls,
+    hasActiveFilters,
+    emptyStateHint,
+    query,
+    userId,
+    viewMode,
+    copiedPollId,
+    navigate,
+    onResetFilters,
+    setCurrentPoll,
+    handleGotoPoll,
+    handleCopyPollLink,
+    handleCopyPollEmbed,
+  } = props;
+
+  if (isLoading && visiblePolls.length === 0) {
+    return (
+      <div
+        className="content-card"
+        role="status"
+        aria-live="polite"
+        style={{ padding: '1.75rem', display: 'grid', gap: '0.75rem' }}
+      >
+        <p
+          style={{
+            margin: 0,
+            fontSize: '0.82rem',
+            fontWeight: 700,
+            color: 'var(--text-secondary)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '7px',
+          }}
+        >
+          <span aria-hidden="true" style={{ fontSize: '1.1rem' }}>
+            {MASCOT.thinking.emoji}
+          </span>
+          {VOICE.loading}
+        </p>
+        {['skeleton-1', 'skeleton-2', 'skeleton-3'].map((skeletonKey) => (
+          <div key={skeletonKey} style={{ display: 'grid', gap: '0.55rem' }}>
+            <div className="skeleton" style={{ height: '0.8rem', width: '42%' }} />
+            <div className="skeleton" style={{ height: '1.35rem', width: '72%' }} />
+            <div className="skeleton" style={{ height: '0.75rem', width: '56%' }} />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (visiblePolls.length === 0) {
+    return (
+      <div
+        className="content-card"
+        style={{
+          padding: '4rem 2rem',
+          textAlign: 'center',
+          display: 'grid',
+          gap: '1.1rem',
+          justifyItems: 'center',
+        }}
+      >
+        <span
+          className="empty-state-icon"
+          aria-hidden="true"
+          style={{ fontSize: '3.6rem', lineHeight: 1 }}
+        >
+          {hasActiveFilters ? '🔍' : MASCOT.idle.emoji}
+        </span>
+        <h3 style={{ fontSize: '1.1rem', fontWeight: 800 }}>
+          {hasActiveFilters ? '조건에 맞는 고민이 없어요' : MASCOT.idle.line}
+        </h3>
+        <p
+          style={{
+            fontSize: '0.92rem',
+            color: 'var(--text-secondary)',
+            maxWidth: '460px',
+            lineHeight: 1.65,
+          }}
+        >
+          {emptyStateHint}
+        </p>
+        {!hasActiveFilters ? (
+          <p
+            style={{
+              fontSize: '0.78rem',
+              color: 'var(--text-muted)',
+              maxWidth: '460px',
+              lineHeight: 1.6,
+              margin: 0,
+            }}
+          >
+            예시처럼 시작해 보세요 — “점심 메뉴 골라줘”, “회의 안건 우선순위”, “주말 일정 투표”.
+          </p>
+        ) : null}
+        <div
+          style={{
+            display: 'flex',
+            gap: '0.5rem',
+            flexWrap: 'wrap',
+            justifyContent: 'center',
+          }}
+        >
+          {hasActiveFilters ? (
+            <button
+              type="button"
+              onClick={onResetFilters}
+              className="btn-secondary"
+              style={{
+                padding: '10px 18px',
+                fontSize: '0.85rem',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+            >
+              <X size={15} />
+              필터 초기화
+            </button>
+          ) : null}
+          <button
+            onClick={() => navigate('/create')}
+            className="btn-primary"
+            style={{
+              padding: '10px 20px',
+              fontSize: '0.85rem',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '7px',
+            }}
+          >
+            <Plus size={16} />첫 고민 작성하러 가기
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <p
+        aria-live="polite"
+        style={{
+          margin: 0,
+          fontSize: '0.74rem',
+          color: 'var(--text-muted)',
+          fontWeight: 700,
+        }}
+      >
+        {hasActiveFilters
+          ? `조건에 맞는 고민 ${visiblePolls.length}개`
+          : `고민 ${visiblePolls.length}개`}
+      </p>
+      <div style={{ display: 'grid', gap: '0.9rem' }}>
+        {visiblePolls.map((poll) => (
+          <PollCard
+            key={poll.id}
+            poll={poll}
+            userId={userId}
+            viewMode={viewMode}
+            copiedPollId={copiedPollId}
+            setCurrentPoll={setCurrentPoll}
+            navigate={navigate}
+            handleGotoPoll={handleGotoPoll}
+            handleCopyPollLink={handleCopyPollLink}
+            handleCopyPollEmbed={handleCopyPollEmbed}
+          />
+        ))}
+      </div>
+      {query ? (
+        <p
+          style={{
+            margin: '0',
+            fontSize: '0.74rem',
+            color: 'var(--text-muted)',
+            textAlign: 'right',
+          }}
+        >
+          총 {visiblePolls.length}개 결과
+        </p>
+      ) : null}
+    </>
+  );
+}
 
 export const PollList: React.FC = () => {
   useDocumentTitle('고민 둘러보기');
@@ -414,7 +1874,7 @@ export const PollList: React.FC = () => {
   }, [searchParams, userId, query, searchInput, sortBy, signal]);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
+    const timer = globalThis.setTimeout(() => {
       const nextQuery = searchInput.trim();
       if (nextQuery !== query) {
         setQuery(nextQuery);
@@ -422,7 +1882,7 @@ export const PollList: React.FC = () => {
     }, 260);
 
     return () => {
-      window.clearTimeout(timer);
+      globalThis.clearTimeout(timer);
     };
   }, [searchInput, query]);
 
@@ -491,8 +1951,8 @@ export const PollList: React.FC = () => {
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    globalThis.addEventListener('keydown', handleKeyDown);
+    return () => globalThis.removeEventListener('keydown', handleKeyDown);
   }, [navigate]);
 
   useEffect(() => {
@@ -501,12 +1961,12 @@ export const PollList: React.FC = () => {
     };
 
     syncRecentPollHistory();
-    window.addEventListener('focus', syncRecentPollHistory);
-    window.addEventListener('storage', syncRecentPollHistory);
+    globalThis.addEventListener('focus', syncRecentPollHistory);
+    globalThis.addEventListener('storage', syncRecentPollHistory);
 
     return () => {
-      window.removeEventListener('focus', syncRecentPollHistory);
-      window.removeEventListener('storage', syncRecentPollHistory);
+      globalThis.removeEventListener('focus', syncRecentPollHistory);
+      globalThis.removeEventListener('storage', syncRecentPollHistory);
     };
   }, []);
 
@@ -527,15 +1987,16 @@ export const PollList: React.FC = () => {
 
   const displayScopeOptions = useMemo(
     () =>
-      scopeOptions.map((option) => ({
-        ...option,
-        count:
-          option.value === 'all'
-            ? scopedCounts.all
-            : option.value === 'mine'
-              ? scopedCounts.mine
-              : scopedCounts.guest,
-      })),
+      scopeOptions.map((option) => {
+        let count = scopedCounts.guest;
+        if (option.value === 'all') {
+          count = scopedCounts.all;
+        } else if (option.value === 'mine') {
+          count = scopedCounts.mine;
+        }
+
+        return { ...option, count };
+      }),
     [scopedCounts],
   );
 
@@ -989,7 +2450,7 @@ export const PollList: React.FC = () => {
       }, 2000);
     } catch (err) {
       console.error('[picky] failed to copy poll link', err);
-      window.alert('링크 복사에 실패했습니다.');
+      globalThis.alert('링크 복사에 실패했습니다.');
     }
   };
 
@@ -1012,7 +2473,7 @@ export const PollList: React.FC = () => {
       }, 2000);
     } catch (err) {
       console.error('[picky] failed to copy poll embed code', err);
-      window.alert('임베드 코드 복사에 실패했습니다.');
+      globalThis.alert('임베드 코드 복사에 실패했습니다.');
     }
   };
 
@@ -1050,6 +2511,16 @@ export const PollList: React.FC = () => {
     savePinnedPollIds([]);
     setPinnedPollIds([]);
   };
+
+  const handleResetFilters = () => {
+    setScope('all');
+    setQuery('');
+    setSearchInput('');
+    setSortBy('latest');
+    setSignal('all');
+  };
+
+  const emptyStateHint = resolveEmptyStateHint(hasActiveFilters, Boolean(userId && isGuest));
 
   return (
     <section
@@ -1786,666 +3257,23 @@ export const PollList: React.FC = () => {
           }}
         />
       </button>
-
-      {operatorToolsExpanded ? (
-        <>
-          <section
-            ref={flowSectionRef}
-            className="desktop-only"
-            aria-label="의사결정 운영 흐름"
-            style={{
-              display: 'grid',
-              gap: '0.85rem',
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'flex-end',
-                gap: '0.9rem',
-                flexWrap: 'wrap',
-              }}
-            >
-              <div style={{ display: 'grid', gap: '0.25rem' }}>
-                <span
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    color: 'var(--brand-accent-teal)',
-                    fontSize: '0.68rem',
-                    fontWeight: 900,
-                    letterSpacing: '0.05em',
-                  }}
-                >
-                  <Sparkles size={13} />
-                  결정 흐름
-                </span>
-                <h2
-                  style={{
-                    margin: 0,
-                    color: 'var(--text-primary)',
-                    fontSize: '1rem',
-                    fontWeight: 900,
-                  }}
-                >
-                  생성부터 후속 결정까지 한 번에 이어지는 운영 흐름
-                </h2>
-              </div>
-              <button
-                type="button"
-                onClick={() => navigate('/create')}
-                className="btn-primary"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '8px 12px',
-                  fontSize: '0.75rem',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                <Plus size={14} />새 투표 만들기
-              </button>
-            </div>
-
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
-                gap: '0.7rem',
-              }}
-            >
-              {decisionFlowCards.map((card) => {
-                const FlowIcon = card.icon;
-
-                return (
-                  <article
-                    key={card.key}
-                    className="press-tile"
-                    style={{
-                      minWidth: 0,
-                      minHeight: '168px',
-                      display: 'grid',
-                      gap: '0.55rem',
-                      alignContent: 'start',
-                      border: '1px solid var(--bg-card-border)',
-                      borderRadius: 'var(--radius-sm)',
-                      background: 'rgba(255,255,255,0.028)',
-                      padding: '0.88rem',
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        gap: '0.6rem',
-                      }}
-                    >
-                      <span
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          color: card.tone,
-                          fontSize: '0.68rem',
-                          fontWeight: 900,
-                        }}
-                      >
-                        <FlowIcon size={14} />
-                        {card.label}
-                      </span>
-                      <span
-                        style={{
-                          border: '1px solid rgba(255,255,255,0.08)',
-                          borderRadius: '999px',
-                          color: 'var(--text-muted)',
-                          padding: '2px 7px',
-                          fontSize: '0.62rem',
-                          fontWeight: 900,
-                        }}
-                      >
-                        {card.step}
-                      </span>
-                    </div>
-                    <strong
-                      style={{
-                        color: 'var(--text-primary)',
-                        fontSize: '0.98rem',
-                        lineHeight: 1.32,
-                      }}
-                    >
-                      {card.title}
-                    </strong>
-                    <span
-                      style={{
-                        color: card.tone,
-                        fontSize: '0.8rem',
-                        fontWeight: 900,
-                      }}
-                    >
-                      {card.metric}
-                    </span>
-                    <p
-                      style={{
-                        margin: 0,
-                        color: 'var(--text-secondary)',
-                        fontSize: '0.7rem',
-                        lineHeight: 1.48,
-                      }}
-                    >
-                      {card.help}
-                    </p>
-                    <button
-                      type="button"
-                      className="ghost-btn"
-                      onClick={() => {
-                        if (card.key === 'create') {
-                          navigate('/create');
-                          return;
-                        }
-                        if (card.key === 'launch') {
-                          document.getElementById('join-code-input')?.focus();
-                          return;
-                        }
-                        if (card.key === 'live') {
-                          setSignal('all');
-                          setScope('all');
-                          return;
-                        }
-                        setSortBy('popular');
-                      }}
-                      style={{
-                        justifySelf: 'start',
-                        alignSelf: 'end',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '5px',
-                        padding: '5px 9px',
-                        fontSize: '0.66rem',
-                        marginTop: 'auto',
-                      }}
-                    >
-                      {card.actionLabel}
-                      <ArrowRight size={12} />
-                    </button>
-                  </article>
-                );
-              })}
-            </div>
-
-            <div
-              style={{
-                display: 'flex',
-                gap: '0.45rem',
-                flexWrap: 'wrap',
-              }}
-              aria-label="배포 및 분석 채널"
-            >
-              {launchSurfaceChips.map((chip) => {
-                const ChipIcon = chip.icon;
-
-                return (
-                  <span
-                    key={chip.label}
-                    className="stat-pill"
-                    style={{
-                      color: 'var(--text-secondary)',
-                      borderColor: 'rgba(45, 212, 191, 0.18)',
-                      background: 'rgba(45, 212, 191, 0.045)',
-                    }}
-                  >
-                    <ChipIcon size={12} />
-                    {chip.label}
-                  </span>
-                );
-              })}
-            </div>
-          </section>
-
-          <section
-            ref={insightSectionRef}
-            className="content-card desktop-only"
-            style={{
-              padding: '1rem',
-              display: 'grid',
-              gap: '0.85rem',
-              cursor: 'default',
-              borderColor: 'rgba(45, 212, 191, 0.16)',
-              background:
-                'linear-gradient(135deg, rgba(45, 212, 191, 0.045), rgba(250, 204, 21, 0.025))',
-            }}
-            aria-label="투표 운영 인사이트"
-          >
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'flex-start',
-                gap: '0.85rem',
-                flexWrap: 'wrap',
-              }}
-            >
-              <div style={{ display: 'grid', gap: '0.22rem' }}>
-                <span
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    color: 'var(--brand-accent-teal)',
-                    fontSize: '0.68rem',
-                    fontWeight: 900,
-                    letterSpacing: '0.05em',
-                  }}
-                >
-                  <Sparkles size={13} />
-                  실시간 운영
-                </span>
-                <h2
-                  style={{
-                    margin: 0,
-                    color: 'var(--text-primary)',
-                    fontSize: '0.98rem',
-                    fontWeight: 900,
-                  }}
-                >
-                  공유 후 응답 흐름 한눈에 보기
-                </h2>
-              </div>
-              <span
-                style={{
-                  border: '1px solid rgba(45, 212, 191, 0.26)',
-                  borderRadius: '999px',
-                  color: 'var(--brand-accent-teal)',
-                  background: 'rgba(45, 212, 191, 0.07)',
-                  padding: '5px 10px',
-                  fontSize: '0.68rem',
-                  fontWeight: 900,
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                열린 투표 {openPollCount}개
-              </span>
-            </div>
-
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
-                gap: '0.65rem',
-              }}
-            >
-              {operatorInsightCards.map((card) => {
-                const CardIcon = card.icon;
-
-                return (
-                  <button
-                    key={card.key}
-                    type="button"
-                    className="press-tile"
-                    onClick={() => {
-                      setSignal(card.signal);
-                      setScope('all');
-                    }}
-                    style={{
-                      border: '1px solid rgba(255, 255, 255, 0.09)',
-                      borderRadius: 'var(--radius-sm)',
-                      background: 'var(--bg-card)',
-                      color: 'var(--text-primary)',
-                      padding: '0.82rem',
-                      display: 'grid',
-                      gap: '0.42rem',
-                      textAlign: 'left',
-                      cursor: 'pointer',
-                      minHeight: '132px',
-                    }}
-                  >
-                    <span
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        color: card.tone,
-                        fontSize: '0.68rem',
-                        fontWeight: 900,
-                      }}
-                    >
-                      <CardIcon size={14} />
-                      {card.label}
-                    </span>
-                    <strong
-                      style={{
-                        color: 'var(--text-primary)',
-                        fontSize: '1.28rem',
-                        lineHeight: 1.1,
-                      }}
-                    >
-                      {card.value}
-                    </strong>
-                    <span
-                      style={{
-                        color: 'var(--text-secondary)',
-                        fontSize: '0.68rem',
-                        lineHeight: 1.45,
-                      }}
-                    >
-                      {card.help}
-                    </span>
-                    <span
-                      style={{
-                        color: card.tone,
-                        fontSize: '0.64rem',
-                        fontWeight: 900,
-                        marginTop: 'auto',
-                      }}
-                    >
-                      관련 투표 보기
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-
-          <section
-            className="content-card desktop-only"
-            style={{
-              padding: '1rem',
-              display: 'grid',
-              gap: '0.85rem',
-              cursor: 'default',
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'flex-start',
-                gap: '0.85rem',
-                flexWrap: 'wrap',
-              }}
-            >
-              <div style={{ display: 'grid', gap: '0.2rem' }}>
-                <h2
-                  style={{
-                    margin: 0,
-                    color: 'var(--text-primary)',
-                    fontSize: '0.96rem',
-                    fontWeight: 900,
-                  }}
-                >
-                  지금 참여하면 좋은 고민
-                </h2>
-                <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.76rem' }}>
-                  참여 대기, 접전, 피드백 활발 상태를 기준으로 바로 들어갈 투표를 추천합니다.
-                </p>
-              </div>
-              <span
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  color: 'var(--brand-accent-teal)',
-                  border: '1px solid rgba(45, 212, 191, 0.28)',
-                  borderRadius: '999px',
-                  background: 'rgba(45, 212, 191, 0.08)',
-                  padding: '5px 10px',
-                  fontSize: '0.68rem',
-                  fontWeight: 900,
-                }}
-              >
-                <Sparkles size={13} />
-                실시간 인기
-              </span>
-            </div>
-
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
-                gap: '0.7rem',
-              }}
-            >
-              {recommendationCards.map((card) => {
-                const CardIcon = card.icon;
-                const poll = card.poll;
-                return (
-                  <article
-                    key={card.key}
-                    style={{
-                      minWidth: 0,
-                      display: 'grid',
-                      gap: '0.55rem',
-                      alignContent: 'start',
-                      border: '1px solid var(--bg-card-border)',
-                      borderRadius: 'var(--radius-sm)',
-                      background: poll ? 'rgba(255,255,255,0.025)' : 'rgba(250, 204, 21, 0.035)',
-                      padding: '0.85rem',
-                    }}
-                  >
-                    <span
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        color: card.tone,
-                        fontSize: '0.66rem',
-                        fontWeight: 900,
-                        letterSpacing: '0.05em',
-                      }}
-                    >
-                      <CardIcon size={13} />
-                      {card.eyebrow}
-                    </span>
-                    <strong
-                      style={{
-                        color: 'var(--text-primary)',
-                        fontSize: '0.9rem',
-                        lineHeight: 1.38,
-                        overflowWrap: 'anywhere',
-                      }}
-                    >
-                      {poll ? poll.question : card.emptyTitle}
-                    </strong>
-                    <p
-                      style={{
-                        margin: 0,
-                        color: 'var(--text-muted)',
-                        fontSize: '0.7rem',
-                        lineHeight: 1.45,
-                        display: '-webkit-box',
-                        overflow: 'hidden',
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: 'vertical',
-                      }}
-                    >
-                      {poll ? card.help : card.emptyHelp}
-                    </p>
-                    <div
-                      style={{
-                        display: 'flex',
-                        gap: '0.4rem',
-                        flexWrap: 'wrap',
-                        color: 'var(--text-muted)',
-                        fontSize: '0.66rem',
-                      }}
-                    >
-                      {poll ? (
-                        <>
-                          <span className="stat-pill">{poll.totalVotes}표</span>
-                          <span className="stat-pill">{poll.comments.length}의견</span>
-                          <span className="stat-pill">{formatPollEndAt(poll)}</span>
-                        </>
-                      ) : (
-                        <span className="stat-pill">새 투표 생성 추천</span>
-                      )}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (poll) {
-                          setCurrentPoll(poll);
-                          navigate(`/poll/${poll.id}`);
-                          return;
-                        }
-                        navigate('/create');
-                      }}
-                      className="ghost-btn"
-                      style={{
-                        justifySelf: 'start',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '5px',
-                        padding: '6px 10px',
-                        fontSize: '0.7rem',
-                      }}
-                    >
-                      {poll ? '바로 참여' : '새 고민 작성'}
-                      <ArrowRight size={13} />
-                    </button>
-                  </article>
-                );
-              })}
-            </div>
-          </section>
-
-          <section
-            className="content-card desktop-only"
-            style={{
-              padding: '1rem',
-              display: 'grid',
-              gap: '0.85rem',
-              cursor: 'default',
-              borderColor: 'rgba(45, 212, 191, 0.18)',
-              background: 'rgba(45, 212, 191, 0.035)',
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'flex-start',
-                gap: '0.85rem',
-                flexWrap: 'wrap',
-              }}
-            >
-              <div style={{ display: 'grid', gap: '0.2rem' }}>
-                <h2
-                  style={{
-                    margin: 0,
-                    color: 'var(--text-primary)',
-                    fontSize: '0.96rem',
-                    fontWeight: 900,
-                  }}
-                >
-                  라이브 응답 큐
-                </h2>
-                <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.76rem' }}>
-                  현재 목록에서 먼저 처리해야 할 투표 상태를 한눈에 보고 바로 필터링합니다.
-                </p>
-              </div>
-              <span
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  color: 'var(--brand-accent-teal)',
-                  border: '1px solid rgba(45, 212, 191, 0.28)',
-                  borderRadius: '999px',
-                  background: 'rgba(45, 212, 191, 0.08)',
-                  padding: '5px 10px',
-                  fontSize: '0.68rem',
-                  fontWeight: 900,
-                }}
-              >
-                <Eye size={13} />
-                {openPollCount}개 진행 중
-              </span>
-            </div>
-
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-                gap: '0.6rem',
-              }}
-            >
-              {liveQueueItems.map((item) => {
-                const QueueIcon = item.icon;
-                const active = signal === item.signal;
-                const disabled = item.key !== 'all' && item.count === 0;
-
-                return (
-                  <button
-                    key={item.key}
-                    type="button"
-                    onClick={() => {
-                      if (!disabled) {
-                        setSignal(item.signal);
-                      }
-                    }}
-                    aria-pressed={active}
-                    disabled={disabled}
-                    style={{
-                      minWidth: 0,
-                      textAlign: 'left',
-                      display: 'grid',
-                      gap: '0.42rem',
-                      border: active
-                        ? '1px solid rgba(45, 212, 191, 0.46)'
-                        : '1px solid var(--bg-card-border)',
-                      borderRadius: 'var(--radius-sm)',
-                      background: active ? 'rgba(45, 212, 191, 0.1)' : 'rgba(255,255,255,0.025)',
-                      padding: '0.75rem',
-                      color: disabled ? 'var(--text-muted)' : 'var(--text-primary)',
-                      cursor: disabled ? 'not-allowed' : 'pointer',
-                      opacity: disabled ? 0.58 : 1,
-                      fontFamily: 'var(--font-sans)',
-                    }}
-                  >
-                    <span
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '5px',
-                        color: item.tone,
-                        fontSize: '0.68rem',
-                        fontWeight: 900,
-                      }}
-                    >
-                      <QueueIcon size={13} />
-                      {item.label}
-                    </span>
-                    <strong style={{ fontSize: '1.28rem', lineHeight: 1, color: item.tone }}>
-                      {item.count}
-                    </strong>
-                    <small
-                      style={{ color: 'var(--text-muted)', fontSize: '0.66rem', lineHeight: 1.42 }}
-                    >
-                      {item.help}
-                    </small>
-                    <span
-                      style={{
-                        justifySelf: 'start',
-                        border: '1px solid rgba(255,255,255,0.08)',
-                        borderRadius: '999px',
-                        padding: '3px 8px',
-                        color: active ? 'var(--brand-accent-teal)' : 'var(--text-secondary)',
-                        fontSize: '0.62rem',
-                        fontWeight: 900,
-                      }}
-                    >
-                      {active ? '적용 중' : disabled ? '대기 중' : '필터 적용'}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-        </>
-      ) : null}
+      <OperatorToolsPanel
+        visible={operatorToolsExpanded}
+        flowSectionRef={flowSectionRef}
+        insightSectionRef={insightSectionRef}
+        navigate={navigate}
+        setSignal={setSignal}
+        setScope={setScope}
+        setSortBy={setSortBy}
+        setCurrentPoll={setCurrentPoll}
+        openPollCount={openPollCount}
+        signal={signal}
+        decisionFlowCards={decisionFlowCards}
+        launchSurfaceChips={launchSurfaceChips}
+        operatorInsightCards={operatorInsightCards}
+        recommendationCards={recommendationCards}
+        liveQueueItems={liveQueueItems}
+      />
 
       <div
         id="poll-list-anchor"
@@ -2562,10 +3390,17 @@ export const PollList: React.FC = () => {
             {viewMode === 'stack' ? <LayoutList size={12} /> : <LayoutGrid size={12} />}
             <span style={{ fontSize: '0.7rem' }}>{viewMode === 'stack' ? '넓게' : '요약'}</span>
           </button>
-          <div
-            role="group"
+          <fieldset
             aria-label="작성자 범위 필터"
-            style={{ display: 'inline-flex', gap: '6px', flexWrap: 'wrap' }}
+            style={{
+              display: 'inline-flex',
+              gap: '6px',
+              flexWrap: 'wrap',
+              margin: 0,
+              padding: 0,
+              border: 'none',
+              minWidth: 0,
+            }}
           >
             {displayScopeOptions.map((option) => (
               <button
@@ -2594,10 +3429,9 @@ export const PollList: React.FC = () => {
                 {option.label} ({option.count})
               </button>
             ))}
-          </div>
+          </fieldset>
 
-          <div
-            role="group"
+          <fieldset
             aria-label="결정 신호 필터"
             style={{
               flex: '1 1 100%',
@@ -2605,6 +3439,10 @@ export const PollList: React.FC = () => {
               alignItems: 'center',
               gap: '6px',
               flexWrap: 'wrap',
+              minWidth: 0,
+              margin: 0,
+              border: 'none',
+              padding: 0,
               paddingTop: '0.68rem',
               borderTop: '1px solid rgba(255, 255, 255, 0.06)',
             }}
@@ -2632,7 +3470,7 @@ export const PollList: React.FC = () => {
                 {option.label} ({option.count})
               </button>
             ))}
-          </div>
+          </fieldset>
 
           <button
             onClick={() => navigate('/create')}
@@ -2650,569 +3488,35 @@ export const PollList: React.FC = () => {
         </div>
       </div>
 
-      {!normalizedQuery && scope === 'all' ? (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.45rem' }}>
-          <span
-            style={{
-              fontSize: '0.68rem',
-              color: 'var(--text-muted)',
-              display: 'inline-flex',
-              alignItems: 'center',
-            }}
-          >
-            빠른 검색:
-          </span>
-          {quickSeeds.map((seed) => (
-            <button
-              key={seed}
-              type="button"
-              onClick={() => setSearchInput(seed)}
-              className="ghost-inline"
-              style={{
-                padding: '4px 8px',
-                borderRadius: '999px',
-                border: '1px solid var(--bg-card-border)',
-                color: 'var(--text-muted)',
-                fontSize: '0.68rem',
-              }}
-            >
-              {seed}
-            </button>
-          ))}
-        </div>
-      ) : null}
+      <QuickSeedChips
+        normalizedQuery={normalizedQuery}
+        scope={scope}
+        quickSeeds={quickSeeds}
+        setSearchInput={setSearchInput}
+      />
 
-      {hasActiveFilters ? (
-        <div className="content-card" style={{ padding: '0.65rem 0.9rem' }}>
-          <p
-            style={{
-              margin: 0,
-              fontSize: '0.72rem',
-              color: 'var(--text-secondary)',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              flexWrap: 'wrap',
-            }}
-          >
-            <SlidersHorizontal size={12} />
-            <strong style={{ color: 'var(--text-primary)' }}>활성 필터:</strong>
-            {activeFilters.join(' / ')}
-            <button
-              type="button"
-              onClick={() => {
-                setScope('all');
-                setQuery('');
-                setSearchInput('');
-                setSortBy('latest');
-                setSignal('all');
-              }}
-              style={{
-                marginLeft: 'auto',
-                border: '1px solid var(--bg-card-border)',
-                background: 'transparent',
-                color: 'var(--text-muted)',
-                borderRadius: '999px',
-                fontSize: '0.66rem',
-                padding: '4px 8px',
-                cursor: 'pointer',
-              }}
-            >
-              초기화
-            </button>
-          </p>
-        </div>
-      ) : null}
+      <ActiveFiltersBar
+        hasActiveFilters={hasActiveFilters}
+        activeFilters={activeFilters}
+        onResetFilters={handleResetFilters}
+      />
 
-      {isLoading && visiblePolls.length === 0 ? (
-        <div
-          className="content-card"
-          role="status"
-          aria-live="polite"
-          style={{ padding: '1.75rem', display: 'grid', gap: '0.75rem' }}
-        >
-          <p
-            style={{
-              margin: 0,
-              fontSize: '0.82rem',
-              fontWeight: 700,
-              color: 'var(--text-secondary)',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '7px',
-            }}
-          >
-            <span aria-hidden="true" style={{ fontSize: '1.1rem' }}>
-              {MASCOT.thinking.emoji}
-            </span>
-            {VOICE.loading}
-          </p>
-          {Array.from({ length: 3 }).map((_, index) => (
-            <div key={index} style={{ display: 'grid', gap: '0.55rem' }}>
-              <div className="skeleton" style={{ height: '0.8rem', width: '42%' }} />
-              <div className="skeleton" style={{ height: '1.35rem', width: '72%' }} />
-              <div className="skeleton" style={{ height: '0.75rem', width: '56%' }} />
-            </div>
-          ))}
-        </div>
-      ) : visiblePolls.length === 0 ? (
-        <div
-          className="content-card"
-          style={{
-            padding: '4rem 2rem',
-            textAlign: 'center',
-            display: 'grid',
-            gap: '1.1rem',
-            justifyItems: 'center',
-          }}
-        >
-          <span
-            className="empty-state-icon"
-            aria-hidden="true"
-            style={{ fontSize: '3.6rem', lineHeight: 1 }}
-          >
-            {hasActiveFilters ? '🔍' : MASCOT.idle.emoji}
-          </span>
-          <h3 style={{ fontSize: '1.1rem', fontWeight: 800 }}>
-            {hasActiveFilters ? '조건에 맞는 고민이 없어요' : MASCOT.idle.line}
-          </h3>
-          <p
-            style={{
-              fontSize: '0.92rem',
-              color: 'var(--text-secondary)',
-              maxWidth: '460px',
-              lineHeight: 1.65,
-            }}
-          >
-            {hasActiveFilters
-              ? '검색어나 필터를 바꿔서 다시 찾아볼까요?'
-              : userId && isGuest
-                ? '비회원으로도 바로 시작할 수 있어요. 첫 고민을 올리고 친구들에게 링크로 물어보세요 🥑'
-                : '첫 고민을 올리고 친구·동료에게 링크로 빠르게 물어보세요 🥑'}
-          </p>
-          {!hasActiveFilters ? (
-            <p
-              style={{
-                fontSize: '0.78rem',
-                color: 'var(--text-muted)',
-                maxWidth: '460px',
-                lineHeight: 1.6,
-                margin: 0,
-              }}
-            >
-              예시처럼 시작해 보세요 — “점심 메뉴 골라줘”, “회의 안건 우선순위”, “주말 일정 투표”.
-            </p>
-          ) : null}
-          <div
-            style={{
-              display: 'flex',
-              gap: '0.5rem',
-              flexWrap: 'wrap',
-              justifyContent: 'center',
-            }}
-          >
-            {hasActiveFilters ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setScope('all');
-                  setQuery('');
-                  setSearchInput('');
-                  setSortBy('latest');
-                  setSignal('all');
-                }}
-                className="btn-secondary"
-                style={{
-                  padding: '10px 18px',
-                  fontSize: '0.85rem',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                }}
-              >
-                <X size={15} />
-                필터 초기화
-              </button>
-            ) : null}
-            <button
-              onClick={() => navigate('/create')}
-              className="btn-primary"
-              style={{
-                padding: '10px 20px',
-                fontSize: '0.85rem',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '7px',
-              }}
-            >
-              <Plus size={16} />첫 고민 작성하러 가기
-            </button>
-          </div>
-        </div>
-      ) : (
-        <>
-          <p
-            aria-live="polite"
-            style={{
-              margin: 0,
-              fontSize: '0.74rem',
-              color: 'var(--text-muted)',
-              fontWeight: 700,
-            }}
-          >
-            {hasActiveFilters
-              ? `조건에 맞는 고민 ${visiblePolls.length}개`
-              : `고민 ${visiblePolls.length}개`}
-          </p>
-          <div style={{ display: 'grid', gap: '0.9rem' }}>
-            {visiblePolls.map((poll) => {
-              const creatorLabel = getCreatorLabel(poll.creatorId, poll.creatorIsGuest);
-              // Poll 타입에 categoryId 가 아직 없지만 런타임 데이터엔 실릴 수 있어 방어적으로 읽는다.
-              const pollCategory = categoryMeta(
-                (poll as { categoryId?: string | null }).categoryId,
-              );
-              const isMine = userId && poll.creatorId === userId;
-              const isCompact = viewMode === 'compact';
-              const signalLabel = getPollSignalLabel(poll);
-              const endAtLabel = formatPollEndAt(poll);
-              const resultsVisibilityLabel = getPollResultsVisibilityLabel(poll);
-              const attachmentCount = poll.attachments?.length || 0;
-              const compactDescription =
-                poll.description && poll.description.length > 84
-                  ? `${poll.description.slice(0, 81)}...`
-                  : poll.description || '';
-
-              return (
-                <article
-                  key={poll.id}
-                  className="poll-card"
-                  style={{
-                    textAlign: 'left',
-                    padding: isCompact ? '1.05rem' : '1.25rem',
-                    width: '100%',
-                    border: isMine ? '1px solid rgba(99, 102, 241, 0.45)' : undefined,
-                  }}
-                >
-                  {/* 카드 전체를 덮는 접근성 내비 버튼(키보드+마우스). 내부 액션 버튼은
-                      .poll-card 의 z-index 규칙으로 이 오버레이 위에 떠서 따로 동작한다. */}
-                  <button
-                    type="button"
-                    className="poll-card-open"
-                    aria-label={`${poll.question} 투표 페이지로 이동`}
-                    onClick={() => {
-                      setCurrentPoll(poll);
-                      navigate(`/poll/${poll.id}`);
-                    }}
-                  />
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      gap: '0.8rem',
-                      flexWrap: 'wrap',
-                      marginBottom: '0.7rem',
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: 'flex',
-                        gap: '0.35rem',
-                        alignItems: 'center',
-                        flexWrap: 'wrap',
-                      }}
-                    >
-                      <span className="floating-tag">POLL #{poll.id}</span>
-                      {pollCategory ? (
-                        <span
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            fontSize: '0.62rem',
-                            fontWeight: 800,
-                            color: pollCategory.color,
-                            backgroundColor: `${pollCategory.color}1f`,
-                            border: `1px solid ${pollCategory.color}55`,
-                            padding: '2px 8px',
-                            borderRadius: '999px',
-                          }}
-                        >
-                          <span aria-hidden="true">{pollCategory.emoji}</span>
-                          {pollCategory.label}
-                        </span>
-                      ) : null}
-                      <span
-                        style={{
-                          fontSize: '0.62rem',
-                          color: 'var(--text-muted)',
-                          border: '1px solid var(--bg-card-border)',
-                          padding: '2px 8px',
-                          borderRadius: '999px',
-                          fontWeight: 600,
-                        }}
-                      >
-                        {creatorLabel}
-                      </span>
-                      <span
-                        style={{
-                          fontSize: '0.62rem',
-                          border: '1px solid',
-                          padding: '2px 8px',
-                          borderRadius: '999px',
-                          fontWeight: 700,
-                          ...getPollSignalStyle(signalLabel),
-                        }}
-                      >
-                        {signalLabel}
-                      </span>
-                    </div>
-
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        fontSize: '0.64rem',
-                        color: 'var(--text-muted)',
-                      }}
-                    >
-                      <Calendar size={12} />
-                      <span>
-                        {new Date(poll.createdAt).toLocaleDateString([], {
-                          year: '2-digit',
-                          month: 'short',
-                          day: 'numeric',
-                        })}
-                      </span>
-                    </div>
-                  </div>
-
-                  <h3
-                    style={{
-                      color: 'var(--text-primary)',
-                      fontSize: isCompact ? '1rem' : '1.06rem',
-                      fontWeight: 800,
-                      letterSpacing: 0,
-                      lineHeight: 1.45,
-                      marginBottom: '0.4rem',
-                    }}
-                  >
-                    {poll.question}
-                  </h3>
-
-                  {poll.description ? (
-                    <p
-                      style={{
-                        color: 'var(--text-secondary)',
-                        fontSize: isCompact ? '0.74rem' : '0.825rem',
-                        marginBottom: '0.6rem',
-                        display: isCompact ? 'block' : '-webkit-box',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        WebkitLineClamp: isCompact ? 1 : 2,
-                        WebkitBoxOrient: 'vertical',
-                        lineHeight: 1.56,
-                      }}
-                    >
-                      {isCompact ? compactDescription : poll.description}
-                    </p>
-                  ) : null}
-
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      flexWrap: 'wrap',
-                      marginTop: '0.5rem',
-                      marginBottom: '0.6rem',
-                    }}
-                  >
-                    <span
-                      style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600 }}
-                    >
-                      상위 선택지:
-                    </span>
-                    {poll.options.length > 0 ? (
-                      [...poll.options]
-                        .sort((a, b) => b.voteCount - a.voteCount)
-                        .slice(0, 2)
-                        .map((opt) => (
-                          <span
-                            key={opt.id}
-                            style={{
-                              background: 'rgba(255, 255, 255, 0.05)',
-                              border: '1px solid rgba(255, 255, 255, 0.08)',
-                              borderRadius: '8px',
-                              padding: '3px 8px',
-                              fontSize: '0.72rem',
-                              color: 'var(--text-secondary)',
-                              fontWeight: 700,
-                            }}
-                          >
-                            {opt.text}
-                          </span>
-                        ))
-                    ) : (
-                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                        등록 없음
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="poll-card-meta-strip">
-                    <span>
-                      <TimerReset size={12} />
-                      {endAtLabel}
-                    </span>
-                    <span>
-                      <Eye size={12} />
-                      {resultsVisibilityLabel}
-                    </span>
-                    {attachmentCount > 0 ? (
-                      <span style={{ color: 'var(--brand-accent-gold)' }}>
-                        <FileText size={12} />
-                        참고자료 {attachmentCount}개
-                      </span>
-                    ) : null}
-                  </div>
-
-                  <div
-                    style={{
-                      display: 'flex',
-                      flexWrap: 'wrap',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      borderTop: '1px solid rgba(255, 255, 255, 0.06)',
-                      paddingTop: '0.75rem',
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: 'flex',
-                        gap: '0.9rem',
-                        fontSize: '0.74rem',
-                        color: 'var(--text-muted)',
-                      }}
-                    >
-                      <span
-                        style={{
-                          display: 'inline-flex',
-                          gap: '5px',
-                          alignItems: 'center',
-                          color: 'var(--text-secondary)',
-                        }}
-                      >
-                        <Vote size={12} />
-                        <strong style={{ color: 'var(--text-primary)' }}>
-                          {poll.totalVotes}
-                        </strong>{' '}
-                        투표
-                      </span>
-                      <span
-                        style={{
-                          display: 'inline-flex',
-                          gap: '5px',
-                          alignItems: 'center',
-                          color: 'var(--text-secondary)',
-                        }}
-                      >
-                        <MessageSquare size={12} />
-                        <strong style={{ color: 'var(--text-primary)' }}>
-                          {poll.comments.length}
-                        </strong>{' '}
-                        의견
-                      </span>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={(event) => handleGotoPoll(event, poll.id)}
-                      className="btn-primary"
-                      style={{
-                        fontSize: isCompact ? '0.66rem' : '0.7rem',
-                        padding: '7px 13px',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                      }}
-                    >
-                      <span>투표하기</span>
-                      <ArrowRight size={13} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(event) => handleCopyPollLink(event, poll.id)}
-                      className="ghost-btn"
-                      style={{
-                        fontSize: isCompact ? '0.64rem' : '0.68rem',
-                        padding: isCompact ? '5px 9px' : '6px 10px',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                      }}
-                      title={`${poll.id} 링크 복사`}
-                    >
-                      {copiedPollId === poll.id ? <Check size={12} /> : <Copy size={12} />}
-                      <span>{copiedPollId === poll.id ? '복사 완료' : '공유 복사'}</span>
-                      <Link size={11} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(event) => handleCopyPollEmbed(event, poll.id)}
-                      className="ghost-btn"
-                      style={{
-                        fontSize: isCompact ? '0.64rem' : '0.68rem',
-                        padding: isCompact ? '5px 9px' : '6px 10px',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                      }}
-                      title={`${poll.id} 임베드 코드 복사`}
-                    >
-                      {copiedPollId === `embed-${poll.id}` ? (
-                        <Check size={12} />
-                      ) : (
-                        <Code2 size={12} />
-                      )}
-                      <span>{copiedPollId === `embed-${poll.id}` ? '복사 완료' : '임베드'}</span>
-                    </button>
-                  </div>
-                  {copiedPollId === poll.id || copiedPollId === `embed-${poll.id}` ? (
-                    <p
-                      style={{
-                        margin: 0,
-                        marginTop: '6px',
-                        fontSize: '0.64rem',
-                        color: 'var(--brand-accent-teal)',
-                        fontWeight: 700,
-                      }}
-                    >
-                      {copiedPollId === poll.id
-                        ? '링크가 복사되었습니다.'
-                        : '임베드 코드가 복사되었습니다.'}
-                    </p>
-                  ) : null}
-                </article>
-              );
-            })}
-          </div>
-          {query ? (
-            <p
-              style={{
-                margin: '0',
-                fontSize: '0.74rem',
-                color: 'var(--text-muted)',
-                textAlign: 'right',
-              }}
-            >
-              총 {visiblePolls.length}개 결과
-            </p>
-          ) : null}
-        </>
-      )}
+      <PollResultsRegion
+        isLoading={isLoading}
+        visiblePolls={visiblePolls}
+        hasActiveFilters={hasActiveFilters}
+        emptyStateHint={emptyStateHint}
+        query={query}
+        userId={userId}
+        viewMode={viewMode}
+        copiedPollId={copiedPollId}
+        navigate={navigate}
+        onResetFilters={handleResetFilters}
+        setCurrentPoll={setCurrentPoll}
+        handleGotoPoll={handleGotoPoll}
+        handleCopyPollLink={handleCopyPollLink}
+        handleCopyPollEmbed={handleCopyPollEmbed}
+      />
 
       {error ? (
         <div

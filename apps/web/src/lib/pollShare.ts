@@ -10,11 +10,11 @@ const DEFAULT_TWITTER_SITE = '@pickflow_io';
 
 const safeEncode = (value: string): string => encodeURIComponent(value);
 
-const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
+const wait = (ms: number) => new Promise((resolve) => globalThis.setTimeout(resolve, ms));
 
 const trimTrailingSlashes = (value: string): string => {
   let end = value.length;
-  while (end > 0 && value.charCodeAt(end - 1) === 47) {
+  while (end > 0 && value.codePointAt(end - 1) === 47) {
     end -= 1;
   }
   return end === value.length ? value : value.slice(0, end);
@@ -42,11 +42,11 @@ const normalizeOrigin = (value: string | null | undefined): string | null => {
 };
 
 const getRuntimeOrigin = (): string | null => {
-  if (typeof window === 'undefined') {
+  if (typeof globalThis.window === 'undefined') {
     return null;
   }
 
-  return window.location.origin;
+  return globalThis.location.origin;
 };
 
 const parseUrl = (value: string | null | undefined): URL | null => {
@@ -73,7 +73,7 @@ const isLocalHostname = (hostname: string): boolean => {
 const isPublicHttpsUrl = (url: string): boolean => {
   const parsed = parseUrl(url);
 
-  return Boolean(parsed && parsed.protocol === 'https:' && !isLocalHostname(parsed.hostname));
+  return Boolean(parsed?.protocol === 'https:' && !isLocalHostname(parsed.hostname));
 };
 
 const getConfiguredAppOrigin = (): string | null =>
@@ -134,7 +134,7 @@ const setMetaContent = (selector: string, content: string) => {
 
   let element = document.head.querySelector<HTMLMetaElement>(selector);
   if (!element) {
-    const match = selector.match(/^meta\[(name|property)="([^"]+)"\]$/);
+    const match = /^meta\[(name|property)="([^"]+)"\]$/.exec(selector);
     const attributeName = match?.[1];
     const attributeValue = match?.[2];
     if (!attributeName || attributeValue === undefined) {
@@ -172,14 +172,14 @@ const waitForKakaoSdk = async () => {
   const startedAt = Date.now();
 
   while (
-    typeof window !== 'undefined' &&
-    !window.Kakao &&
+    typeof globalThis.window !== 'undefined' &&
+    !globalThis.window.Kakao &&
     Date.now() - startedAt < KAKAO_SDK_WAIT_TIMEOUT_MS
   ) {
     await wait(80);
   }
 
-  return window.Kakao;
+  return globalThis.window.Kakao;
 };
 
 export const buildShareablePollSnapshot = (poll: Poll): string | null => {
@@ -249,7 +249,7 @@ const escapeHtmlAttribute = (value: string): string => {
 };
 
 const escapeScriptString = (value: string): string => {
-  return replaceEvery(replaceEvery(value, '\\', '\\\\'), "'", "\\'");
+  return replaceEvery(replaceEvery(value, '\\', String.raw`\\`), "'", String.raw`\'`);
 };
 
 export type PollEmbedMode = 'standard' | 'compact' | 'popup';
@@ -360,7 +360,7 @@ export const updatePollMetaTags = (poll: Poll | null | undefined) => {
 
   const title = poll ? `${poll.question} | pickflow` : DEFAULT_SHARE_TITLE;
   const description = poll?.description || DEFAULT_SHARE_DESCRIPTION;
-  const url = poll ? resolvePollShareUrl(poll) : window.location.href;
+  const url = poll ? resolvePollShareUrl(poll) : globalThis.location.href;
   const imageUrl = resolvePollImageUrl(poll);
   const imageAlt = poll ? `${poll.question} 투표 미리보기` : 'pickflow 고민 투표 공유 미리보기';
   const publishedTime = poll?.createdAt || new Date().toISOString();
@@ -421,21 +421,36 @@ export type KakaoShareDiagnostics = {
   items: KakaoShareReadinessItem[];
 };
 
-export const getKakaoShareDiagnostics = (poll: Poll): KakaoShareDiagnostics => {
-  const shareUrl = resolvePollShareUrl(poll);
-  const imageUrl = resolvePollImageUrl(poll);
-  const shareUrlInfo = parseUrl(shareUrl);
-  const imageUrlInfo = parseUrl(imageUrl);
-  const shareHostname = shareUrlInfo?.hostname || '';
-  const imageHostname = imageUrlInfo?.hostname || '';
-  const hasKakaoJavascriptKey = Boolean(import.meta.env.VITE_KAKAO_JAVASCRIPT_KEY?.trim());
-  const hasPublicHttpsShareUrl = isPublicHttpsUrl(shareUrl);
-  const hasPollPageShareUrl = Boolean(shareUrlInfo?.pathname.startsWith('/poll/'));
-  const hasPublicHttpsImageUrl = isPublicHttpsUrl(imageUrl);
-  const hasUploadedImage = poll.options.some((option) => Boolean(option.imageUrl));
-  const hasDataUrlImage = poll.options.some((option) => isDataUrl(option.imageUrl));
-  const canUseScrap = false;
-  const items: KakaoShareReadinessItem[] = [
+type KakaoShareSignals = {
+  shareHostname: string;
+  imageHostname: string;
+  hasKakaoJavascriptKey: boolean;
+  hasPublicHttpsShareUrl: boolean;
+  hasPollPageShareUrl: boolean;
+  hasPublicHttpsImageUrl: boolean;
+  hasUploadedImage: boolean;
+  hasDataUrlImage: boolean;
+};
+
+const buildOgImageHelp = (signals: KakaoShareSignals): string => {
+  if (signals.hasPublicHttpsImageUrl) {
+    return `${signals.imageHostname} 이미지 URL을 카카오가 크롤링할 수 있습니다.`;
+  }
+  if (signals.hasUploadedImage && signals.hasDataUrlImage) {
+    return '업로드 이미지는 data URL 그대로 공유하지 않고 서버 이미지 엔드포인트 또는 기본 OG 이미지로 변환되어야 합니다.';
+  }
+  return '기본 OG 이미지도 HTTPS 공개 URL이어야 카카오 미리보기에 안정적으로 표시됩니다.';
+};
+
+const buildKakaoReadinessItems = (signals: KakaoShareSignals): KakaoShareReadinessItem[] => {
+  const {
+    shareHostname,
+    hasKakaoJavascriptKey,
+    hasPublicHttpsShareUrl,
+    hasPollPageShareUrl,
+    hasPublicHttpsImageUrl,
+  } = signals;
+  return [
     {
       id: 'javascript-key',
       label: 'JavaScript 키',
@@ -479,11 +494,7 @@ export const getKakaoShareDiagnostics = (poll: Poll): KakaoShareDiagnostics => {
       status: hasPublicHttpsImageUrl ? 'passed' : 'warning',
       passed: hasPublicHttpsImageUrl,
       blocking: true,
-      help: hasPublicHttpsImageUrl
-        ? `${imageHostname} 이미지 URL을 카카오가 크롤링할 수 있습니다.`
-        : hasUploadedImage && hasDataUrlImage
-          ? '업로드 이미지는 data URL 그대로 공유하지 않고 서버 이미지 엔드포인트 또는 기본 OG 이미지로 변환되어야 합니다.'
-          : '기본 OG 이미지도 HTTPS 공개 URL이어야 카카오 미리보기에 안정적으로 표시됩니다.',
+      help: buildOgImageHelp(signals),
       action: hasPublicHttpsImageUrl
         ? undefined
         : '업로드 이미지 엔드포인트와 /og-default.png가 공개 HTTPS 도메인에서 열리는지 확인하세요.',
@@ -501,6 +512,27 @@ export const getKakaoShareDiagnostics = (poll: Poll): KakaoShareDiagnostics => {
         '이 항목은 브라우저에서 검증할 수 없어 Kakao Developers 콘솔에서 직접 확인해야 합니다.',
     },
   ];
+};
+
+export const getKakaoShareDiagnostics = (poll: Poll): KakaoShareDiagnostics => {
+  const shareUrl = resolvePollShareUrl(poll);
+  const imageUrl = resolvePollImageUrl(poll);
+  const shareUrlInfo = parseUrl(shareUrl);
+  const imageUrlInfo = parseUrl(imageUrl);
+  const shareHostname = shareUrlInfo?.hostname || '';
+  const imageHostname = imageUrlInfo?.hostname || '';
+  const hasKakaoJavascriptKey = Boolean(import.meta.env.VITE_KAKAO_JAVASCRIPT_KEY?.trim());
+  const canUseScrap = false;
+  const items = buildKakaoReadinessItems({
+    shareHostname,
+    imageHostname,
+    hasKakaoJavascriptKey,
+    hasPublicHttpsShareUrl: isPublicHttpsUrl(shareUrl),
+    hasPollPageShareUrl: Boolean(shareUrlInfo?.pathname.startsWith('/poll/')),
+    hasPublicHttpsImageUrl: isPublicHttpsUrl(imageUrl),
+    hasUploadedImage: poll.options.some((option) => Boolean(option.imageUrl)),
+    hasDataUrlImage: poll.options.some((option) => isDataUrl(option.imageUrl)),
+  });
   const blockingItems = items.filter((item) => item.blocking);
   const readyCount = blockingItems.filter((item) => item.passed).length;
   const totalBlockingCount = blockingItems.length;
@@ -524,6 +556,58 @@ const isKakaoScrapableUrl = (url: string): boolean => {
   return isPublicHttpsUrl(url);
 };
 
+const buildKakaoFeedPayload = (poll: Poll, shareUrl: string) => {
+  const link = {
+    mobileWebUrl: shareUrl,
+    webUrl: shareUrl,
+  };
+  return {
+    objectType: 'feed' as const,
+    content: {
+      title: poll.question,
+      description: poll.description || '결정에 참여하고 의견을 남겨주세요.',
+      imageUrl: resolvePollImageUrl(poll),
+      link,
+    },
+    buttons: [
+      {
+        title: '투표하러 가기',
+        link,
+      },
+    ],
+  };
+};
+
+const trySharePollViaKakaoSdk = async (
+  poll: Poll,
+  shareUrl: string,
+  kakaoKey: string,
+  canUseScrap: boolean,
+): Promise<boolean> => {
+  const kakao = await waitForKakaoSdk();
+  if (kakao?.Share) {
+    if (!kakao.isInitialized()) {
+      kakao.init(kakaoKey);
+    }
+    if (canUseScrap && isKakaoScrapableUrl(shareUrl) && kakao.Share.sendScrap) {
+      kakao.Share.sendScrap({ requestUrl: shareUrl });
+    } else {
+      kakao.Share.sendDefault(buildKakaoFeedPayload(poll, shareUrl));
+    }
+    return true;
+  }
+
+  if (kakao?.Link) {
+    if (!kakao.isInitialized()) {
+      kakao.init(kakaoKey);
+    }
+    kakao.Link.sendDefault(buildKakaoFeedPayload(poll, shareUrl));
+    return true;
+  }
+
+  return false;
+};
+
 export const sharePollToKakao = async (
   poll: Poll,
 ): Promise<'kakao' | 'web-share' | 'clipboard'> => {
@@ -532,69 +616,14 @@ export const sharePollToKakao = async (
   const shareMessageText = buildPollShareMessage(poll);
   const kakaoKey = import.meta.env.VITE_KAKAO_JAVASCRIPT_KEY?.trim();
 
-  if (kakaoKey && typeof window !== 'undefined') {
-    const kakao = await waitForKakaoSdk();
-    if (kakao?.Share) {
-      if (!kakao.isInitialized()) {
-        kakao.init(kakaoKey);
-      }
-
-      if (kakaoDiagnostics.canUseScrap && isKakaoScrapableUrl(shareUrl) && kakao.Share.sendScrap) {
-        kakao.Share.sendScrap({
-          requestUrl: shareUrl,
-        });
-      } else {
-        kakao.Share.sendDefault({
-          objectType: 'feed',
-          content: {
-            title: poll.question,
-            description: poll.description || '결정에 참여하고 의견을 남겨주세요.',
-            imageUrl: resolvePollImageUrl(poll),
-            link: {
-              mobileWebUrl: shareUrl,
-              webUrl: shareUrl,
-            },
-          },
-          buttons: [
-            {
-              title: '투표하러 가기',
-              link: {
-                mobileWebUrl: shareUrl,
-                webUrl: shareUrl,
-              },
-            },
-          ],
-        });
-      }
-      return 'kakao';
-    }
-
-    if (kakao?.Link) {
-      if (!kakao.isInitialized()) {
-        kakao.init(kakaoKey);
-      }
-
-      kakao.Link.sendDefault({
-        objectType: 'feed',
-        content: {
-          title: poll.question,
-          description: poll.description || '결정에 참여하고 의견을 남겨주세요.',
-          imageUrl: resolvePollImageUrl(poll),
-          link: {
-            mobileWebUrl: shareUrl,
-            webUrl: shareUrl,
-          },
-        },
-        buttons: [
-          {
-            title: '투표하러 가기',
-            link: {
-              mobileWebUrl: shareUrl,
-              webUrl: shareUrl,
-            },
-          },
-        ],
-      });
+  if (kakaoKey && typeof globalThis.window !== 'undefined') {
+    const sharedViaKakao = await trySharePollViaKakaoSdk(
+      poll,
+      shareUrl,
+      kakaoKey,
+      kakaoDiagnostics.canUseScrap,
+    );
+    if (sharedViaKakao) {
       return 'kakao';
     }
   }

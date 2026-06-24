@@ -8,7 +8,8 @@ export default async function handler(req: any, res: any) {
 
     const rest = requestUrl.searchParams.toString();
     const normalizedPath = pathMatch.replace(/^\/+/, '');
-    req.url = `/api/${normalizedPath}${rest ? `?${rest}` : ''}`;
+    const query = rest ? `?${rest}` : '';
+    req.url = `/api/${normalizedPath}${query}`;
   }
 
   const handler = await getApiRequestHandler();

@@ -17,11 +17,11 @@ import { copyText } from '../lib/pollShare';
 type CommentSignal = 'support' | 'risk' | 'question' | 'neutral';
 type RunbookStatus = 'done' | 'current' | 'pending';
 
-type LiveFacilitationConsoleProps = {
+type LiveFacilitationConsoleProps = Readonly<{
   poll: Poll;
   shareUrl: string;
   pollClosed: boolean;
-};
+}>;
 
 const SIGNAL_LABELS: Record<CommentSignal, string> = {
   support: '찬성 근거',
@@ -225,7 +225,7 @@ export function LiveFacilitationConsole({
     try {
       await copyText(facilitation.liveBrief);
       setCopied(true);
-      window.setTimeout(() => setCopied(false), 2200);
+      globalThis.setTimeout(() => setCopied(false), 2200);
     } catch (err) {
       console.error('facilitation brief copy failed', err);
     }
@@ -380,6 +380,10 @@ export function LiveFacilitationConsole({
             {facilitation.runbook.map((item) => {
               const active = item.status === 'current';
               const done = item.status === 'done';
+              const activeBorderColor = active
+                ? 'var(--brand-accent-gold)'
+                : 'rgba(148, 163, 184, 0.24)';
+              const borderColor = done ? 'var(--brand-accent-teal)' : activeBorderColor;
 
               return (
                 <article
@@ -387,13 +391,7 @@ export function LiveFacilitationConsole({
                   style={{
                     display: 'grid',
                     gap: '0.3rem',
-                    borderLeft: `3px solid ${
-                      done
-                        ? 'var(--brand-accent-teal)'
-                        : active
-                          ? 'var(--brand-accent-gold)'
-                          : 'rgba(148, 163, 184, 0.24)'
-                    }`,
+                    borderLeft: `3px solid ${borderColor}`,
                     paddingLeft: '0.65rem',
                   }}
                 >

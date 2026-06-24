@@ -191,16 +191,16 @@ const AUTO_SAVE_INTERVAL_MS = 700;
 const MAX_IMAGE_SOURCE_BYTES = 5 * 1024 * 1024;
 const MAX_IMAGE_DATA_URL_BYTES = 140 * 1024;
 const IMAGE_OUTPUT_MAX_SIDE = 720;
-const SUPPORTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const SUPPORTED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const MAX_ATTACHMENTS = 3;
 const MAX_ATTACHMENT_FILE_BYTES = 300 * 1024;
 const MAX_ATTACHMENT_DATA_URL_BYTES = 420 * 1024;
-const SUPPORTED_ATTACHMENT_TYPES = [
+const SUPPORTED_ATTACHMENT_TYPES = new Set([
   'application/pdf',
   'text/plain',
   'text/csv',
   'application/json',
-];
+]);
 
 const DEADLINE_PRESETS: Array<{ value: DeadlinePreset; label: string }> = [
   { value: 'none', label: '마감 없음' },
@@ -283,7 +283,7 @@ const resolveDeadlinePresetValue = (preset: DeadlinePreset): string => {
 };
 
 const loadDraftFromStorage = (): PollDraft | null => {
-  if (typeof window === 'undefined') {
+  if (typeof globalThis.window === 'undefined') {
     return null;
   }
 
@@ -376,7 +376,7 @@ const loadDraftFromStorage = (): PollDraft | null => {
 };
 
 const clearDraftStorage = () => {
-  if (typeof window === 'undefined') {
+  if (typeof globalThis.window === 'undefined') {
     return;
   }
 
@@ -384,7 +384,7 @@ const clearDraftStorage = () => {
 };
 
 const saveDraftToStorage = (draft: PollDraft) => {
-  if (typeof window === 'undefined') {
+  if (typeof globalThis.window === 'undefined') {
     return;
   }
 
@@ -426,7 +426,7 @@ const loadImageElement = (src: string): Promise<HTMLImageElement> => {
 };
 
 const compressImageFile = async (file: File): Promise<string> => {
-  if (!SUPPORTED_IMAGE_TYPES.includes(file.type)) {
+  if (!SUPPORTED_IMAGE_TYPES.has(file.type)) {
     throw new Error('JPG, PNG, WebP 이미지만 업로드할 수 있습니다.');
   }
 
@@ -459,6 +459,2849 @@ const compressImageFile = async (file: File): Promise<string> => {
 
   return compressed;
 };
+
+const buildLaunchActionItems = (args: {
+  hasQuestionShape: boolean;
+  hasLoadedWording: boolean;
+  responseEffort: string;
+  normalizedDescriptionLength: number;
+  imageOptionCount: number;
+  attachmentsLength: number;
+  evidenceValue: string;
+}): Array<{ label: string; ready: boolean; value: string; action: string }> => {
+  const {
+    hasQuestionShape,
+    hasLoadedWording,
+    responseEffort,
+    normalizedDescriptionLength,
+    imageOptionCount,
+    attachmentsLength,
+    evidenceValue,
+  } = args;
+  const hasEvidence =
+    normalizedDescriptionLength >= 20 || imageOptionCount > 0 || attachmentsLength > 0;
+
+  return [
+    {
+      label: '질문 형태',
+      ready: hasQuestionShape,
+      value: hasQuestionShape ? '질문형 문장' : '질문 끝을 ?로 마무리',
+      action: hasQuestionShape
+        ? '공유 카드에서 질문 의도가 명확하게 보입니다.'
+        : '응답자가 바로 판단할 수 있도록 질문형 문장으로 다듬어 보세요.',
+    },
+    {
+      label: '편향 표현',
+      ready: !hasLoadedWording,
+      value: hasLoadedWording ? '강한 유도어 감지' : '중립 문장',
+      action: hasLoadedWording
+        ? '무조건, 최고, 최악 같은 단어는 결과를 한쪽으로 유도할 수 있습니다.'
+        : '응답자가 자기 기준으로 고르기 좋은 톤입니다.',
+    },
+    {
+      label: '응답 부담',
+      ready: responseEffort !== '높음',
+      value: `부담 ${responseEffort}`,
+      action:
+        responseEffort === '높음'
+          ? '설명이 길거나 선택지가 복잡합니다. 선택지 문장을 줄이면 모바일 참여율이 좋아집니다.'
+          : '짧은 시간 안에 읽고 선택할 수 있는 구조입니다.',
+    },
+    {
+      label: '판단 근거',
+      ready: hasEvidence,
+      value: evidenceValue,
+      action: hasEvidence
+        ? '투표자가 선택 기준을 이해할 수 있는 자료가 있습니다.'
+        : '짧은 배경 설명이나 참고 파일을 추가하면 선택 이유가 더 잘 모입니다.',
+    },
+  ];
+};
+
+const buildSurveyCoachItems = (args: {
+  hasQuestionShape: boolean;
+  hasLoadedWording: boolean;
+  nonEmptyOptionsLength: number;
+  longOptionCount: number;
+  averageOptionLength: number;
+  responseEffort: string;
+}): Array<{ label: string; passed: boolean; value: string; help: string }> => {
+  const {
+    hasQuestionShape,
+    hasLoadedWording,
+    nonEmptyOptionsLength,
+    longOptionCount,
+    averageOptionLength,
+    responseEffort,
+  } = args;
+
+  return [
+    {
+      label: '한 질문 한 결정',
+      passed: hasQuestionShape,
+      value: hasQuestionShape ? '명확함' : '질문형으로 다듬기',
+      help: '응답자는 질문이 짧고 끝이 분명할수록 바로 선택합니다.',
+    },
+    {
+      label: '편향 표현',
+      passed: !hasLoadedWording,
+      value: hasLoadedWording ? '강한 표현 감지' : '중립적',
+      help: '무조건, 당연히, 최고 같은 표현은 선택을 유도할 수 있습니다.',
+    },
+    {
+      label: '모바일 선택 부담',
+      passed: nonEmptyOptionsLength >= 2 && nonEmptyOptionsLength <= 6 && longOptionCount === 0,
+      value:
+        nonEmptyOptionsLength > 0
+          ? `평균 ${averageOptionLength}자 · 긴 선택지 ${longOptionCount}개`
+          : '선택지 대기',
+      help: '짧은 선택지 2~6개가 모바일 단톡방 응답에 가장 안정적입니다.',
+    },
+    {
+      label: '응답 부담',
+      passed: responseEffort !== '높음',
+      value: responseEffort,
+      help: '설명이 길거나 선택지가 많으면 공유 후 이탈 가능성이 커집니다.',
+    },
+  ];
+};
+
+const buildParticipantExperienceItems = (args: {
+  shareReady: boolean;
+  estimatedReadSeconds: number;
+  responseEffort: string;
+  imageOptionCount: number;
+  nonEmptyOptionsLength: number;
+  attachmentsLength: number;
+  normalizedDescriptionLength: number;
+  resultsVisibilityLabel: string;
+  deadlineLabel: string;
+  endsAtLocal: string;
+  isEndsAtInvalid: boolean;
+}): ParticipantExperienceItem[] => {
+  const {
+    shareReady,
+    estimatedReadSeconds,
+    responseEffort,
+    imageOptionCount,
+    nonEmptyOptionsLength,
+    attachmentsLength,
+    normalizedDescriptionLength,
+    resultsVisibilityLabel,
+    deadlineLabel,
+    endsAtLocal,
+    isEndsAtInvalid,
+  } = args;
+
+  return [
+    {
+      label: '첫 화면 집중도',
+      icon: Smartphone,
+      value: shareReady ? `${estimatedReadSeconds}초 안에 읽기` : '질문/선택지 대기',
+      help: shareReady
+        ? '참여자가 링크를 열었을 때 질문과 선택지를 한 번에 훑을 수 있습니다.'
+        : '질문과 최소 2개 선택지를 입력해야 실제 참여 화면이 완성됩니다.',
+      ready: shareReady && responseEffort !== '높음',
+    },
+    {
+      label: '시각 자료',
+      icon: ImageIcon,
+      value: imageOptionCount > 0 ? `이미지 ${imageOptionCount}개` : '텍스트 중심',
+      help:
+        imageOptionCount > 0
+          ? '이미지가 있는 선택지는 비교 판단과 공유 미리보기에서 더 잘 드러납니다.'
+          : '비교가 어려운 항목이면 선택지 이미지 업로드를 고려하세요.',
+      ready: imageOptionCount > 0 || nonEmptyOptionsLength <= 4,
+    },
+    {
+      label: '참고 자료',
+      icon: FileText,
+      value: attachmentsLength > 0 ? `첨부 ${attachmentsLength}개` : '첨부 없음',
+      help:
+        attachmentsLength > 0
+          ? '참여자가 상세 화면에서 자료를 보고 선택 이유를 남길 수 있습니다.'
+          : '근거가 필요한 투표라면 작은 PDF/TXT/CSV/JSON 파일을 첨부할 수 있습니다.',
+      ready: attachmentsLength > 0 || normalizedDescriptionLength >= 20,
+    },
+    {
+      label: '운영 신호',
+      icon: TimerReset,
+      value: `${resultsVisibilityLabel} · ${deadlineLabel}`,
+      help: endsAtLocal
+        ? '마감이 있으면 공유 메시지와 리마인더에서 행동 시점이 분명해집니다.'
+        : '상시 투표는 부담이 낮지만 응답을 모으는 긴급성은 약합니다.',
+      ready: !isEndsAtInvalid,
+    },
+  ];
+};
+
+const buildShareReadinessItems = (args: {
+  shareReady: boolean;
+  imageOptionCount: number;
+  isEndsAtInvalid: boolean;
+  deadlineLabel: string;
+}): ShareReadinessItem[] => {
+  const { shareReady, imageOptionCount, isEndsAtInvalid, deadlineLabel } = args;
+
+  return [
+    {
+      label: '참여 링크',
+      icon: Link2,
+      ready: shareReady,
+      value: shareReady ? '생성 즉시 발급' : '질문과 선택지 필요',
+    },
+    {
+      label: '카카오 OG',
+      icon: Share2,
+      ready: shareReady,
+      value: imageOptionCount > 0 ? '업로드 이미지 반영' : '기본 이미지 사용',
+    },
+    {
+      label: '임베드 코드',
+      icon: Code2,
+      ready: shareReady,
+      value: shareReady ? '웹사이트 삽입 가능' : '생성 후 복사 가능',
+    },
+    {
+      label: '운영 상태',
+      icon: TimerReset,
+      ready: !isEndsAtInvalid,
+      value: deadlineLabel,
+    },
+  ];
+};
+
+const resolveFirstPublishBlockedReason = (args: {
+  normalizedQuestionLength: number;
+  normalizedDescriptionLength: number;
+  nonEmptyOptionsLength: number;
+  hasDuplicateOptions: boolean;
+  isEndsAtInvalid: boolean;
+  attachmentsLength: number;
+  isLoading: boolean;
+}): string | undefined => {
+  const {
+    normalizedQuestionLength,
+    normalizedDescriptionLength,
+    nonEmptyOptionsLength,
+    hasDuplicateOptions,
+    isEndsAtInvalid,
+    attachmentsLength,
+    isLoading,
+  } = args;
+
+  return [
+    normalizedQuestionLength < 2 ? '질문을 2자 이상 입력해야 합니다.' : null,
+    normalizedQuestionLength > 100 ? '질문은 100자 이하로 줄여야 합니다.' : null,
+    normalizedDescriptionLength > 500 ? '상세 내용은 500자 이하로 줄여야 합니다.' : null,
+    nonEmptyOptionsLength < 2 ? '선택지는 최소 2개 필요합니다.' : null,
+    hasDuplicateOptions ? '중복된 선택지 텍스트를 정리해야 합니다.' : null,
+    isEndsAtInvalid ? '마감 시간은 현재보다 최소 1분 이후여야 합니다.' : null,
+    attachmentsLength > MAX_ATTACHMENTS ? '첨부파일은 최대 3개까지 등록할 수 있습니다.' : null,
+    isLoading ? '투표 생성 요청을 처리 중입니다.' : null,
+  ].find((item): item is string => item !== null);
+};
+
+const buildPublishReviewItems = (args: {
+  normalizedQuestion: string;
+  nonEmptyOptionsLength: number;
+  hasDuplicateOptions: boolean;
+  imageOptionCount: number;
+  attachmentsLength: number;
+  isEndsAtInvalid: boolean;
+  resultsVisibilityLabel: string;
+  deadlineLabel: string;
+}): Array<{ label: string; ready: boolean; value: string; help: string }> => {
+  const {
+    normalizedQuestion,
+    nonEmptyOptionsLength,
+    hasDuplicateOptions,
+    imageOptionCount,
+    attachmentsLength,
+    isEndsAtInvalid,
+    resultsVisibilityLabel,
+    deadlineLabel,
+  } = args;
+
+  return [
+    {
+      label: '질문',
+      ready: normalizedQuestion.length >= 2 && normalizedQuestion.length <= 100,
+      value: normalizedQuestion ? `${normalizedQuestion.length}/100자` : '입력 필요',
+      help: normalizedQuestion || '공유 카드의 제목으로 쓰입니다.',
+    },
+    {
+      label: '선택지',
+      ready: nonEmptyOptionsLength >= 2 && !hasDuplicateOptions,
+      value: `${nonEmptyOptionsLength}개`,
+      help: hasDuplicateOptions ? '중복 선택지를 제거하세요.' : '응답자가 고를 항목입니다.',
+    },
+    {
+      label: '업로드 이미지',
+      ready: true,
+      value: imageOptionCount > 0 ? `${imageOptionCount}개 포함` : '이미지 없이 생성',
+      help:
+        imageOptionCount > 0
+          ? '선택지 이미지와 OG 미리보기에 반영됩니다.'
+          : '필요하면 선택지별 업로드 버튼으로 파일을 추가할 수 있습니다.',
+    },
+    {
+      label: '첨부파일',
+      ready: attachmentsLength <= MAX_ATTACHMENTS,
+      value: attachmentsLength > 0 ? `${attachmentsLength}개 첨부` : '파일 없이 생성',
+      help:
+        attachmentsLength > 0
+          ? '참여자가 상세 화면에서 참고 파일을 내려받을 수 있습니다.'
+          : '필요하면 PDF/TXT/CSV/JSON 파일을 첨부할 수 있습니다.',
+    },
+    {
+      label: '운영 설정',
+      ready: !isEndsAtInvalid,
+      value: `${resultsVisibilityLabel} · ${deadlineLabel}`,
+      help: '마감과 결과 공개 정책은 생성 후 참여 흐름에 영향을 줍니다.',
+    },
+  ];
+};
+
+type TemplateGallerySectionProps = Readonly<{
+  isTemplateGalleryOpen: boolean;
+  setIsTemplateGalleryOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  templateCategory: PresetCategoryFilter;
+  setTemplateCategory: (value: PresetCategoryFilter) => void;
+  presetCategoryCounts: Record<PresetCategoryFilter, number>;
+  templateSearchInput: string;
+  setTemplateSearchInput: (value: string) => void;
+  visiblePresetTemplates: Array<{ template: PresetTemplate; index: number }>;
+  activePresetIndex: number | null;
+  applyPreset: (index: number) => void;
+  draftSavedAt: string | null;
+  cachedDraft: PollDraft | null;
+  handleRestoreDraft: () => void;
+  handleClearDraft: () => void;
+}>;
+
+type TemplateGalleryPanelProps = Readonly<{
+  templateCategory: PresetCategoryFilter;
+  setTemplateCategory: (value: PresetCategoryFilter) => void;
+  presetCategoryCounts: Record<PresetCategoryFilter, number>;
+  templateSearchInput: string;
+  setTemplateSearchInput: (value: string) => void;
+  visiblePresetTemplates: Array<{ template: PresetTemplate; index: number }>;
+  activePresetIndex: number | null;
+  applyPreset: (index: number) => void;
+}>;
+
+function TemplateGalleryPanel({
+  templateCategory,
+  setTemplateCategory,
+  presetCategoryCounts,
+  templateSearchInput,
+  setTemplateSearchInput,
+  visiblePresetTemplates,
+  activePresetIndex,
+  applyPreset,
+}: TemplateGalleryPanelProps) {
+  return (
+    <div
+      id="create-template-gallery"
+      style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}
+    >
+      <div
+        role="tablist"
+        aria-label="템플릿 카테고리"
+        style={{
+          display: 'flex',
+          gap: '6px',
+          flexWrap: 'wrap',
+        }}
+      >
+        {PRESET_CATEGORY_OPTIONS.map((category) => {
+          const active = templateCategory === category.value;
+
+          return (
+            <button
+              key={category.value}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setTemplateCategory(category.value)}
+              className="ghost-btn"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                padding: '6px 10px',
+                fontSize: '0.68rem',
+                borderRadius: '999px',
+                color: active ? 'var(--brand-accent-teal)' : 'var(--text-secondary)',
+                borderColor: active ? 'rgba(45, 212, 191, 0.35)' : 'var(--bg-card-border)',
+                background: active ? 'rgba(45, 212, 191, 0.08)' : 'rgba(255,255,255,0.02)',
+              }}
+            >
+              {category.emoji ? <span aria-hidden>{category.emoji}</span> : null}
+              {category.label}
+              <span
+                style={{
+                  color: active ? 'var(--brand-accent-teal)' : 'var(--text-muted)',
+                  fontSize: '0.62rem',
+                  fontWeight: 900,
+                }}
+              >
+                {presetCategoryCounts[category.value]}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      <label
+        style={{
+          display: 'grid',
+          gap: '0.35rem',
+          maxWidth: '620px',
+        }}
+      >
+        <span
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '5px',
+            color: 'var(--text-secondary)',
+            fontSize: '0.68rem',
+            fontWeight: 900,
+          }}
+        >
+          <Search size={13} style={{ color: 'var(--brand-accent-teal)' }} />
+          템플릿 검색
+        </span>
+        <div style={{ position: 'relative' }}>
+          <input
+            value={templateSearchInput}
+            onChange={(event) => setTemplateSearchInput(event.target.value)}
+            placeholder="예: 회의, 일정, 피드백, 수업, 우선순위"
+            className="form-input"
+            style={{
+              width: '100%',
+              paddingRight: templateSearchInput ? '76px' : undefined,
+              minHeight: '40px',
+              fontSize: '0.78rem',
+            }}
+          />
+          {templateSearchInput ? (
+            <button
+              type="button"
+              onClick={() => setTemplateSearchInput('')}
+              className="ghost-inline"
+              style={{
+                position: 'absolute',
+                right: '10px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: 'var(--text-muted)',
+                fontSize: '0.66rem',
+              }}
+            >
+              지우기
+            </button>
+          ) : null}
+        </div>
+      </label>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
+          gap: '8px',
+        }}
+      >
+        {visiblePresetTemplates.length > 0 ? (
+          visiblePresetTemplates.map(({ template: tmpl, index: idx }) => (
+            <button
+              type="button"
+              key={idx}
+              onClick={() => applyPreset(idx)}
+              className="btn-secondary"
+              style={{
+                padding: '0.78rem',
+                fontSize: '0.75rem',
+                borderRadius: 'var(--radius-sm)',
+                display: 'grid',
+                alignItems: 'start',
+                gap: '0.42rem',
+                textAlign: 'left',
+                backgroundColor:
+                  activePresetIndex === idx ? 'rgba(99, 102, 241, 0.15)' : 'transparent',
+                borderColor:
+                  activePresetIndex === idx ? 'var(--brand-primary)' : 'var(--bg-card-border)',
+              }}
+            >
+              <span
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                }}
+              >
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    color:
+                      activePresetIndex === idx ? 'var(--brand-primary)' : 'var(--text-primary)',
+                    fontWeight: 900,
+                  }}
+                >
+                  <span>{tmpl.icon}</span>
+                  <span>{tmpl.name}</span>
+                </span>
+                {activePresetIndex === idx ? (
+                  <CheckCircle2 size={14} style={{ color: 'var(--brand-accent-teal)' }} />
+                ) : null}
+              </span>
+              <span
+                style={{
+                  color: 'var(--text-muted)',
+                  fontSize: '0.66rem',
+                  lineHeight: 1.42,
+                  display: '-webkit-box',
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden',
+                }}
+              >
+                {tmpl.question}
+              </span>
+              <span
+                style={{
+                  color: 'var(--brand-accent-teal)',
+                  fontSize: '0.62rem',
+                  fontWeight: 900,
+                }}
+              >
+                {
+                  PRESET_CATEGORY_OPTIONS.find((category) => category.value === tmpl.category)
+                    ?.label
+                }{' '}
+                템플릿
+              </span>
+            </button>
+          ))
+        ) : (
+          <div
+            style={{
+              gridColumn: '1 / -1',
+              border: '1px dashed rgba(250, 204, 21, 0.28)',
+              borderRadius: 'var(--radius-sm)',
+              background: 'rgba(250, 204, 21, 0.045)',
+              padding: '0.9rem',
+              display: 'grid',
+              gap: '0.5rem',
+              color: 'var(--text-secondary)',
+              fontSize: '0.74rem',
+            }}
+          >
+            <strong style={{ color: 'var(--brand-accent-gold)', fontSize: '0.82rem' }}>
+              조건에 맞는 템플릿이 없습니다
+            </strong>
+            <span>검색어를 줄이거나 전체 카테고리로 돌아가면 더 많은 시작점을 볼 수 있습니다.</span>
+            <button
+              type="button"
+              onClick={() => {
+                setTemplateCategory('all');
+                setTemplateSearchInput('');
+              }}
+              className="ghost-btn"
+              style={{
+                justifySelf: 'start',
+                padding: '6px 10px',
+                fontSize: '0.68rem',
+              }}
+            >
+              전체 템플릿 보기
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function TemplateGallerySection({
+  isTemplateGalleryOpen,
+  setIsTemplateGalleryOpen,
+  templateCategory,
+  setTemplateCategory,
+  presetCategoryCounts,
+  templateSearchInput,
+  setTemplateSearchInput,
+  visiblePresetTemplates,
+  activePresetIndex,
+  applyPreset,
+  draftSavedAt,
+  cachedDraft,
+  handleRestoreDraft,
+  handleClearDraft,
+}: TemplateGallerySectionProps) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', order: 2 }}>
+      <button
+        type="button"
+        onClick={() => setIsTemplateGalleryOpen((open) => !open)}
+        aria-expanded={isTemplateGalleryOpen}
+        aria-controls="create-template-gallery"
+        className="ghost-btn"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          padding: '12px 14px',
+          borderRadius: 'var(--radius-sm)',
+          textAlign: 'left',
+          background: isTemplateGalleryOpen ? 'rgba(232, 200, 77, 0.06)' : 'rgba(255,255,255,0.02)',
+          borderColor: isTemplateGalleryOpen ? 'rgba(232, 200, 77, 0.3)' : 'var(--bg-card-border)',
+        }}
+      >
+        <Sparkles size={15} style={{ color: 'var(--brand-accent-gold)', flexShrink: 0 }} />
+        <span style={{ display: 'grid', gap: '2px', flex: 1, minWidth: 0 }}>
+          <span style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+            템플릿에서 시작하기 ✨
+          </span>
+          <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)' }}>
+            {isTemplateGalleryOpen
+              ? '마음에 드는 시작점을 고르면 질문과 선택지가 자동으로 채워져요.'
+              : `바로 작성해도 좋고, 준비된 ${PRESET_TEMPLATES.length}개 템플릿으로 시작해도 좋아요.`}
+          </span>
+        </span>
+        <ChevronDown
+          size={16}
+          style={{
+            color: 'var(--text-muted)',
+            flexShrink: 0,
+            transition: 'transform 0.18s ease',
+            transform: isTemplateGalleryOpen ? 'rotate(180deg)' : 'none',
+          }}
+        />
+      </button>
+      {isTemplateGalleryOpen ? (
+        <TemplateGalleryPanel
+          templateCategory={templateCategory}
+          setTemplateCategory={setTemplateCategory}
+          presetCategoryCounts={presetCategoryCounts}
+          templateSearchInput={templateSearchInput}
+          setTemplateSearchInput={setTemplateSearchInput}
+          visiblePresetTemplates={visiblePresetTemplates}
+          activePresetIndex={activePresetIndex}
+          applyPreset={applyPreset}
+        />
+      ) : null}
+
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          gap: '8px',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          color: 'var(--text-muted)',
+          fontSize: '0.68rem',
+          paddingTop: '6px',
+        }}
+      >
+        {draftSavedAt ? (
+          <span>
+            마지막 임시저장:{' '}
+            {new Date(draftSavedAt).toLocaleTimeString([], {
+              hour: '2-digit',
+              minute: '2-digit',
+            })}
+          </span>
+        ) : (
+          <span>임시 저장되지 않음</span>
+        )}
+        <div style={{ display: 'inline-flex', gap: '6px', marginLeft: 'auto' }}>
+          <button
+            type="button"
+            onClick={handleRestoreDraft}
+            className="ghost-inline"
+            disabled={!cachedDraft}
+            style={{
+              color: cachedDraft ? 'var(--text-secondary)' : 'var(--text-muted)',
+              cursor: cachedDraft ? 'pointer' : 'not-allowed',
+            }}
+          >
+            임시저장 복원
+          </button>
+          <button
+            type="button"
+            onClick={handleClearDraft}
+            className="ghost-inline"
+            disabled={!draftSavedAt}
+            style={{
+              color: draftSavedAt ? 'var(--text-secondary)' : 'var(--text-muted)',
+              cursor: draftSavedAt ? 'pointer' : 'not-allowed',
+            }}
+          >
+            임시저장 삭제
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+type QualityCheckSectionProps = Readonly<{
+  qualityTone: string;
+  qualityScore: number;
+  qualityItems: Array<{ label: string; passed: boolean; help: string }>;
+  responseEffortColor: string;
+  responseEffort: string;
+  surveyCoachItems: Array<{ label: string; passed: boolean; value: string; help: string }>;
+  nonEmptyOptionsCount: number;
+  imageOptionCount: number;
+  passedQualityCount: number;
+}>;
+
+function QualityCheckSection({
+  qualityTone,
+  qualityScore,
+  qualityItems,
+  responseEffortColor,
+  responseEffort,
+  surveyCoachItems,
+  nonEmptyOptionsCount,
+  imageOptionCount,
+  passedQualityCount,
+}: QualityCheckSectionProps) {
+  return (
+    <section
+      className="content-card"
+      style={{
+        padding: '1rem',
+        display: 'grid',
+        gap: '0.9rem',
+        cursor: 'default',
+        order: 3,
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: '0.85rem',
+          flexWrap: 'wrap',
+        }}
+      >
+        <div style={{ display: 'grid', gap: '0.2rem' }}>
+          <h2
+            style={{
+              margin: 0,
+              fontSize: '0.96rem',
+              fontWeight: 800,
+              color: 'var(--text-primary)',
+            }}
+          >
+            작성 품질 점검
+          </h2>
+          <p style={{ margin: 0, fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
+            공유 전에 질문과 선택지가 바로 참여 가능한 상태인지 확인합니다.
+          </p>
+        </div>
+        <div
+          style={{
+            minWidth: '96px',
+            border: '1px solid var(--bg-card-border)',
+            borderRadius: 'var(--radius-sm)',
+            padding: '0.55rem 0.7rem',
+            textAlign: 'right',
+            background: 'rgba(255,255,255,0.025)',
+          }}
+        >
+          <span style={{ display: 'block', fontSize: '0.64rem', color: 'var(--text-muted)' }}>
+            준비도
+          </span>
+          <strong style={{ color: qualityTone, fontSize: '1.15rem' }}>{qualityScore}%</strong>
+        </div>
+      </div>
+
+      <div className="quality-grid">
+        {qualityItems.map((item) => (
+          <div
+            key={item.label}
+            style={{
+              display: 'grid',
+              gap: '0.35rem',
+              alignContent: 'start',
+              border: '1px solid var(--bg-card-border)',
+              borderRadius: 'var(--radius-sm)',
+              padding: '0.7rem',
+              background: item.passed ? 'rgba(45, 212, 191, 0.06)' : 'rgba(255,255,255,0.02)',
+            }}
+          >
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                color: item.passed ? 'var(--brand-accent-teal)' : 'var(--brand-accent-gold)',
+                fontSize: '0.74rem',
+                fontWeight: 800,
+              }}
+            >
+              {item.passed ? <CheckCircle2 size={14} /> : <AlertTriangle size={14} />}
+              {item.label}
+            </span>
+            <span style={{ color: 'var(--text-muted)', fontSize: '0.68rem', lineHeight: 1.45 }}>
+              {item.help}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      <section
+        style={{
+          border: '1px solid rgba(232, 200, 77, 0.18)',
+          borderRadius: 'var(--radius-sm)',
+          background: 'rgba(232, 200, 77, 0.045)',
+          padding: '0.85rem',
+          display: 'grid',
+          gap: '0.75rem',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            gap: '0.75rem',
+            flexWrap: 'wrap',
+          }}
+        >
+          <div style={{ display: 'grid', gap: '0.2rem' }}>
+            <h3
+              style={{
+                margin: 0,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                color: 'var(--text-primary)',
+                fontSize: '0.9rem',
+                fontWeight: 900,
+              }}
+            >
+              <Sparkles size={14} style={{ color: 'var(--brand-accent-gold)' }} />
+              응답률 코치
+            </h3>
+            <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.72rem' }}>
+              질문이 명확하고 선택 부담이 낮을수록 단톡방에서 바로 응답하기 쉽습니다.
+            </p>
+          </div>
+          <span
+            style={{
+              border: '1px solid rgba(232, 200, 77, 0.28)',
+              borderRadius: '999px',
+              color: responseEffortColor,
+              background: 'rgba(255,255,255,0.035)',
+              padding: '5px 10px',
+              fontSize: '0.68rem',
+              fontWeight: 900,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            응답 부담 {responseEffort}
+          </span>
+        </div>
+
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
+            gap: '0.55rem',
+          }}
+        >
+          {surveyCoachItems.map((item) => (
+            <article
+              key={item.label}
+              style={{
+                display: 'grid',
+                gap: '0.35rem',
+                border: '1px solid var(--bg-card-border)',
+                borderRadius: 'var(--radius-sm)',
+                background: item.passed ? 'rgba(45, 212, 191, 0.055)' : 'rgba(255,255,255,0.025)',
+                padding: '0.7rem',
+              }}
+            >
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  color: item.passed ? 'var(--brand-accent-teal)' : 'var(--brand-accent-gold)',
+                  fontSize: '0.72rem',
+                  fontWeight: 900,
+                }}
+              >
+                {item.passed ? <CheckCircle2 size={14} /> : <AlertTriangle size={14} />}
+                {item.label}
+              </span>
+              <strong
+                style={{
+                  color: 'var(--text-primary)',
+                  fontSize: '0.78rem',
+                  lineHeight: 1.35,
+                }}
+              >
+                {item.value}
+              </strong>
+              <small style={{ color: 'var(--text-muted)', fontSize: '0.66rem', lineHeight: 1.42 }}>
+                {item.help}
+              </small>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <div
+        style={{
+          display: 'flex',
+          gap: '0.55rem',
+          flexWrap: 'wrap',
+          color: 'var(--text-muted)',
+          fontSize: '0.7rem',
+        }}
+      >
+        <span className="stat-pill">선택지 {nonEmptyOptionsCount}개</span>
+        <span className="stat-pill">이미지 선택지 {imageOptionCount}개</span>
+        <span className="stat-pill">
+          통과 항목 {passedQualityCount}/{qualityItems.length}
+        </span>
+      </div>
+    </section>
+  );
+}
+
+type ShareReadinessItem = {
+  label: string;
+  icon: React.ComponentType<{ size?: number }>;
+  ready: boolean;
+  value: string;
+};
+
+type SharePreviewSectionProps = Readonly<{
+  shareReady: boolean;
+  showEmbedPreview: boolean;
+  setShowEmbedPreview: React.Dispatch<React.SetStateAction<boolean>>;
+  imageOptionCount: number;
+  sharePreviewTitle: string;
+  sharePreviewDescription: string;
+  shareReadinessItems: ShareReadinessItem[];
+  embedPreviewDevice: EmbedPreviewDevice;
+  setEmbedPreviewDevice: (value: EmbedPreviewDevice) => void;
+  sharePreviewImageUrl: string | null;
+  sharePreviewOptions: string[];
+  resultsVisibilityLabel: string;
+  deadlineLabel: string;
+}>;
+
+type SharePreviewEmbedProps = Readonly<{
+  shareReady: boolean;
+  embedPreviewDevice: EmbedPreviewDevice;
+  setEmbedPreviewDevice: (value: EmbedPreviewDevice) => void;
+  sharePreviewImageUrl: string | null;
+  sharePreviewTitle: string;
+  sharePreviewDescription: string;
+  sharePreviewOptions: string[];
+}>;
+
+function SharePreviewEmbed({
+  shareReady,
+  embedPreviewDevice,
+  setEmbedPreviewDevice,
+  sharePreviewImageUrl,
+  sharePreviewTitle,
+  sharePreviewDescription,
+  sharePreviewOptions,
+}: SharePreviewEmbedProps) {
+  const isMobile = embedPreviewDevice === 'mobile';
+  const previewOptions =
+    sharePreviewOptions.length > 0 ? sharePreviewOptions : ['선택지 입력 대기', '선택지 입력 대기'];
+
+  return (
+    <div className="embed-preview-shell">
+      <div className="embed-preview-toolbar">
+        <span>embed preview</span>
+        <small>
+          {shareReady ? '생성 후 /embed/:id 로 제공됩니다.' : '질문과 선택지 입력 후 활성화됩니다.'}
+        </small>
+        <div className="embed-device-switch" aria-label="임베드 미리보기 화면 폭 선택">
+          <button
+            type="button"
+            onClick={() => setEmbedPreviewDevice('desktop')}
+            aria-pressed={embedPreviewDevice === 'desktop'}
+            className={embedPreviewDevice === 'desktop' ? 'active' : undefined}
+          >
+            <Monitor size={12} />
+            데스크톱
+          </button>
+          <button
+            type="button"
+            onClick={() => setEmbedPreviewDevice('mobile')}
+            aria-pressed={isMobile}
+            className={isMobile ? 'active' : undefined}
+          >
+            <Smartphone size={12} />
+            모바일
+          </button>
+        </div>
+      </div>
+      <div className={`embed-preview-card ${isMobile ? 'mobile' : ''}`}>
+        <span className="floating-tag">POLL PREVIEW</span>
+        {sharePreviewImageUrl ? (
+          <img
+            src={sharePreviewImageUrl}
+            alt="업로드 이미지가 반영된 공유 미리보기"
+            style={{
+              width: '100%',
+              aspectRatio: '16 / 9',
+              objectFit: 'cover',
+              borderRadius: 'var(--radius-sm)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              background: 'rgba(255,255,255,0.03)',
+            }}
+          />
+        ) : null}
+        <strong>{sharePreviewTitle}</strong>
+        <p>{sharePreviewDescription}</p>
+        <div className="embed-preview-options">
+          {previewOptions.map((option, index) => (
+            <span key={`${option}-${index}`}>
+              {index + 1}. {option}
+            </span>
+          ))}
+        </div>
+        <button type="button" className="btn-primary" disabled={!shareReady}>
+          임베드에서 투표하기
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function SharePreviewSection({
+  shareReady,
+  showEmbedPreview,
+  setShowEmbedPreview,
+  imageOptionCount,
+  sharePreviewTitle,
+  sharePreviewDescription,
+  shareReadinessItems,
+  embedPreviewDevice,
+  setEmbedPreviewDevice,
+  sharePreviewImageUrl,
+  sharePreviewOptions,
+  resultsVisibilityLabel,
+  deadlineLabel,
+}: SharePreviewSectionProps) {
+  return (
+    <section
+      className="content-card"
+      style={{
+        padding: '1rem',
+        display: 'grid',
+        gap: '0.95rem',
+        cursor: 'default',
+        order: 4,
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          gap: '0.85rem',
+          flexWrap: 'wrap',
+        }}
+      >
+        <div style={{ display: 'grid', gap: '0.24rem' }}>
+          <h2
+            style={{
+              margin: 0,
+              fontSize: '0.96rem',
+              fontWeight: 800,
+              color: 'var(--text-primary)',
+            }}
+          >
+            공유 화면 미리보기
+          </h2>
+          <p style={{ margin: 0, fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
+            생성 후 카카오톡, 링크, 임베드에서 보일 핵심 정보를 미리 점검합니다.
+          </p>
+        </div>
+        <span
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '5px',
+            border: '1px solid rgba(45, 212, 191, 0.28)',
+            borderRadius: '999px',
+            padding: '5px 10px',
+            color: shareReady ? 'var(--brand-accent-teal)' : 'var(--brand-accent-gold)',
+            background: shareReady ? 'rgba(45, 212, 191, 0.08)' : 'rgba(250, 204, 21, 0.08)',
+            fontSize: '0.68rem',
+            fontWeight: 800,
+          }}
+        >
+          <Share2 size={13} />
+          {shareReady ? '공유 준비됨' : '공유 준비 중'}
+        </span>
+        <button
+          type="button"
+          onClick={() => setShowEmbedPreview((current) => !current)}
+          className="ghost-btn"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '5px',
+            padding: '5px 10px',
+            fontSize: '0.68rem',
+            fontWeight: 800,
+          }}
+        >
+          <Code2 size={13} />
+          {showEmbedPreview ? '임베드 미리보기 닫기' : '임베드 미리보기'}
+        </button>
+      </div>
+
+      <div className="share-preview-grid">
+        <article className="share-preview-card">
+          <div
+            style={{
+              minHeight: '96px',
+              borderRadius: 'var(--radius-sm)',
+              border: '1px solid var(--bg-card-border)',
+              background:
+                imageOptionCount > 0
+                  ? 'linear-gradient(135deg, rgba(45, 212, 191, 0.2), rgba(250, 204, 21, 0.12))'
+                  : 'linear-gradient(135deg, rgba(45, 212, 191, 0.14), rgba(255,255,255,0.035))',
+              display: 'grid',
+              placeItems: 'center',
+              color: 'var(--text-secondary)',
+            }}
+          >
+            {imageOptionCount > 0 ? (
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontSize: '0.72rem',
+                  fontWeight: 800,
+                }}
+              >
+                <ImageIcon size={15} />
+                선택지 이미지 {imageOptionCount}개 포함
+              </span>
+            ) : (
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontSize: '0.72rem',
+                  fontWeight: 800,
+                }}
+              >
+                <ImageIcon size={15} />
+                기본 OG 이미지
+              </span>
+            )}
+          </div>
+          <div style={{ display: 'grid', gap: '0.35rem' }}>
+            <span
+              style={{
+                color: 'var(--brand-accent-teal)',
+                fontSize: '0.66rem',
+                fontWeight: 900,
+              }}
+            >
+              KAKAO · LINK PREVIEW
+            </span>
+            <strong
+              style={{
+                color: 'var(--text-primary)',
+                fontSize: '0.92rem',
+                lineHeight: 1.42,
+                overflowWrap: 'anywhere',
+              }}
+            >
+              {sharePreviewTitle}
+            </strong>
+            <p
+              style={{
+                margin: 0,
+                color: 'var(--text-muted)',
+                fontSize: '0.72rem',
+                lineHeight: 1.48,
+                display: '-webkit-box',
+                overflow: 'hidden',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+              }}
+            >
+              {sharePreviewDescription}
+            </p>
+          </div>
+        </article>
+
+        <div className="share-readiness-grid">
+          {shareReadinessItems.map((item) => {
+            const Icon = item.icon;
+            return (
+              <div
+                key={item.label}
+                className="share-readiness-item"
+                style={{
+                  borderColor: item.ready ? 'rgba(45, 212, 191, 0.26)' : 'rgba(250, 204, 21, 0.24)',
+                  background: item.ready
+                    ? 'rgba(45, 212, 191, 0.055)'
+                    : 'rgba(250, 204, 21, 0.055)',
+                }}
+              >
+                <span>
+                  <Icon size={13} />
+                  {item.label}
+                </span>
+                <strong>{item.value}</strong>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {showEmbedPreview ? (
+        <SharePreviewEmbed
+          shareReady={shareReady}
+          embedPreviewDevice={embedPreviewDevice}
+          setEmbedPreviewDevice={setEmbedPreviewDevice}
+          sharePreviewImageUrl={sharePreviewImageUrl}
+          sharePreviewTitle={sharePreviewTitle}
+          sharePreviewDescription={sharePreviewDescription}
+          sharePreviewOptions={sharePreviewOptions}
+        />
+      ) : null}
+
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '0.45rem',
+          color: 'var(--text-muted)',
+          fontSize: '0.68rem',
+        }}
+      >
+        <span className="stat-pill">{resultsVisibilityLabel}</span>
+        <span className="stat-pill">마감 {deadlineLabel}</span>
+        <span className="stat-pill">
+          OG 이미지 {sharePreviewImageUrl ? '업로드 이미지 반영' : '기본 이미지'}
+        </span>
+        <span className="stat-pill">
+          선택지 {sharePreviewOptions.length > 0 ? sharePreviewOptions.join(' / ') : '입력 대기'}
+        </span>
+      </div>
+    </section>
+  );
+}
+
+type FinalReviewSectionProps = Readonly<{
+  canSubmit: boolean;
+  publishReadyCount: number;
+  publishReviewItems: Array<{ label: string; ready: boolean; value: string; help: string }>;
+  launchActionReadyCount: number;
+  launchActionItems: Array<{ label: string; ready: boolean; value: string; action: string }>;
+  firstPublishBlockedReason: string | undefined;
+}>;
+
+function FinalReviewSection({
+  canSubmit,
+  publishReadyCount,
+  publishReviewItems,
+  launchActionReadyCount,
+  launchActionItems,
+  firstPublishBlockedReason,
+}: FinalReviewSectionProps) {
+  return (
+    <section
+      className="content-card"
+      style={{
+        padding: '1rem',
+        display: 'grid',
+        gap: '0.85rem',
+        borderColor: canSubmit ? 'rgba(45, 212, 191, 0.22)' : 'rgba(250, 204, 21, 0.2)',
+        background: canSubmit ? 'rgba(45, 212, 191, 0.04)' : 'rgba(250, 204, 21, 0.035)',
+        cursor: 'default',
+        order: 5,
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          gap: '0.85rem',
+          flexWrap: 'wrap',
+        }}
+      >
+        <div style={{ display: 'grid', gap: '0.25rem' }}>
+          <h2
+            style={{
+              margin: 0,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              color: 'var(--text-primary)',
+              fontSize: '0.96rem',
+              fontWeight: 900,
+            }}
+          >
+            <Eye size={15} style={{ color: 'var(--brand-accent-teal)' }} />
+            생성 전 최종 검토
+          </h2>
+          <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.76rem' }}>
+            생성 버튼을 누르기 전에 공유 카드, 선택지, 업로드 이미지, 운영 설정을 한 번에
+            확인합니다.
+          </p>
+        </div>
+        <span
+          style={{
+            border: '1px solid rgba(45, 212, 191, 0.28)',
+            borderRadius: '999px',
+            color: canSubmit ? 'var(--brand-accent-teal)' : 'var(--brand-accent-gold)',
+            background: canSubmit ? 'rgba(45, 212, 191, 0.08)' : 'rgba(250, 204, 21, 0.08)',
+            padding: '5px 10px',
+            fontSize: '0.68rem',
+            fontWeight: 900,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {publishReadyCount}/{publishReviewItems.length} 준비됨
+        </span>
+      </div>
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
+          gap: '0.65rem',
+        }}
+      >
+        {publishReviewItems.map((item) => (
+          <article
+            key={item.label}
+            style={{
+              display: 'grid',
+              gap: '0.38rem',
+              border: '1px solid var(--bg-card-border)',
+              borderRadius: 'var(--radius-sm)',
+              background: item.ready ? 'rgba(45, 212, 191, 0.055)' : 'rgba(255,255,255,0.02)',
+              padding: '0.72rem',
+            }}
+          >
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                color: item.ready ? 'var(--brand-accent-teal)' : 'var(--brand-accent-gold)',
+                fontSize: '0.72rem',
+                fontWeight: 900,
+              }}
+            >
+              {item.ready ? <CheckCircle2 size={14} /> : <AlertTriangle size={14} />}
+              {item.label}
+            </span>
+            <strong
+              style={{
+                color: 'var(--text-primary)',
+                fontSize: '0.8rem',
+                lineHeight: 1.35,
+                overflowWrap: 'anywhere',
+              }}
+            >
+              {item.value}
+            </strong>
+            <small style={{ color: 'var(--text-muted)', fontSize: '0.68rem', lineHeight: 1.42 }}>
+              {item.help}
+            </small>
+          </article>
+        ))}
+      </div>
+
+      <section
+        style={{
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          borderRadius: 'var(--radius-sm)',
+          background: 'rgba(255, 255, 255, 0.025)',
+          padding: '0.85rem',
+          display: 'grid',
+          gap: '0.7rem',
+        }}
+        aria-label="출시 전 액션 체크"
+      >
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            gap: '0.75rem',
+            alignItems: 'flex-start',
+            flexWrap: 'wrap',
+          }}
+        >
+          <div style={{ display: 'grid', gap: '0.22rem' }}>
+            <strong
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                color: 'var(--text-primary)',
+                fontSize: '0.84rem',
+              }}
+            >
+              <Sparkles size={14} style={{ color: 'var(--brand-accent-gold)' }} />
+              출시 전 액션 체크
+            </strong>
+            <span style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', lineHeight: 1.45 }}>
+              공유 전에 응답자가 헷갈릴 수 있는 문장, 편향, 부담, 맥락을 빠르게 점검합니다.
+            </span>
+          </div>
+          <span
+            style={{
+              border: '1px solid rgba(232, 200, 77, 0.28)',
+              borderRadius: '999px',
+              color:
+                launchActionReadyCount === launchActionItems.length
+                  ? 'var(--brand-accent-teal)'
+                  : 'var(--brand-accent-gold)',
+              background:
+                launchActionReadyCount === launchActionItems.length
+                  ? 'rgba(45, 212, 191, 0.08)'
+                  : 'rgba(250, 204, 21, 0.08)',
+              padding: '4px 9px',
+              fontSize: '0.66rem',
+              fontWeight: 900,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {launchActionReadyCount}/{launchActionItems.length} 통과
+          </span>
+        </div>
+
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+            gap: '0.55rem',
+          }}
+        >
+          {launchActionItems.map((item) => (
+            <article
+              key={item.label}
+              style={{
+                border: item.ready
+                  ? '1px solid rgba(45, 212, 191, 0.2)'
+                  : '1px solid rgba(250, 204, 21, 0.2)',
+                borderRadius: 'var(--radius-sm)',
+                background: item.ready ? 'rgba(45, 212, 191, 0.045)' : 'rgba(250, 204, 21, 0.045)',
+                padding: '0.7rem',
+                display: 'grid',
+                gap: '0.34rem',
+              }}
+            >
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  color: item.ready ? 'var(--brand-accent-teal)' : 'var(--brand-accent-gold)',
+                  fontSize: '0.68rem',
+                  fontWeight: 900,
+                }}
+              >
+                {item.ready ? <CheckCircle2 size={13} /> : <AlertTriangle size={13} />}
+                {item.label}
+              </span>
+              <strong
+                style={{
+                  color: 'var(--text-primary)',
+                  fontSize: '0.78rem',
+                  lineHeight: 1.32,
+                }}
+              >
+                {item.value}
+              </strong>
+              <small
+                style={{ color: 'var(--text-secondary)', fontSize: '0.66rem', lineHeight: 1.45 }}
+              >
+                {item.action}
+              </small>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          gap: '0.75rem',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          borderTop: '1px solid rgba(255,255,255,0.055)',
+          paddingTop: '0.8rem',
+        }}
+      >
+        <span
+          style={{
+            color: canSubmit ? 'var(--brand-accent-teal)' : 'var(--brand-accent-gold)',
+            fontSize: '0.74rem',
+            fontWeight: 800,
+            lineHeight: 1.45,
+          }}
+        >
+          {canSubmit
+            ? '지금 생성하면 공유 링크와 카카오 미리보기가 바로 준비됩니다.'
+            : firstPublishBlockedReason}
+        </span>
+        <button
+          type="button"
+          onClick={() =>
+            document
+              .getElementById('create-poll-form')
+              ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          }
+          className="ghost-btn"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '5px',
+            padding: '6px 10px',
+            fontSize: '0.7rem',
+          }}
+        >
+          <ArrowLeft size={13} style={{ transform: 'rotate(90deg)' }} />
+          입력 폼으로 이동
+        </button>
+      </div>
+    </section>
+  );
+}
+
+type PollOptionCardHeaderProps = Readonly<{
+  index: number;
+  optionsLength: number;
+  handleRemoveOptionInput: (index: number) => void;
+}>;
+
+function PollOptionCardHeader({
+  index,
+  optionsLength,
+  handleRemoveOptionInput,
+}: PollOptionCardHeaderProps) {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        gap: '8px',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+      }}
+    >
+      <span
+        style={{
+          fontSize: '0.75rem',
+          color: 'var(--brand-primary)',
+          fontWeight: 700,
+        }}
+      >
+        선택지 {index + 1}
+      </span>
+      {optionsLength > 2 ? (
+        <button
+          type="button"
+          onClick={() => handleRemoveOptionInput(index)}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: 'var(--text-muted)',
+            cursor: 'pointer',
+            padding: '2px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Trash2
+            size={15}
+            style={{ transition: 'color 0.2s' }}
+            onMouseEnter={(e: React.MouseEvent<SVGSVGElement>) =>
+              (e.currentTarget.style.color = 'var(--brand-accent-coral)')
+            }
+            onMouseLeave={(e: React.MouseEvent<SVGSVGElement>) =>
+              (e.currentTarget.style.color = 'var(--text-muted)')
+            }
+          />
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+type PollOptionImageControlProps = Readonly<{
+  option: OptionInput;
+  index: number;
+  optionLabel: string;
+  isDragging: boolean;
+  setDraggingOptionIndex: React.Dispatch<React.SetStateAction<number | null>>;
+  handleOptionImageDrop: (index: number, event: React.DragEvent<HTMLElement>) => void;
+  handleRemoveOptionImage: (index: number) => void;
+  handleOptionImageUpload: (index: number, file?: File) => Promise<void>;
+}>;
+
+function PollOptionImageControl({
+  option,
+  index,
+  optionLabel,
+  isDragging,
+  setDraggingOptionIndex,
+  handleOptionImageDrop,
+  handleRemoveOptionImage,
+  handleOptionImageUpload,
+}: PollOptionImageControlProps) {
+  const dragData = isDragging ? 'true' : undefined;
+  const dragClassSuffix = isDragging ? 'drag-over' : '';
+  const previewSmallColor = isDragging ? 'var(--brand-accent-teal)' : 'var(--text-muted)';
+  const dropzoneBorderColor = isDragging ? 'rgba(45, 212, 191, 0.42)' : undefined;
+  const dropzoneBackground = isDragging ? 'rgba(45, 212, 191, 0.08)' : undefined;
+  const dropzoneLabel = isDragging ? '여기에 놓아 업로드' : '이미지 업로드';
+  const markDragging = (event: React.DragEvent<HTMLElement>) => {
+    event.preventDefault();
+    setDraggingOptionIndex(index);
+  };
+  const markDraggingCopy = (event: React.DragEvent<HTMLElement>) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+    setDraggingOptionIndex(index);
+  };
+
+  return (
+    <div className="upload-control">
+      {option.imageUrl ? (
+        <figure
+          className={`upload-preview ${dragClassSuffix}`}
+          data-drag={dragData}
+          onDragEnter={markDragging}
+          onDragOver={markDraggingCopy}
+          onDragLeave={() => setDraggingOptionIndex(null)}
+          onDrop={(event) => handleOptionImageDrop(index, event)}
+        >
+          <img src={option.imageUrl} alt={`${optionLabel} 이미지`} />
+          <figcaption>
+            <span>
+              <ImageIcon size={12} />
+              이미지 첨부됨
+            </span>
+            <button
+              type="button"
+              onClick={() => handleRemoveOptionImage(index)}
+              aria-label={`선택지 ${index + 1} 이미지 삭제`}
+            >
+              <X size={13} />
+            </button>
+          </figcaption>
+          <small
+            style={{
+              color: previewSmallColor,
+              fontSize: '0.64rem',
+              fontWeight: 800,
+            }}
+          >
+            새 파일을 드롭하면 이미지가 교체됩니다.
+          </small>
+        </figure>
+      ) : (
+        <label
+          className={`upload-dropzone ${dragClassSuffix}`}
+          data-drag={dragData}
+          onDragEnter={markDragging}
+          onDragOver={markDraggingCopy}
+          onDragLeave={() => setDraggingOptionIndex(null)}
+          onDrop={(event) => handleOptionImageDrop(index, event)}
+          style={{
+            borderColor: dropzoneBorderColor,
+            background: dropzoneBackground,
+          }}
+        >
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              void handleOptionImageUpload(index, file);
+              event.currentTarget.value = '';
+            }}
+          />
+          <Upload size={16} />
+          <span>{dropzoneLabel}</span>
+          <small>클릭 또는 드롭 · JPG/PNG/WebP, 5MB 이하</small>
+        </label>
+      )}
+    </div>
+  );
+}
+
+type PollOptionCardProps = Readonly<{
+  option: OptionInput;
+  index: number;
+  optionsLength: number;
+  draggingOptionIndex: number | null;
+  setDraggingOptionIndex: React.Dispatch<React.SetStateAction<number | null>>;
+  handleOptionImageDrop: (index: number, event: React.DragEvent<HTMLElement>) => void;
+  handleRemoveOptionInput: (index: number) => void;
+  clearError: () => void;
+  setFormError: (value: string) => void;
+  handleOptionTextChange: (index: number, text: string) => void;
+  handleRemoveOptionImage: (index: number) => void;
+  handleOptionImageUpload: (index: number, file?: File) => Promise<void>;
+}>;
+
+function PollOptionCard({
+  option,
+  index,
+  optionsLength,
+  draggingOptionIndex,
+  setDraggingOptionIndex,
+  handleOptionImageDrop,
+  handleRemoveOptionInput,
+  clearError,
+  setFormError,
+  handleOptionTextChange,
+  handleRemoveOptionImage,
+  handleOptionImageUpload,
+}: PollOptionCardProps) {
+  const optionLabel = option.text || `선택지 ${index + 1}`;
+  const isDragging = draggingOptionIndex === index;
+  return (
+    <div
+      key={index}
+      className="content-card"
+      onDragEnter={(event) => {
+        event.preventDefault();
+        setDraggingOptionIndex(index);
+      }}
+      onDragOver={(event) => {
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'copy';
+        setDraggingOptionIndex(index);
+      }}
+      onDragLeave={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          setDraggingOptionIndex(null);
+        }
+      }}
+      onDrop={(event) => handleOptionImageDrop(index, event)}
+      style={{
+        padding: '12px 16px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '8px',
+        backgroundColor: isDragging ? 'rgba(45, 212, 191, 0.08)' : 'oklch(16% 0.015 260)',
+        border: isDragging
+          ? '1px solid rgba(45, 212, 191, 0.42)'
+          : '1px solid var(--bg-card-border)',
+        borderRadius: 'var(--radius-sm)',
+        boxShadow: isDragging ? '0 0 0 3px rgba(45, 212, 191, 0.08)' : 'none',
+        transition: 'border-color 0.2s, background 0.2s, box-shadow 0.2s',
+      }}
+    >
+      <PollOptionCardHeader
+        index={index}
+        optionsLength={optionsLength}
+        handleRemoveOptionInput={handleRemoveOptionInput}
+      />
+
+      <div className="option-input-grid">
+        <input
+          type="text"
+          aria-label={`선택지 ${index + 1} 내용`}
+          placeholder="내용 입력 (필수)"
+          value={option.text}
+          onChange={(e) => {
+            clearError();
+            setFormError('');
+            handleOptionTextChange(index, e.target.value);
+          }}
+          required
+          maxLength={80}
+          className="form-input"
+          style={{ padding: '8px 12px', fontSize: '0.8rem' }}
+        />
+        <PollOptionImageControl
+          option={option}
+          index={index}
+          optionLabel={optionLabel}
+          isDragging={isDragging}
+          setDraggingOptionIndex={setDraggingOptionIndex}
+          handleOptionImageDrop={handleOptionImageDrop}
+          handleRemoveOptionImage={handleRemoveOptionImage}
+          handleOptionImageUpload={handleOptionImageUpload}
+        />
+      </div>
+
+      <span style={{ color: 'var(--text-muted)', fontSize: '0.68rem' }}>
+        현재 글자 수: {option.text.trim().length} / 80
+      </span>
+    </div>
+  );
+}
+
+type PollOptionsListProps = Readonly<{
+  options: OptionInput[];
+  hasDuplicateOptions: boolean;
+  draggingOptionIndex: number | null;
+  setDraggingOptionIndex: React.Dispatch<React.SetStateAction<number | null>>;
+  handleOptionImageDrop: (index: number, event: React.DragEvent<HTMLElement>) => void;
+  handleRemoveOptionInput: (index: number) => void;
+  clearError: () => void;
+  setFormError: (value: string) => void;
+  handleOptionTextChange: (index: number, text: string) => void;
+  handleRemoveOptionImage: (index: number) => void;
+  handleOptionImageUpload: (index: number, file?: File) => Promise<void>;
+  handleAddOptionInput: () => void;
+}>;
+
+function PollOptionsList({
+  options,
+  hasDuplicateOptions,
+  draggingOptionIndex,
+  setDraggingOptionIndex,
+  handleOptionImageDrop,
+  handleRemoveOptionInput,
+  clearError,
+  setFormError,
+  handleOptionTextChange,
+  handleRemoveOptionImage,
+  handleOptionImageUpload,
+  handleAddOptionInput,
+}: PollOptionsListProps) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+          투표 선택지 목록 (2~10개)
+        </span>
+        <span style={{ fontSize: '0.725rem', color: 'var(--text-muted)', fontWeight: 500 }}>
+          {options.length} / 10
+        </span>
+      </div>
+
+      {hasDuplicateOptions ? (
+        <p
+          style={{
+            margin: 0,
+            color: 'var(--brand-accent-coral)',
+            fontSize: '0.74rem',
+            border: '1px solid rgba(239, 68, 68, 0.2)',
+            background: 'rgba(239, 68, 68, 0.12)',
+            borderRadius: 'var(--radius-sm)',
+            padding: '8px 10px',
+          }}
+        >
+          동일한 텍스트의 선택지가 있습니다. 각 선택지는 고유해야 합니다.
+        </p>
+      ) : null}
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        {options.map((option, index) => (
+          <PollOptionCard
+            key={index}
+            option={option}
+            index={index}
+            optionsLength={options.length}
+            draggingOptionIndex={draggingOptionIndex}
+            setDraggingOptionIndex={setDraggingOptionIndex}
+            handleOptionImageDrop={handleOptionImageDrop}
+            handleRemoveOptionInput={handleRemoveOptionInput}
+            clearError={clearError}
+            setFormError={setFormError}
+            handleOptionTextChange={handleOptionTextChange}
+            handleRemoveOptionImage={handleRemoveOptionImage}
+            handleOptionImageUpload={handleOptionImageUpload}
+          />
+        ))}
+      </div>
+
+      {options.length < MAX_OPTIONS && (
+        <button
+          type="button"
+          onClick={handleAddOptionInput}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '6px',
+            padding: '10px',
+            borderRadius: 'var(--radius-sm)',
+            backgroundColor: 'rgba(255, 255, 255, 0.015)',
+            border: '1px dashed var(--bg-card-border)',
+            color: 'var(--text-secondary)',
+            fontSize: '0.8rem',
+            cursor: 'pointer',
+            marginTop: '4px',
+            transition: 'all 0.2s',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.03)';
+            e.currentTarget.style.borderColor = 'var(--brand-primary)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.015)';
+            e.currentTarget.style.borderColor = 'var(--bg-card-border)';
+          }}
+        >
+          <Plus size={14} />
+          <span>선택지 추가</span>
+        </button>
+      )}
+    </div>
+  );
+}
+
+type ParticipantExperienceItem = {
+  label: string;
+  icon: React.ComponentType<{ size?: number }>;
+  value: string;
+  help: string;
+  ready: boolean;
+};
+
+type ParticipantExperienceSectionProps = Readonly<{
+  sharePreviewTitle: string;
+  sharePreviewDescription: string;
+  nonEmptyOptions: Array<{ text: string; imageUrl: string | null }>;
+  sharePreviewImageUrl: string | null;
+  participantExperienceItems: ParticipantExperienceItem[];
+}>;
+
+function ParticipantExperienceSection({
+  sharePreviewTitle,
+  sharePreviewDescription,
+  nonEmptyOptions,
+  sharePreviewImageUrl,
+  participantExperienceItems,
+}: ParticipantExperienceSectionProps) {
+  return (
+    <section
+      style={{
+        border: '1px solid rgba(45, 212, 191, 0.2)',
+        borderRadius: 'var(--radius-sm)',
+        padding: '0.95rem',
+        background: 'rgba(45, 212, 191, 0.035)',
+        display: 'grid',
+        gap: '0.78rem',
+      }}
+      aria-label="참여자 경험 리허설"
+    >
+      <div style={{ display: 'grid', gap: '0.24rem' }}>
+        <h3
+          style={{
+            margin: 0,
+            fontSize: '0.84rem',
+            color: 'var(--text-primary)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '5px',
+          }}
+        >
+          <Smartphone size={14} style={{ color: 'var(--brand-accent-teal)' }} />
+          참여자 경험 리허설
+        </h3>
+        <p
+          style={{
+            margin: 0,
+            color: 'var(--text-secondary)',
+            fontSize: '0.7rem',
+            lineHeight: 1.45,
+          }}
+        >
+          링크를 받은 사람이 실제로 보게 될 첫 화면, 자료, 운영 신호를 생성 전에 점검합니다.
+        </p>
+      </div>
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+          gap: '0.65rem',
+          alignItems: 'start',
+        }}
+      >
+        <SnsPreviewCard
+          platform="kakao"
+          question={sharePreviewTitle}
+          description={sharePreviewDescription}
+          options={nonEmptyOptions.map((option) => option.text)}
+          imageUrl={sharePreviewImageUrl}
+        />
+        <SnsPreviewCard
+          platform="x"
+          question={sharePreviewTitle}
+          description={sharePreviewDescription}
+          options={nonEmptyOptions.map((option) => option.text)}
+          imageUrl={sharePreviewImageUrl}
+        />
+      </div>
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+          gap: '0.55rem',
+        }}
+      >
+        {participantExperienceItems.map((item) => {
+          const Icon = item.icon;
+
+          return (
+            <article
+              key={item.label}
+              style={{
+                minWidth: 0,
+                border: item.ready
+                  ? '1px solid rgba(45, 212, 191, 0.22)'
+                  : '1px solid rgba(250, 204, 21, 0.2)',
+                borderRadius: 'var(--radius-sm)',
+                background: item.ready ? 'rgba(45, 212, 191, 0.045)' : 'rgba(250, 204, 21, 0.04)',
+                padding: '0.72rem',
+                display: 'grid',
+                gap: '0.32rem',
+              }}
+            >
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  color: item.ready ? 'var(--brand-accent-teal)' : 'var(--brand-accent-gold)',
+                  fontSize: '0.68rem',
+                  fontWeight: 900,
+                }}
+              >
+                <Icon size={13} />
+                {item.label}
+              </span>
+              <strong
+                style={{
+                  color: 'var(--text-primary)',
+                  fontSize: '0.8rem',
+                  lineHeight: 1.32,
+                  overflowWrap: 'anywhere',
+                }}
+              >
+                {item.value}
+              </strong>
+              <small
+                style={{
+                  color: 'var(--text-secondary)',
+                  fontSize: '0.66rem',
+                  lineHeight: 1.45,
+                }}
+              >
+                {item.help}
+              </small>
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+type LivePreviewSectionProps = Readonly<{
+  normalizedQuestion: string;
+  nonEmptyOptions: Array<{ text: string; imageUrl: string | null }>;
+}>;
+
+function LivePreviewSection({ normalizedQuestion, nonEmptyOptions }: LivePreviewSectionProps) {
+  return (
+    <div
+      style={{
+        border: '1px solid var(--bg-card-border)',
+        borderRadius: 'var(--radius-sm)',
+        padding: '0.95rem',
+        background: 'rgba(255,255,255,0.02)',
+      }}
+    >
+      <h3
+        style={{
+          margin: 0,
+          fontSize: '0.84rem',
+          color: 'var(--text-primary)',
+          marginBottom: '0.6rem',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '5px',
+        }}
+      >
+        <Eye size={14} style={{ color: 'var(--brand-accent-teal)' }} />
+        실시간 미리보기
+      </h3>
+      <p
+        style={{
+          margin: 0,
+          marginBottom: '0.5rem',
+          color: 'var(--text-primary)',
+          fontSize: '1rem',
+          fontWeight: 700,
+        }}
+      >
+        {normalizedQuestion || '질문을 입력하면 미리보기가 표시됩니다.'}
+      </p>
+      {nonEmptyOptions.length > 0 ? (
+        <div style={{ display: 'grid', gap: '0.45rem' }}>
+          {nonEmptyOptions.slice(0, 4).map((option, index) => (
+            <p
+              key={`${option.text}-${index}`}
+              style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.78rem' }}
+            >
+              · {option.text}
+            </p>
+          ))}
+          {nonEmptyOptions.length > 4 ? (
+            <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.74rem' }}>
+              ...그 외 {nonEmptyOptions.length - 4}개 선택지
+            </p>
+          ) : null}
+          {nonEmptyOptions.some((option) => option.imageUrl) ? (
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(128px, 1fr))',
+                gap: '0.5rem',
+                marginTop: '0.35rem',
+              }}
+            >
+              {nonEmptyOptions
+                .filter((option) => option.imageUrl)
+                .slice(0, 4)
+                .map((option, index) => (
+                  <figure
+                    key={`${option.text}-image-${index}`}
+                    style={{
+                      margin: 0,
+                      border: '1px solid var(--bg-card-border)',
+                      borderRadius: 'var(--radius-sm)',
+                      overflow: 'hidden',
+                      background: 'rgba(255,255,255,0.02)',
+                    }}
+                  >
+                    <img
+                      src={option.imageUrl || ''}
+                      alt=""
+                      style={{
+                        width: '100%',
+                        aspectRatio: '16 / 9',
+                        objectFit: 'cover',
+                        display: 'block',
+                      }}
+                    />
+                    <figcaption
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        padding: '0.45rem 0.55rem',
+                        color: 'var(--text-secondary)',
+                        fontSize: '0.68rem',
+                      }}
+                    >
+                      <ImageIcon size={12} />
+                      <span
+                        style={{
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {option.text}
+                      </span>
+                    </figcaption>
+                  </figure>
+                ))}
+            </div>
+          ) : null}
+        </div>
+      ) : (
+        <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+          선택지를 입력하면 미리보기가 생성됩니다.
+        </p>
+      )}
+    </div>
+  );
+}
+
+type BulkPasteSectionProps = Readonly<{
+  parsedBulkOptions: string[];
+  bulkOptionsText: string;
+  setBulkOptionsText: (value: string) => void;
+  handleReadClipboardOptions: () => void;
+  handleApplyBulkOptions: () => void;
+}>;
+
+function BulkPasteSection({
+  parsedBulkOptions,
+  bulkOptionsText,
+  setBulkOptionsText,
+  handleReadClipboardOptions,
+  handleApplyBulkOptions,
+}: BulkPasteSectionProps) {
+  return (
+    <section
+      style={{
+        display: 'grid',
+        gap: '0.75rem',
+        border: '1px solid rgba(45, 212, 191, 0.18)',
+        borderRadius: 'var(--radius-sm)',
+        padding: '1rem',
+        background: 'rgba(45, 212, 191, 0.04)',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          gap: '0.75rem',
+          flexWrap: 'wrap',
+        }}
+      >
+        <div style={{ display: 'grid', gap: '0.22rem' }}>
+          <h2
+            style={{
+              margin: 0,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              color: 'var(--text-primary)',
+              fontSize: '0.92rem',
+              fontWeight: 900,
+            }}
+          >
+            <FileText size={15} style={{ color: 'var(--brand-accent-teal)' }} />
+            선택지 빠른 붙여넣기
+          </h2>
+          <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.72rem' }}>
+            줄바꿈으로 구분된 목록을 붙여넣으면 선택지 텍스트가 한 번에 채워집니다.
+          </p>
+        </div>
+        <span
+          style={{
+            border: '1px solid var(--bg-card-border)',
+            borderRadius: '999px',
+            padding: '4px 9px',
+            color: parsedBulkOptions.length >= 2 ? 'var(--brand-accent-teal)' : 'var(--text-muted)',
+            fontSize: '0.66rem',
+            fontWeight: 900,
+          }}
+        >
+          {parsedBulkOptions.length}/{MAX_OPTIONS}개 감지
+        </span>
+      </div>
+
+      <textarea
+        aria-label="선택지 빠른 붙여넣기"
+        value={bulkOptionsText}
+        onChange={(event) => setBulkOptionsText(event.target.value)}
+        placeholder={'예:\n아침 9시 회의\n오후 2시 회의\n비동기 문서 공유'}
+        rows={4}
+        className="form-input"
+        style={{ resize: 'vertical' }}
+      />
+
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: '0.75rem',
+          flexWrap: 'wrap',
+        }}
+      >
+        <span style={{ color: 'var(--text-muted)', fontSize: '0.68rem', lineHeight: 1.45 }}>
+          번호 목록, 하이픈 목록도 자동으로 정리합니다. 기존 이미지 업로드는 같은 순서에서
+          유지됩니다.
+        </span>
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            flexWrap: 'wrap',
+            justifyContent: 'flex-end',
+          }}
+        >
+          <button
+            type="button"
+            onClick={handleReadClipboardOptions}
+            className="ghost-btn"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '8px 12px',
+              fontSize: '0.74rem',
+            }}
+          >
+            <FileText size={14} />
+            클립보드 가져오기
+          </button>
+          <button
+            type="button"
+            onClick={handleApplyBulkOptions}
+            disabled={parsedBulkOptions.length < 2}
+            className="btn-secondary"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '8px 12px',
+              fontSize: '0.74rem',
+              opacity: parsedBulkOptions.length < 2 ? 0.55 : 1,
+              cursor: parsedBulkOptions.length < 2 ? 'not-allowed' : 'pointer',
+            }}
+          >
+            <CheckCircle2 size={14} />
+            선택지로 적용
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+type AttachmentsSectionProps = Readonly<{
+  attachments: AttachmentInput[];
+  isAttachmentDragging: boolean;
+  handleAttachmentDragOver: (event: React.DragEvent<HTMLLabelElement>) => void;
+  setIsAttachmentDragging: (value: boolean) => void;
+  handleAttachmentDrop: (event: React.DragEvent<HTMLLabelElement>) => void;
+  handleAttachmentUpload: (fileList?: FileList | null) => Promise<void>;
+  attachmentDropzoneLabel: string;
+  handleRemoveAttachment: (index: number) => void;
+}>;
+
+function AttachmentsSection({
+  attachments,
+  isAttachmentDragging,
+  handleAttachmentDragOver,
+  setIsAttachmentDragging,
+  handleAttachmentDrop,
+  handleAttachmentUpload,
+  attachmentDropzoneLabel,
+  handleRemoveAttachment,
+}: AttachmentsSectionProps) {
+  return (
+    <section
+      style={{
+        display: 'grid',
+        gap: '0.75rem',
+        border: '1px solid var(--bg-card-border)',
+        borderRadius: 'var(--radius-sm)',
+        padding: '1rem',
+        background: 'rgba(255,255,255,0.022)',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          gap: '0.75rem',
+          flexWrap: 'wrap',
+        }}
+      >
+        <div style={{ display: 'grid', gap: '0.25rem' }}>
+          <h2
+            style={{
+              margin: 0,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontSize: '0.92rem',
+              fontWeight: 800,
+              color: 'var(--text-primary)',
+            }}
+          >
+            <FileText size={15} style={{ color: 'var(--brand-accent-gold)' }} />
+            참고 파일 첨부
+          </h2>
+          <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.72rem' }}>
+            이미지가 아닌 자료는 작은 파일로 첨부할 수 있습니다. 참여자는 상세 화면에서
+            내려받습니다.
+          </p>
+        </div>
+        <span className="stat-pill">
+          {attachments.length}/{MAX_ATTACHMENTS}
+        </span>
+      </div>
+
+      <label
+        className={`upload-dropzone ${isAttachmentDragging ? 'drag-over' : ''}`}
+        data-drag={isAttachmentDragging ? 'true' : undefined}
+        onDragEnter={handleAttachmentDragOver}
+        onDragOver={handleAttachmentDragOver}
+        onDragLeave={() => setIsAttachmentDragging(false)}
+        onDrop={handleAttachmentDrop}
+        style={{
+          minHeight: '96px',
+          opacity: attachments.length >= MAX_ATTACHMENTS ? 0.62 : 1,
+          cursor: attachments.length >= MAX_ATTACHMENTS ? 'not-allowed' : 'pointer',
+        }}
+      >
+        <input
+          type="file"
+          accept=".pdf,.txt,.csv,.json,application/pdf,text/plain,text/csv,application/json"
+          multiple
+          disabled={attachments.length >= MAX_ATTACHMENTS}
+          onChange={(event) => {
+            void handleAttachmentUpload(event.target.files);
+            event.currentTarget.value = '';
+          }}
+        />
+        <Upload size={17} />
+        <span>{attachmentDropzoneLabel}</span>
+        <small>클릭하거나 끌어다 놓기 · 최대 {MAX_ATTACHMENTS}개 · 파일당 300KB 이하</small>
+      </label>
+
+      {attachments.length > 0 ? (
+        <div style={{ display: 'grid', gap: '0.5rem' }}>
+          {attachments.map((attachment, index) => (
+            <article
+              key={`${attachment.name}-${index}`}
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: '0.75rem',
+                border: '1px solid var(--bg-card-border)',
+                borderRadius: 'var(--radius-sm)',
+                background: 'rgba(255,255,255,0.025)',
+                padding: '0.68rem 0.75rem',
+              }}
+            >
+              <div style={{ minWidth: 0, display: 'grid', gap: '0.18rem' }}>
+                <strong
+                  style={{
+                    color: 'var(--text-primary)',
+                    fontSize: '0.78rem',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {attachment.name}
+                </strong>
+                <small style={{ color: 'var(--text-muted)', fontSize: '0.66rem' }}>
+                  {(attachment.size / 1024).toFixed(1)}KB · {attachment.type || 'file'}
+                </small>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleRemoveAttachment(index)}
+                className="ghost-btn"
+                aria-label={`${attachment.name} 첨부 삭제`}
+                style={{ padding: '5px 8px', fontSize: '0.68rem', flexShrink: 0 }}
+              >
+                삭제
+              </button>
+            </article>
+          ))}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+type PollSettingsSectionProps = Readonly<{
+  endsAtLocal: string;
+  clearError: () => void;
+  setFormError: (value: string) => void;
+  setEndsAtLocal: (value: string) => void;
+  isEndsAtInvalid: boolean;
+  resultsVisibility: PollResultsVisibility;
+  setResultsVisibility: (value: PollResultsVisibility) => void;
+}>;
+
+function PollSettingsSection({
+  endsAtLocal,
+  clearError,
+  setFormError,
+  setEndsAtLocal,
+  isEndsAtInvalid,
+  resultsVisibility,
+  setResultsVisibility,
+}: PollSettingsSectionProps) {
+  return (
+    <section
+      style={{
+        display: 'grid',
+        gap: '0.85rem',
+        border: '1px solid var(--bg-card-border)',
+        borderRadius: 'var(--radius-sm)',
+        padding: '1rem',
+        background: 'rgba(255,255,255,0.022)',
+      }}
+    >
+      <div style={{ display: 'grid', gap: '0.25rem' }}>
+        <h2
+          style={{
+            margin: 0,
+            fontSize: '0.92rem',
+            fontWeight: 800,
+            color: 'var(--text-primary)',
+          }}
+        >
+          투표 운영 설정
+        </h2>
+        <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.72rem' }}>
+          공유 후 참여 흐름을 제어합니다. 마감과 결과 공개 방식은 생성 후 투표 화면에 표시됩니다.
+        </p>
+      </div>
+
+      <div className="poll-settings-grid">
+        <label style={{ display: 'grid', gap: '0.45rem' }}>
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
+              color: 'var(--text-secondary)',
+              fontSize: '0.76rem',
+              fontWeight: 800,
+            }}
+          >
+            <AlertTriangle size={13} style={{ color: 'var(--brand-accent-gold)' }} />
+            마감 시간
+          </span>
+          <input
+            type="datetime-local"
+            value={endsAtLocal}
+            onChange={(event) => {
+              clearError();
+              setFormError('');
+              setEndsAtLocal(event.target.value);
+            }}
+            className="form-input"
+            style={{ fontSize: '0.82rem' }}
+          />
+          <div className="deadline-preset-grid" aria-label="마감 시간 빠른 선택">
+            {DEADLINE_PRESETS.map((preset) => (
+              <button
+                key={preset.value}
+                type="button"
+                onClick={() => {
+                  clearError();
+                  setFormError('');
+                  setEndsAtLocal(resolveDeadlinePresetValue(preset.value));
+                }}
+                className="ghost-btn"
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+          <small
+            style={{
+              color: isEndsAtInvalid ? 'var(--brand-accent-coral)' : 'var(--text-muted)',
+              fontSize: '0.66rem',
+              lineHeight: 1.4,
+            }}
+          >
+            비워두면 상시 진행됩니다. 마감 후에는 새 투표가 차단됩니다.
+          </small>
+        </label>
+
+        <div style={{ display: 'grid', gap: '0.45rem' }}>
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
+              color: 'var(--text-secondary)',
+              fontSize: '0.76rem',
+              fontWeight: 800,
+            }}
+          >
+            <Eye size={13} style={{ color: 'var(--brand-accent-teal)' }} />
+            결과 공개
+          </span>
+          <div className="result-mode-grid">
+            {RESULT_VISIBILITY_OPTIONS.map((option) => {
+              const active = resultsVisibility === option.value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setResultsVisibility(option.value)}
+                  className="result-mode-button"
+                  aria-pressed={active}
+                  style={{
+                    borderColor: active ? 'rgba(45, 212, 191, 0.42)' : 'var(--bg-card-border)',
+                    background: active ? 'rgba(45, 212, 191, 0.08)' : 'rgba(255,255,255,0.02)',
+                  }}
+                >
+                  <strong
+                    style={{
+                      color: active ? 'var(--brand-accent-teal)' : 'var(--text-primary)',
+                    }}
+                  >
+                    {option.label}
+                  </strong>
+                  <span>{option.description}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+type QuestionFieldsSectionProps = Readonly<{
+  formError: string;
+  error: string | null;
+  question: string;
+  clearError: () => void;
+  setFormError: (value: string) => void;
+  setQuestion: (value: string) => void;
+  normalizedQuestion: string;
+  categoryId: string | null;
+  setCategoryId: React.Dispatch<React.SetStateAction<string | null>>;
+  description: string;
+  setDescription: (value: string) => void;
+  normalizedDescription: string;
+}>;
+
+function QuestionFieldsSection({
+  formError,
+  error,
+  question,
+  clearError,
+  setFormError,
+  setQuestion,
+  normalizedQuestion,
+  categoryId,
+  setCategoryId,
+  description,
+  setDescription,
+  normalizedDescription,
+}: QuestionFieldsSectionProps) {
+  return (
+    <>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          padding: '12px 14px',
+          borderRadius: 'var(--radius-sm)',
+          border: '1px solid rgba(45, 212, 191, 0.2)',
+          background: 'rgba(45, 212, 191, 0.05)',
+        }}
+      >
+        <span aria-hidden style={{ fontSize: '1.4rem', lineHeight: 1 }}>
+          🥑
+        </span>
+        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+          안녕하세요, 피키예요! 어떤 게 고민이세요? 아래에 질문만 적어주면 제가 예쁘게
+          정리해드릴게요.
+        </span>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        <label
+          htmlFor="create-poll-question"
+          style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}
+        >
+          고민 주제 (질문)
+        </label>
+        {formError ? (
+          <p
+            style={{
+              margin: 0,
+              fontSize: '0.78rem',
+              color: 'var(--brand-accent-coral)',
+              padding: '7px 10px',
+              borderRadius: 'var(--radius-sm)',
+              border: '1px solid rgba(239, 68, 68, 0.2)',
+              background: 'rgba(239, 68, 68, 0.12)',
+            }}
+          >
+            {formError}
+          </p>
+        ) : null}
+        {error ? (
+          <p
+            style={{
+              margin: 0,
+              fontSize: '0.78rem',
+              color: 'var(--brand-accent-coral)',
+              padding: '7px 10px',
+              borderRadius: 'var(--radius-sm)',
+              border: '1px solid rgba(239, 68, 68, 0.2)',
+              background: 'rgba(239, 68, 68, 0.12)',
+            }}
+          >
+            {error}
+          </p>
+        ) : null}
+
+        <input
+          id="create-poll-question"
+          type="text"
+          aria-label="고민 주제 (질문)"
+          placeholder="예: 이번 주말 모임, 어디서 만날까요?"
+          value={question}
+          onChange={(e) => {
+            clearError();
+            setFormError('');
+            setQuestion(e.target.value);
+          }}
+          required
+          maxLength={100}
+          className="form-input"
+        />
+        <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+          {normalizedQuestion.length} / 100
+        </span>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <label style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+          고민 카테고리 <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>(선택)</span>
+        </label>
+        <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+          어떤 고민인지 콕 골라주면 피키가 더 잘 정리해드려요 🥑
+        </p>
+        <fieldset
+          aria-label="고민 카테고리 선택"
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '8px',
+            margin: 0,
+            padding: 0,
+            border: 0,
+            minInlineSize: 'auto',
+          }}
+        >
+          {POLL_CATEGORIES.map((category) => {
+            const active = categoryId === category.id;
+            return (
+              <button
+                key={category.id}
+                type="button"
+                aria-pressed={active}
+                onClick={() => {
+                  clearError();
+                  setFormError('');
+                  setCategoryId((current) => (current === category.id ? null : category.id));
+                }}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '8px 14px',
+                  borderRadius: '999px',
+                  fontSize: '0.8rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  transition: 'transform 0.12s ease, box-shadow 0.12s ease',
+                  color: active ? '#fff' : 'var(--text-secondary)',
+                  background: active ? category.color : 'rgba(255,255,255,0.03)',
+                  border: `1.5px solid ${active ? category.color : 'var(--bg-card-border)'}`,
+                  boxShadow: active ? `0 4px 14px ${category.color}55` : 'none',
+                  transform: active ? 'translateY(-1px)' : 'none',
+                }}
+              >
+                <span aria-hidden style={{ fontSize: '0.95rem' }}>
+                  {category.emoji}
+                </span>
+                {category.label}
+              </button>
+            );
+          })}
+        </fieldset>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        <label
+          htmlFor="create-poll-description"
+          style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}
+        >
+          상세 내용 / 고민 배경 (선택)
+        </label>
+        <textarea
+          id="create-poll-description"
+          aria-label="상세 내용 / 고민 배경 (선택)"
+          placeholder="결정을 내리기 힘든 이유나 배경을 적어주면 더 정확한 답을 받을 수 있어요."
+          value={description}
+          onChange={(e) => {
+            clearError();
+            setFormError('');
+            setDescription(e.target.value);
+          }}
+          rows={4}
+          maxLength={500}
+          className="form-input"
+          style={{ resize: 'none' }}
+        />
+        <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+          {normalizedDescription.length} / 500
+        </span>
+      </div>
+    </>
+  );
+}
+
+type MobileSubmitBarProps = Readonly<{
+  canSubmit: boolean;
+  isLoading: boolean;
+}>;
+
+function MobileSubmitBar({ canSubmit, isLoading }: MobileSubmitBarProps) {
+  return (
+    <>
+      {/* 모바일 전용 고정 제출 바 — 긴 폼에서도 1차 액션을 항상 손 닿는 곳에.
+          form 속성으로 위 폼과 연결되어 별도 핸들러 없이 동일하게 제출된다. */}
+      <div className="mobile-only" aria-hidden="true" style={{ height: '78px' }} />
+      <div className="sticky-action-bar mobile-only">
+        <button
+          type="submit"
+          form="create-poll-form"
+          disabled={!canSubmit}
+          className="btn-primary"
+          style={{ width: '100%', padding: '14px', fontSize: '0.95rem' }}
+        >
+          {isLoading
+            ? '고민 등록 중...'
+            : canSubmit
+              ? '고민 등록 및 링크 생성'
+              : '질문과 선택지 2개를 입력해 주세요'}
+        </button>
+      </div>
+    </>
+  );
+}
 
 export const CreatePoll: React.FC = () => {
   useDocumentTitle('새 고민 작성');
@@ -597,7 +3440,7 @@ export const CreatePoll: React.FC = () => {
       return;
     }
 
-    const timer = window.setTimeout(() => {
+    const timer = globalThis.setTimeout(() => {
       const nextDraft: PollDraft = {
         question: question.trim(),
         description: description.trim(),
@@ -699,12 +3542,16 @@ export const CreatePoll: React.FC = () => {
   const passedQualityCount = qualityItems.filter((item) => item.passed).length;
   const qualityScore = Math.round((passedQualityCount / qualityItems.length) * 100);
   const imageOptionCount = normalizedOptions.filter((option) => Boolean(option.imageUrl)).length;
-  const qualityTone =
-    qualityScore >= 80
-      ? 'var(--brand-accent-teal)'
-      : qualityScore >= 60
-        ? 'var(--brand-accent-gold)'
-        : 'var(--brand-accent-coral)';
+  const resolveQualityTone = () => {
+    if (qualityScore >= 80) {
+      return 'var(--brand-accent-teal)';
+    }
+    if (qualityScore >= 60) {
+      return 'var(--brand-accent-gold)';
+    }
+    return 'var(--brand-accent-coral)';
+  };
+  const qualityTone = resolveQualityTone();
   const longOptionCount = nonEmptyOptions.filter((option) => option.text.length > 36).length;
   const averageOptionLength =
     nonEmptyOptions.length > 0
@@ -720,85 +3567,65 @@ export const CreatePoll: React.FC = () => {
   const hasLoadedWording = /(무조건|당연히|반드시|항상|절대|최고|최악)/.test(
     `${normalizedQuestion} ${normalizedDescription}`,
   );
-  const responseEffort =
-    nonEmptyOptions.length <= 4 && normalizedDescription.length <= 180 && longOptionCount === 0
-      ? '낮음'
-      : nonEmptyOptions.length <= 6 && normalizedDescription.length <= 320 && longOptionCount <= 1
-        ? '보통'
-        : '높음';
-  const launchActionItems = [
-    {
-      label: '질문 형태',
-      ready: hasQuestionShape,
-      value: hasQuestionShape ? '질문형 문장' : '질문 끝을 ?로 마무리',
-      action: hasQuestionShape
-        ? '공유 카드에서 질문 의도가 명확하게 보입니다.'
-        : '응답자가 바로 판단할 수 있도록 질문형 문장으로 다듬어 보세요.',
-    },
-    {
-      label: '편향 표현',
-      ready: !hasLoadedWording,
-      value: hasLoadedWording ? '강한 유도어 감지' : '중립 문장',
-      action: hasLoadedWording
-        ? '무조건, 최고, 최악 같은 단어는 결과를 한쪽으로 유도할 수 있습니다.'
-        : '응답자가 자기 기준으로 고르기 좋은 톤입니다.',
-    },
-    {
-      label: '응답 부담',
-      ready: responseEffort !== '높음',
-      value: `부담 ${responseEffort}`,
-      action:
-        responseEffort === '높음'
-          ? '설명이 길거나 선택지가 복잡합니다. 선택지 문장을 줄이면 모바일 참여율이 좋아집니다.'
-          : '짧은 시간 안에 읽고 선택할 수 있는 구조입니다.',
-    },
-    {
-      label: '판단 근거',
-      ready: normalizedDescription.length >= 20 || imageOptionCount > 0 || attachments.length > 0,
-      value:
-        attachments.length > 0
-          ? `첨부 ${attachments.length}개`
-          : imageOptionCount > 0
-            ? `이미지 ${imageOptionCount}개`
-            : normalizedDescription.length >= 20
-              ? '배경 설명 있음'
-              : '맥락 보강 필요',
-      action:
-        normalizedDescription.length >= 20 || imageOptionCount > 0 || attachments.length > 0
-          ? '투표자가 선택 기준을 이해할 수 있는 자료가 있습니다.'
-          : '짧은 배경 설명이나 참고 파일을 추가하면 선택 이유가 더 잘 모입니다.',
-    },
-  ];
+  const resolveResponseEffort = () => {
+    if (
+      nonEmptyOptions.length <= 4 &&
+      normalizedDescription.length <= 180 &&
+      longOptionCount === 0
+    ) {
+      return '낮음';
+    }
+    if (
+      nonEmptyOptions.length <= 6 &&
+      normalizedDescription.length <= 320 &&
+      longOptionCount <= 1
+    ) {
+      return '보통';
+    }
+    return '높음';
+  };
+  const responseEffort = resolveResponseEffort();
+  const resolveResponseEffortColor = () => {
+    if (responseEffort === '낮음') {
+      return 'var(--brand-accent-teal)';
+    }
+    if (responseEffort === '보통') {
+      return 'var(--brand-accent-gold)';
+    }
+    return 'var(--brand-accent-coral)';
+  };
+  const responseEffortColor = resolveResponseEffortColor();
+  const resolveEvidenceValue = () => {
+    if (attachments.length > 0) {
+      return `첨부 ${attachments.length}개`;
+    }
+    if (imageOptionCount > 0) {
+      return `이미지 ${imageOptionCount}개`;
+    }
+    if (normalizedDescription.length >= 20) {
+      return '배경 설명 있음';
+    }
+    return '맥락 보강 필요';
+  };
+  const evidenceValue = resolveEvidenceValue();
+  const launchActionItems = buildLaunchActionItems({
+    hasQuestionShape,
+    hasLoadedWording,
+    responseEffort,
+    normalizedDescriptionLength: normalizedDescription.length,
+    imageOptionCount,
+    attachmentsLength: attachments.length,
+    evidenceValue,
+  });
   const launchActionReadyCount = launchActionItems.filter((item) => item.ready).length;
-  const surveyCoachItems = [
-    {
-      label: '한 질문 한 결정',
-      passed: hasQuestionShape,
-      value: hasQuestionShape ? '명확함' : '질문형으로 다듬기',
-      help: '응답자는 질문이 짧고 끝이 분명할수록 바로 선택합니다.',
-    },
-    {
-      label: '편향 표현',
-      passed: !hasLoadedWording,
-      value: hasLoadedWording ? '강한 표현 감지' : '중립적',
-      help: '무조건, 당연히, 최고 같은 표현은 선택을 유도할 수 있습니다.',
-    },
-    {
-      label: '모바일 선택 부담',
-      passed: nonEmptyOptions.length >= 2 && nonEmptyOptions.length <= 6 && longOptionCount === 0,
-      value:
-        nonEmptyOptions.length > 0
-          ? `평균 ${averageOptionLength}자 · 긴 선택지 ${longOptionCount}개`
-          : '선택지 대기',
-      help: '짧은 선택지 2~6개가 모바일 단톡방 응답에 가장 안정적입니다.',
-    },
-    {
-      label: '응답 부담',
-      passed: responseEffort !== '높음',
-      value: responseEffort,
-      help: '설명이 길거나 선택지가 많으면 공유 후 이탈 가능성이 커집니다.',
-    },
-  ];
+  const surveyCoachItems = buildSurveyCoachItems({
+    hasQuestionShape,
+    hasLoadedWording,
+    nonEmptyOptionsLength: nonEmptyOptions.length,
+    longOptionCount,
+    averageOptionLength,
+    responseEffort,
+  });
   const sharePreviewTitle = normalizedQuestion || '공유될 고민 제목이 여기에 표시됩니다';
   const sharePreviewDescription =
     normalizedDescription ||
@@ -823,125 +3650,49 @@ export const CreatePoll: React.FC = () => {
     nonEmptyOptions.reduce((total, option) => total + option.text.length, 0);
   const estimatedReadSeconds =
     readableCharacterCount > 0 ? Math.max(6, Math.ceil(readableCharacterCount / 14)) : 0;
-  const participantExperienceItems = [
-    {
-      label: '첫 화면 집중도',
-      icon: Smartphone,
-      value: shareReady ? `${estimatedReadSeconds}초 안에 읽기` : '질문/선택지 대기',
-      help: shareReady
-        ? '참여자가 링크를 열었을 때 질문과 선택지를 한 번에 훑을 수 있습니다.'
-        : '질문과 최소 2개 선택지를 입력해야 실제 참여 화면이 완성됩니다.',
-      ready: shareReady && responseEffort !== '높음',
-    },
-    {
-      label: '시각 자료',
-      icon: ImageIcon,
-      value: imageOptionCount > 0 ? `이미지 ${imageOptionCount}개` : '텍스트 중심',
-      help:
-        imageOptionCount > 0
-          ? '이미지가 있는 선택지는 비교 판단과 공유 미리보기에서 더 잘 드러납니다.'
-          : '비교가 어려운 항목이면 선택지 이미지 업로드를 고려하세요.',
-      ready: imageOptionCount > 0 || nonEmptyOptions.length <= 4,
-    },
-    {
-      label: '참고 자료',
-      icon: FileText,
-      value: attachments.length > 0 ? `첨부 ${attachments.length}개` : '첨부 없음',
-      help:
-        attachments.length > 0
-          ? '참여자가 상세 화면에서 자료를 보고 선택 이유를 남길 수 있습니다.'
-          : '근거가 필요한 투표라면 작은 PDF/TXT/CSV/JSON 파일을 첨부할 수 있습니다.',
-      ready: attachments.length > 0 || normalizedDescription.length >= 20,
-    },
-    {
-      label: '운영 신호',
-      icon: TimerReset,
-      value: `${resultsVisibilityLabel} · ${deadlineLabel}`,
-      help: endsAtLocal
-        ? '마감이 있으면 공유 메시지와 리마인더에서 행동 시점이 분명해집니다.'
-        : '상시 투표는 부담이 낮지만 응답을 모으는 긴급성은 약합니다.',
-      ready: !isEndsAtInvalid,
-    },
-  ];
-  const shareReadinessItems = [
-    {
-      label: '참여 링크',
-      icon: Link2,
-      ready: shareReady,
-      value: shareReady ? '생성 즉시 발급' : '질문과 선택지 필요',
-    },
-    {
-      label: '카카오 OG',
-      icon: Share2,
-      ready: shareReady,
-      value: imageOptionCount > 0 ? '업로드 이미지 반영' : '기본 이미지 사용',
-    },
-    {
-      label: '임베드 코드',
-      icon: Code2,
-      ready: shareReady,
-      value: shareReady ? '웹사이트 삽입 가능' : '생성 후 복사 가능',
-    },
-    {
-      label: '운영 상태',
-      icon: TimerReset,
-      ready: !isEndsAtInvalid,
-      value: deadlineLabel,
-    },
-  ];
+  const participantExperienceItems = buildParticipantExperienceItems({
+    shareReady,
+    estimatedReadSeconds,
+    responseEffort,
+    imageOptionCount,
+    nonEmptyOptionsLength: nonEmptyOptions.length,
+    attachmentsLength: attachments.length,
+    normalizedDescriptionLength: normalizedDescription.length,
+    resultsVisibilityLabel,
+    deadlineLabel,
+    endsAtLocal,
+    isEndsAtInvalid,
+  });
+  const shareReadinessItems = buildShareReadinessItems({
+    shareReady,
+    imageOptionCount,
+    isEndsAtInvalid,
+    deadlineLabel,
+  });
   const parsedBulkOptions = bulkOptionsText
     .split(/\r?\n/)
     .map((line) => line.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '').trim())
     .filter(Boolean)
     .slice(0, MAX_OPTIONS);
-  const publishBlockedReasons = [
-    normalizedQuestion.length < 2 ? '질문을 2자 이상 입력해야 합니다.' : null,
-    normalizedQuestion.length > 100 ? '질문은 100자 이하로 줄여야 합니다.' : null,
-    normalizedDescription.length > 500 ? '상세 내용은 500자 이하로 줄여야 합니다.' : null,
-    nonEmptyOptions.length < 2 ? '선택지는 최소 2개 필요합니다.' : null,
-    hasDuplicateOptions ? '중복된 선택지 텍스트를 정리해야 합니다.' : null,
-    isEndsAtInvalid ? '마감 시간은 현재보다 최소 1분 이후여야 합니다.' : null,
-    attachments.length > MAX_ATTACHMENTS ? '첨부파일은 최대 3개까지 등록할 수 있습니다.' : null,
-    isLoading ? '투표 생성 요청을 처리 중입니다.' : null,
-  ].filter((item): item is string => item !== null);
-  const publishReviewItems = [
-    {
-      label: '질문',
-      ready: normalizedQuestion.length >= 2 && normalizedQuestion.length <= 100,
-      value: normalizedQuestion ? `${normalizedQuestion.length}/100자` : '입력 필요',
-      help: normalizedQuestion || '공유 카드의 제목으로 쓰입니다.',
-    },
-    {
-      label: '선택지',
-      ready: nonEmptyOptions.length >= 2 && !hasDuplicateOptions,
-      value: `${nonEmptyOptions.length}개`,
-      help: hasDuplicateOptions ? '중복 선택지를 제거하세요.' : '응답자가 고를 항목입니다.',
-    },
-    {
-      label: '업로드 이미지',
-      ready: true,
-      value: imageOptionCount > 0 ? `${imageOptionCount}개 포함` : '이미지 없이 생성',
-      help:
-        imageOptionCount > 0
-          ? '선택지 이미지와 OG 미리보기에 반영됩니다.'
-          : '필요하면 선택지별 업로드 버튼으로 파일을 추가할 수 있습니다.',
-    },
-    {
-      label: '첨부파일',
-      ready: attachments.length <= MAX_ATTACHMENTS,
-      value: attachments.length > 0 ? `${attachments.length}개 첨부` : '파일 없이 생성',
-      help:
-        attachments.length > 0
-          ? '참여자가 상세 화면에서 참고 파일을 내려받을 수 있습니다.'
-          : '필요하면 PDF/TXT/CSV/JSON 파일을 첨부할 수 있습니다.',
-    },
-    {
-      label: '운영 설정',
-      ready: !isEndsAtInvalid,
-      value: `${resultsVisibilityLabel} · ${deadlineLabel}`,
-      help: '마감과 결과 공개 정책은 생성 후 참여 흐름에 영향을 줍니다.',
-    },
-  ];
+  const firstPublishBlockedReason = resolveFirstPublishBlockedReason({
+    normalizedQuestionLength: normalizedQuestion.length,
+    normalizedDescriptionLength: normalizedDescription.length,
+    nonEmptyOptionsLength: nonEmptyOptions.length,
+    hasDuplicateOptions,
+    isEndsAtInvalid,
+    attachmentsLength: attachments.length,
+    isLoading,
+  });
+  const publishReviewItems = buildPublishReviewItems({
+    normalizedQuestion,
+    nonEmptyOptionsLength: nonEmptyOptions.length,
+    hasDuplicateOptions,
+    imageOptionCount,
+    attachmentsLength: attachments.length,
+    isEndsAtInvalid,
+    resultsVisibilityLabel,
+    deadlineLabel,
+  });
   const publishReadyCount = publishReviewItems.filter((item) => item.ready).length;
 
   const applyPreset = (index: number) => {
@@ -1082,9 +3833,7 @@ export const CreatePoll: React.FC = () => {
   };
 
   const isSupportedAttachmentFile = (file: File) => {
-    return (
-      SUPPORTED_ATTACHMENT_TYPES.includes(file.type) || /\.(pdf|txt|csv|json)$/i.test(file.name)
-    );
+    return SUPPORTED_ATTACHMENT_TYPES.has(file.type) || /\.(pdf|txt|csv|json)$/i.test(file.name);
   };
 
   const handleAttachmentUpload = async (fileList?: FileList | null) => {
@@ -1223,6 +3972,17 @@ export const CreatePoll: React.FC = () => {
     }
   };
 
+  const resolveAttachmentDropzoneLabel = () => {
+    if (attachments.length >= MAX_ATTACHMENTS) {
+      return '첨부 한도 도달';
+    }
+    if (isAttachmentDragging) {
+      return '여기에 놓아 첨부';
+    }
+    return 'PDF/TXT/CSV/JSON 파일 업로드';
+  };
+  const attachmentDropzoneLabel = resolveAttachmentDropzoneLabel();
+
   return (
     <div
       className="animate-slide-up"
@@ -1269,1073 +4029,59 @@ export const CreatePoll: React.FC = () => {
         </button>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', order: 2 }}>
-        <button
-          type="button"
-          onClick={() => setIsTemplateGalleryOpen((open) => !open)}
-          aria-expanded={isTemplateGalleryOpen}
-          aria-controls="create-template-gallery"
-          className="ghost-btn"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '12px 14px',
-            borderRadius: 'var(--radius-sm)',
-            textAlign: 'left',
-            background: isTemplateGalleryOpen
-              ? 'rgba(232, 200, 77, 0.06)'
-              : 'rgba(255,255,255,0.02)',
-            borderColor: isTemplateGalleryOpen
-              ? 'rgba(232, 200, 77, 0.3)'
-              : 'var(--bg-card-border)',
-          }}
-        >
-          <Sparkles size={15} style={{ color: 'var(--brand-accent-gold)', flexShrink: 0 }} />
-          <span style={{ display: 'grid', gap: '2px', flex: 1, minWidth: 0 }}>
-            <span style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-              템플릿에서 시작하기 ✨
-            </span>
-            <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)' }}>
-              {isTemplateGalleryOpen
-                ? '마음에 드는 시작점을 고르면 질문과 선택지가 자동으로 채워져요.'
-                : `바로 작성해도 좋고, 준비된 ${PRESET_TEMPLATES.length}개 템플릿으로 시작해도 좋아요.`}
-            </span>
-          </span>
-          <ChevronDown
-            size={16}
-            style={{
-              color: 'var(--text-muted)',
-              flexShrink: 0,
-              transition: 'transform 0.18s ease',
-              transform: isTemplateGalleryOpen ? 'rotate(180deg)' : 'none',
-            }}
-          />
-        </button>
-        {isTemplateGalleryOpen ? (
-          <div
-            id="create-template-gallery"
-            style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}
-          >
-            <div
-              role="tablist"
-              aria-label="템플릿 카테고리"
-              style={{
-                display: 'flex',
-                gap: '6px',
-                flexWrap: 'wrap',
-              }}
-            >
-              {PRESET_CATEGORY_OPTIONS.map((category) => {
-                const active = templateCategory === category.value;
+      <TemplateGallerySection
+        isTemplateGalleryOpen={isTemplateGalleryOpen}
+        setIsTemplateGalleryOpen={setIsTemplateGalleryOpen}
+        templateCategory={templateCategory}
+        setTemplateCategory={setTemplateCategory}
+        presetCategoryCounts={presetCategoryCounts}
+        templateSearchInput={templateSearchInput}
+        setTemplateSearchInput={setTemplateSearchInput}
+        visiblePresetTemplates={visiblePresetTemplates}
+        activePresetIndex={activePresetIndex}
+        applyPreset={applyPreset}
+        draftSavedAt={draftSavedAt}
+        cachedDraft={cachedDraft}
+        handleRestoreDraft={handleRestoreDraft}
+        handleClearDraft={handleClearDraft}
+      />
 
-                return (
-                  <button
-                    key={category.value}
-                    type="button"
-                    role="tab"
-                    aria-selected={active}
-                    onClick={() => setTemplateCategory(category.value)}
-                    className="ghost-btn"
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '5px',
-                      padding: '6px 10px',
-                      fontSize: '0.68rem',
-                      borderRadius: '999px',
-                      color: active ? 'var(--brand-accent-teal)' : 'var(--text-secondary)',
-                      borderColor: active ? 'rgba(45, 212, 191, 0.35)' : 'var(--bg-card-border)',
-                      background: active ? 'rgba(45, 212, 191, 0.08)' : 'rgba(255,255,255,0.02)',
-                    }}
-                  >
-                    {category.emoji ? <span aria-hidden>{category.emoji}</span> : null}
-                    {category.label}
-                    <span
-                      style={{
-                        color: active ? 'var(--brand-accent-teal)' : 'var(--text-muted)',
-                        fontSize: '0.62rem',
-                        fontWeight: 900,
-                      }}
-                    >
-                      {presetCategoryCounts[category.value]}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-            <label
-              style={{
-                display: 'grid',
-                gap: '0.35rem',
-                maxWidth: '620px',
-              }}
-            >
-              <span
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  color: 'var(--text-secondary)',
-                  fontSize: '0.68rem',
-                  fontWeight: 900,
-                }}
-              >
-                <Search size={13} style={{ color: 'var(--brand-accent-teal)' }} />
-                템플릿 검색
-              </span>
-              <div style={{ position: 'relative' }}>
-                <input
-                  value={templateSearchInput}
-                  onChange={(event) => setTemplateSearchInput(event.target.value)}
-                  placeholder="예: 회의, 일정, 피드백, 수업, 우선순위"
-                  className="form-input"
-                  style={{
-                    width: '100%',
-                    paddingRight: templateSearchInput ? '76px' : undefined,
-                    minHeight: '40px',
-                    fontSize: '0.78rem',
-                  }}
-                />
-                {templateSearchInput ? (
-                  <button
-                    type="button"
-                    onClick={() => setTemplateSearchInput('')}
-                    className="ghost-inline"
-                    style={{
-                      position: 'absolute',
-                      right: '10px',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      color: 'var(--text-muted)',
-                      fontSize: '0.66rem',
-                    }}
-                  >
-                    지우기
-                  </button>
-                ) : null}
-              </div>
-            </label>
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
-                gap: '8px',
-              }}
-            >
-              {visiblePresetTemplates.length > 0 ? (
-                visiblePresetTemplates.map(({ template: tmpl, index: idx }) => (
-                  <button
-                    type="button"
-                    key={idx}
-                    onClick={() => applyPreset(idx)}
-                    className="btn-secondary"
-                    style={{
-                      padding: '0.78rem',
-                      fontSize: '0.75rem',
-                      borderRadius: 'var(--radius-sm)',
-                      display: 'grid',
-                      alignItems: 'start',
-                      gap: '0.42rem',
-                      textAlign: 'left',
-                      backgroundColor:
-                        activePresetIndex === idx ? 'rgba(99, 102, 241, 0.15)' : 'transparent',
-                      borderColor:
-                        activePresetIndex === idx
-                          ? 'var(--brand-primary)'
-                          : 'var(--bg-card-border)',
-                    }}
-                  >
-                    <span
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                      }}
-                    >
-                      <span
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          color:
-                            activePresetIndex === idx
-                              ? 'var(--brand-primary)'
-                              : 'var(--text-primary)',
-                          fontWeight: 900,
-                        }}
-                      >
-                        <span>{tmpl.icon}</span>
-                        <span>{tmpl.name}</span>
-                      </span>
-                      {activePresetIndex === idx ? (
-                        <CheckCircle2 size={14} style={{ color: 'var(--brand-accent-teal)' }} />
-                      ) : null}
-                    </span>
-                    <span
-                      style={{
-                        color: 'var(--text-muted)',
-                        fontSize: '0.66rem',
-                        lineHeight: 1.42,
-                        display: '-webkit-box',
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: 'vertical',
-                        overflow: 'hidden',
-                      }}
-                    >
-                      {tmpl.question}
-                    </span>
-                    <span
-                      style={{
-                        color: 'var(--brand-accent-teal)',
-                        fontSize: '0.62rem',
-                        fontWeight: 900,
-                      }}
-                    >
-                      {
-                        PRESET_CATEGORY_OPTIONS.find((category) => category.value === tmpl.category)
-                          ?.label
-                      }{' '}
-                      템플릿
-                    </span>
-                  </button>
-                ))
-              ) : (
-                <div
-                  style={{
-                    gridColumn: '1 / -1',
-                    border: '1px dashed rgba(250, 204, 21, 0.28)',
-                    borderRadius: 'var(--radius-sm)',
-                    background: 'rgba(250, 204, 21, 0.045)',
-                    padding: '0.9rem',
-                    display: 'grid',
-                    gap: '0.5rem',
-                    color: 'var(--text-secondary)',
-                    fontSize: '0.74rem',
-                  }}
-                >
-                  <strong style={{ color: 'var(--brand-accent-gold)', fontSize: '0.82rem' }}>
-                    조건에 맞는 템플릿이 없습니다
-                  </strong>
-                  <span>
-                    검색어를 줄이거나 전체 카테고리로 돌아가면 더 많은 시작점을 볼 수 있습니다.
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setTemplateCategory('all');
-                      setTemplateSearchInput('');
-                    }}
-                    className="ghost-btn"
-                    style={{
-                      justifySelf: 'start',
-                      padding: '6px 10px',
-                      fontSize: '0.68rem',
-                    }}
-                  >
-                    전체 템플릿 보기
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        ) : null}
+      <QualityCheckSection
+        qualityTone={qualityTone}
+        qualityScore={qualityScore}
+        qualityItems={qualityItems}
+        responseEffortColor={responseEffortColor}
+        responseEffort={responseEffort}
+        surveyCoachItems={surveyCoachItems}
+        nonEmptyOptionsCount={nonEmptyOptions.length}
+        imageOptionCount={imageOptionCount}
+        passedQualityCount={passedQualityCount}
+      />
 
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            gap: '8px',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            color: 'var(--text-muted)',
-            fontSize: '0.68rem',
-            paddingTop: '6px',
-          }}
-        >
-          {draftSavedAt ? (
-            <span>
-              마지막 임시저장:{' '}
-              {new Date(draftSavedAt).toLocaleTimeString([], {
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
-            </span>
-          ) : (
-            <span>임시 저장되지 않음</span>
-          )}
-          <div style={{ display: 'inline-flex', gap: '6px', marginLeft: 'auto' }}>
-            <button
-              type="button"
-              onClick={handleRestoreDraft}
-              className="ghost-inline"
-              disabled={!cachedDraft}
-              style={{
-                color: cachedDraft ? 'var(--text-secondary)' : 'var(--text-muted)',
-                cursor: cachedDraft ? 'pointer' : 'not-allowed',
-              }}
-            >
-              임시저장 복원
-            </button>
-            <button
-              type="button"
-              onClick={handleClearDraft}
-              className="ghost-inline"
-              disabled={!draftSavedAt}
-              style={{
-                color: draftSavedAt ? 'var(--text-secondary)' : 'var(--text-muted)',
-                cursor: draftSavedAt ? 'pointer' : 'not-allowed',
-              }}
-            >
-              임시저장 삭제
-            </button>
-          </div>
-        </div>
-      </div>
+      <SharePreviewSection
+        shareReady={shareReady}
+        showEmbedPreview={showEmbedPreview}
+        setShowEmbedPreview={setShowEmbedPreview}
+        imageOptionCount={imageOptionCount}
+        sharePreviewTitle={sharePreviewTitle}
+        sharePreviewDescription={sharePreviewDescription}
+        shareReadinessItems={shareReadinessItems}
+        embedPreviewDevice={embedPreviewDevice}
+        setEmbedPreviewDevice={setEmbedPreviewDevice}
+        sharePreviewImageUrl={sharePreviewImageUrl}
+        sharePreviewOptions={sharePreviewOptions}
+        resultsVisibilityLabel={resultsVisibilityLabel}
+        deadlineLabel={deadlineLabel}
+      />
 
-      <section
-        className="content-card"
-        style={{
-          padding: '1rem',
-          display: 'grid',
-          gap: '0.9rem',
-          cursor: 'default',
-          order: 3,
-        }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            gap: '0.85rem',
-            flexWrap: 'wrap',
-          }}
-        >
-          <div style={{ display: 'grid', gap: '0.2rem' }}>
-            <h2
-              style={{
-                margin: 0,
-                fontSize: '0.96rem',
-                fontWeight: 800,
-                color: 'var(--text-primary)',
-              }}
-            >
-              작성 품질 점검
-            </h2>
-            <p style={{ margin: 0, fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
-              공유 전에 질문과 선택지가 바로 참여 가능한 상태인지 확인합니다.
-            </p>
-          </div>
-          <div
-            style={{
-              minWidth: '96px',
-              border: '1px solid var(--bg-card-border)',
-              borderRadius: 'var(--radius-sm)',
-              padding: '0.55rem 0.7rem',
-              textAlign: 'right',
-              background: 'rgba(255,255,255,0.025)',
-            }}
-          >
-            <span style={{ display: 'block', fontSize: '0.64rem', color: 'var(--text-muted)' }}>
-              준비도
-            </span>
-            <strong style={{ color: qualityTone, fontSize: '1.15rem' }}>{qualityScore}%</strong>
-          </div>
-        </div>
-
-        <div className="quality-grid">
-          {qualityItems.map((item) => (
-            <div
-              key={item.label}
-              style={{
-                display: 'grid',
-                gap: '0.35rem',
-                alignContent: 'start',
-                border: '1px solid var(--bg-card-border)',
-                borderRadius: 'var(--radius-sm)',
-                padding: '0.7rem',
-                background: item.passed ? 'rgba(45, 212, 191, 0.06)' : 'rgba(255,255,255,0.02)',
-              }}
-            >
-              <span
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  color: item.passed ? 'var(--brand-accent-teal)' : 'var(--brand-accent-gold)',
-                  fontSize: '0.74rem',
-                  fontWeight: 800,
-                }}
-              >
-                {item.passed ? <CheckCircle2 size={14} /> : <AlertTriangle size={14} />}
-                {item.label}
-              </span>
-              <span style={{ color: 'var(--text-muted)', fontSize: '0.68rem', lineHeight: 1.45 }}>
-                {item.help}
-              </span>
-            </div>
-          ))}
-        </div>
-
-        <section
-          style={{
-            border: '1px solid rgba(232, 200, 77, 0.18)',
-            borderRadius: 'var(--radius-sm)',
-            background: 'rgba(232, 200, 77, 0.045)',
-            padding: '0.85rem',
-            display: 'grid',
-            gap: '0.75rem',
-          }}
-        >
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'flex-start',
-              gap: '0.75rem',
-              flexWrap: 'wrap',
-            }}
-          >
-            <div style={{ display: 'grid', gap: '0.2rem' }}>
-              <h3
-                style={{
-                  margin: 0,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  color: 'var(--text-primary)',
-                  fontSize: '0.9rem',
-                  fontWeight: 900,
-                }}
-              >
-                <Sparkles size={14} style={{ color: 'var(--brand-accent-gold)' }} />
-                응답률 코치
-              </h3>
-              <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.72rem' }}>
-                질문이 명확하고 선택 부담이 낮을수록 단톡방에서 바로 응답하기 쉽습니다.
-              </p>
-            </div>
-            <span
-              style={{
-                border: '1px solid rgba(232, 200, 77, 0.28)',
-                borderRadius: '999px',
-                color:
-                  responseEffort === '낮음'
-                    ? 'var(--brand-accent-teal)'
-                    : responseEffort === '보통'
-                      ? 'var(--brand-accent-gold)'
-                      : 'var(--brand-accent-coral)',
-                background: 'rgba(255,255,255,0.035)',
-                padding: '5px 10px',
-                fontSize: '0.68rem',
-                fontWeight: 900,
-                whiteSpace: 'nowrap',
-              }}
-            >
-              응답 부담 {responseEffort}
-            </span>
-          </div>
-
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
-              gap: '0.55rem',
-            }}
-          >
-            {surveyCoachItems.map((item) => (
-              <article
-                key={item.label}
-                style={{
-                  display: 'grid',
-                  gap: '0.35rem',
-                  border: '1px solid var(--bg-card-border)',
-                  borderRadius: 'var(--radius-sm)',
-                  background: item.passed ? 'rgba(45, 212, 191, 0.055)' : 'rgba(255,255,255,0.025)',
-                  padding: '0.7rem',
-                }}
-              >
-                <span
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    color: item.passed ? 'var(--brand-accent-teal)' : 'var(--brand-accent-gold)',
-                    fontSize: '0.72rem',
-                    fontWeight: 900,
-                  }}
-                >
-                  {item.passed ? <CheckCircle2 size={14} /> : <AlertTriangle size={14} />}
-                  {item.label}
-                </span>
-                <strong
-                  style={{
-                    color: 'var(--text-primary)',
-                    fontSize: '0.78rem',
-                    lineHeight: 1.35,
-                  }}
-                >
-                  {item.value}
-                </strong>
-                <small
-                  style={{ color: 'var(--text-muted)', fontSize: '0.66rem', lineHeight: 1.42 }}
-                >
-                  {item.help}
-                </small>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <div
-          style={{
-            display: 'flex',
-            gap: '0.55rem',
-            flexWrap: 'wrap',
-            color: 'var(--text-muted)',
-            fontSize: '0.7rem',
-          }}
-        >
-          <span className="stat-pill">선택지 {nonEmptyOptions.length}개</span>
-          <span className="stat-pill">이미지 선택지 {imageOptionCount}개</span>
-          <span className="stat-pill">
-            통과 항목 {passedQualityCount}/{qualityItems.length}
-          </span>
-        </div>
-      </section>
-
-      <section
-        className="content-card"
-        style={{
-          padding: '1rem',
-          display: 'grid',
-          gap: '0.95rem',
-          cursor: 'default',
-          order: 4,
-        }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'flex-start',
-            gap: '0.85rem',
-            flexWrap: 'wrap',
-          }}
-        >
-          <div style={{ display: 'grid', gap: '0.24rem' }}>
-            <h2
-              style={{
-                margin: 0,
-                fontSize: '0.96rem',
-                fontWeight: 800,
-                color: 'var(--text-primary)',
-              }}
-            >
-              공유 화면 미리보기
-            </h2>
-            <p style={{ margin: 0, fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
-              생성 후 카카오톡, 링크, 임베드에서 보일 핵심 정보를 미리 점검합니다.
-            </p>
-          </div>
-          <span
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '5px',
-              border: '1px solid rgba(45, 212, 191, 0.28)',
-              borderRadius: '999px',
-              padding: '5px 10px',
-              color: shareReady ? 'var(--brand-accent-teal)' : 'var(--brand-accent-gold)',
-              background: shareReady ? 'rgba(45, 212, 191, 0.08)' : 'rgba(250, 204, 21, 0.08)',
-              fontSize: '0.68rem',
-              fontWeight: 800,
-            }}
-          >
-            <Share2 size={13} />
-            {shareReady ? '공유 준비됨' : '공유 준비 중'}
-          </span>
-          <button
-            type="button"
-            onClick={() => setShowEmbedPreview((current) => !current)}
-            className="ghost-btn"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '5px',
-              padding: '5px 10px',
-              fontSize: '0.68rem',
-              fontWeight: 800,
-            }}
-          >
-            <Code2 size={13} />
-            {showEmbedPreview ? '임베드 미리보기 닫기' : '임베드 미리보기'}
-          </button>
-        </div>
-
-        <div className="share-preview-grid">
-          <article className="share-preview-card">
-            <div
-              style={{
-                minHeight: '96px',
-                borderRadius: 'var(--radius-sm)',
-                border: '1px solid var(--bg-card-border)',
-                background:
-                  imageOptionCount > 0
-                    ? 'linear-gradient(135deg, rgba(45, 212, 191, 0.2), rgba(250, 204, 21, 0.12))'
-                    : 'linear-gradient(135deg, rgba(45, 212, 191, 0.14), rgba(255,255,255,0.035))',
-                display: 'grid',
-                placeItems: 'center',
-                color: 'var(--text-secondary)',
-              }}
-            >
-              {imageOptionCount > 0 ? (
-                <span
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    fontSize: '0.72rem',
-                    fontWeight: 800,
-                  }}
-                >
-                  <ImageIcon size={15} />
-                  선택지 이미지 {imageOptionCount}개 포함
-                </span>
-              ) : (
-                <span
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    fontSize: '0.72rem',
-                    fontWeight: 800,
-                  }}
-                >
-                  <ImageIcon size={15} />
-                  기본 OG 이미지
-                </span>
-              )}
-            </div>
-            <div style={{ display: 'grid', gap: '0.35rem' }}>
-              <span
-                style={{
-                  color: 'var(--brand-accent-teal)',
-                  fontSize: '0.66rem',
-                  fontWeight: 900,
-                }}
-              >
-                KAKAO · LINK PREVIEW
-              </span>
-              <strong
-                style={{
-                  color: 'var(--text-primary)',
-                  fontSize: '0.92rem',
-                  lineHeight: 1.42,
-                  overflowWrap: 'anywhere',
-                }}
-              >
-                {sharePreviewTitle}
-              </strong>
-              <p
-                style={{
-                  margin: 0,
-                  color: 'var(--text-muted)',
-                  fontSize: '0.72rem',
-                  lineHeight: 1.48,
-                  display: '-webkit-box',
-                  overflow: 'hidden',
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: 'vertical',
-                }}
-              >
-                {sharePreviewDescription}
-              </p>
-            </div>
-          </article>
-
-          <div className="share-readiness-grid">
-            {shareReadinessItems.map((item) => {
-              const Icon = item.icon;
-              return (
-                <div
-                  key={item.label}
-                  className="share-readiness-item"
-                  style={{
-                    borderColor: item.ready
-                      ? 'rgba(45, 212, 191, 0.26)'
-                      : 'rgba(250, 204, 21, 0.24)',
-                    background: item.ready
-                      ? 'rgba(45, 212, 191, 0.055)'
-                      : 'rgba(250, 204, 21, 0.055)',
-                  }}
-                >
-                  <span>
-                    <Icon size={13} />
-                    {item.label}
-                  </span>
-                  <strong>{item.value}</strong>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {showEmbedPreview ? (
-          <div className="embed-preview-shell">
-            <div className="embed-preview-toolbar">
-              <span>embed preview</span>
-              <small>
-                {shareReady
-                  ? '생성 후 /embed/:id 로 제공됩니다.'
-                  : '질문과 선택지 입력 후 활성화됩니다.'}
-              </small>
-              <div className="embed-device-switch" aria-label="임베드 미리보기 화면 폭 선택">
-                <button
-                  type="button"
-                  onClick={() => setEmbedPreviewDevice('desktop')}
-                  aria-pressed={embedPreviewDevice === 'desktop'}
-                  className={embedPreviewDevice === 'desktop' ? 'active' : undefined}
-                >
-                  <Monitor size={12} />
-                  데스크톱
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setEmbedPreviewDevice('mobile')}
-                  aria-pressed={embedPreviewDevice === 'mobile'}
-                  className={embedPreviewDevice === 'mobile' ? 'active' : undefined}
-                >
-                  <Smartphone size={12} />
-                  모바일
-                </button>
-              </div>
-            </div>
-            <div
-              className={`embed-preview-card ${embedPreviewDevice === 'mobile' ? 'mobile' : ''}`}
-            >
-              <span className="floating-tag">POLL PREVIEW</span>
-              {sharePreviewImageUrl ? (
-                <img
-                  src={sharePreviewImageUrl}
-                  alt="업로드 이미지가 반영된 공유 미리보기"
-                  style={{
-                    width: '100%',
-                    aspectRatio: '16 / 9',
-                    objectFit: 'cover',
-                    borderRadius: 'var(--radius-sm)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    background: 'rgba(255,255,255,0.03)',
-                  }}
-                />
-              ) : null}
-              <strong>{sharePreviewTitle}</strong>
-              <p>{sharePreviewDescription}</p>
-              <div className="embed-preview-options">
-                {(sharePreviewOptions.length > 0
-                  ? sharePreviewOptions
-                  : ['선택지 입력 대기', '선택지 입력 대기']
-                ).map((option, index) => (
-                  <span key={`${option}-${index}`}>
-                    {index + 1}. {option}
-                  </span>
-                ))}
-              </div>
-              <button type="button" className="btn-primary" disabled={!shareReady}>
-                임베드에서 투표하기
-              </button>
-            </div>
-          </div>
-        ) : null}
-
-        <div
-          style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: '0.45rem',
-            color: 'var(--text-muted)',
-            fontSize: '0.68rem',
-          }}
-        >
-          <span className="stat-pill">{resultsVisibilityLabel}</span>
-          <span className="stat-pill">마감 {deadlineLabel}</span>
-          <span className="stat-pill">
-            OG 이미지 {sharePreviewImageUrl ? '업로드 이미지 반영' : '기본 이미지'}
-          </span>
-          <span className="stat-pill">
-            선택지 {sharePreviewOptions.length > 0 ? sharePreviewOptions.join(' / ') : '입력 대기'}
-          </span>
-        </div>
-      </section>
-
-      <section
-        className="content-card"
-        style={{
-          padding: '1rem',
-          display: 'grid',
-          gap: '0.85rem',
-          borderColor: canSubmit ? 'rgba(45, 212, 191, 0.22)' : 'rgba(250, 204, 21, 0.2)',
-          background: canSubmit ? 'rgba(45, 212, 191, 0.04)' : 'rgba(250, 204, 21, 0.035)',
-          cursor: 'default',
-          order: 5,
-        }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'flex-start',
-            gap: '0.85rem',
-            flexWrap: 'wrap',
-          }}
-        >
-          <div style={{ display: 'grid', gap: '0.25rem' }}>
-            <h2
-              style={{
-                margin: 0,
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                color: 'var(--text-primary)',
-                fontSize: '0.96rem',
-                fontWeight: 900,
-              }}
-            >
-              <Eye size={15} style={{ color: 'var(--brand-accent-teal)' }} />
-              생성 전 최종 검토
-            </h2>
-            <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.76rem' }}>
-              생성 버튼을 누르기 전에 공유 카드, 선택지, 업로드 이미지, 운영 설정을 한 번에
-              확인합니다.
-            </p>
-          </div>
-          <span
-            style={{
-              border: '1px solid rgba(45, 212, 191, 0.28)',
-              borderRadius: '999px',
-              color: canSubmit ? 'var(--brand-accent-teal)' : 'var(--brand-accent-gold)',
-              background: canSubmit ? 'rgba(45, 212, 191, 0.08)' : 'rgba(250, 204, 21, 0.08)',
-              padding: '5px 10px',
-              fontSize: '0.68rem',
-              fontWeight: 900,
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {publishReadyCount}/{publishReviewItems.length} 준비됨
-          </span>
-        </div>
-
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
-            gap: '0.65rem',
-          }}
-        >
-          {publishReviewItems.map((item) => (
-            <article
-              key={item.label}
-              style={{
-                display: 'grid',
-                gap: '0.38rem',
-                border: '1px solid var(--bg-card-border)',
-                borderRadius: 'var(--radius-sm)',
-                background: item.ready ? 'rgba(45, 212, 191, 0.055)' : 'rgba(255,255,255,0.02)',
-                padding: '0.72rem',
-              }}
-            >
-              <span
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  color: item.ready ? 'var(--brand-accent-teal)' : 'var(--brand-accent-gold)',
-                  fontSize: '0.72rem',
-                  fontWeight: 900,
-                }}
-              >
-                {item.ready ? <CheckCircle2 size={14} /> : <AlertTriangle size={14} />}
-                {item.label}
-              </span>
-              <strong
-                style={{
-                  color: 'var(--text-primary)',
-                  fontSize: '0.8rem',
-                  lineHeight: 1.35,
-                  overflowWrap: 'anywhere',
-                }}
-              >
-                {item.value}
-              </strong>
-              <small style={{ color: 'var(--text-muted)', fontSize: '0.68rem', lineHeight: 1.42 }}>
-                {item.help}
-              </small>
-            </article>
-          ))}
-        </div>
-
-        <section
-          style={{
-            border: '1px solid rgba(255, 255, 255, 0.08)',
-            borderRadius: 'var(--radius-sm)',
-            background: 'rgba(255, 255, 255, 0.025)',
-            padding: '0.85rem',
-            display: 'grid',
-            gap: '0.7rem',
-          }}
-          aria-label="출시 전 액션 체크"
-        >
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              gap: '0.75rem',
-              alignItems: 'flex-start',
-              flexWrap: 'wrap',
-            }}
-          >
-            <div style={{ display: 'grid', gap: '0.22rem' }}>
-              <strong
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  color: 'var(--text-primary)',
-                  fontSize: '0.84rem',
-                }}
-              >
-                <Sparkles size={14} style={{ color: 'var(--brand-accent-gold)' }} />
-                출시 전 액션 체크
-              </strong>
-              <span
-                style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', lineHeight: 1.45 }}
-              >
-                공유 전에 응답자가 헷갈릴 수 있는 문장, 편향, 부담, 맥락을 빠르게 점검합니다.
-              </span>
-            </div>
-            <span
-              style={{
-                border: '1px solid rgba(232, 200, 77, 0.28)',
-                borderRadius: '999px',
-                color:
-                  launchActionReadyCount === launchActionItems.length
-                    ? 'var(--brand-accent-teal)'
-                    : 'var(--brand-accent-gold)',
-                background:
-                  launchActionReadyCount === launchActionItems.length
-                    ? 'rgba(45, 212, 191, 0.08)'
-                    : 'rgba(250, 204, 21, 0.08)',
-                padding: '4px 9px',
-                fontSize: '0.66rem',
-                fontWeight: 900,
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {launchActionReadyCount}/{launchActionItems.length} 통과
-            </span>
-          </div>
-
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-              gap: '0.55rem',
-            }}
-          >
-            {launchActionItems.map((item) => (
-              <article
-                key={item.label}
-                style={{
-                  border: item.ready
-                    ? '1px solid rgba(45, 212, 191, 0.2)'
-                    : '1px solid rgba(250, 204, 21, 0.2)',
-                  borderRadius: 'var(--radius-sm)',
-                  background: item.ready
-                    ? 'rgba(45, 212, 191, 0.045)'
-                    : 'rgba(250, 204, 21, 0.045)',
-                  padding: '0.7rem',
-                  display: 'grid',
-                  gap: '0.34rem',
-                }}
-              >
-                <span
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    color: item.ready ? 'var(--brand-accent-teal)' : 'var(--brand-accent-gold)',
-                    fontSize: '0.68rem',
-                    fontWeight: 900,
-                  }}
-                >
-                  {item.ready ? <CheckCircle2 size={13} /> : <AlertTriangle size={13} />}
-                  {item.label}
-                </span>
-                <strong
-                  style={{
-                    color: 'var(--text-primary)',
-                    fontSize: '0.78rem',
-                    lineHeight: 1.32,
-                  }}
-                >
-                  {item.value}
-                </strong>
-                <small
-                  style={{ color: 'var(--text-secondary)', fontSize: '0.66rem', lineHeight: 1.45 }}
-                >
-                  {item.action}
-                </small>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            gap: '0.75rem',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            borderTop: '1px solid rgba(255,255,255,0.055)',
-            paddingTop: '0.8rem',
-          }}
-        >
-          <span
-            style={{
-              color: canSubmit ? 'var(--brand-accent-teal)' : 'var(--brand-accent-gold)',
-              fontSize: '0.74rem',
-              fontWeight: 800,
-              lineHeight: 1.45,
-            }}
-          >
-            {canSubmit
-              ? '지금 생성하면 공유 링크와 카카오 미리보기가 바로 준비됩니다.'
-              : publishBlockedReasons[0]}
-          </span>
-          <button
-            type="button"
-            onClick={() =>
-              document
-                .getElementById('create-poll-form')
-                ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-            }
-            className="ghost-btn"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '5px',
-              padding: '6px 10px',
-              fontSize: '0.7rem',
-            }}
-          >
-            <ArrowLeft size={13} style={{ transform: 'rotate(90deg)' }} />
-            입력 폼으로 이동
-          </button>
-        </div>
-      </section>
+      <FinalReviewSection
+        canSubmit={canSubmit}
+        publishReadyCount={publishReadyCount}
+        publishReviewItems={publishReviewItems}
+        launchActionReadyCount={launchActionReadyCount}
+        launchActionItems={launchActionItems}
+        firstPublishBlockedReason={firstPublishBlockedReason}
+      />
 
       <form
         id="create-poll-form"
@@ -2350,526 +4096,49 @@ export const CreatePoll: React.FC = () => {
           order: 1,
         }}
       >
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            padding: '12px 14px',
-            borderRadius: 'var(--radius-sm)',
-            border: '1px solid rgba(45, 212, 191, 0.2)',
-            background: 'rgba(45, 212, 191, 0.05)',
-          }}
-        >
-          <span aria-hidden style={{ fontSize: '1.4rem', lineHeight: 1 }}>
-            🥑
-          </span>
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-            안녕하세요, 피키예요! 어떤 게 고민이세요? 아래에 질문만 적어주면 제가 예쁘게
-            정리해드릴게요.
-          </span>
-        </div>
+        <QuestionFieldsSection
+          formError={formError}
+          error={error}
+          question={question}
+          clearError={clearError}
+          setFormError={setFormError}
+          setQuestion={setQuestion}
+          normalizedQuestion={normalizedQuestion}
+          categoryId={categoryId}
+          setCategoryId={setCategoryId}
+          description={description}
+          setDescription={setDescription}
+          normalizedDescription={normalizedDescription}
+        />
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <label style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-            고민 주제 (질문)
-          </label>
-          {formError ? (
-            <p
-              style={{
-                margin: 0,
-                fontSize: '0.78rem',
-                color: 'var(--brand-accent-coral)',
-                padding: '7px 10px',
-                borderRadius: 'var(--radius-sm)',
-                border: '1px solid rgba(239, 68, 68, 0.2)',
-                background: 'rgba(239, 68, 68, 0.12)',
-              }}
-            >
-              {formError}
-            </p>
-          ) : null}
-          {error ? (
-            <p
-              style={{
-                margin: 0,
-                fontSize: '0.78rem',
-                color: 'var(--brand-accent-coral)',
-                padding: '7px 10px',
-                borderRadius: 'var(--radius-sm)',
-                border: '1px solid rgba(239, 68, 68, 0.2)',
-                background: 'rgba(239, 68, 68, 0.12)',
-              }}
-            >
-              {error}
-            </p>
-          ) : null}
+        <BulkPasteSection
+          parsedBulkOptions={parsedBulkOptions}
+          bulkOptionsText={bulkOptionsText}
+          setBulkOptionsText={setBulkOptionsText}
+          handleReadClipboardOptions={handleReadClipboardOptions}
+          handleApplyBulkOptions={handleApplyBulkOptions}
+        />
 
-          <input
-            type="text"
-            aria-label="고민 주제 (질문)"
-            placeholder="예: 이번 주말 모임, 어디서 만날까요?"
-            value={question}
-            onChange={(e) => {
-              clearError();
-              setFormError('');
-              setQuestion(e.target.value);
-            }}
-            required
-            maxLength={100}
-            className="form-input"
-          />
-          <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
-            {normalizedQuestion.length} / 100
-          </span>
-        </div>
+        <AttachmentsSection
+          attachments={attachments}
+          isAttachmentDragging={isAttachmentDragging}
+          handleAttachmentDragOver={handleAttachmentDragOver}
+          setIsAttachmentDragging={setIsAttachmentDragging}
+          handleAttachmentDrop={handleAttachmentDrop}
+          handleAttachmentUpload={handleAttachmentUpload}
+          attachmentDropzoneLabel={attachmentDropzoneLabel}
+          handleRemoveAttachment={handleRemoveAttachment}
+        />
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <label style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-            고민 카테고리{' '}
-            <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>(선택)</span>
-          </label>
-          <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
-            어떤 고민인지 콕 골라주면 피키가 더 잘 정리해드려요 🥑
-          </p>
-          <div
-            role="group"
-            aria-label="고민 카테고리 선택"
-            style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}
-          >
-            {POLL_CATEGORIES.map((category) => {
-              const active = categoryId === category.id;
-              return (
-                <button
-                  key={category.id}
-                  type="button"
-                  aria-pressed={active}
-                  onClick={() => {
-                    clearError();
-                    setFormError('');
-                    setCategoryId((current) => (current === category.id ? null : category.id));
-                  }}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '8px 14px',
-                    borderRadius: '999px',
-                    fontSize: '0.8rem',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    transition: 'transform 0.12s ease, box-shadow 0.12s ease',
-                    color: active ? '#fff' : 'var(--text-secondary)',
-                    background: active ? category.color : 'rgba(255,255,255,0.03)',
-                    border: `1.5px solid ${active ? category.color : 'var(--bg-card-border)'}`,
-                    boxShadow: active ? `0 4px 14px ${category.color}55` : 'none',
-                    transform: active ? 'translateY(-1px)' : 'none',
-                  }}
-                >
-                  <span aria-hidden style={{ fontSize: '0.95rem' }}>
-                    {category.emoji}
-                  </span>
-                  {category.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <label style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-            상세 내용 / 고민 배경 (선택)
-          </label>
-          <textarea
-            aria-label="상세 내용 / 고민 배경 (선택)"
-            placeholder="결정을 내리기 힘든 이유나 배경을 적어주면 더 정확한 답을 받을 수 있어요."
-            value={description}
-            onChange={(e) => {
-              clearError();
-              setFormError('');
-              setDescription(e.target.value);
-            }}
-            rows={4}
-            maxLength={500}
-            className="form-input"
-            style={{ resize: 'none' }}
-          />
-          <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
-            {normalizedDescription.length} / 500
-          </span>
-        </div>
-
-        <section
-          style={{
-            display: 'grid',
-            gap: '0.75rem',
-            border: '1px solid rgba(45, 212, 191, 0.18)',
-            borderRadius: 'var(--radius-sm)',
-            padding: '1rem',
-            background: 'rgba(45, 212, 191, 0.04)',
-          }}
-        >
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'flex-start',
-              gap: '0.75rem',
-              flexWrap: 'wrap',
-            }}
-          >
-            <div style={{ display: 'grid', gap: '0.22rem' }}>
-              <h2
-                style={{
-                  margin: 0,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  color: 'var(--text-primary)',
-                  fontSize: '0.92rem',
-                  fontWeight: 900,
-                }}
-              >
-                <FileText size={15} style={{ color: 'var(--brand-accent-teal)' }} />
-                선택지 빠른 붙여넣기
-              </h2>
-              <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.72rem' }}>
-                줄바꿈으로 구분된 목록을 붙여넣으면 선택지 텍스트가 한 번에 채워집니다.
-              </p>
-            </div>
-            <span
-              style={{
-                border: '1px solid var(--bg-card-border)',
-                borderRadius: '999px',
-                padding: '4px 9px',
-                color:
-                  parsedBulkOptions.length >= 2 ? 'var(--brand-accent-teal)' : 'var(--text-muted)',
-                fontSize: '0.66rem',
-                fontWeight: 900,
-              }}
-            >
-              {parsedBulkOptions.length}/{MAX_OPTIONS}개 감지
-            </span>
-          </div>
-
-          <textarea
-            aria-label="선택지 빠른 붙여넣기"
-            value={bulkOptionsText}
-            onChange={(event) => setBulkOptionsText(event.target.value)}
-            placeholder={'예:\n아침 9시 회의\n오후 2시 회의\n비동기 문서 공유'}
-            rows={4}
-            className="form-input"
-            style={{ resize: 'vertical' }}
-          />
-
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              gap: '0.75rem',
-              flexWrap: 'wrap',
-            }}
-          >
-            <span style={{ color: 'var(--text-muted)', fontSize: '0.68rem', lineHeight: 1.45 }}>
-              번호 목록, 하이픈 목록도 자동으로 정리합니다. 기존 이미지 업로드는 같은 순서에서
-              유지됩니다.
-            </span>
-            <div
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                flexWrap: 'wrap',
-                justifyContent: 'flex-end',
-              }}
-            >
-              <button
-                type="button"
-                onClick={handleReadClipboardOptions}
-                className="ghost-btn"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '8px 12px',
-                  fontSize: '0.74rem',
-                }}
-              >
-                <FileText size={14} />
-                클립보드 가져오기
-              </button>
-              <button
-                type="button"
-                onClick={handleApplyBulkOptions}
-                disabled={parsedBulkOptions.length < 2}
-                className="btn-secondary"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '8px 12px',
-                  fontSize: '0.74rem',
-                  opacity: parsedBulkOptions.length < 2 ? 0.55 : 1,
-                  cursor: parsedBulkOptions.length < 2 ? 'not-allowed' : 'pointer',
-                }}
-              >
-                <CheckCircle2 size={14} />
-                선택지로 적용
-              </button>
-            </div>
-          </div>
-        </section>
-
-        <section
-          style={{
-            display: 'grid',
-            gap: '0.75rem',
-            border: '1px solid var(--bg-card-border)',
-            borderRadius: 'var(--radius-sm)',
-            padding: '1rem',
-            background: 'rgba(255,255,255,0.022)',
-          }}
-        >
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'flex-start',
-              gap: '0.75rem',
-              flexWrap: 'wrap',
-            }}
-          >
-            <div style={{ display: 'grid', gap: '0.25rem' }}>
-              <h2
-                style={{
-                  margin: 0,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  fontSize: '0.92rem',
-                  fontWeight: 800,
-                  color: 'var(--text-primary)',
-                }}
-              >
-                <FileText size={15} style={{ color: 'var(--brand-accent-gold)' }} />
-                참고 파일 첨부
-              </h2>
-              <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.72rem' }}>
-                이미지가 아닌 자료는 작은 파일로 첨부할 수 있습니다. 참여자는 상세 화면에서
-                내려받습니다.
-              </p>
-            </div>
-            <span className="stat-pill">
-              {attachments.length}/{MAX_ATTACHMENTS}
-            </span>
-          </div>
-
-          <label
-            className={`upload-dropzone ${isAttachmentDragging ? 'drag-over' : ''}`}
-            data-drag={isAttachmentDragging ? 'true' : undefined}
-            onDragEnter={handleAttachmentDragOver}
-            onDragOver={handleAttachmentDragOver}
-            onDragLeave={() => setIsAttachmentDragging(false)}
-            onDrop={handleAttachmentDrop}
-            style={{
-              minHeight: '96px',
-              opacity: attachments.length >= MAX_ATTACHMENTS ? 0.62 : 1,
-              cursor: attachments.length >= MAX_ATTACHMENTS ? 'not-allowed' : 'pointer',
-            }}
-          >
-            <input
-              type="file"
-              accept=".pdf,.txt,.csv,.json,application/pdf,text/plain,text/csv,application/json"
-              multiple
-              disabled={attachments.length >= MAX_ATTACHMENTS}
-              onChange={(event) => {
-                void handleAttachmentUpload(event.target.files);
-                event.currentTarget.value = '';
-              }}
-            />
-            <Upload size={17} />
-            <span>
-              {attachments.length >= MAX_ATTACHMENTS
-                ? '첨부 한도 도달'
-                : isAttachmentDragging
-                  ? '여기에 놓아 첨부'
-                  : 'PDF/TXT/CSV/JSON 파일 업로드'}
-            </span>
-            <small>클릭하거나 끌어다 놓기 · 최대 {MAX_ATTACHMENTS}개 · 파일당 300KB 이하</small>
-          </label>
-
-          {attachments.length > 0 ? (
-            <div style={{ display: 'grid', gap: '0.5rem' }}>
-              {attachments.map((attachment, index) => (
-                <article
-                  key={`${attachment.name}-${index}`}
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    gap: '0.75rem',
-                    border: '1px solid var(--bg-card-border)',
-                    borderRadius: 'var(--radius-sm)',
-                    background: 'rgba(255,255,255,0.025)',
-                    padding: '0.68rem 0.75rem',
-                  }}
-                >
-                  <div style={{ minWidth: 0, display: 'grid', gap: '0.18rem' }}>
-                    <strong
-                      style={{
-                        color: 'var(--text-primary)',
-                        fontSize: '0.78rem',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {attachment.name}
-                    </strong>
-                    <small style={{ color: 'var(--text-muted)', fontSize: '0.66rem' }}>
-                      {(attachment.size / 1024).toFixed(1)}KB · {attachment.type || 'file'}
-                    </small>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveAttachment(index)}
-                    className="ghost-btn"
-                    aria-label={`${attachment.name} 첨부 삭제`}
-                    style={{ padding: '5px 8px', fontSize: '0.68rem', flexShrink: 0 }}
-                  >
-                    삭제
-                  </button>
-                </article>
-              ))}
-            </div>
-          ) : null}
-        </section>
-
-        <section
-          style={{
-            display: 'grid',
-            gap: '0.85rem',
-            border: '1px solid var(--bg-card-border)',
-            borderRadius: 'var(--radius-sm)',
-            padding: '1rem',
-            background: 'rgba(255,255,255,0.022)',
-          }}
-        >
-          <div style={{ display: 'grid', gap: '0.25rem' }}>
-            <h2
-              style={{
-                margin: 0,
-                fontSize: '0.92rem',
-                fontWeight: 800,
-                color: 'var(--text-primary)',
-              }}
-            >
-              투표 운영 설정
-            </h2>
-            <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.72rem' }}>
-              공유 후 참여 흐름을 제어합니다. 마감과 결과 공개 방식은 생성 후 투표 화면에
-              표시됩니다.
-            </p>
-          </div>
-
-          <div className="poll-settings-grid">
-            <label style={{ display: 'grid', gap: '0.45rem' }}>
-              <span
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  color: 'var(--text-secondary)',
-                  fontSize: '0.76rem',
-                  fontWeight: 800,
-                }}
-              >
-                <AlertTriangle size={13} style={{ color: 'var(--brand-accent-gold)' }} />
-                마감 시간
-              </span>
-              <input
-                type="datetime-local"
-                value={endsAtLocal}
-                onChange={(event) => {
-                  clearError();
-                  setFormError('');
-                  setEndsAtLocal(event.target.value);
-                }}
-                className="form-input"
-                style={{ fontSize: '0.82rem' }}
-              />
-              <div className="deadline-preset-grid" aria-label="마감 시간 빠른 선택">
-                {DEADLINE_PRESETS.map((preset) => (
-                  <button
-                    key={preset.value}
-                    type="button"
-                    onClick={() => {
-                      clearError();
-                      setFormError('');
-                      setEndsAtLocal(resolveDeadlinePresetValue(preset.value));
-                    }}
-                    className="ghost-btn"
-                  >
-                    {preset.label}
-                  </button>
-                ))}
-              </div>
-              <small
-                style={{
-                  color: isEndsAtInvalid ? 'var(--brand-accent-coral)' : 'var(--text-muted)',
-                  fontSize: '0.66rem',
-                  lineHeight: 1.4,
-                }}
-              >
-                비워두면 상시 진행됩니다. 마감 후에는 새 투표가 차단됩니다.
-              </small>
-            </label>
-
-            <div style={{ display: 'grid', gap: '0.45rem' }}>
-              <span
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  color: 'var(--text-secondary)',
-                  fontSize: '0.76rem',
-                  fontWeight: 800,
-                }}
-              >
-                <Eye size={13} style={{ color: 'var(--brand-accent-teal)' }} />
-                결과 공개
-              </span>
-              <div className="result-mode-grid">
-                {RESULT_VISIBILITY_OPTIONS.map((option) => {
-                  const active = resultsVisibility === option.value;
-                  return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => setResultsVisibility(option.value)}
-                      className="result-mode-button"
-                      aria-pressed={active}
-                      style={{
-                        borderColor: active ? 'rgba(45, 212, 191, 0.42)' : 'var(--bg-card-border)',
-                        background: active ? 'rgba(45, 212, 191, 0.08)' : 'rgba(255,255,255,0.02)',
-                      }}
-                    >
-                      <strong
-                        style={{
-                          color: active ? 'var(--brand-accent-teal)' : 'var(--text-primary)',
-                        }}
-                      >
-                        {option.label}
-                      </strong>
-                      <span>{option.description}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </section>
+        <PollSettingsSection
+          endsAtLocal={endsAtLocal}
+          clearError={clearError}
+          setFormError={setFormError}
+          setEndsAtLocal={setEndsAtLocal}
+          isEndsAtInvalid={isEndsAtInvalid}
+          resultsVisibility={resultsVisibility}
+          setResultsVisibility={setResultsVisibility}
+        />
 
         <ParticipantPreviewPanel
           question={question}
@@ -2880,497 +4149,33 @@ export const CreatePoll: React.FC = () => {
           resultsVisibility={resultsVisibility}
         />
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <label style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-              투표 선택지 목록 (2~10개)
-            </label>
-            <span style={{ fontSize: '0.725rem', color: 'var(--text-muted)', fontWeight: 500 }}>
-              {options.length} / 10
-            </span>
-          </div>
+        <PollOptionsList
+          options={options}
+          hasDuplicateOptions={hasDuplicateOptions}
+          draggingOptionIndex={draggingOptionIndex}
+          setDraggingOptionIndex={setDraggingOptionIndex}
+          handleOptionImageDrop={handleOptionImageDrop}
+          handleRemoveOptionInput={handleRemoveOptionInput}
+          clearError={clearError}
+          setFormError={setFormError}
+          handleOptionTextChange={handleOptionTextChange}
+          handleRemoveOptionImage={handleRemoveOptionImage}
+          handleOptionImageUpload={handleOptionImageUpload}
+          handleAddOptionInput={handleAddOptionInput}
+        />
 
-          {hasDuplicateOptions ? (
-            <p
-              style={{
-                margin: 0,
-                color: 'var(--brand-accent-coral)',
-                fontSize: '0.74rem',
-                border: '1px solid rgba(239, 68, 68, 0.2)',
-                background: 'rgba(239, 68, 68, 0.12)',
-                borderRadius: 'var(--radius-sm)',
-                padding: '8px 10px',
-              }}
-            >
-              동일한 텍스트의 선택지가 있습니다. 각 선택지는 고유해야 합니다.
-            </p>
-          ) : null}
+        <ParticipantExperienceSection
+          sharePreviewTitle={sharePreviewTitle}
+          sharePreviewDescription={sharePreviewDescription}
+          nonEmptyOptions={nonEmptyOptions}
+          sharePreviewImageUrl={sharePreviewImageUrl}
+          participantExperienceItems={participantExperienceItems}
+        />
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {options.map((option, index) => (
-              <div
-                key={index}
-                className="content-card"
-                onDragEnter={(event) => {
-                  event.preventDefault();
-                  setDraggingOptionIndex(index);
-                }}
-                onDragOver={(event) => {
-                  event.preventDefault();
-                  event.dataTransfer.dropEffect = 'copy';
-                  setDraggingOptionIndex(index);
-                }}
-                onDragLeave={(event) => {
-                  if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-                    setDraggingOptionIndex(null);
-                  }
-                }}
-                onDrop={(event) => handleOptionImageDrop(index, event)}
-                style={{
-                  padding: '12px 16px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '8px',
-                  backgroundColor:
-                    draggingOptionIndex === index
-                      ? 'rgba(45, 212, 191, 0.08)'
-                      : 'oklch(16% 0.015 260)',
-                  border:
-                    draggingOptionIndex === index
-                      ? '1px solid rgba(45, 212, 191, 0.42)'
-                      : '1px solid var(--bg-card-border)',
-                  borderRadius: 'var(--radius-sm)',
-                  boxShadow:
-                    draggingOptionIndex === index ? '0 0 0 3px rgba(45, 212, 191, 0.08)' : 'none',
-                  transition: 'border-color 0.2s, background 0.2s, box-shadow 0.2s',
-                }}
-              >
-                <div
-                  style={{
-                    display: 'flex',
-                    gap: '8px',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                  }}
-                >
-                  <span
-                    style={{ fontSize: '0.75rem', color: 'var(--brand-primary)', fontWeight: 700 }}
-                  >
-                    선택지 {index + 1}
-                  </span>
-                  {options.length > 2 ? (
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveOptionInput(index)}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: 'var(--text-muted)',
-                        cursor: 'pointer',
-                        padding: '2px',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <Trash2
-                        size={15}
-                        style={{ transition: 'color 0.2s' }}
-                        onMouseEnter={(e: React.MouseEvent<SVGSVGElement>) =>
-                          (e.currentTarget.style.color = 'var(--brand-accent-coral)')
-                        }
-                        onMouseLeave={(e: React.MouseEvent<SVGSVGElement>) =>
-                          (e.currentTarget.style.color = 'var(--text-muted)')
-                        }
-                      />
-                    </button>
-                  ) : null}
-                </div>
-
-                <div className="option-input-grid">
-                  <input
-                    type="text"
-                    aria-label={`선택지 ${index + 1} 내용`}
-                    placeholder="내용 입력 (필수)"
-                    value={option.text}
-                    onChange={(e) => {
-                      clearError();
-                      setFormError('');
-                      handleOptionTextChange(index, e.target.value);
-                    }}
-                    required
-                    maxLength={80}
-                    className="form-input"
-                    style={{ padding: '8px 12px', fontSize: '0.8rem' }}
-                  />
-                  <div className="upload-control">
-                    {option.imageUrl ? (
-                      <figure
-                        className={`upload-preview ${draggingOptionIndex === index ? 'drag-over' : ''}`}
-                        data-drag={draggingOptionIndex === index ? 'true' : undefined}
-                        onDragEnter={(event) => {
-                          event.preventDefault();
-                          setDraggingOptionIndex(index);
-                        }}
-                        onDragOver={(event) => {
-                          event.preventDefault();
-                          event.dataTransfer.dropEffect = 'copy';
-                          setDraggingOptionIndex(index);
-                        }}
-                        onDragLeave={() => setDraggingOptionIndex(null)}
-                        onDrop={(event) => handleOptionImageDrop(index, event)}
-                      >
-                        <img
-                          src={option.imageUrl}
-                          alt={`${option.text || `선택지 ${index + 1}`} 이미지`}
-                        />
-                        <figcaption>
-                          <span>
-                            <ImageIcon size={12} />
-                            이미지 첨부됨
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveOptionImage(index)}
-                            aria-label={`선택지 ${index + 1} 이미지 삭제`}
-                          >
-                            <X size={13} />
-                          </button>
-                        </figcaption>
-                        <small
-                          style={{
-                            color:
-                              draggingOptionIndex === index
-                                ? 'var(--brand-accent-teal)'
-                                : 'var(--text-muted)',
-                            fontSize: '0.64rem',
-                            fontWeight: 800,
-                          }}
-                        >
-                          새 파일을 드롭하면 이미지가 교체됩니다.
-                        </small>
-                      </figure>
-                    ) : (
-                      <label
-                        className={`upload-dropzone ${draggingOptionIndex === index ? 'drag-over' : ''}`}
-                        data-drag={draggingOptionIndex === index ? 'true' : undefined}
-                        onDragEnter={(event) => {
-                          event.preventDefault();
-                          setDraggingOptionIndex(index);
-                        }}
-                        onDragOver={(event) => {
-                          event.preventDefault();
-                          event.dataTransfer.dropEffect = 'copy';
-                          setDraggingOptionIndex(index);
-                        }}
-                        onDragLeave={() => setDraggingOptionIndex(null)}
-                        onDrop={(event) => handleOptionImageDrop(index, event)}
-                        style={{
-                          borderColor:
-                            draggingOptionIndex === index ? 'rgba(45, 212, 191, 0.42)' : undefined,
-                          background:
-                            draggingOptionIndex === index ? 'rgba(45, 212, 191, 0.08)' : undefined,
-                        }}
-                      >
-                        <input
-                          type="file"
-                          accept="image/png,image/jpeg,image/webp"
-                          onChange={(event) => {
-                            const file = event.target.files?.[0];
-                            void handleOptionImageUpload(index, file);
-                            event.currentTarget.value = '';
-                          }}
-                        />
-                        <Upload size={16} />
-                        <span>
-                          {draggingOptionIndex === index ? '여기에 놓아 업로드' : '이미지 업로드'}
-                        </span>
-                        <small>클릭 또는 드롭 · JPG/PNG/WebP, 5MB 이하</small>
-                      </label>
-                    )}
-                  </div>
-                </div>
-
-                <span style={{ color: 'var(--text-muted)', fontSize: '0.68rem' }}>
-                  현재 글자 수: {option.text.trim().length} / 80
-                </span>
-              </div>
-            ))}
-          </div>
-
-          {options.length < MAX_OPTIONS && (
-            <button
-              type="button"
-              onClick={handleAddOptionInput}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '6px',
-                padding: '10px',
-                borderRadius: 'var(--radius-sm)',
-                backgroundColor: 'rgba(255, 255, 255, 0.015)',
-                border: '1px dashed var(--bg-card-border)',
-                color: 'var(--text-secondary)',
-                fontSize: '0.8rem',
-                cursor: 'pointer',
-                marginTop: '4px',
-                transition: 'all 0.2s',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.03)';
-                e.currentTarget.style.borderColor = 'var(--brand-primary)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.015)';
-                e.currentTarget.style.borderColor = 'var(--bg-card-border)';
-              }}
-            >
-              <Plus size={14} />
-              <span>선택지 추가</span>
-            </button>
-          )}
-        </div>
-
-        <section
-          style={{
-            border: '1px solid rgba(45, 212, 191, 0.2)',
-            borderRadius: 'var(--radius-sm)',
-            padding: '0.95rem',
-            background: 'rgba(45, 212, 191, 0.035)',
-            display: 'grid',
-            gap: '0.78rem',
-          }}
-          aria-label="참여자 경험 리허설"
-        >
-          <div style={{ display: 'grid', gap: '0.24rem' }}>
-            <h3
-              style={{
-                margin: 0,
-                fontSize: '0.84rem',
-                color: 'var(--text-primary)',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '5px',
-              }}
-            >
-              <Smartphone size={14} style={{ color: 'var(--brand-accent-teal)' }} />
-              참여자 경험 리허설
-            </h3>
-            <p
-              style={{
-                margin: 0,
-                color: 'var(--text-secondary)',
-                fontSize: '0.7rem',
-                lineHeight: 1.45,
-              }}
-            >
-              링크를 받은 사람이 실제로 보게 될 첫 화면, 자료, 운영 신호를 생성 전에 점검합니다.
-            </p>
-          </div>
-
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-              gap: '0.65rem',
-              alignItems: 'start',
-            }}
-          >
-            <SnsPreviewCard
-              platform="kakao"
-              question={sharePreviewTitle}
-              description={sharePreviewDescription}
-              options={nonEmptyOptions.map((option) => option.text)}
-              imageUrl={sharePreviewImageUrl}
-            />
-            <SnsPreviewCard
-              platform="x"
-              question={sharePreviewTitle}
-              description={sharePreviewDescription}
-              options={nonEmptyOptions.map((option) => option.text)}
-              imageUrl={sharePreviewImageUrl}
-            />
-          </div>
-
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-              gap: '0.55rem',
-            }}
-          >
-            {participantExperienceItems.map((item) => {
-              const Icon = item.icon;
-
-              return (
-                <article
-                  key={item.label}
-                  style={{
-                    minWidth: 0,
-                    border: item.ready
-                      ? '1px solid rgba(45, 212, 191, 0.22)'
-                      : '1px solid rgba(250, 204, 21, 0.2)',
-                    borderRadius: 'var(--radius-sm)',
-                    background: item.ready
-                      ? 'rgba(45, 212, 191, 0.045)'
-                      : 'rgba(250, 204, 21, 0.04)',
-                    padding: '0.72rem',
-                    display: 'grid',
-                    gap: '0.32rem',
-                  }}
-                >
-                  <span
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '5px',
-                      color: item.ready ? 'var(--brand-accent-teal)' : 'var(--brand-accent-gold)',
-                      fontSize: '0.68rem',
-                      fontWeight: 900,
-                    }}
-                  >
-                    <Icon size={13} />
-                    {item.label}
-                  </span>
-                  <strong
-                    style={{
-                      color: 'var(--text-primary)',
-                      fontSize: '0.8rem',
-                      lineHeight: 1.32,
-                      overflowWrap: 'anywhere',
-                    }}
-                  >
-                    {item.value}
-                  </strong>
-                  <small
-                    style={{
-                      color: 'var(--text-secondary)',
-                      fontSize: '0.66rem',
-                      lineHeight: 1.45,
-                    }}
-                  >
-                    {item.help}
-                  </small>
-                </article>
-              );
-            })}
-          </div>
-        </section>
-
-        <div
-          style={{
-            border: '1px solid var(--bg-card-border)',
-            borderRadius: 'var(--radius-sm)',
-            padding: '0.95rem',
-            background: 'rgba(255,255,255,0.02)',
-          }}
-        >
-          <h3
-            style={{
-              margin: 0,
-              fontSize: '0.84rem',
-              color: 'var(--text-primary)',
-              marginBottom: '0.6rem',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '5px',
-            }}
-          >
-            <Eye size={14} style={{ color: 'var(--brand-accent-teal)' }} />
-            실시간 미리보기
-          </h3>
-          <p
-            style={{
-              margin: 0,
-              marginBottom: '0.5rem',
-              color: 'var(--text-primary)',
-              fontSize: '1rem',
-              fontWeight: 700,
-            }}
-          >
-            {normalizedQuestion || '질문을 입력하면 미리보기가 표시됩니다.'}
-          </p>
-          {nonEmptyOptions.length > 0 ? (
-            <div style={{ display: 'grid', gap: '0.45rem' }}>
-              {nonEmptyOptions.slice(0, 4).map((option, index) => (
-                <p
-                  key={`${option.text}-${index}`}
-                  style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.78rem' }}
-                >
-                  · {option.text}
-                </p>
-              ))}
-              {nonEmptyOptions.length > 4 ? (
-                <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.74rem' }}>
-                  ...그 외 {nonEmptyOptions.length - 4}개 선택지
-                </p>
-              ) : null}
-              {nonEmptyOptions.some((option) => option.imageUrl) ? (
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(128px, 1fr))',
-                    gap: '0.5rem',
-                    marginTop: '0.35rem',
-                  }}
-                >
-                  {nonEmptyOptions
-                    .filter((option) => option.imageUrl)
-                    .slice(0, 4)
-                    .map((option, index) => (
-                      <figure
-                        key={`${option.text}-image-${index}`}
-                        style={{
-                          margin: 0,
-                          border: '1px solid var(--bg-card-border)',
-                          borderRadius: 'var(--radius-sm)',
-                          overflow: 'hidden',
-                          background: 'rgba(255,255,255,0.02)',
-                        }}
-                      >
-                        <img
-                          src={option.imageUrl || ''}
-                          alt=""
-                          style={{
-                            width: '100%',
-                            aspectRatio: '16 / 9',
-                            objectFit: 'cover',
-                            display: 'block',
-                          }}
-                        />
-                        <figcaption
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '5px',
-                            padding: '0.45rem 0.55rem',
-                            color: 'var(--text-secondary)',
-                            fontSize: '0.68rem',
-                          }}
-                        >
-                          <ImageIcon size={12} />
-                          <span
-                            style={{
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
-                            {option.text}
-                          </span>
-                        </figcaption>
-                      </figure>
-                    ))}
-                </div>
-              ) : null}
-            </div>
-          ) : (
-            <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.78rem' }}>
-              선택지를 입력하면 미리보기가 생성됩니다.
-            </p>
-          )}
-        </div>
+        <LivePreviewSection
+          normalizedQuestion={normalizedQuestion}
+          nonEmptyOptions={nonEmptyOptions}
+        />
 
         {error ? (
           <p
@@ -3417,24 +4222,7 @@ export const CreatePoll: React.FC = () => {
         </div>
       </form>
 
-      {/* 모바일 전용 고정 제출 바 — 긴 폼에서도 1차 액션을 항상 손 닿는 곳에.
-          form 속성으로 위 폼과 연결되어 별도 핸들러 없이 동일하게 제출된다. */}
-      <div className="mobile-only" aria-hidden="true" style={{ height: '78px' }} />
-      <div className="sticky-action-bar mobile-only">
-        <button
-          type="submit"
-          form="create-poll-form"
-          disabled={!canSubmit}
-          className="btn-primary"
-          style={{ width: '100%', padding: '14px', fontSize: '0.95rem' }}
-        >
-          {isLoading
-            ? '고민 등록 중...'
-            : canSubmit
-              ? '고민 등록 및 링크 생성'
-              : '질문과 선택지 2개를 입력해 주세요'}
-        </button>
-      </div>
+      <MobileSubmitBar canSubmit={canSubmit} isLoading={isLoading} />
     </div>
   );
 };

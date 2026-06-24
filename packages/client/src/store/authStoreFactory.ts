@@ -142,7 +142,7 @@ const decodeAuthToken = (token: string | null): UserProfile | null => {
       atob(paddedPayload)
         .split('')
         .map((character) => {
-          const hex = character.charCodeAt(0).toString(16).padStart(2, '0');
+          const hex = (character.codePointAt(0) ?? 0).toString(16).padStart(2, '0');
           return `%${hex}`;
         })
         .join(''),
@@ -179,12 +179,9 @@ const resolveAuthFieldErrors = (payload: any): Record<string, string> => {
       ? item.path.filter((part: any) => typeof part === 'string' || typeof part === 'number')
       : undefined;
 
+    const fallbackField = typeof item.path === 'string' ? item.path : undefined;
     const leafField =
-      Array.isArray(path) && path.length > 0
-        ? path[path.length - 1]
-        : typeof item.path === 'string'
-          ? item.path
-          : undefined;
+      Array.isArray(path) && path.length > 0 ? path[path.length - 1] : fallbackField;
 
     const rawKey =
       typeof leafField === 'string' || typeof leafField === 'number' ? String(leafField) : 'root';
@@ -532,7 +529,7 @@ export const createAuthStoreState =
           }
 
           const user = (await parseApiPayload(res)) as UserProfile | null;
-          if (!user || !user.id) {
+          if (!user?.id) {
             localStorage.removeItem('picky_token');
             persistUser(null);
             set({

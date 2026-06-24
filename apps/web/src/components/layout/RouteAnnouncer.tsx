@@ -23,8 +23,10 @@ export const RouteAnnouncer: React.FC = () => {
 
       document.getElementById('main-content')?.focus({ preventScroll: true });
 
-      const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      window.scrollTo({ top: 0, left: 0, behavior: prefersReducedMotion ? 'auto' : 'smooth' });
+      const prefersReducedMotion = globalThis.matchMedia(
+        '(prefers-reduced-motion: reduce)',
+      ).matches;
+      globalThis.scrollTo({ top: 0, left: 0, behavior: prefersReducedMotion ? 'auto' : 'smooth' });
     });
 
     return () => cancelAnimationFrame(frame);

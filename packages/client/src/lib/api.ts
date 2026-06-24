@@ -1,6 +1,6 @@
 const trimTrailingSlashes = (value: string): string => {
   let end = value.length;
-  while (end > 0 && value.charCodeAt(end - 1) === 47) {
+  while (end > 0 && value.codePointAt(end - 1) === 47) {
     end -= 1;
   }
   return end === value.length ? value : value.slice(0, end);
@@ -39,20 +39,20 @@ const normalizeApiBase = (rawBase: string): string => {
 const PREFERRED_API_BASE_KEY = 'picky_api_base_preferred';
 
 const getPreferredApiBase = (): string | undefined => {
-  if (typeof window === 'undefined') {
+  if (typeof globalThis.window === 'undefined') {
     return undefined;
   }
 
-  const raw = window.localStorage.getItem(PREFERRED_API_BASE_KEY)?.trim();
+  const raw = globalThis.localStorage.getItem(PREFERRED_API_BASE_KEY)?.trim();
   if (!raw) {
     return undefined;
   }
 
-  return raw ? raw : undefined;
+  return raw || undefined;
 };
 
 const persistPreferredApiBase = (base: string) => {
-  if (typeof window === 'undefined') {
+  if (typeof globalThis.window === 'undefined') {
     return;
   }
 
@@ -67,20 +67,20 @@ const persistPreferredApiBase = (base: string) => {
 const dedupe = <T>(items: T[]): T[] => Array.from(new Set(items));
 
 const getWindowApiCandidates = (): string[] => {
-  if (typeof window === 'undefined') {
+  if (typeof globalThis.window === 'undefined') {
     return [];
   }
 
-  const { protocol, host } = window.location;
+  const { protocol, host } = globalThis.location;
   return [normalizeApiBase(`${protocol}//${host}/api`)];
 };
 
 const getLocalDevApiCandidates = (): string[] => {
-  if (typeof window === 'undefined') {
+  if (typeof globalThis.window === 'undefined') {
     return [];
   }
 
-  const { hostname } = window.location;
+  const { hostname } = globalThis.location;
   if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
     return [];
   }
@@ -92,11 +92,11 @@ const getLocalDevApiCandidates = (): string[] => {
 };
 
 const getCustomApiCandidateFromWindow = (): string[] => {
-  if (typeof window === 'undefined') {
+  if (typeof globalThis.window === 'undefined') {
     return [];
   }
 
-  const rawCandidate = new URLSearchParams(window.location.search).get('api_base')?.trim();
+  const rawCandidate = new URLSearchParams(globalThis.location.search).get('api_base')?.trim();
   if (!rawCandidate) {
     return [];
   }
@@ -105,12 +105,12 @@ const getCustomApiCandidateFromWindow = (): string[] => {
 };
 
 const getVercelApiCandidates = (): string[] => {
-  if (typeof window === 'undefined') {
+  if (typeof globalThis.window === 'undefined') {
     return [];
   }
 
-  const { protocol, hostname } = window.location;
-  if (!hostname || !hostname.endsWith('.vercel.app')) {
+  const { protocol, hostname } = globalThis.location;
+  if (!hostname?.endsWith('.vercel.app')) {
     return [];
   }
 
@@ -127,7 +127,7 @@ const getVercelApiCandidates = (): string[] => {
     baseHost.replace(/-web$/, ''),
     baseHost.replace(/-app$/, ''),
     baseHost.replace(/-api$/, ''),
-  ]).filter((value) => Boolean(value));
+  ]).filter(Boolean);
 
   const apiHosts = dedupe([
     `${baseHost}-api.vercel.app`,
@@ -164,7 +164,7 @@ const getApiCandidates = (): string[] => {
   const baseCandidates = getWindowApiCandidates();
   const localDevCandidates = getLocalDevApiCandidates();
 
-  if (typeof window === 'undefined') {
+  if (typeof globalThis.window === 'undefined') {
     return ['/api', ...preferred];
   }
 
@@ -208,9 +208,9 @@ const shouldRetryOnFailure = (
   }
 
   const isVercelFallbackProbe =
-    typeof window !== 'undefined' &&
-    window.location.hostname.endsWith('.vercel.app') &&
-    base.includes(`${window.location.host}/api`) &&
+    typeof globalThis.window !== 'undefined' &&
+    globalThis.location.hostname.endsWith('.vercel.app') &&
+    base.includes(`${globalThis.location.host}/api`) &&
     !base.includes('-api.vercel.app');
 
   if (isVercelFallbackProbe && res.status === 404) {
@@ -229,75 +229,87 @@ const isApiDebugEnabled = (): boolean => {
     return true;
   }
 
-  if (typeof window === 'undefined') {
+  if (typeof globalThis.window === 'undefined') {
     return false;
   }
 
-  const raw = window.localStorage.getItem('picky_api_debug');
+  const raw = globalThis.localStorage.getItem('picky_api_debug');
   if (raw === '1' || raw?.toLowerCase() === 'true') {
     return true;
   }
 
-  const query = new URLSearchParams(window.location.search);
+  const query = new URLSearchParams(globalThis.location.search);
   const debugParam = query.get('api_debug');
   return debugParam === '1' || debugParam?.toLowerCase() === 'true';
 };
 
-export const requestApi = async (path: string, init: RequestInit = {}): Promise<Response> => {
-  const explicitBase = import.meta.env.VITE_API_BASE_URL?.trim();
-  const hasExplicitBase = Boolean(explicitBase);
-  const candidates = getApiCandidates();
-  let lastResponse: Response | null = null;
-  let lastError: Error | null = null;
-  const trace: Array<{ base: string; ok: boolean; status?: number; error?: string }> = [];
-  const debug = isApiDebugEnabled();
-  const isProdLike =
-    typeof window !== 'undefined' && window.location.hostname.includes('vercel.app');
-  const requestMethod = String(init.method || 'GET').toUpperCase();
+type ApiTraceEntry = { base: string; ok: boolean; status?: number; error?: string };
 
-  for (let i = 0; i < candidates.length; i += 1) {
-    const base = candidates[i];
-    if (!base) {
-      continue;
+type ApiAttemptResult =
+  | { kind: 'return'; response: Response }
+  | { kind: 'retry'; response: Response }
+  | { kind: 'error'; error: Error };
+
+type ApiAttemptContext = {
+  path: string;
+  init: RequestInit;
+  candidatesLength: number;
+  requestMethod: string;
+  debug: boolean;
+  hasExplicitBase: boolean;
+  trace: ApiTraceEntry[];
+};
+
+const attemptApiRequest = async (
+  base: string,
+  index: number,
+  ctx: ApiAttemptContext,
+): Promise<ApiAttemptResult> => {
+  try {
+    const res = await fetch(`${base}${ctx.path}`, ctx.init);
+    const needRetry = shouldRetryOnFailure(
+      res,
+      index,
+      ctx.candidatesLength,
+      base,
+      ctx.requestMethod,
+    );
+    ctx.trace.push({ base, ok: !needRetry, status: res.status });
+    if (ctx.debug) {
+      console.info('[picky] requestApi attempt', {
+        path: ctx.path,
+        base,
+        status: res.status,
+        retry: needRetry,
+      });
     }
-    try {
-      const res = await fetch(`${base}${path}`, init);
-      const needRetry = shouldRetryOnFailure(res, i, candidates.length, base, requestMethod);
-      trace.push({ base, ok: !needRetry, status: res.status });
-      if (debug) {
-        console.info('[picky] requestApi attempt', {
-          path,
-          base,
-          status: res.status,
-          retry: needRetry,
-        });
-      }
 
-      if (!needRetry) {
-        if (!hasExplicitBase && res.ok) {
-          persistPreferredApiBase(base);
-        }
-        return res;
+    if (!needRetry) {
+      if (!ctx.hasExplicitBase && res.ok) {
+        persistPreferredApiBase(base);
       }
-
-      lastResponse = res;
-    } catch (err: any) {
-      trace.push({ base, ok: false, error: String(err?.message || err) });
-      if (debug) {
-        console.error('[picky] requestApi error', {
-          path,
-          base,
-          error: String(err?.message || err),
-        });
-      }
-      lastError = err instanceof Error ? err : new Error(String(err));
+      return { kind: 'return', response: res };
     }
-  }
 
-  if ((isProdLike || debug) && path.startsWith('/auth/')) {
-    console.info('[picky] requestApi trace', path, trace);
+    return { kind: 'retry', response: res };
+  } catch (err: any) {
+    ctx.trace.push({ base, ok: false, error: String(err?.message || err) });
+    if (ctx.debug) {
+      console.error('[picky] requestApi error', {
+        path: ctx.path,
+        base,
+        error: String(err?.message || err),
+      });
+    }
+    return { kind: 'error', error: err instanceof Error ? err : new Error(String(err)) };
   }
+};
 
+const resolveApiOutcome = (
+  path: string,
+  lastResponse: Response | null,
+  lastError: Error | null,
+): Response => {
   if (lastResponse) {
     if (isLikelyStaticHtmlResponse(lastResponse)) {
       throw new Error(
@@ -312,6 +324,48 @@ export const requestApi = async (path: string, init: RequestInit = {}): Promise<
   }
 
   throw new Error('API 서버를 찾을 수 없습니다. VITE_API_BASE_URL를 확인해 주세요.');
+};
+
+export const requestApi = async (path: string, init: RequestInit = {}): Promise<Response> => {
+  const hasExplicitBase = Boolean(import.meta.env.VITE_API_BASE_URL?.trim());
+  const candidates = getApiCandidates();
+  let lastResponse: Response | null = null;
+  let lastError: Error | null = null;
+  const trace: ApiTraceEntry[] = [];
+  const debug = isApiDebugEnabled();
+  const isProdLike =
+    typeof globalThis.window !== 'undefined' && globalThis.location.hostname.includes('vercel.app');
+  const ctx: ApiAttemptContext = {
+    path,
+    init,
+    candidatesLength: candidates.length,
+    requestMethod: String(init.method || 'GET').toUpperCase(),
+    debug,
+    hasExplicitBase,
+    trace,
+  };
+
+  for (let i = 0; i < candidates.length; i += 1) {
+    const base = candidates[i];
+    if (!base) {
+      continue;
+    }
+    const result = await attemptApiRequest(base, i, ctx);
+    if (result.kind === 'return') {
+      return result.response;
+    }
+    if (result.kind === 'retry') {
+      lastResponse = result.response;
+    } else {
+      lastError = result.error;
+    }
+  }
+
+  if ((isProdLike || debug) && path.startsWith('/auth/')) {
+    console.info('[picky] requestApi trace', path, trace);
+  }
+
+  return resolveApiOutcome(path, lastResponse, lastError);
 };
 
 export const getApiBaseUrl = (): string => {
