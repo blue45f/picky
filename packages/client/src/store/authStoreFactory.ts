@@ -29,6 +29,11 @@ export interface AuthState {
   /** 앱인토스 토스 로그인(appLogin) → 서버 mTLS 토큰 교환. 미설정 시 안내 메시지 반환. */
   loginWithTossAccount: () => Promise<{ ok: boolean; message?: string }>;
   registerGuest: (input: GuestRegisterInput) => Promise<boolean>;
+  /**
+   * 토큰이 없으면 조용히 비회원 세션을 발급해 식별을 보장한다.
+   * 고민 생성 직전에 호출해 creatorId가 없는 '고아 고민'이 생기지 않게 한다.
+   */
+  ensureIdentity: () => Promise<boolean>;
   logout: () => void;
   fetchMe: () => Promise<void>;
   setGuestName: (name: string) => void;
@@ -194,6 +199,11 @@ const resolveAuthFieldErrors = (payload: any): Record<string, string> => {
 
     return next;
   }, {});
+};
+
+const generateGuestNickname = (): string => {
+  const suffix = Math.floor(1000 + Math.random() * 9000);
+  return `비회원${suffix}`;
 };
 
 const isAuthResultPayload = (payload: any): payload is AuthResult => {
@@ -467,6 +477,31 @@ export const createAuthStoreState =
             isLoading: false,
             validationErrors: {},
           });
+          return false;
+        }
+      },
+
+      ensureIdentity: async () => {
+        if (get().token) {
+          return true;
+        }
+        try {
+          const nickname = (get().guestName || '').trim() || generateGuestNickname();
+          const res = await requestApi('/auth/guest', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nickname }),
+          });
+          const data = (await parseApiPayload(res)) as AuthResult;
+          if (!res.ok || !isAuthResultPayload(data) || !commitAuthSuccess(set, data)) {
+            return false;
+          }
+          if (!get().guestName) {
+            localStorage.setItem('picky_guest_name', nickname);
+            set({ guestName: nickname });
+          }
+          return true;
+        } catch {
           return false;
         }
       },

@@ -21,6 +21,8 @@ const PollList = lazy(() => import('./pages/PollList').then((m) => ({ default: m
 const CreatePoll = lazy(() =>
   import('./pages/CreatePoll').then((m) => ({ default: m.CreatePoll })),
 );
+const EditPoll = lazy(() => import('./pages/EditPoll').then((m) => ({ default: m.EditPoll })));
+const Admin = lazy(() => import('./pages/Admin').then((m) => ({ default: m.Admin })));
 const PollDetail = lazy(() =>
   import('./pages/PollDetail').then((m) => ({ default: m.PollDetail })),
 );
@@ -116,6 +118,8 @@ export const App: React.FC = () => {
               <Route path="/design" element={<DesignSystem />} />
               <Route path="/sitemap" element={<SitemapPage />} />
               <Route path="/poll/:id" element={<PollDetail />} />
+              <Route path="/poll/:id/edit" element={<EditPoll />} />
+              <Route path="/admin" element={<Admin />} />
               <Route path="/share/:id" element={<ShareRouteRedirect />} />
               <Route path="/embed/:id" element={<PollDetail />} />
               <Route path="/present/:id" element={<PollDetail />} />
@@ -233,7 +237,7 @@ export const App: React.FC = () => {
                 개인정보처리방침
               </Link>
             </p>
-            <p>© {new Date().getFullYear()} 에이치준랩스 · pickflow. All rights reserved.</p>
+            <p>© {new Date().getFullYear()} 에이치준랩스 · picky. All rights reserved.</p>
             <p
               style={{
                 display: 'inline-flex',

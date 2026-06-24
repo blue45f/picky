@@ -28,6 +28,9 @@ import {
   QrCode,
   CalendarPlus,
   Plus,
+  Settings,
+  Pencil,
+  Trash2,
 } from 'lucide-react';
 import { usePollStore } from '../store/usePollStore';
 import { useAuthStore } from '../store/useAuthStore';
@@ -96,7 +99,7 @@ const RESULT_IMAGE_THEME_OPTIONS: Array<{
   label: string;
   description: string;
 }> = [
-  { value: 'classic', label: '클래식', description: 'pickflow 기본 다크 카드' },
+  { value: 'classic', label: '클래식', description: 'picky 기본 다크 카드' },
   { value: 'light', label: '라이트', description: '문서와 회의록에 적합' },
   { value: 'presentation', label: '프레젠트', description: '발표 화면용 고대비' },
 ];
@@ -388,7 +391,7 @@ const buildPollMarkdownReport = (poll: Poll, shareUrl: string) => {
     commentLines.length > 0 ? commentLines.join('\n') : '아직 남겨진 의견이 없습니다.',
     '',
     '---',
-    'pickflow 결과 리포트',
+    'picky 결과 리포트',
   ].join('\n');
 };
 
@@ -501,7 +504,7 @@ const buildPollResultSummary = (poll: Poll, shareUrl: string, mode: ResultSummar
 
   if (mode === 'brief') {
     return [
-      `[pickflow 요약] ${poll.question}`,
+      `[picky 요약] ${poll.question}`,
       leader
         ? `현재 1위: ${leader.text} · ${leader.voteCount}표 (${leaderPercentage}%)`
         : '현재 1위: 아직 없음',
@@ -512,7 +515,7 @@ const buildPollResultSummary = (poll: Poll, shareUrl: string, mode: ResultSummar
   }
 
   return [
-    `[pickflow 결과 요약] ${poll.question}`,
+    `[picky 결과 요약] ${poll.question}`,
     poll.description ? `맥락: ${poll.description}` : null,
     `총 ${poll.totalVotes}표 · 의견 ${poll.comments.length}개`,
     '',
@@ -628,7 +631,7 @@ const drawResultImageCommentPanel = (
     context,
     latestComment
       ? `${latestComment.voterName} · ${latestComment.selectedOptionText || '선택지 정보 없음'}`
-      : 'pickflow',
+      : 'picky',
     810,
     394,
     270,
@@ -705,7 +708,7 @@ const buildPollResultImageDataUrl = (
 
   context.fillStyle = themeConfig.primary;
   context.font = '800 24px "Pretendard Variable", Arial, sans-serif';
-  context.fillText('PICKFLOW RESULT', 80, 124);
+  context.fillText('PICKY RESULT', 80, 124);
 
   context.fillStyle = themeConfig.title;
   context.font = '900 48px "Pretendard Variable", Arial, sans-serif';
@@ -736,7 +739,7 @@ const buildPollResultImageDataUrl = (
   }
   context.fillStyle = themeConfig.title;
   context.font = '900 26px "Pretendard Variable", Arial, sans-serif';
-  context.fillText('pickflow', 1010, 594);
+  context.fillText('picky', 1010, 594);
 
   return canvas.toDataURL('image/png');
 };
@@ -986,7 +989,7 @@ function PollPresentationView(
       <header className="present-header">
         <div>
           <div className="present-live-row">
-            <span>PICKFLOW LIVE RESULT</span>
+            <span>PICKY LIVE RESULT</span>
             <span className="present-live-badge">
               <RefreshCw size={13} />
               {isPresentAutoRefreshPaused
@@ -3867,6 +3870,8 @@ function PollFeedbackList(
     commentFilterOptions: Array<{ id: number; label: string; count: number }>;
     visibleComments: Poll['comments'];
     emptyCommentMessage: string;
+    canManage: boolean;
+    onDeleteComment: (commentId: number) => void;
   }>,
 ) {
   const {
@@ -3878,6 +3883,8 @@ function PollFeedbackList(
     commentFilterOptions,
     visibleComments,
     emptyCommentMessage,
+    canManage,
+    onDeleteComment,
   } = props;
   return (
     <div style={{ marginTop: '0.5rem' }}>
@@ -4078,6 +4085,28 @@ function PollFeedbackList(
               >
                 {comm.comment}
               </p>
+              {canManage ? (
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <button
+                    type="button"
+                    onClick={() => onDeleteComment(comm.id)}
+                    className="ghost-btn"
+                    aria-label={`${comm.voterName} 님의 댓글 삭제`}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      padding: '4px 9px',
+                      fontSize: '0.7rem',
+                      color: 'var(--brand-accent-coral)',
+                      borderColor: 'rgba(239, 68, 68, 0.28)',
+                    }}
+                  >
+                    <Trash2 size={12} />
+                    삭제
+                  </button>
+                </div>
+              ) : null}
             </div>
           ))}
         </div>
@@ -4771,7 +4800,7 @@ function PollTopNav(
   const { isEmbedMode, originalPollPath, navigate, setShowShareModal } = props;
   return isEmbedMode ? (
     <div className="embed-origin-cta">
-      <span>pickflow embedded poll</span>
+      <span>picky embedded poll</span>
       <a href={originalPollPath} target="_blank" rel="noreferrer">
         원본에서 크게 보기
         <ExternalLink size={12} />
@@ -5405,7 +5434,7 @@ function buildPollViewModel(
   });
   const shareUrl = resolvePollShareUrl(currentPoll);
   const decisionMemo = [
-    `[pickflow 결정 메모] ${currentPoll.question}`,
+    `[picky 결정 메모] ${currentPoll.question}`,
     `상태: ${pollClosed ? '마감' : consensusLabel}`,
     leadingOption
       ? `선두: ${leadingOption.text} (${leadingOption.voteCount}표, ${leadingShare}%)`
@@ -6582,6 +6611,8 @@ export const PollDetail: React.FC = () => {
   const vote = usePollStore((state) => state.vote);
   const clearError = usePollStore((state) => state.clearError);
   const setCurrentPoll = usePollStore((state) => state.setCurrentPoll);
+  const deletePoll = usePollStore((state) => state.deletePoll);
+  const deleteComment = usePollStore((state) => state.deleteComment);
   const user = useAuthStore((state) => state.user);
   const guestName = useAuthStore((state) => state.guestName);
 
@@ -6623,6 +6654,40 @@ export const PollDetail: React.FC = () => {
       return POLL_AUTHOR_LABELS.guest;
     }
     return currentPoll.creatorId ? POLL_AUTHOR_LABELS.otherMember : POLL_AUTHOR_LABELS.guest;
+  };
+
+  // 작성자/운영자 관리 권한 — 수정/삭제 액션을 노출할지 결정한다.
+  const isPollOwner = !!(user?.id && currentPoll?.creatorId === user.id);
+  const isPollAdmin = !!user?.isAdmin;
+  const canManagePoll = isPollOwner || isPollAdmin;
+
+  const handleManageEdit = () => {
+    if (id) {
+      navigate(`/poll/${encodeURIComponent(id)}/edit`);
+    }
+  };
+
+  const handleManageDelete = async () => {
+    if (!id) {
+      return;
+    }
+    if (!globalThis.confirm('이 고민을 삭제할까요? 되돌릴 수 없어요.')) {
+      return;
+    }
+    const ok = await deletePoll(id);
+    if (ok) {
+      navigate('/');
+    }
+  };
+
+  const handleDeleteComment = (commentId: number) => {
+    if (!id) {
+      return;
+    }
+    if (!globalThis.confirm('이 댓글을 삭제할까요?')) {
+      return;
+    }
+    deleteComment(id, commentId);
   };
 
   // Modal share check
@@ -6854,7 +6919,7 @@ export const PollDetail: React.FC = () => {
 
       globalThis.parent?.postMessage(
         {
-          type: 'pickflow:embed-resize',
+          type: 'picky:embed-resize',
           height: document.documentElement.scrollHeight,
         },
         embedTargetOrigin,
@@ -7142,7 +7207,7 @@ export const PollDetail: React.FC = () => {
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
-      anchor.download = `pickflow-poll-${currentPoll.id}-results.csv`;
+      anchor.download = `picky-poll-${currentPoll.id}-results.csv`;
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
@@ -7165,7 +7230,7 @@ export const PollDetail: React.FC = () => {
 
     const link = document.createElement('a');
     link.href = dataUrl;
-    link.download = `pickflow-${currentPoll.id}-result.png`;
+    link.download = `picky-${currentPoll.id}-result.png`;
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -7532,6 +7597,63 @@ export const PollDetail: React.FC = () => {
         setShowShareModal={setShowShareModal}
       />
 
+      {/* 작성자/운영자 전용 관리 액션바 — 임베드/발표 모드에서는 숨긴다. */}
+      {canManagePoll && !isEmbedMode && !isPresentationMode ? (
+        <div
+          className="content-card"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '0.75rem',
+            flexWrap: 'wrap',
+            padding: '0.75rem 1rem',
+          }}
+        >
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontSize: '0.78rem',
+              fontWeight: 700,
+              color: 'var(--text-secondary)',
+            }}
+          >
+            <Settings size={14} style={{ color: 'var(--brand-accent-teal)' }} />
+            {isPollOwner ? '내 고민 관리' : '운영자 관리'}
+          </span>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={handleManageEdit}
+              className="btn-secondary"
+              aria-label="이 고민 수정"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+            >
+              <Pencil size={14} />
+              수정
+            </button>
+            <button
+              type="button"
+              onClick={handleManageDelete}
+              className="ghost-btn"
+              aria-label="이 고민 삭제"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                color: 'var(--brand-accent-coral)',
+                borderColor: 'rgba(239, 68, 68, 0.32)',
+              }}
+            >
+              <Trash2 size={14} />
+              삭제
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       {/* Main Poll Card — order:-1 로 질문/투표를 최상단 히어로로(토스 정렬). QR·안내는 아래로. */}
       <PollMainCard
         vm={vm}
@@ -7588,6 +7710,8 @@ export const PollDetail: React.FC = () => {
             commentFilterOptions={commentFilterOptions}
             visibleComments={visibleComments}
             emptyCommentMessage={emptyCommentMessage}
+            canManage={canManagePoll}
+            onDeleteComment={handleDeleteComment}
           />
 
           {resultImagePreviewUrl ? (

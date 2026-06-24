@@ -1,4 +1,4 @@
-import type { Poll, CreatePollInput, VoteInput } from '@picky/shared';
+import type { Poll, CreatePollInput, UpdatePollInput, VoteInput } from '@picky/shared';
 import type { AuthState } from './authStoreFactory';
 
 type StoreSet<T> = (
@@ -19,12 +19,14 @@ export interface PollState {
   fetchPolls: () => Promise<void>;
   fetchPoll: (id: string) => Promise<Poll | null>;
   createPoll: (input: CreatePollInput) => Promise<Poll | null>;
+  updatePoll: (id: string, patch: UpdatePollInput) => Promise<Poll | null>;
   vote: (id: string, input: VoteInput) => Promise<boolean>;
   deletePoll: (id: string) => Promise<boolean>;
+  deleteComment: (id: string, commentId: number) => Promise<boolean>;
 }
 
 interface PollAuthStore {
-  getState: () => Pick<AuthState, 'user' | 'token' | 'invalidateSession'>;
+  getState: () => Pick<AuthState, 'user' | 'token' | 'invalidateSession' | 'ensureIdentity'>;
 }
 
 interface LocalVoteFallbackInput {
@@ -459,6 +461,8 @@ export const createPollStoreState =
       };
 
       try {
+        // 비회원이라도 식별 세션을 먼저 확보해 creatorId 없는 '고아 고민'을 막는다.
+        await useAuthStore.getState().ensureIdentity?.();
         const token = getAuthToken(useAuthStore);
         const headers: Record<string, string> = {
           'Content-Type': 'application/json',
@@ -608,6 +612,91 @@ export const createPollStoreState =
         }
 
         dropFromState();
+        return true;
+      } catch (err: any) {
+        set({ error: err.message || '에러가 발생했습니다.' });
+        return false;
+      }
+    },
+
+    updatePoll: async (id, patch) => {
+      set({ error: null });
+      try {
+        const token = getAuthToken(useAuthStore);
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (token) {
+          headers.Authorization = `Bearer ${token}`;
+        }
+
+        const res = await requestApi(`/polls/${id}`, {
+          method: 'PATCH',
+          headers,
+          body: JSON.stringify(patch),
+        });
+        if (!res.ok) {
+          const message = await setAuthSessionExpired(
+            res,
+            '고민을 수정하지 못했습니다.',
+            parseApiPayload,
+            useAuthStore,
+          );
+          set({ error: message });
+          return null;
+        }
+
+        const data = ensurePollPayload(await parseApiPayload(res));
+        upsertPollToCache(data, get().polls);
+        set((state) => ({
+          polls: replacePollById(state.polls, id, data),
+          currentPoll: state.currentPoll?.id === id ? data : state.currentPoll,
+          error: null,
+        }));
+        return data;
+      } catch (err: any) {
+        set({ error: err.message || '에러가 발생했습니다.' });
+        return null;
+      }
+    },
+
+    deleteComment: async (id, commentId) => {
+      set({ error: null });
+      const removeComment = (poll: Poll): Poll => ({
+        ...poll,
+        comments: poll.comments.filter((comment) => comment.id !== commentId),
+      });
+
+      try {
+        const token = getAuthToken(useAuthStore);
+        const headers: Record<string, string> = {};
+        if (token) {
+          headers.Authorization = `Bearer ${token}`;
+        }
+
+        const res = await requestApi(`/polls/${id}/comments/${commentId}`, {
+          method: 'DELETE',
+          headers,
+        });
+        if (!res.ok) {
+          const message = await setAuthSessionExpired(
+            res,
+            '댓글을 삭제하지 못했습니다.',
+            parseApiPayload,
+            useAuthStore,
+          );
+          set({ error: message });
+          return false;
+        }
+
+        const current = get().currentPoll;
+        if (current?.id === id) {
+          upsertPollToCache(removeComment(current), get().polls);
+        }
+        set((state) => ({
+          polls: state.polls.map((poll) => (poll.id === id ? removeComment(poll) : poll)),
+          currentPoll:
+            state.currentPoll?.id === id ? removeComment(state.currentPoll) : state.currentPoll,
+          error: null,
+        }));
         return true;
       } catch (err: any) {
         set({ error: err.message || '에러가 발생했습니다.' });

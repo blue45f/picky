@@ -138,7 +138,7 @@ export const Navbar: React.FC = () => {
                 color: 'var(--brand-primary-light)',
               }}
             >
-              pickflow
+              picky
             </span>
           </span>
           <span
@@ -190,6 +190,30 @@ export const Navbar: React.FC = () => {
               </Link>
             );
           })}
+          {user?.isAdmin ? (
+            <Link
+              to="/admin"
+              style={{
+                textDecoration: 'none',
+                fontSize: '0.84rem',
+                padding: '8px 10px',
+                borderRadius: '8px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                color:
+                  location.pathname === '/admin' ? 'var(--brand-accent-teal)' : 'var(--text-muted)',
+                border:
+                  location.pathname === '/admin'
+                    ? '1px solid rgba(45, 212, 191, 0.38)'
+                    : '1px solid transparent',
+                fontWeight: location.pathname === '/admin' ? 700 : 500,
+              }}
+            >
+              <ShieldCheck size={14} />
+              관리자
+            </Link>
+          ) : null}
           <form
             onSubmit={handleJoinCodeSubmit}
             aria-label="참여 코드로 투표 입장"
@@ -552,6 +576,27 @@ export const Navbar: React.FC = () => {
                 {item.label}
               </Link>
             ))}
+            {user?.isAdmin ? (
+              <Link
+                to="/admin"
+                onClick={() => setMobileOpen(false)}
+                style={{
+                  textDecoration: 'none',
+                  color: 'var(--brand-accent-teal)',
+                  fontSize: '0.85rem',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(45, 212, 191, 0.32)',
+                  padding: '10px 12px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontWeight: 700,
+                }}
+              >
+                <ShieldCheck size={14} />
+                관리자
+              </Link>
+            ) : null}
             {user ? (
               <button
                 type="button"

@@ -9,6 +9,7 @@ import * as crypto from 'node:crypto';
 import * as https from 'node:https';
 import * as fs from 'node:fs';
 import { DatabaseService, DatabaseUser } from '../database/database.service';
+import { isAdminEmail } from './admin';
 import {
   RegisterInput,
   LoginInput,
@@ -52,6 +53,7 @@ export class AuthService {
       nickname: user.nickname,
       createdAt: user.createdAt,
       isGuest: user.isGuest,
+      isAdmin: isAdminEmail(user.email),
     };
   }
 
@@ -317,6 +319,7 @@ export class AuthService {
       nickname: payload.nickname,
       createdAt: new Date().toISOString(),
       isGuest: payload.isGuest,
+      isAdmin: isAdminEmail(payload.email),
     };
   }
 }

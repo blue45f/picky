@@ -2,20 +2,23 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   Delete,
   Body,
   Param,
+  ParseIntPipe,
   UsePipes,
   UseGuards,
   Request,
   Res,
 } from '@nestjs/common';
 import { ZodValidationPipe, createZodDto } from 'nestjs-zod';
-import { CreatePollSchema, VoteSchema } from '@picky/shared';
+import { CreatePollSchema, UpdatePollSchema, VoteSchema } from '@picky/shared';
 import { PollService } from './poll.service';
 import { AuthGuard, OptionalAuthGuard } from '../auth/auth.guard';
 
 class CreatePollDto extends createZodDto(CreatePollSchema) {}
+class UpdatePollDto extends createZodDto(UpdatePollSchema) {}
 class VoteDto extends createZodDto(VoteSchema) {}
 
 const trimTrailingSlashes = (value: string): string => {
@@ -60,7 +63,7 @@ export class PollController {
     const safePollUrl = this.escapeHtml(pollUrl);
     const safeImageUrl = this.escapeHtml(shareImage.url);
     const imageType = this.escapeHtml(shareImage.mimeType);
-    const titleText = `${poll.question} | pickflow`;
+    const titleText = `${poll.question} | picky`;
     const descriptionText = poll.description || '결정에 참여하고 의견을 남겨주세요.';
     const publishedTimeText = poll.createdAt || new Date().toISOString();
     const updatedTimeText =
@@ -86,7 +89,7 @@ export class PollController {
       dateModified: updatedTimeText,
       isPartOf: {
         '@type': 'WebSite',
-        name: 'pickflow',
+        name: 'picky',
         url: appOrigin,
       },
       mainEntity: {
@@ -114,11 +117,11 @@ export class PollController {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>${title}</title>
     <meta name="description" content="${description}" />
-    <meta name="application-name" content="pickflow" />
+    <meta name="application-name" content="picky" />
     <meta name="robots" content="index, follow" />
     <meta name="theme-color" content="#061411" />
     <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="pickflow" />
+    <meta property="og:site_name" content="picky" />
     <meta property="og:locale" content="ko_KR" />
     <meta property="og:title" content="${title}" />
     <meta property="og:description" content="${description}" />
@@ -136,8 +139,8 @@ export class PollController {
     <meta property="article:section" content="poll" />
     <meta property="og:updated_time" content="${updatedTime}" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:site" content="@pickflow_io" />
-    <meta name="twitter:creator" content="@pickflow_io" />
+    <meta name="twitter:site" content="@picky_io" />
+    <meta name="twitter:creator" content="@picky_io" />
     <meta name="twitter:domain" content="${appDomain}" />
     <meta name="twitter:url" content="${safeShareUrl}" />
     <meta name="twitter:title" content="${title}" />
@@ -176,7 +179,7 @@ export class PollController {
   </head>
   <body>
     <main>
-      <small>pickflow poll</small>
+      <small>picky poll</small>
       <h1>${title}</h1>
       <p>${description}</p>
       <p>${optionSummary}</p>
@@ -230,10 +233,31 @@ export class PollController {
     return this.pollService.vote(id, dto);
   }
 
+  @Patch(':id')
+  @UseGuards(AuthGuard)
+  updatePoll(@Param('id') id: string, @Request() req: any, @Body() dto: UpdatePollDto) {
+    return this.pollService.updatePoll(id, dto, req.user?.sub ?? null, Boolean(req.user?.isAdmin));
+  }
+
   @Delete(':id')
   @UseGuards(AuthGuard)
   deletePoll(@Param('id') id: string, @Request() req: any) {
-    return this.pollService.deletePoll(id, req.user?.sub ?? null);
+    return this.pollService.deletePoll(id, req.user?.sub ?? null, Boolean(req.user?.isAdmin));
+  }
+
+  @Delete(':id/comments/:commentId')
+  @UseGuards(AuthGuard)
+  deleteComment(
+    @Param('id') id: string,
+    @Param('commentId', ParseIntPipe) commentId: number,
+    @Request() req: any,
+  ) {
+    return this.pollService.deleteComment(
+      id,
+      commentId,
+      req.user?.sub ?? null,
+      Boolean(req.user?.isAdmin),
+    );
   }
 
   private getRequestOrigin(req: any): string {

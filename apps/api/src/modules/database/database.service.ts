@@ -244,7 +244,7 @@ export class DatabaseService implements OnModuleInit {
           question:
             'WebstormProjects 개인 프로젝트들 중 어떤 것을 가장 먼저 상용 서비스화 시킬까요?',
           description:
-            '일상에서 고민되는 것들을 지인들에게 쉽게 물어보는 pickflow(피키) 서비스 출시를 축하하며, 다음 개인 프로젝트 중 하나를 상용 런칭하고 싶습니다. 여러분의 선택은?',
+            '일상에서 고민되는 것들을 지인들에게 쉽게 물어보는 picky(피키) 서비스 출시를 축하하며, 다음 개인 프로젝트 중 하나를 상용 런칭하고 싶습니다. 여러분의 선택은?',
           options: [
             {
               id: 1,
@@ -677,6 +677,84 @@ export class DatabaseService implements OnModuleInit {
       return false;
     }
     const nextPolls = this.data.polls.filter((p) => p.id !== id);
+    await this.commit({ ...this.data, polls: nextPolls });
+    return true;
+  }
+
+  /**
+   * 고민(투표) 본문 수정 저장. 투표수(voteCount)는 건드리지 않고 작성 내용만 갱신한다.
+   * optionsStructurallyChanged=true면 선택지를 통째로 교체(추가/삭제/순서변경)한다.
+   */
+  async savePollContent(
+    poll: Poll & { categoryId?: string | null },
+    options: { optionsStructurallyChanged: boolean },
+  ): Promise<void> {
+    if (this.useSqlDb) {
+      await db
+        .update(schema.polls)
+        .set({
+          question: poll.question,
+          description: poll.description ?? null,
+          endsAt: poll.endsAt ? new Date(poll.endsAt) : null,
+          resultsVisibility: poll.resultsVisibility || 'afterVote',
+          categoryId: poll.categoryId ?? null,
+          totalVotes: poll.totalVotes,
+          attachments: (poll.attachments ?? []) as any,
+        })
+        .where(eq(schema.polls.id, poll.id));
+
+      if (options.optionsStructurallyChanged) {
+        await db.delete(schema.pollOptions).where(eq(schema.pollOptions.pollId, poll.id));
+        if (poll.options.length > 0) {
+          await db.insert(schema.pollOptions).values(
+            poll.options.map((opt) => ({
+              pollId: poll.id,
+              optionIndex: opt.id,
+              text: opt.text,
+              voteCount: opt.voteCount,
+              imageUrl: opt.imageUrl,
+            })),
+          );
+        }
+      } else {
+        for (const opt of poll.options) {
+          await db
+            .update(schema.pollOptions)
+            .set({ text: opt.text, imageUrl: opt.imageUrl })
+            .where(
+              sql`${schema.pollOptions.pollId} = ${poll.id} AND ${schema.pollOptions.optionIndex} = ${opt.id}`,
+            );
+        }
+      }
+      return;
+    }
+
+    await this.refresh();
+    const nextPolls = [...this.data.polls];
+    const idx = nextPolls.findIndex((p) => p.id === poll.id);
+    if (idx === -1) {
+      return;
+    }
+    nextPolls[idx] = poll;
+    await this.commit({ ...this.data, polls: nextPolls });
+  }
+
+  async deleteComment(pollId: string, commentId: number): Promise<boolean> {
+    if (this.useSqlDb) {
+      await db
+        .delete(schema.pollComments)
+        .where(
+          sql`${schema.pollComments.pollId} = ${pollId} AND ${schema.pollComments.id} = ${commentId}`,
+        );
+      return true;
+    }
+
+    await this.refresh();
+    const nextPolls = this.data.polls.map((p) =>
+      p.id === pollId
+        ? { ...p, comments: p.comments.filter((comment) => comment.id !== commentId) }
+        : p,
+    );
     await this.commit({ ...this.data, polls: nextPolls });
     return true;
   }

@@ -52,6 +52,52 @@ export const CreatePollSchema = z.object({
 
 export type CreatePollInput = z.infer<typeof CreatePollSchema>;
 
+/**
+ * 등록한 고민(투표)을 수정할 때 쓰는 스키마.
+ * 모든 필드가 선택값이라 부분 수정(PATCH)을 허용하고, 최소 한 필드는 보내야 한다.
+ * 선택지 개수 변경 가능 여부(투표 시작 후 금지)는 서버 비즈니스 규칙에서 강제한다.
+ */
+export const UpdatePollSchema = z
+  .object({
+    question: z
+      .string()
+      .min(2, '질문은 최소 2글자 이상이어야 합니다.')
+      .max(100, '질문은 최대 100글자 이하이어야 합니다.')
+      .optional(),
+    description: z
+      .string()
+      .max(500, '설명은 최대 500글자 이하이어야 합니다.')
+      .optional()
+      .nullable(),
+    endsAt: z.string().datetime('마감 시간 형식이 올바르지 않습니다.').optional().nullable(),
+    resultsVisibility: PollResultsVisibilitySchema.optional().nullable(),
+    options: z
+      .array(
+        z.object({
+          text: z.string().min(1, '선택지는 빈 칸일 수 없습니다.'),
+          imageUrl: z
+            .string()
+            .max(160_000, '이미지 데이터는 선택지당 160KB 이하이어야 합니다.')
+            .optional()
+            .nullable(),
+        }),
+      )
+      .min(2, '최소 2개 이상의 선택지가 필요합니다.')
+      .max(10, '최대 10개까지의 선택지만 등록 가능합니다.')
+      .optional(),
+    attachments: z
+      .array(PollAttachmentSchema)
+      .max(3, '첨부파일은 최대 3개까지 등록 가능합니다.')
+      .optional()
+      .nullable(),
+    categoryId: z.string().optional().nullable(),
+  })
+  .refine((value) => Object.keys(value).length > 0, {
+    message: '수정할 내용이 없습니다.',
+  });
+
+export type UpdatePollInput = z.infer<typeof UpdatePollSchema>;
+
 export const VoteSchema = z.object({
   optionId: z.number({ required_error: '선택할 옵션 ID가 필요합니다.' }),
   voterName: z
@@ -166,6 +212,8 @@ export interface UserProfile {
   nickname: string;
   createdAt: string;
   isGuest?: boolean;
+  /** 운영자(어드민) 여부 — ADMIN_EMAILS 환경변수로 지정된 계정이면 true. */
+  isAdmin?: boolean;
 }
 
 export interface AuthResult {
