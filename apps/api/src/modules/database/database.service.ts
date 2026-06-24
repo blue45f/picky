@@ -596,6 +596,29 @@ export class DatabaseService implements OnModuleInit {
     return this.data.polls.find((p) => p.id === id);
   }
 
+  /** 비공개 투표 접근 코드 검증. accessCode 원문은 외부로 절대 노출하지 않고 내부 비교만 한다. */
+  async verifyAccessCode(pollId: string, code: string | null | undefined): Promise<boolean> {
+    if (!code) {
+      return false;
+    }
+    if (this.useSqlDb) {
+      const r = await db.query.polls.findFirst({
+        where: eq(schema.polls.id, pollId),
+        columns: { accessCode: true, visibility: true },
+      });
+      if (!r) return false;
+      if (r.visibility !== 'private') return true;
+      return r.accessCode === code;
+    }
+    await this.refresh();
+    const p = this.data.polls.find((x) => x.id === pollId) as
+      | (Poll & { accessCode?: string | null })
+      | undefined;
+    if (!p) return false;
+    if ((p.visibility ?? 'public') !== 'private') return true;
+    return p.accessCode === code;
+  }
+
   async createPoll(poll: Poll & { accessCode?: string | null }) {
     if (this.useSqlDb) {
       await db.insert(schema.polls).values({

@@ -6,6 +6,7 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   ParseIntPipe,
   UsePipes,
   UseGuards,
@@ -224,8 +225,8 @@ export class PollController {
   }
 
   @Get(':id')
-  getPoll(@Param('id') id: string) {
-    return this.pollService.getPoll(id);
+  getPoll(@Param('id') id: string, @Query('code') code?: string) {
+    return this.pollService.getPollForViewer(id, code);
   }
 
   @Post(':id/vote')

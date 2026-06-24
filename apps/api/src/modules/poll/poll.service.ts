@@ -82,6 +82,11 @@ export class PollService {
       imageUrl: opt.imageUrl || null,
     }));
 
+    const visibility = input.visibility ?? 'public';
+    if (visibility === 'private' && !input.accessCode) {
+      throw new BadRequestException('비공개(private) 투표는 접근 코드가 필요합니다.');
+    }
+
     const newPoll: PollWithCategory = {
       id: pollId,
       question: input.question,
@@ -93,13 +98,49 @@ export class PollService {
       endsAt: normalizedEndsAt,
       totalVotes: 0,
       resultsVisibility: input.resultsVisibility || 'afterVote',
+      visibility,
+      requiresCode: visibility === 'private',
       creatorId,
       creatorIsGuest,
       categoryId: input.categoryId || null,
     };
 
-    await this.db.createPoll(newPoll);
+    await this.db.createPoll({
+      ...newPoll,
+      accessCode: visibility === 'private' ? (input.accessCode ?? null) : null,
+    });
     return newPoll;
+  }
+
+  /**
+   * 열람용 조회 — 비공개(private) 투표는 올바른 접근 코드가 있어야 전체를 반환한다.
+   * 코드 미입력/오류 시 질문만 노출하고 선택지·결과·댓글은 가린다(requiresCode=true).
+   */
+  async getPollForViewer(id: string, code?: string | null): Promise<Poll> {
+    const poll = await this.getPoll(id);
+    if (poll.visibility !== 'private') {
+      return poll;
+    }
+    const ok = await this.db.verifyAccessCode(id, code ?? null);
+    if (ok) {
+      return poll;
+    }
+    return {
+      id: poll.id,
+      question: poll.question,
+      description: null,
+      options: [],
+      comments: [],
+      attachments: [],
+      createdAt: poll.createdAt,
+      endsAt: poll.endsAt ?? null,
+      totalVotes: 0,
+      resultsVisibility: poll.resultsVisibility ?? 'afterVote',
+      visibility: 'private',
+      requiresCode: true,
+      creatorId: poll.creatorId ?? null,
+      categoryId: poll.categoryId ?? null,
+    };
   }
 
   private assertCanManage(poll: Poll, userId: string | null, isAdmin: boolean, action: string) {
