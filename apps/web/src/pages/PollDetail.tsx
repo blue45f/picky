@@ -6258,6 +6258,29 @@ export const PollDetail: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* 모바일 전용 고정 투표 바 — 투표 전(미참여·미마감·비임베드)에만 노출.
+          긴 상세 페이지에서도 핵심 액션인 '투표하기'를 항상 손 닿는 곳에 둔다. */}
+      {!isEmbedMode && !hasVoted && !pollClosed ? (
+        <>
+          <div className="mobile-only" aria-hidden="true" style={{ height: '78px' }} />
+          <div className="sticky-action-bar mobile-only">
+            <button
+              type="button"
+              onClick={() => void handleVoteSubmit()}
+              disabled={votedOptionId === null || isSubmittingVote}
+              className="btn-primary"
+              style={{ width: '100%', padding: '14px', fontSize: '0.95rem' }}
+            >
+              {isSubmittingVote
+                ? '투표 등록 중...'
+                : votedOptionId === null
+                  ? '선택지를 골라 투표해 주세요'
+                  : '이 선택지로 투표하기'}
+            </button>
+          </div>
+        </>
+      ) : null}
     </div>
   );
 };
