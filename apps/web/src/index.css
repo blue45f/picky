@@ -726,6 +726,11 @@ body.present-mode .page-shell {
   border: 0;
 }
 
+/* 모바일 전용 노출 유틸 — 기본(데스크탑)은 숨김, ≤560px 에서만 보인다(.desktop-only 의 짝). */
+.mobile-only {
+  display: none;
+}
+
 /* 본문 바로가기 — 키보드 포커스 시에만 가시화되어 첫 탭에서 노출된다 */
 .skip-link {
   position: absolute;
@@ -2190,6 +2195,10 @@ body.present-mode .page-shell {
 
   .desktop-only {
     display: none !important;
+  }
+
+  .mobile-only {
+    display: block !important;
   }
 
   .horizontal-scroll-mobile {

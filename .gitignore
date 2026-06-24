@@ -16,3 +16,6 @@ build
 *.ait
 .playwright-mcp
 .turbo
+
+# 디자인 리뷰용 루트 스크린샷(임시 산출물)
+/*.png

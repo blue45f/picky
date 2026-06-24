@@ -692,7 +692,7 @@ export const PollList: React.FC = () => {
   ];
   const launchSurfaceChips = [
     { label: '참여 링크', icon: Link },
-    { label: 'JOIN CODE', icon: Code2 },
+    { label: '참여 코드', icon: Code2 },
     { label: 'QR', icon: QrCode },
     { label: '임베드', icon: LayoutGrid },
     { label: '라이브 필터', icon: Radio },
@@ -730,7 +730,7 @@ export const PollList: React.FC = () => {
     const cards = [
       {
         key: 'needsVote',
-        eyebrow: 'FIRST VOTE',
+        eyebrow: '첫 표 필요',
         title: '첫 표가 필요한 고민',
         help: '아직 흐름이 만들어지지 않은 투표에 참여해 기준점을 만들어 주세요.',
         poll: needsVotePoll,
@@ -741,7 +741,7 @@ export const PollList: React.FC = () => {
       },
       {
         key: 'closingSoon',
-        eyebrow: 'LAST CALL',
+        eyebrow: '마감 임박',
         title: '마감이 가까운 고민',
         help: '곧 닫히는 투표입니다. 지금 참여하면 마지막 흐름에 영향을 줄 수 있습니다.',
         poll: closingSoonPoll,
@@ -752,7 +752,7 @@ export const PollList: React.FC = () => {
       },
       {
         key: 'closeRace',
-        eyebrow: 'CLOSE RACE',
+        eyebrow: '접전',
         title: '접전 중인 고민',
         help: '한 표가 결과 해석을 바꿀 수 있는 투표입니다.',
         poll: closeRacePoll,
@@ -763,7 +763,7 @@ export const PollList: React.FC = () => {
       },
       {
         key: 'feedback',
-        eyebrow: 'FEEDBACK',
+        eyebrow: '의견 활발',
         title: '의견이 활발한 고민',
         help: '댓글 맥락까지 함께 보면 더 좋은 결정을 할 수 있습니다.',
         poll: feedbackPoll,
@@ -774,7 +774,7 @@ export const PollList: React.FC = () => {
       },
       {
         key: 'attachment',
-        eyebrow: 'CONTEXT FILE',
+        eyebrow: '참고자료',
         title: '참고자료가 있는 고민',
         help: '첨부파일을 보고 맥락을 확인한 뒤 더 정확하게 참여할 수 있습니다.',
         poll: attachmentPoll,
@@ -1067,6 +1067,13 @@ export const PollList: React.FC = () => {
             고민되는 선택, <span className="hero-accent">링크 하나</span>로 빠르게 물어보세요
           </h1>
 
+          <p
+            className="hero-lede hero-enter mobile-only"
+            style={{ ['--enter-i' as string]: 2, marginBottom: '0.1rem' }}
+          >
+            친구·동료에게 투표 링크를 보내고 답을 빠르게 모아요.
+          </p>
+
           <p className="hero-lede hero-enter desktop-only" style={{ ['--enter-i' as string]: 2 }}>
             점심 메뉴부터 팀 회의 안건까지 — 선택지를 카드로 만들고 지인·동료에게 링크를 보내면 바로
             의견이 모입니다. 결과는 실시간으로, 결정은 더 가볍게.
@@ -1333,7 +1340,7 @@ export const PollList: React.FC = () => {
               }}
             >
               <Code2 size={13} />
-              JOIN CODE로 바로 참여
+              참여 코드로 바로 참여
             </label>
             <div
               style={{
@@ -1426,7 +1433,7 @@ export const PollList: React.FC = () => {
                     }}
                   >
                     <Pin size={13} />
-                    PINNED POLLS
+                    고정한 고민
                   </span>
                   <strong style={{ color: 'var(--text-primary)', fontSize: '0.86rem' }}>
                     자주 확인할 투표를 고정했습니다
@@ -1469,7 +1476,7 @@ export const PollList: React.FC = () => {
                         position: 'relative',
                         border: '1px solid rgba(250, 204, 21, 0.16)',
                         borderRadius: 'var(--radius-sm)',
-                        background: 'rgba(5, 14, 12, 0.5)',
+                        background: 'var(--bg-card)',
                         padding: '0.72rem',
                         display: 'grid',
                         gap: '0.48rem',
@@ -1593,7 +1600,7 @@ export const PollList: React.FC = () => {
                     }}
                   >
                     <History size={13} />
-                    RECENT ACTIVITY
+                    최근 본 투표
                   </span>
                   <strong style={{ color: 'var(--text-primary)', fontSize: '0.86rem' }}>
                     최근 본 투표로 바로 이어가기
@@ -1641,7 +1648,7 @@ export const PollList: React.FC = () => {
                         position: 'relative',
                         border: '1px solid rgba(255, 255, 255, 0.08)',
                         borderRadius: 'var(--radius-sm)',
-                        background: 'rgba(5, 14, 12, 0.44)',
+                        background: 'var(--bg-card)',
                         padding: '0.72rem',
                         display: 'grid',
                         gap: '0.48rem',
@@ -1813,7 +1820,7 @@ export const PollList: React.FC = () => {
                   }}
                 >
                   <Sparkles size={13} />
-                  DECISION FLOW
+                  결정 흐름
                 </span>
                 <h2
                   style={{
@@ -2034,7 +2041,7 @@ export const PollList: React.FC = () => {
                   }}
                 >
                   <Sparkles size={13} />
-                  LIVE OPERATIONS
+                  실시간 운영
                 </span>
                 <h2
                   style={{
@@ -2085,7 +2092,7 @@ export const PollList: React.FC = () => {
                     style={{
                       border: '1px solid rgba(255, 255, 255, 0.09)',
                       borderRadius: 'var(--radius-sm)',
-                      background: 'rgba(5, 14, 12, 0.42)',
+                      background: 'var(--bg-card)',
                       color: 'var(--text-primary)',
                       padding: '0.82rem',
                       display: 'grid',
@@ -2190,7 +2197,7 @@ export const PollList: React.FC = () => {
                 }}
               >
                 <Sparkles size={13} />
-                LIVE PICK
+                실시간 인기
               </span>
             </div>
 
@@ -3123,10 +3130,10 @@ export const PollList: React.FC = () => {
                     <button
                       type="button"
                       onClick={(event) => handleGotoPoll(event, poll.id)}
-                      className="btn-secondary"
+                      className="btn-primary"
                       style={{
                         fontSize: isCompact ? '0.66rem' : '0.7rem',
-                        padding: '6px 11px',
+                        padding: '7px 13px',
                         display: 'inline-flex',
                         alignItems: 'center',
                         gap: '4px',
