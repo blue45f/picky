@@ -874,6 +874,23 @@ export function PollListPage() {
           onCreate={goToCreate}
           onSelect={goToPoll}
         />
+
+        <button
+          type="button"
+          onClick={() => navigate('/support')}
+          style={{
+            margin: '18px auto 0',
+            display: 'block',
+            background: 'none',
+            border: 'none',
+            color: theme.textMuted,
+            fontSize: 13,
+            textDecoration: 'underline',
+            cursor: 'pointer',
+          }}
+        >
+          고객센터 · 문의하기
+        </button>
       </div>
 
       <div style={stickyActionBar}>

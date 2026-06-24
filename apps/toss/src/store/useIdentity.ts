@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { getStableUserKey, getTossEnv, type TossEnv } from '../lib/toss';
 import { useAuthStore } from './useAuthStore';
+import { pingVisit } from '../lib/deskPlatform';
 
 const NAME_KEY = 'picky_display_name';
 
@@ -34,6 +35,9 @@ export const useIdentity = create<IdentityState>((set, get) => ({
     const env = getTossEnv();
     const userKey = await getStableUserKey();
     set({ env, userKey, initialized: true });
+
+    // desk-platform 방문 집계(공개·키 불필요, 웹과 동일 appId). 실패는 조용히 무시.
+    void pingVisit();
 
     // 토스 환경: 식별키로 서버 세션을 발급받아 작성/투표를 안정적 사용자에 귀속.
     if (userKey) {

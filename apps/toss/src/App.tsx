@@ -4,6 +4,7 @@ import { PollListPage } from './pages/PollListPage';
 import { CreatePollPage } from './pages/CreatePollPage';
 import { PollDetailPage } from './pages/PollDetailPage';
 import { EditPollPage } from './pages/EditPollPage';
+import { SupportPage } from './pages/SupportPage';
 import { PollDetailView } from './pages/PollDetailView';
 import { useIdentity } from './store/useIdentity';
 import { parseEntryRoute } from './lib/toss';
@@ -155,6 +156,7 @@ export function App() {
           <Route path="/create" element={<CreatePollPage />} />
           <Route path="/poll/:id" element={<PollDetailPage />} />
           <Route path="/poll/:id/edit" element={<EditPollPage />} />
+          <Route path="/support" element={<SupportPage />} />
           {/* Verif preview routes (no API, for honest full-context screenshots) */}
           {import.meta.env.VITE_VERIF_PREVIEW === '1' && (
             <>
