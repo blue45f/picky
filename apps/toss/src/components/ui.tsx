@@ -1,6 +1,7 @@
 /** 픽플로우 미니앱 공용 UI 프리미티브. TDS 셰임 드리프트 없이 일관된 디자인을 유지해요. */
 import type { CSSProperties, ReactNode } from 'react';
 import { theme } from '../theme';
+import { RADIUS } from '../shared';
 
 type ChipTone = 'accent' | 'gold' | 'muted' | 'danger' | 'neutral';
 
@@ -27,12 +28,12 @@ export function Chip({
       style={{
         display: 'inline-flex',
         alignItems: 'center',
-        gap: 4,
-        fontSize: 11,
+        gap: 5,
+        fontSize: 13,
         fontWeight: 700,
         lineHeight: 1.4,
-        padding: '3px 9px',
-        borderRadius: theme.radiusPill,
+        padding: '4px 11px',
+        borderRadius: RADIUS.pill,
         whiteSpace: 'nowrap',
         ...chipToneStyle[tone],
         ...style,
@@ -47,7 +48,7 @@ export function Chip({
 export function ProgressBar({
   percent,
   tone = 'accent',
-  height = 6,
+  height = 10,
   track = theme.track,
 }: {
   percent: number;
@@ -63,7 +64,7 @@ export function ProgressBar({
       role="presentation"
       style={{
         height,
-        borderRadius: theme.radiusPill,
+        borderRadius: RADIUS.pill,
         background: track,
         overflow: 'hidden',
       }}
@@ -73,7 +74,7 @@ export function ProgressBar({
         style={{
           height: '100%',
           width: `${clamped}%`,
-          minWidth: clamped > 0 ? 6 : 0,
+          minWidth: clamped > 0 ? height : 0,
           borderRadius: 'inherit',
           background: fill,
         }}
@@ -107,7 +108,7 @@ export function SegmentedControl<T extends string>({
         display: 'flex',
         gap: 4,
         padding: 4,
-        borderRadius: theme.radiusSm,
+        borderRadius: RADIUS.md,
         background: 'rgba(255,255,255,0.04)',
         border: `1px solid ${theme.border}`,
       }}
@@ -124,12 +125,12 @@ export function SegmentedControl<T extends string>({
             onClick={() => onChange(option.value)}
             style={{
               flex: 1,
-              minHeight: 34,
+              minHeight: 44,
               border: 'none',
-              borderRadius: theme.radiusSm - 2,
+              borderRadius: RADIUS.md - 4,
               background: active ? theme.accent : 'transparent',
               color: active ? theme.accentInk : theme.textMuted,
-              fontSize: 13,
+              fontSize: 13.5,
               fontWeight: 700,
               cursor: 'pointer',
             }}
@@ -191,14 +192,14 @@ export function AppBar({
           onClick={onBack}
           style={{
             flexShrink: 0,
-            width: 40,
-            height: 40,
+            width: 44,
+            height: 44,
             display: 'grid',
             placeItems: 'center',
             background: 'none',
             border: 'none',
             color: theme.text,
-            fontSize: 24,
+            fontSize: 26,
             lineHeight: 1,
             cursor: 'pointer',
           }}
@@ -206,7 +207,7 @@ export function AppBar({
           ←
         </button>
       ) : null}
-      <h1 style={{ flex: 1, fontSize: 17, fontWeight: 800, minWidth: 0, margin: 0 }}>{title}</h1>
+      <h1 style={{ flex: 1, fontSize: 18, fontWeight: 800, minWidth: 0, margin: 0 }}>{title}</h1>
       {right ? <div style={{ flexShrink: 0 }}>{right}</div> : null}
     </header>
   );

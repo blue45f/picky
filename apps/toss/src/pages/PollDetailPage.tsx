@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@toss/tds-mobile';
 import type { PollOption } from '../shared';
+import { MASCOT, VOICE } from '../shared';
 import { usePollStore } from '../store/usePollStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useIdentity } from '../store/useIdentity';
@@ -113,7 +114,7 @@ export function PollDetailPage() {
         speedMultiplier: 1.4,
       });
 
-      showToast('투표 성공! 소중한 생각 고마워요 💖');
+      showToast(`${MASCOT.celebrate.emoji} ${MASCOT.celebrate.line}`);
       maybeRequestReview();
     } else {
       hapticFeedback('error');
@@ -162,12 +163,20 @@ export function PollDetailPage() {
   };
 
   if (isLoading && !poll) {
-    return <CenterMessage>고민을 열심히 가져오고 있어요... 🥑</CenterMessage>;
+    return (
+      <CenterMessage>
+        <span style={{ fontSize: 48 }}>{MASCOT.thinking.emoji}</span>
+        <span style={{ fontSize: 15, marginTop: 10 }}>{VOICE.loading}</span>
+      </CenterMessage>
+    );
   }
   if (!poll) {
     return (
       <CenterMessage>
-        {error ?? '앗, 고민을 찾을 수 없어요 🥺'}
+        <span style={{ fontSize: 48 }}>{MASCOT.empty.emoji}</span>
+        <span style={{ fontSize: 15, marginTop: 10 }}>
+          {error ?? '앗, 고민을 찾을 수 없어요 🥺'}
+        </span>
         <Button style={{ marginTop: 16 }} variant="weak" onClick={() => navigate('/')}>
           목록으로 돌아가기 🔙
         </Button>

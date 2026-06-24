@@ -1,0 +1,13 @@
+# gitleaks 설정 — picky 모노레포.
+# 기본 룰셋(useDefault)을 그대로 쓰되, 앱 내부 localStorage·캐시 키 상수처럼
+# 자격증명이 아닌 식별자가 generic-api-key 엔트로피 룰에 오탐되는 것만 허용목록 처리한다.
+# 'picky_*' 접두 문자열은 전부 클라이언트 스토리지/캐시 키이며 비밀이 아니다.
+# (PostToolUse 시크릿 스캔 훅이 이 파일들을 편집할 때마다 오탐으로 막던 문제 해소)
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "앱 내부 localStorage/캐시 키 상수 (picky_* 접두) — 비밀 아님"
+regexes = [
+  '''picky_[a-z0-9_]+''',
+]

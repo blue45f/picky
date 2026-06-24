@@ -22,7 +22,7 @@ export const theme = {
   track: 'rgba(255, 255, 255, 0.06)',
   overlay: 'rgba(0, 0, 0, 0.82)',
   radius: 22,
-  radiusSm: 16,
+  radiusSm: 18,
   radiusPill: 999,
 } as const;
 

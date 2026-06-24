@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Top } from '@toss/tds-mobile';
 import type { Poll } from '../shared';
+import { MASCOT } from '../shared';
 import { usePollStore } from '../store/usePollStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { theme, pageShell, stickyActionBar } from '../theme';
@@ -86,7 +87,7 @@ function PollCard({ poll, index, onClick }: { poll: Poll; index: number; onClick
           alignItems: 'center',
           gap: 6,
           marginBottom: 8,
-          fontSize: 12,
+          fontSize: 13,
           color: theme.textMuted,
         }}
       >
@@ -159,7 +160,7 @@ function PollCard({ poll, index, onClick }: { poll: Poll; index: number; onClick
             border: `1px solid rgba(255,255,255,0.02)`,
           }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, gap: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, gap: 12 }}>
             <span
               style={{
                 color: theme.textMuted,
@@ -171,15 +172,15 @@ function PollCard({ poll, index, onClick }: { poll: Poll; index: number; onClick
             >
               📊 {leading.text}
             </span>
-            <span style={{ color: theme.accent, fontWeight: 700, flexShrink: 0 }}>{percent}%</span>
+            <span style={{ color: theme.accent, fontWeight: 800, flexShrink: 0 }}>{percent}%</span>
           </div>
           <div style={{ marginTop: 8 }}>
-            <ProgressBar percent={percent} height={6} />
+            <ProgressBar percent={percent} height={10} />
           </div>
         </div>
       ) : null}
 
-      <div style={{ marginTop: 14, fontSize: 11, color: theme.textFaint, display: 'flex', gap: 8 }}>
+      <div style={{ marginTop: 14, fontSize: 13, color: theme.textFaint, display: 'flex', gap: 8 }}>
         <span>🗳️ {formatNumber(poll.totalVotes)}명이 고민을 나누는 중</span>
         <span>·</span>
         <span>💬 한마디 {poll.comments.length}개</span>
@@ -242,19 +243,19 @@ function RecentStrip({
             </div>
             <span
               style={{
-                fontSize: 13,
-                fontWeight: 600,
-                lineHeight: 1.4,
+                fontSize: 14,
+                fontWeight: 700,
+                lineHeight: 1.45,
                 display: '-webkit-box',
                 WebkitLineClamp: 2,
                 WebkitBoxOrient: 'vertical',
                 overflow: 'hidden',
-                height: '2.8em',
+                height: '2.9em',
               }}
             >
               {item.question}
             </span>
-            <div style={{ marginTop: 8, fontSize: 11, color: theme.textFaint }}>
+            <div style={{ marginTop: 8, fontSize: 12.5, color: theme.textFaint }}>
               🗳️ {formatNumber(item.totalVotes)} · 💬 {item.commentCount}
             </div>
           </button>
@@ -478,24 +479,24 @@ export function PollListPage() {
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: 6,
+                gap: 8,
                 marginBottom: 10,
-                fontSize: 12,
+                fontSize: 13,
               }}
             >
               <span
                 style={{
                   background: theme.accent,
                   color: theme.accentInk,
-                  padding: '2px 8px',
+                  padding: '4px 10px',
                   borderRadius: '999px',
                   fontWeight: 800,
-                  fontSize: 11,
+                  fontSize: 12.5,
                 }}
               >
                 실시간 인기 고민 🔥
               </span>
-              <span style={{ color: theme.textMuted }}>
+              <span style={{ color: theme.textMuted, fontWeight: 600 }}>
                 🗳️ {formatNumber(hotPoll.totalVotes)}명 참여 중
               </span>
             </div>
@@ -547,17 +548,17 @@ export function PollListPage() {
                     style={{
                       display: 'flex',
                       justifyContent: 'space-between',
-                      fontSize: 12,
+                      fontSize: 13,
                       gap: 12,
                     }}
                   >
                     <span style={{ color: theme.textMuted, fontWeight: 600 }}>
                       📊 1위: {leadingOpt.text}
                     </span>
-                    <span style={{ color: theme.accent, fontWeight: 700 }}>{pct}%</span>
+                    <span style={{ color: theme.accent, fontWeight: 800 }}>{pct}%</span>
                   </div>
                   <div style={{ marginTop: 8 }}>
-                    <ProgressBar percent={pct} height={6} />
+                    <ProgressBar percent={pct} height={10} />
                   </div>
                 </div>
               );
@@ -607,15 +608,18 @@ export function PollListPage() {
               onClick={() => setQuery('')}
               style={{
                 position: 'absolute',
-                right: 10,
+                right: 4,
                 top: '50%',
                 transform: 'translateY(-50%)',
+                width: 40,
+                height: 40,
+                display: 'grid',
+                placeItems: 'center',
                 background: 'none',
                 border: 'none',
                 fontSize: 16,
                 color: theme.textFaint,
                 cursor: 'pointer',
-                padding: 4,
               }}
             >
               ✕
@@ -648,13 +652,14 @@ export function PollListPage() {
               onClick={() => setMyOnly((prev) => !prev)}
               aria-pressed={myOnly}
               style={{
-                padding: '8px 14px',
+                minHeight: 44,
+                padding: '8px 16px',
                 borderRadius: 14,
                 background: myOnly ? theme.accentSoft : 'rgba(255,255,255,0.04)',
                 backdropFilter: 'blur(16px)',
                 WebkitBackdropFilter: 'blur(16px)',
                 color: myOnly ? theme.accent : theme.textMuted,
-                fontSize: 13,
+                fontSize: 13.5,
                 fontWeight: 700,
                 border: `1px solid ${myOnly ? theme.accent : theme.border}`,
                 cursor: 'pointer',
@@ -682,19 +687,24 @@ export function PollListPage() {
 
         {!isInitialLoading && polls.length > 0 && visiblePolls.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '40px 0', color: theme.textMuted }}>
-            <p style={{ fontSize: 15 }}>앗, 조건에 맞는 고민을 찾지 못했어요 😢</p>
-            <p style={{ fontSize: 13 }}>다른 검색어를 입력하거나 필터를 변경해 보세요!</p>
+            <div style={{ fontSize: 44, marginBottom: 10 }}>{MASCOT.curious.emoji}</div>
+            <p style={{ fontSize: 15.5, color: theme.text, fontWeight: 700 }}>
+              앗, 조건에 맞는 고민을 찾지 못했어요 😢
+            </p>
+            <p style={{ fontSize: 13.5, marginTop: 4, lineHeight: 1.5 }}>
+              다른 검색어를 입력하거나 필터를 바꿔 볼까요?
+            </p>
           </div>
         ) : null}
 
         {!isInitialLoading && polls.length === 0 && !error ? (
           <div style={{ textAlign: 'center', padding: '56px 0', color: theme.textMuted }}>
-            <div style={{ fontSize: 44, marginBottom: 12 }}>🥑</div>
-            <p style={{ fontSize: 16, color: theme.text, fontWeight: 700 }}>
-              아직 등록된 고민이 없어요.
+            <div style={{ fontSize: 56, marginBottom: 14 }}>{MASCOT.empty.emoji}</div>
+            <p style={{ fontSize: 16.5, color: theme.text, fontWeight: 800, lineHeight: 1.45 }}>
+              {MASCOT.empty.line}
             </p>
-            <p style={{ fontSize: 13, marginTop: 4 }}>
-              가장 먼저 재미있는 고민 투표를 만들어볼까요? 🚀
+            <p style={{ fontSize: 13.5, marginTop: 6, lineHeight: 1.5 }}>
+              가장 먼저 재미있는 고민 투표를 만들어 볼까요? 🚀
             </p>
           </div>
         ) : null}

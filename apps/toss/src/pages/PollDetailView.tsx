@@ -1,5 +1,6 @@
 import { Button } from '@toss/tds-mobile';
 import type { Poll, PollComment, PollOption } from '../shared';
+import { MASCOT, VOICE } from '../shared';
 import { formatNumber } from '../lib/format';
 import { optionPercent } from '../lib/poll';
 import { theme, stickyActionBar } from '../theme';
@@ -75,12 +76,15 @@ export function PollDetailView(props: PollDetailViewProps) {
         style={{
           minHeight: '100dvh',
           display: 'flex',
+          flexDirection: 'column',
+          gap: 10,
           alignItems: 'center',
           justifyContent: 'center',
           color: theme.textMuted,
         }}
       >
-        No poll data
+        <span style={{ fontSize: 48 }}>{MASCOT.empty.emoji}</span>
+        <span style={{ fontSize: 15 }}>{MASCOT.empty.line}</span>
       </div>
     );
   }
@@ -91,6 +95,7 @@ export function PollDetailView(props: PollDetailViewProps) {
       className="pressable"
       onClick={onDelete}
       style={{
+        minHeight: 44,
         background: 'none',
         border: 'none',
         color: confirmDelete ? theme.danger : (theme.textFaint ?? theme.textMuted),
@@ -103,7 +108,7 @@ export function PollDetailView(props: PollDetailViewProps) {
         transition: 'all 0.2s ease',
       }}
     >
-      {confirmDelete ? '진짜 지울까요? 🥺' : '지우기 🗑'}
+      {confirmDelete ? VOICE.deleteConfirm : '지우기 🗑'}
     </button>
   ) : null;
 
@@ -155,12 +160,13 @@ export function PollDetailView(props: PollDetailViewProps) {
         {/* Compact single-line meta (stats + leader) to save space vs voting content */}
         <div
           style={{
-            color: theme.textFaint,
-            fontSize: 12,
-            marginBottom: 12,
+            color: theme.textMuted,
+            fontSize: 13,
+            marginBottom: 14,
             display: 'flex',
-            gap: 8,
+            gap: 10,
             flexWrap: 'wrap',
+            fontWeight: 600,
           }}
         >
           <span>🗳️ {formatNumber(totalVotes)}명 참여</span>
@@ -180,10 +186,10 @@ export function PollDetailView(props: PollDetailViewProps) {
             const highlight = selected || isMine || isWinner;
 
             const cardBorderColor = isWinner
-              ? 'rgba(244, 197, 96, 0.4)'
+              ? 'rgba(244, 197, 96, 0.7)'
               : highlight
-                ? 'rgba(19, 194, 163, 0.4)'
-                : 'rgba(255, 255, 255, 0.05)';
+                ? 'rgba(19, 194, 163, 0.7)'
+                : 'rgba(255, 255, 255, 0.06)';
             const cardBoxShadow = isWinner
               ? '0 8px 24px rgba(244, 197, 96, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.06)'
               : highlight
@@ -200,9 +206,10 @@ export function PollDetailView(props: PollDetailViewProps) {
                 onClick={() => onSelect(option.id)}
                 style={{
                   textAlign: 'left',
+                  minHeight: 64,
                   padding: '20px 22px',
                   borderRadius: theme.radius,
-                  border: `1.5px solid ${cardBorderColor}`,
+                  border: `${highlight ? 2 : 1.5}px solid ${cardBorderColor}`,
                   boxShadow: cardBoxShadow,
                   background: isMine || isWinner ? theme.accentSoft : theme.surface,
                   backdropFilter: 'blur(20px)',
@@ -237,18 +244,45 @@ export function PollDetailView(props: PollDetailViewProps) {
                     alignItems: 'center',
                   }}
                 >
-                  <span style={{ fontWeight: 800, minWidth: 0, fontSize: 17 }}>
-                    {isMine ? '✓ ' : ''}
-                    {isWinner ? '👑 ' : ''}
+                  <span
+                    style={{
+                      fontWeight: 800,
+                      minWidth: 0,
+                      fontSize: 18,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 7,
+                    }}
+                  >
+                    {isMine ? (
+                      <span
+                        aria-hidden
+                        style={{
+                          flexShrink: 0,
+                          display: 'grid',
+                          placeItems: 'center',
+                          width: 24,
+                          height: 24,
+                          borderRadius: theme.radiusPill,
+                          background: theme.accent,
+                          color: theme.accentInk,
+                          fontSize: 15,
+                          fontWeight: 900,
+                        }}
+                      >
+                        ✓
+                      </span>
+                    ) : null}
+                    {isWinner ? <span style={{ flexShrink: 0, fontSize: 20 }}>👑</span> : null}
                     {option.text}
                   </span>
                   {showResults ? (
                     <span
                       style={{
                         color: isWinner ? theme.gold : theme.accent,
-                        fontWeight: 800,
+                        fontWeight: 900,
                         flexShrink: 0,
-                        fontSize: 16,
+                        fontSize: 17,
                       }}
                     >
                       {percent}% · {formatNumber(option.voteCount)}표
@@ -256,8 +290,12 @@ export function PollDetailView(props: PollDetailViewProps) {
                   ) : null}
                 </div>
                 {showResults ? (
-                  <div style={{ marginTop: 10 }}>
-                    <ProgressBar percent={percent} tone={isWinner ? 'gold' : 'accent'} height={6} />
+                  <div style={{ marginTop: 12 }}>
+                    <ProgressBar
+                      percent={percent}
+                      tone={isWinner ? 'gold' : 'accent'}
+                      height={10}
+                    />
                   </div>
                 ) : null}
               </button>
@@ -324,13 +362,14 @@ export function PollDetailView(props: PollDetailViewProps) {
                       display: 'flex',
                       justifyContent: 'space-between',
                       alignItems: 'center',
-                      fontSize: 11,
+                      gap: 8,
+                      fontSize: 13,
                       color: theme.textFaint,
                     }}
                   >
                     <strong style={{ color: theme.textMuted }}>{c.voterName}</strong>
                     {c.selectedOptionText ? (
-                      <span style={{ color: theme.accent, fontWeight: 600 }}>
+                      <span style={{ color: theme.accent, fontWeight: 700, flexShrink: 0 }}>
                         {c.selectedOptionText} 콕! 찝음
                       </span>
                     ) : null}
@@ -361,8 +400,8 @@ export function PollDetailView(props: PollDetailViewProps) {
             gap: 10,
           }}
         >
-          <span style={{ fontSize: 12, fontWeight: 700, color: theme.textMuted }}>
-            친구들의 생각도 물어볼까요? 🌈
+          <span style={{ fontSize: 14, fontWeight: 800, color: theme.text }}>
+            {VOICE.sharePrompt} 🌈
           </span>
           <div style={{ display: 'flex', gap: 8 }}>
             <button
@@ -371,12 +410,12 @@ export function PollDetailView(props: PollDetailViewProps) {
               onClick={onShare}
               style={{
                 flex: 1,
-                height: 44,
-                borderRadius: 12,
+                minHeight: 48,
+                borderRadius: 14,
                 background: theme.accent,
                 color: theme.accentInk,
-                fontWeight: 700,
-                fontSize: 14,
+                fontWeight: 800,
+                fontSize: 15,
                 border: 'none',
                 cursor: 'pointer',
               }}
@@ -389,12 +428,12 @@ export function PollDetailView(props: PollDetailViewProps) {
               onClick={onCopy}
               style={{
                 flex: 1,
-                height: 44,
-                borderRadius: 12,
+                minHeight: 48,
+                borderRadius: 14,
                 background: 'rgba(255, 255, 255, 0.06)',
                 color: theme.text,
-                fontWeight: 700,
-                fontSize: 14,
+                fontWeight: 800,
+                fontSize: 15,
                 border: 'none',
                 cursor: 'pointer',
               }}
@@ -409,12 +448,12 @@ export function PollDetailView(props: PollDetailViewProps) {
               onClick={onCopyResult}
               style={{
                 width: '100%',
-                height: 40,
-                borderRadius: 12,
+                minHeight: 44,
+                borderRadius: 14,
                 background: 'transparent',
                 color: theme.accent,
-                fontWeight: 600,
-                fontSize: 13,
+                fontWeight: 700,
+                fontSize: 14,
                 border: `1.5px solid ${theme.accentSoft}`,
                 cursor: 'pointer',
               }}
@@ -426,9 +465,15 @@ export function PollDetailView(props: PollDetailViewProps) {
           {/* QR 태그 포함 완전 통합 공유 영역 — 직관적으로 스캔/복사 강조 */}
           <div style={{ marginTop: 6 }}>
             <div
-              style={{ fontSize: 11, color: theme.textFaint, marginBottom: 4, textAlign: 'center' }}
+              style={{
+                fontSize: 13,
+                color: theme.textMuted,
+                marginBottom: 6,
+                textAlign: 'center',
+                lineHeight: 1.5,
+              }}
             >
-              QR 태그 스캔 또는 링크 공유로 친구를 초대하세요
+              {VOICE.scanHint}
             </div>
             {shareUrl ? (
               <PollShareQrSection

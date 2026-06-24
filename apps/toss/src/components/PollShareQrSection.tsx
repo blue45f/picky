@@ -29,31 +29,32 @@ export function PollShareQrSection({ shareUrl, qrUrl, onCopyLink }: PollShareQrS
     >
       <div
         style={{
-          fontSize: 12,
+          fontSize: 13.5,
           fontWeight: 700,
           color: theme.textMuted,
-          marginBottom: 6,
+          marginBottom: 8,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          gap: 6,
+          gap: 8,
         }}
       >
         QR 태그 📱
         {onCopyLink ? (
           <button
             type="button"
+            className="pressable"
             onClick={onCopyLink}
             style={{
-              fontSize: 12,
-              padding: '4px 10px',
-              borderRadius: 8,
+              fontSize: 13,
+              padding: '7px 14px',
+              borderRadius: 10,
               border: `1px solid ${theme.border}`,
               background: 'rgba(255,255,255,0.04)',
               color: theme.accent,
               cursor: 'pointer',
-              minHeight: 28,
-              fontWeight: 600,
+              minHeight: 36,
+              fontWeight: 700,
             }}
           >
             링크 복사
@@ -67,24 +68,24 @@ export function PollShareQrSection({ shareUrl, qrUrl, onCopyLink }: PollShareQrS
           width: 240,
           height: 240,
           background: '#fff',
-          borderRadius: 16,
+          borderRadius: 18,
           padding: 12,
           border: `1px solid ${theme.border}`,
           boxShadow: '0 6px 20px rgba(0,0,0,0.25)',
           imageRendering: 'pixelated',
         }}
       />
-      <div style={{ fontSize: 11, color: theme.textFaint, marginTop: 6 }}>
+      <div style={{ fontSize: 12.5, color: theme.textMuted, marginTop: 8, lineHeight: 1.5 }}>
         카메라로 스캔하면 웹에서 열리고, Toss 앱이 있으면 앱으로 이동할 수 있어요
       </div>
       {/* Fallback visible link for mobile tap/long-press when camera scan is tricky */}
       <div
         style={{
-          fontSize: 10,
+          fontSize: 12,
           color: theme.textFaint,
-          marginTop: 4,
+          marginTop: 6,
           wordBreak: 'break-all',
-          opacity: 0.7,
+          opacity: 0.8,
         }}
       >
         {shareUrl}

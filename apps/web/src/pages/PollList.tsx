@@ -27,6 +27,7 @@ import {
   Pin,
 } from 'lucide-react';
 import type { Poll } from '@picky/shared';
+import { MASCOT } from '@picky/shared';
 import { usePollStore } from '../store/usePollStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
@@ -53,7 +54,7 @@ type SignalMode =
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const CLOSING_SOON_MS = 24 * 60 * 60 * 1000;
-const PINNED_POLLS_STORAGE_KEY = 'picky_pinned_poll_ids_v1';
+const PINNED_POLLS_STORAGE_KEY = 'picky_pinned_poll_ids_v1'; // gitleaks:allow — localStorage 키(비밀 아님)
 const MAX_PINNED_POLLS = 6;
 
 const loadPinnedPollIds = (): string[] => {
@@ -1101,6 +1102,7 @@ export const PollList: React.FC = () => {
               둘러보기
             </button>
             <span
+              className="desktop-only"
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -1173,14 +1175,14 @@ export const PollList: React.FC = () => {
                   <Sparkles size={11} />
                   실시간 핫 고민 🔥
                 </span>
-                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>
                   {hotPoll.totalVotes}명 참여 중
                 </span>
               </div>
               <h3
                 style={{
                   margin: 0,
-                  fontSize: '1.1rem',
+                  fontSize: '1.2rem',
                   fontWeight: 900,
                   color: 'var(--text-primary)',
                   lineHeight: 1.4,
@@ -1192,7 +1194,7 @@ export const PollList: React.FC = () => {
                 <p
                   style={{
                     margin: 0,
-                    fontSize: '0.8rem',
+                    fontSize: '0.88rem',
                     color: 'var(--text-secondary)',
                     display: '-webkit-box',
                     WebkitLineClamp: 2,
@@ -1217,18 +1219,19 @@ export const PollList: React.FC = () => {
                         style={{
                           display: 'flex',
                           justifyContent: 'space-between',
-                          fontSize: '0.72rem',
+                          gap: '8px',
+                          fontSize: '0.86rem',
                           color: 'var(--text-secondary)',
                         }}
                       >
-                        <span style={{ fontWeight: 600 }}>{opt.text}</span>
+                        <span style={{ fontWeight: 700 }}>{opt.text}</span>
                         <span style={{ fontWeight: 800, color: 'var(--brand-accent-teal)' }}>
                           {pct}%
                         </span>
                       </div>
                       <div
                         style={{
-                          height: '4px',
+                          height: '9px',
                           background: 'rgba(255,255,255,0.06)',
                           borderRadius: '999px',
                           overflow: 'hidden',
@@ -2692,27 +2695,31 @@ export const PollList: React.FC = () => {
             justifyItems: 'center',
           }}
         >
-          <span className="empty-state-icon" aria-hidden="true">
-            <Sparkles size={36} style={{ color: 'var(--brand-accent-gold)' }} />
+          <span
+            className="empty-state-icon"
+            aria-hidden="true"
+            style={{ fontSize: '3.6rem', lineHeight: 1 }}
+          >
+            {scope !== 'all' || normalizedQuery ? '🔍' : MASCOT.empty.emoji}
           </span>
-          <h3 style={{ fontSize: '1rem', fontWeight: 700 }}>
+          <h3 style={{ fontSize: '1.1rem', fontWeight: 800 }}>
             {scope !== 'all' || normalizedQuery
-              ? '조건에 맞는 고민이 없습니다.'
-              : '아직 등록된 고민이 없습니다'}
+              ? '조건에 맞는 고민이 없어요'
+              : '아직 고민이 없어요'}
           </h3>
           <p
             style={{
-              fontSize: '0.825rem',
+              fontSize: '0.92rem',
               color: 'var(--text-secondary)',
               maxWidth: '460px',
-              lineHeight: 1.6,
+              lineHeight: 1.65,
             }}
           >
             {scope !== 'all' || normalizedQuery
-              ? '검색어 또는 필터를 바꿔 다시 확인해보세요.'
+              ? '검색어나 필터를 바꿔서 다시 찾아볼까요?'
               : userId && isGuest
-                ? '비회원으로도 간단히 시작할 수 있습니다. 첫 질문을 등록하고 링크를 공유해보세요.'
-                : '첫 번째 고민을 생성하고 팀/커뮤니티의 판단을 빠르게 받아보세요.'}
+                ? '비회원으로도 바로 시작할 수 있어요. 첫 고민을 올리고 친구들에게 링크로 물어보세요 🥑'
+                : '첫 고민을 올리고 친구·동료에게 링크로 빠르게 물어보세요 🥑'}
           </p>
           <div
             style={{

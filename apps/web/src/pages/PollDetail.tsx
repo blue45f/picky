@@ -4170,8 +4170,8 @@ export const PollDetail: React.FC = () => {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <div
                         style={{
-                          width: '16px',
-                          height: '16px',
+                          width: '20px',
+                          height: '20px',
                           borderRadius: '50%',
                           border: `2px solid ${isSelected ? 'var(--brand-primary)' : 'var(--bg-card-border-hover)'}`,
                           display: 'flex',
@@ -4184,8 +4184,8 @@ export const PollDetail: React.FC = () => {
                         {isSelected && (
                           <div
                             style={{
-                              width: '8px',
-                              height: '8px',
+                              width: '10px',
+                              height: '10px',
                               borderRadius: '50%',
                               backgroundColor: 'var(--brand-primary)',
                             }}
@@ -4195,8 +4195,8 @@ export const PollDetail: React.FC = () => {
 
                       <span
                         style={{
-                          fontSize: '0.85rem',
-                          fontWeight: isSelected ? 700 : 500,
+                          fontSize: '0.95rem',
+                          fontWeight: isSelected ? 800 : 600,
                           color: isSelected ? 'var(--text-primary)' : 'var(--text-secondary)',
                           display: 'flex',
                           alignItems: 'center',
@@ -4217,11 +4217,12 @@ export const PollDetail: React.FC = () => {
                         {isSelected ? (
                           <span
                             style={{
-                              fontSize: '0.62rem',
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
                               color: 'var(--brand-accent-teal)',
                               border: '1px solid rgba(45, 212, 191, 0.28)',
                               borderRadius: '999px',
-                              padding: '1px 6px',
+                              padding: '2px 8px',
                               whiteSpace: 'nowrap',
                             }}
                           >

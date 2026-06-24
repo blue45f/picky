@@ -23,10 +23,10 @@
   --text-secondary: oklch(84% 0.015 205);
   --text-muted: oklch(66% 0.015 205);
 
-  /* Corners & Shapes */
-  --radius-lg: 18px;
-  --radius-md: 12px;
-  --radius-sm: 8px;
+  /* Corners & Shapes — 둥글고 말랑한 친근감 (공유 brand RADIUS 12/18/24 와 정렬) */
+  --radius-lg: 24px;
+  --radius-md: 18px;
+  --radius-sm: 12px;
 
   /* Shadows */
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.2);
@@ -85,6 +85,23 @@
     linear-gradient(135deg, rgba(20, 184, 166, 0.04), transparent 34%),
     linear-gradient(210deg, rgba(250, 204, 21, 0.03), transparent 28%),
     linear-gradient(180deg, rgba(0, 0, 0, 0.01), transparent 36%);
+}
+
+/* 라이트 모드 히어로 — 다크 그라데이션 대신 밝은 표면을 써서 어두운 본문 글자가 또렷하게 읽히도록(대비 확보). */
+:root[data-theme='light'] .hero-shell {
+  background: linear-gradient(
+    140deg,
+    oklch(97% 0.022 185) 0%,
+    oklch(98% 0.016 165) 52%,
+    oklch(99% 0.01 205) 100%
+  );
+  border-color: rgba(0, 0, 0, 0.07);
+}
+
+/* 라이트 모드에선 히어로 오로라 광원을 은은하게 낮춰 글자 가독성을 지킨다. */
+:root[data-theme='light'] .hero-shell::before {
+  opacity: 0.5;
+  filter: blur(18px);
 }
 
 * {
@@ -1998,8 +2015,9 @@ body.present-mode .page-shell {
     line-height: 1.3 !important;
   }
   .hero-lede {
-    font-size: 0.85rem !important;
-    opacity: 0.8;
+    font-size: 0.96rem !important;
+    line-height: 1.6 !important;
+    opacity: 0.86;
   }
   .kpi-grid {
     display: none !important; /* 모바일에서 복잡한 KPI 수치는 숨김 처리하여 즉각성 확보 */
@@ -2041,12 +2059,13 @@ body.present-mode .page-shell {
     border-radius: 16px !important;
   }
 
-  /* 폼 요소 둥글게 */
+  /* 폼 요소 둥글게 + 16px(모바일 가독성 & iOS 포커스 자동확대 방지) */
   .form-input,
   textarea,
   select {
-    border-radius: 12px !important;
-    padding: 12px 14px !important;
+    border-radius: 14px !important;
+    padding: 13px 15px !important;
+    font-size: 16px !important;
     background-color: rgba(255, 255, 255, 0.03) !important;
     border: 1px solid rgba(255, 255, 255, 0.08) !important;
   }
@@ -2090,20 +2109,53 @@ body.present-mode .page-shell {
 
   /* 더 큼직하고 시인성이 좋은 텍스트와 레이아웃 */
   .poll-card h3 {
-    font-size: 1.18rem !important;
+    font-size: 1.22rem !important;
     font-weight: 900 !important;
     line-height: 1.4 !important;
     margin-bottom: 0.55rem !important;
   }
   .poll-card p {
-    font-size: 0.86rem !important;
-    line-height: 1.5 !important;
+    font-size: 0.92rem !important;
+    line-height: 1.55 !important;
+  }
+
+  /* 메타·칩·태그 — 모바일에서 읽히도록 최소 크기 상향(약 12px↑) */
+  .poll-card-meta-strip > span,
+  .stat-pill,
+  .floating-tag {
+    font-size: 0.74rem !important;
+    padding: 4px 10px !important;
+  }
+  .insight-tile > span,
+  .insight-tile > small {
+    font-size: 0.74rem !important;
+  }
+  .insight-tile > strong {
+    font-size: 1rem !important;
+  }
+
+  /* 탭 타깃 — 선택지/버튼 손가락에 맞게 키움 (≥48px) */
+  .choice-card {
+    min-height: 56px !important;
+    padding: 15px 16px !important;
+    border-radius: 18px !important;
+  }
+  .btn-primary,
+  .btn-secondary,
+  .hero-cta,
+  .hero-secondary-cta {
+    min-height: 48px !important;
+    font-size: 0.96rem !important;
+  }
+  .ghost-btn {
+    min-height: 40px !important;
+    font-size: 0.8rem !important;
   }
 
   .hot-poll-card {
-    padding: 1.35rem !important;
+    padding: 1.4rem !important;
   }
   .hot-poll-card h3 {
-    font-size: 1.25rem !important;
+    font-size: 1.32rem !important;
   }
 }

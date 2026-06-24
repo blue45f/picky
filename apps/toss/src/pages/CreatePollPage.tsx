@@ -78,7 +78,7 @@ const labelStyle: React.CSSProperties = {
 };
 
 const counterStyle: React.CSSProperties = {
-  fontSize: 12,
+  fontSize: 13,
   color: theme.textFaint,
 };
 
@@ -520,14 +520,15 @@ export function CreatePollPage() {
                     aria-pressed={active}
                     onClick={() => selectDeadlinePreset(preset.value)}
                     style={{
-                      padding: '8px 14px',
+                      minHeight: 40,
+                      padding: '8px 16px',
                       borderRadius: theme.radiusPill,
                       border: `1px solid ${active ? 'rgba(19,194,163,0.3)' : 'rgba(255,255,255,0.04)'}`,
                       background: active ? theme.accentSoft : 'rgba(255,255,255,0.02)',
                       backdropFilter: 'blur(16px)',
                       WebkitBackdropFilter: 'blur(16px)',
                       color: active ? theme.accent : theme.textMuted,
-                      fontSize: 13,
+                      fontSize: 13.5,
                       fontWeight: 700,
                       cursor: 'pointer',
                       boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.01)',
@@ -556,7 +557,7 @@ export function CreatePollPage() {
               value={resultsVisibility}
               onChange={setResultsVisibility}
             />
-            <p style={{ fontSize: 11, color: theme.textFaint, marginTop: 6, marginLeft: 2 }}>
+            <p style={{ fontSize: 13, color: theme.textFaint, marginTop: 8, marginLeft: 2 }}>
               투표 후 바로 확인하거나 언제든 공개할 수 있어요
             </p>
           </div>
