@@ -124,7 +124,8 @@ export class PollService {
     }
     const ok = await this.db.verifyAccessCode(id, code ?? null);
     if (ok) {
-      return poll;
+      // 코드 검증 통과 — 열람자에겐 더 이상 코드 게이트가 필요 없음.
+      return { ...poll, requiresCode: false };
     }
     return {
       id: poll.id,
@@ -311,7 +312,8 @@ export class PollService {
     }
 
     await this.db.updatePoll(poll);
-    return poll;
+    // 새 댓글이 DB serial id를 갖도록 재조회(직후 답글 parentId 정합성).
+    return (await this.db.getPollById(id)) ?? poll;
   }
 
   /** 한마디(댓글)·답글 작성 — 투표와 무관. parentId가 있으면 해당 댓글의 답글. */
@@ -344,6 +346,7 @@ export class PollService {
     poll.comments.push(newComment);
 
     await this.db.updatePoll(poll);
-    return poll;
+    // 새 댓글이 DB serial id를 갖도록 재조회(직후 답글 parentId 정합성).
+    return (await this.db.getPollById(id)) ?? poll;
   }
 }
