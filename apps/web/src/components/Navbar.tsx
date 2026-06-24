@@ -121,14 +121,23 @@ export const Navbar: React.FC = () => {
             style={{
               fontSize: '1.22rem',
               fontWeight: 900,
-              letterSpacing: 0,
-              background:
-                'linear-gradient(90deg, var(--brand-primary-light), var(--brand-primary))',
-              WebkitBackgroundClip: 'text',
-              color: 'transparent',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
             }}
           >
-            🗳️ pickflow
+            <span aria-hidden="true">🥑</span>
+            <span
+              style={{
+                letterSpacing: 0,
+                background:
+                  'linear-gradient(90deg, var(--brand-primary-light), var(--brand-primary))',
+                WebkitBackgroundClip: 'text',
+                color: 'transparent',
+              }}
+            >
+              pickflow
+            </span>
           </span>
           <span
             style={{
