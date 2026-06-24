@@ -2407,7 +2407,7 @@ export const CreatePoll: React.FC = () => {
 
           <input
             type="text"
-            placeholder="예: 어떤 사이드 프로젝트를 가장 먼저 상용화할까요?"
+            placeholder="예: 이번 주말 모임, 어디서 만날까요?"
             value={question}
             onChange={(e) => {
               clearError();
@@ -2480,7 +2480,7 @@ export const CreatePoll: React.FC = () => {
             상세 내용 / 고민 배경 (선택)
           </label>
           <textarea
-            placeholder="결정을 내리기 힘든 맥락이나 프로젝트의 간략한 소개 등을 작성해주세요."
+            placeholder="결정을 내리기 힘든 이유나 배경을 적어주면 더 정확한 답을 받을 수 있어요."
             value={description}
             onChange={(e) => {
               clearError();
@@ -3412,6 +3412,25 @@ export const CreatePoll: React.FC = () => {
           </button>
         </div>
       </form>
+
+      {/* 모바일 전용 고정 제출 바 — 긴 폼에서도 1차 액션을 항상 손 닿는 곳에.
+          form 속성으로 위 폼과 연결되어 별도 핸들러 없이 동일하게 제출된다. */}
+      <div className="mobile-only" aria-hidden="true" style={{ height: '78px' }} />
+      <div className="sticky-action-bar mobile-only">
+        <button
+          type="submit"
+          form="create-poll-form"
+          disabled={!canSubmit}
+          className="btn-primary"
+          style={{ width: '100%', padding: '14px', fontSize: '0.95rem' }}
+        >
+          {isLoading
+            ? '고민 등록 중...'
+            : canSubmit
+              ? '고민 등록 및 링크 생성'
+              : '질문과 선택지 2개를 입력해 주세요'}
+        </button>
+      </div>
     </div>
   );
 };

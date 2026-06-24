@@ -2029,6 +2029,26 @@ body.present-mode .page-shell {
   opacity: 1;
 }
 
+/* 모바일 전용 고정 제출 바 — 길어진 작성 폼에서 1차 액션(등록)을 항상 손 닿는 곳에 둔다.
+   .mobile-only 가 display 를 제어하므로 여기선 fixed 배치만 담당. */
+.sticky-action-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: var(--z-sticky);
+  padding: 0.7rem 0.9rem calc(0.7rem + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(180deg, transparent, var(--bg-main) 30%);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-top: 1px solid var(--bg-card-border);
+}
+@media (max-width: 560px) {
+  .sticky-action-bar.mobile-only {
+    display: block !important;
+  }
+}
+
 .topbar-shell {
   position: sticky;
   top: 0;
