@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Button } from '@toss/tds-mobile';
 import type { PollOption } from '../shared';
 import { MASCOT, VOICE } from '../shared';
@@ -32,6 +32,8 @@ const maybeRequestReview = () => {
 export function PollDetailPage() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const urlCode = searchParams.get('code') ?? undefined;
   const { currentPoll, isLoading, error, fetchPoll, vote, deletePoll, deleteComment } =
     usePollStore();
   const { displayName, setDisplayName } = useIdentity();
@@ -43,10 +45,12 @@ export function PollDetailPage() {
   const [voterName, setVoterName] = useState(displayName);
   const [votedOptionId, setVotedOptionId] = useState<number | null>(() => getVotedOptionId(id));
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [codeInput, setCodeInput] = useState('');
+  const [codeError, setCodeError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchPoll(id).catch(() => {});
-  }, [id, fetchPoll]);
+    fetchPoll(id, urlCode).catch(() => {});
+  }, [id, urlCode, fetchPoll]);
 
   useEffect(() => {
     setVotedOptionId(getVotedOptionId(id));
@@ -183,6 +187,23 @@ export function PollDetailPage() {
     }
   };
 
+  const handleUnlock = async () => {
+    const trimmed = codeInput.trim();
+    if (trimmed.length < 4) {
+      setCodeError('코드는 4자 이상이에요');
+      hapticFeedback('error');
+      return;
+    }
+    setCodeError(null);
+    const result = await fetchPoll(id, trimmed);
+    if (result && !result.requiresCode) {
+      hapticFeedback('success');
+    } else {
+      setCodeError('코드가 맞지 않아요 🔒');
+      hapticFeedback('error');
+    }
+  };
+
   if (isLoading && !poll) {
     return (
       <CenterMessage>
@@ -202,6 +223,21 @@ export function PollDetailPage() {
           목록으로 돌아가기 🔙
         </Button>
       </CenterMessage>
+    );
+  }
+
+  // 비공개(private) 투표 — 올바른 코드 전까지 질문만 보여주고 선택지/결과를 가린다.
+  if (poll.requiresCode) {
+    return (
+      <PollCodeGate
+        question={poll.question}
+        code={codeInput}
+        error={codeError}
+        isLoading={isLoading}
+        onCodeChange={setCodeInput}
+        onUnlock={handleUnlock}
+        onBack={() => navigate('/')}
+      />
     );
   }
 
@@ -240,6 +276,66 @@ export function PollDetailPage() {
       totalVotes={poll ? poll.totalVotes : 0}
       comments={poll ? poll.comments : []}
     />
+  );
+}
+
+function PollCodeGate(
+  props: Readonly<{
+    question: string;
+    code: string;
+    error: string | null;
+    isLoading: boolean;
+    onCodeChange: (value: string) => void;
+    onUnlock: () => void;
+    onBack: () => void;
+  }>,
+) {
+  const { question, code, error, isLoading, onCodeChange, onUnlock, onBack } = props;
+  return (
+    <CenterMessage>
+      <span style={{ fontSize: 48 }}>🔒</span>
+      <span style={{ fontSize: 17, fontWeight: 800, color: theme.text, marginTop: 12 }}>
+        비공개 고민이에요
+      </span>
+      <span style={{ fontSize: 14, marginTop: 6, maxWidth: 280, color: theme.textMuted }}>
+        {question}
+      </span>
+      <span style={{ fontSize: 13, color: theme.textFaint, marginTop: 4 }}>
+        참여하려면 접근 코드를 입력해 주세요
+      </span>
+      <input
+        type="text"
+        value={code}
+        onChange={(e) => onCodeChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') onUnlock();
+        }}
+        placeholder="접근 코드"
+        maxLength={20}
+        aria-label="비공개 투표 접근 코드"
+        style={{
+          marginTop: 18,
+          width: '100%',
+          maxWidth: 280,
+          padding: '14px 16px',
+          borderRadius: theme.radiusSm,
+          border: `1px solid ${theme.borderStrong}`,
+          background: theme.surface,
+          color: theme.text,
+          fontSize: 16,
+          textAlign: 'center',
+        }}
+      />
+      {error ? (
+        <span style={{ fontSize: 13, color: theme.danger, marginTop: 8 }}>{error}</span>
+      ) : null}
+      <Button style={{ marginTop: 16 }} disabled={isLoading} onClick={onUnlock}>
+        들어가기 🔓
+      </Button>
+      <Button style={{ marginTop: 8 }} variant="weak" onClick={onBack}>
+        목록으로 🔙
+      </Button>
+    </CenterMessage>
   );
 }
 

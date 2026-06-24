@@ -6,6 +6,7 @@ import {
   POLL_CATEGORIES,
   type CreatePollInput,
   type PollResultsVisibility,
+  type PollVisibility,
 } from '../shared';
 import { usePollStore } from '../store/usePollStore';
 import { theme, stickyActionBar } from '../theme';
@@ -48,6 +49,12 @@ const RESULT_OPTIONS = [
   { value: 'afterVote', label: '투표하고 보기 🗳️' },
   { value: 'always', label: '항상 공개 👀' },
 ] as const satisfies ReadonlyArray<{ value: PollResultsVisibility; label: string }>;
+
+const VISIBILITY_OPTIONS = [
+  { value: 'public', label: '공개 🌍' },
+  { value: 'unlisted', label: '링크전용 🔗' },
+  { value: 'private', label: '비공개 🔒' },
+] as const satisfies ReadonlyArray<{ value: PollVisibility; label: string }>;
 
 const fieldStyle: React.CSSProperties = {
   width: '100%',
@@ -100,9 +107,13 @@ function AdvancedSettings(
     customDeadline: string;
     minCustom: string;
     resultsVisibility: PollResultsVisibility;
+    visibility: PollVisibility;
+    accessCode: string;
     onSelectPreset: (value: DeadlinePreset) => void;
     onCustomDeadlineChange: (value: string) => void;
     onResultsVisibilityChange: (value: PollResultsVisibility) => void;
+    onVisibilityChange: (value: PollVisibility) => void;
+    onAccessCodeChange: (value: string) => void;
   }>,
 ) {
   const {
@@ -112,9 +123,13 @@ function AdvancedSettings(
     customDeadline,
     minCustom,
     resultsVisibility,
+    visibility,
+    accessCode,
     onSelectPreset,
     onCustomDeadlineChange,
     onResultsVisibilityChange,
+    onVisibilityChange,
+    onAccessCodeChange,
   } = props;
   return (
     <>
@@ -179,6 +194,34 @@ function AdvancedSettings(
       <p style={{ fontSize: 13, color: theme.textFaint, marginTop: 8, marginLeft: 2 }}>
         투표 후 바로 확인하거나 언제든 공개할 수 있어요
       </p>
+
+      <span style={{ ...labelStyle, display: 'block', margin: '24px 0 8px' }}>
+        누가 참여할 수 있나요? 🔐
+      </span>
+      <SegmentedControl
+        ariaLabel="공개 범위"
+        options={VISIBILITY_OPTIONS}
+        value={visibility}
+        onChange={onVisibilityChange}
+      />
+      <p style={{ fontSize: 13, color: theme.textFaint, marginTop: 8, marginLeft: 2 }}>
+        {visibility === 'public'
+          ? '목록에 노출되고 누구나 참여할 수 있어요'
+          : visibility === 'unlisted'
+            ? '목록엔 안 보이고, 링크를 받은 사람만 참여해요'
+            : '접근 코드를 아는 사람만 참여할 수 있어요'}
+      </p>
+      {visibility === 'private' ? (
+        <input
+          type="text"
+          value={accessCode}
+          onChange={(e) => onAccessCodeChange(e.target.value)}
+          placeholder="접근 코드 (4~20자)"
+          maxLength={20}
+          style={{ ...fieldStyle, marginTop: 10 }}
+          aria-label="비공개 투표 접근 코드"
+        />
+      ) : null}
     </>
   );
 }
@@ -801,6 +844,8 @@ export function CreatePollPage() {
   const [openImageIndex, setOpenImageIndex] = useState<number | null>(null);
   const [linkDrafts, setLinkDrafts] = useState<Record<number, string>>({});
   const [resultsVisibility, setResultsVisibility] = useState<PollResultsVisibility>('afterVote');
+  const [visibility, setVisibility] = useState<PollVisibility>('public');
+  const [accessCode, setAccessCode] = useState('');
   const [deadlinePreset, setDeadlinePreset] = useState<DeadlinePreset>('none');
   const [customDeadline, setCustomDeadline] = useState('');
   const [endsAtIso, setEndsAtIso] = useState<string | null>(null);
@@ -904,6 +949,8 @@ export function CreatePollPage() {
       description: description.trim() || null,
       categoryId,
       resultsVisibility,
+      visibility,
+      accessCode: visibility === 'private' ? accessCode.trim() : null,
       endsAt: endsAtIso,
       options: filledOptions.map((opt) => ({
         text: opt.text.trim(),
@@ -973,9 +1020,13 @@ export function CreatePollPage() {
       customDeadline={customDeadline}
       minCustom={minCustom}
       resultsVisibility={resultsVisibility}
+      visibility={visibility}
+      accessCode={accessCode}
       onSelectPreset={selectDeadlinePreset}
       onCustomDeadlineChange={handleCustomDeadlineChange}
       onResultsVisibilityChange={setResultsVisibility}
+      onVisibilityChange={setVisibility}
+      onAccessCodeChange={setAccessCode}
     />
   );
 

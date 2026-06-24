@@ -17,7 +17,7 @@ export interface PollState {
   clearError: () => void;
 
   fetchPolls: () => Promise<void>;
-  fetchPoll: (id: string) => Promise<Poll | null>;
+  fetchPoll: (id: string, code?: string) => Promise<Poll | null>;
   createPoll: (input: CreatePollInput) => Promise<Poll | null>;
   updatePoll: (id: string, patch: UpdatePollInput) => Promise<Poll | null>;
   vote: (id: string, input: VoteInput) => Promise<boolean>;
@@ -406,7 +406,7 @@ export const createPollStoreState =
       }
     },
 
-    fetchPoll: async (id) => {
+    fetchPoll: async (id, code) => {
       if (id.startsWith('local-')) {
         const cached = get().polls.find((poll) => poll.id === id) || findPollFromLocalCache(id);
         if (cached) {
@@ -417,7 +417,9 @@ export const createPollStoreState =
 
       set({ isLoading: true, error: null, currentPoll: null });
       try {
-        const res = await requestApi(`/polls/${id}`);
+        const res = await requestApi(
+          `/polls/${id}${code ? `?code=${encodeURIComponent(code)}` : ''}`,
+        );
         if (!res.ok) {
           const cached = get().polls.find((poll) => poll.id === id) || findPollFromLocalCache(id);
 
