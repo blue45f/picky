@@ -3,8 +3,8 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { PollDetailView } from '../pages/PollDetailView';
 import { fixturePoll } from './fixturePoll';
-import { writeFileSync } from 'fs';
-import { join } from 'path';
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 // Mock tds to avoid ThemeProvider requirement in isolated renderToStaticMarkup for verif.
 vi.mock('@toss/tds-mobile', async () => {

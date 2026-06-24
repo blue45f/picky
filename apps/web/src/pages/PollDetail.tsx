@@ -1213,7 +1213,7 @@ function PollResultsScreen(
         paddingTop: '1.5rem',
       }}
     >
-      {!isEmbedMode ? (
+      {isEmbedMode ? null : (
         <div
           style={{
             display: 'inline-flex',
@@ -1230,7 +1230,7 @@ function PollResultsScreen(
           </span>
           {MASCOT.curious.line}
         </div>
-      ) : null}
+      )}
       <section
         style={{
           border: '1px solid var(--bg-card-border)',
@@ -6266,7 +6266,7 @@ function PollMainCard(
         cursor: 'default',
       }}
     >
-      {!isEmbedMode ? (
+      {isEmbedMode ? null : (
         <ShareStripSection
           currentPoll={currentPoll}
           participationQrUrl={participationQrUrl}
@@ -6276,7 +6276,7 @@ function PollMainCard(
           handleCopyJoinCodeClick={handleCopyJoinCodeClick}
           handleCopyEmbedClick={handleCopyEmbedClick}
         />
-      ) : null}
+      )}
       {!isEmbedMode && copyMessage ? (
         <p
           style={{

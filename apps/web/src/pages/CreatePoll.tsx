@@ -171,9 +171,14 @@ const PRESET_TEMPLATES: PresetTemplate[] = [
 ];
 
 interface OptionInput {
+  id: string;
   text: string;
   imageUrl: string;
 }
+
+// 편집 가능한 선택지 목록의 React key 를 위치 인덱스 대신 안정적 고유 id 로 부여한다.
+// crypto.randomUUID 로 생성해 HMR/StrictMode 재평가·재마운트에도 키가 충돌하지 않는다.
+const nextOptionId = () => `opt-${globalThis.crypto.randomUUID()}`;
 
 interface AttachmentInput {
   name: string;
@@ -316,7 +321,10 @@ const loadDraftFromStorage = (): PollDraft | null => {
               return null;
             }
 
+            // id 는 런타임 React key 전용(제출 시 제거)이라 저장값을 신뢰하지 않고 로드마다 새로 부여한다.
+            // 과거 손상된/구버전 드래프트의 중복·누락 id 에도 안전하다.
             return {
+              id: nextOptionId(),
               text: next.text,
               imageUrl: next.imageUrl,
             } satisfies OptionInput;
@@ -392,8 +400,8 @@ const saveDraftToStorage = (draft: PollDraft) => {
 };
 
 const createDefaultOptions = (): OptionInput[] => [
-  { text: '', imageUrl: '' },
-  { text: '', imageUrl: '' },
+  { id: nextOptionId(), text: '', imageUrl: '' },
+  { id: nextOptionId(), text: '', imageUrl: '' },
 ];
 
 const getDataUrlByteLength = (value: string) => {
@@ -2191,7 +2199,7 @@ function PollOptionCard({
   const isDragging = draggingOptionIndex === index;
   return (
     <div
-      key={index}
+      key={option.id}
       className="content-card"
       onDragEnter={(event) => {
         event.preventDefault();
@@ -2322,7 +2330,7 @@ function PollOptionsList({
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
         {options.map((option, index) => (
           <PollOptionCard
-            key={index}
+            key={option.id}
             option={option}
             index={index}
             optionsLength={options.length}
@@ -3186,9 +3194,9 @@ function QuestionFieldsSection({
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        <label style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+        <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>
           고민 카테고리 <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>(선택)</span>
-        </label>
+        </span>
         <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
           어떤 고민인지 콕 골라주면 피키가 더 잘 정리해드려요 🥑
         </p>
@@ -3449,6 +3457,7 @@ export const CreatePoll: React.FC = () => {
         endsAtLocal,
         resultsVisibility,
         options: options.map((option) => ({
+          id: option.id,
           text: option.text.trim(),
           imageUrl: option.imageUrl.trim(),
         })),
@@ -3712,6 +3721,7 @@ export const CreatePoll: React.FC = () => {
     setAttachments([]);
     setOptions(
       template.options.map((opt) => ({
+        id: nextOptionId(),
         text: opt.text,
         imageUrl: opt.imageUrl || '',
       })),
@@ -3738,7 +3748,7 @@ export const CreatePoll: React.FC = () => {
 
   const handleAddOptionInput = () => {
     if (options.length < MAX_OPTIONS) {
-      setOptions([...options, { text: '', imageUrl: '' }]);
+      setOptions([...options, { id: nextOptionId(), text: '', imageUrl: '' }]);
     }
   };
 
@@ -3760,6 +3770,7 @@ export const CreatePoll: React.FC = () => {
     setFormError('');
     setOptions(
       parsedBulkOptions.map((text, index) => ({
+        id: nextOptionId(),
         text,
         imageUrl: options[index]?.imageUrl || '',
       })),

@@ -48,7 +48,7 @@ const getPreferredApiBase = (): string | undefined => {
     return undefined;
   }
 
-  return raw || undefined;
+  return raw;
 };
 
 const persistPreferredApiBase = (base: string) => {

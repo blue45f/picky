@@ -2177,8 +2177,7 @@ body.present-mode .page-shell {
 
   /* 카드 디자인 둥글고 세련되게 모바일화 */
   .poll-card,
-  .content-card,
-  .choice-card {
+  .content-card {
     border-radius: 20px !important;
     border: none !important;
     background-color: var(--bg-card) !important;
@@ -2186,8 +2185,12 @@ body.present-mode .page-shell {
     padding: 1.15rem !important;
   }
 
-  /* 탭 타깃 — 선택지/버튼 손가락에 맞게 키움 (≥48px) */
+  /* 탭 타깃 — 선택지 카드는 카드 공통 스타일에 더해 손가락에 맞게 키움 (≥48px).
+     border-radius/padding 은 이 블록의 값이 우선한다(기존 cascade 와 동일). */
   .choice-card {
+    border: none !important;
+    background-color: var(--bg-card) !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2) !important;
     min-height: 56px !important;
     padding: 15px 16px !important;
     border-radius: 18px !important;
