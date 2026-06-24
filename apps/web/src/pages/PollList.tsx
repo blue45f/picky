@@ -3216,28 +3216,43 @@ export const PollList: React.FC = () => {
 
       {error ? (
         <div
+          role="alert"
           className="content-card"
           style={{
             marginTop: '0.2rem',
-            padding: '0.85rem 1rem',
+            padding: '0.95rem 1rem',
             display: 'grid',
-            gap: '0.6rem',
+            gap: '0.55rem',
           }}
         >
-          <p
+          <strong
             style={{
-              color: 'var(--brand-accent-coral)',
-              fontSize: '0.78rem',
-              margin: 0,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              color: 'var(--text-primary)',
+              fontSize: '0.9rem',
             }}
           >
-            {error}
+            <span className="empty-state-icon" aria-hidden="true">
+              🥑
+            </span>
+            고민을 불러오지 못했어요
+          </strong>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.78rem', margin: 0 }}>
+            잠시 후 다시 시도해 주세요. 문제가 계속되면 네트워크 상태를 확인해 주세요.
           </p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.68rem', margin: 0 }}>{error}</p>
           <button
             type="button"
             onClick={fetchPolls}
-            className="btn-secondary"
-            style={{ width: 'fit-content', padding: '6px 10px', fontSize: '0.74rem' }}
+            className="btn-primary"
+            style={{
+              width: 'fit-content',
+              padding: '7px 14px',
+              fontSize: '0.76rem',
+              marginTop: '0.1rem',
+            }}
           >
             다시 시도
           </button>

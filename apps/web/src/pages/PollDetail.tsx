@@ -2849,11 +2849,7 @@ export const PollDetail: React.FC = () => {
             {voteMessage}
           </p>
         ) : null}
-        <div
-          role="status"
-          aria-live="polite"
-          style={{ display: voteSuccessNote ? 'block' : 'none' }}
-        >
+        <div role="status" aria-live="polite">
           {voteSuccessNote ? (
             <p
               className="animate-slide-up"
