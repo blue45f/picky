@@ -752,7 +752,6 @@ function PollHero(
             fontSize: 13,
             lineHeight: 1.5,
             margin: '0 0 8px',
-            opacity: 0.85,
             // compact: limit height to reduce top text dominance
             display: '-webkit-box',
             WebkitLineClamp: 2,

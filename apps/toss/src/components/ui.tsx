@@ -129,9 +129,9 @@ export function SegmentedControl<T extends string>({
             style={{
               flex: 1,
               minHeight: 44,
-              border: 'none',
+              border: active ? '1px solid transparent' : '1px solid rgba(255, 255, 255, 0.08)',
               borderRadius: RADIUS.md - 4,
-              background: active ? theme.accent : 'transparent',
+              background: active ? theme.accent : 'rgba(255, 255, 255, 0.06)',
               color: active ? theme.accentInk : theme.textMuted,
               fontSize: 13.5,
               fontWeight: 700,

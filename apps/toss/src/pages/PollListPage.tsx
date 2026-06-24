@@ -71,8 +71,8 @@ function PollCard({
         width: '100%',
         textAlign: 'left',
         background: theme.surface,
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
         borderRadius: theme.radius,
         padding: '24px 20px',
         marginBottom: 14,
@@ -184,7 +184,18 @@ function PollCard({
         </div>
       ) : null}
 
-      <div style={{ marginTop: 14, fontSize: 13, color: theme.textFaint, display: 'flex', gap: 8 }}>
+      <div
+        style={{
+          marginTop: 14,
+          fontSize: 13,
+          color: theme.textMuted,
+          fontWeight: 600,
+          lineHeight: 1.3,
+          display: 'flex',
+          gap: 6,
+          alignItems: 'center',
+        }}
+      >
         <span>🗳️ {formatNumber(poll.totalVotes)}명이 고민을 나누는 중</span>
         <span>·</span>
         <span>💬 한마디 {poll.comments.length}개</span>
@@ -230,8 +241,8 @@ function RecentStrip({
               width: 176,
               textAlign: 'left',
               background: theme.surface,
-              backdropFilter: 'blur(20px)',
-              WebkitBackdropFilter: 'blur(20px)',
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
               borderRadius: theme.radiusSm,
               padding: 14,
               color: theme.text,
@@ -259,7 +270,7 @@ function RecentStrip({
             >
               {item.question}
             </span>
-            <div style={{ marginTop: 8, fontSize: 12.5, color: theme.textFaint }}>
+            <div style={{ marginTop: 8, fontSize: 13, color: theme.textMuted, fontWeight: 500 }}>
               🗳️ {formatNumber(item.totalVotes)} · 💬 {item.commentCount}
             </div>
           </button>
@@ -608,17 +619,21 @@ function ListHeader(props: Readonly<{ onTitleTap: (x: number, y: number) => void
         }
         subtitleBottom={
           <>
-            <Top.SubtitleParagraph size={15} style={{ opacity: 0.85 }}>
+            <Top.SubtitleParagraph size={15}>
               QR 태그로 친구들과 바로 고민 투표 ⚡️
             </Top.SubtitleParagraph>
             <span
               style={{
-                display: 'block',
-                marginTop: 6,
-                fontSize: 12,
-                fontWeight: 600,
-                color: theme.accent,
-                opacity: 0.85,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                marginTop: 7,
+                padding: '4px 10px',
+                borderRadius: theme.radiusPill,
+                background: theme.accentSoft,
+                color: theme.accentStrong,
+                fontSize: 13,
+                fontWeight: 700,
               }}
             >
               🧪 {BETA_NOTICE}
@@ -641,7 +656,8 @@ function ListStats(props: Readonly<{ pollCount: number; totalVotes: number }>) {
         display: 'flex',
         gap: 12,
         marginBottom: 14,
-        fontSize: 13,
+        fontSize: 14,
+        fontWeight: 500,
         color: theme.textMuted,
       }}
     >
