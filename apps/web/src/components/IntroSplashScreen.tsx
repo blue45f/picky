@@ -1,5 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react';
 
+// 파티클 연출용 난수 — crypto.getRandomValues로 S2245(PRNG) 룰을 충족하고, 미지원 환경에서만 폴백해요.
+const secureRandom = () => {
+  if (typeof window !== 'undefined' && window.crypto) {
+    const array = new Uint32Array(1);
+    window.crypto.getRandomValues(array);
+    return (array[0] ?? 0) / 4294967296; // 2^32 → [0, 1)
+  }
+  return 0.5;
+};
+
 export const IntroSplashScreen: React.FC = () => {
   const [isVisible, setIsVisible] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -66,23 +76,23 @@ export const IntroSplashScreen: React.FC = () => {
 
     // 초기 초강력 중앙 버스트 (토스 스플래시와 매칭되는 고글램)
     for (let i = 0; i < 120; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const speed = 3.6 + Math.random() * 14;
+      const angle = secureRandom() * Math.PI * 2;
+      const speed = 3.6 + secureRandom() * 14;
       particles.push({
-        x: cx + (Math.random() - 0.5) * 26,
-        y: cy + (Math.random() - 0.5) * 16,
+        x: cx + (secureRandom() - 0.5) * 26,
+        y: cy + (secureRandom() - 0.5) * 16,
         vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed - (1 + Math.random() * 3),
-        size: 11 + Math.random() * 21,
-        color: colors[Math.floor(Math.random() * colors.length)] ?? '#13c2a3',
+        vy: Math.sin(angle) * speed - (1 + secureRandom() * 3),
+        size: 11 + secureRandom() * 21,
+        color: colors[Math.floor(secureRandom() * colors.length)] ?? '#13c2a3',
         char:
-          Math.random() > 0.33
-            ? (chars[Math.floor(Math.random() * chars.length)] ?? '✨')
+          secureRandom() > 0.33
+            ? (chars[Math.floor(secureRandom() * chars.length)] ?? '✨')
             : undefined,
         alpha: 0.98,
-        rot: Math.random() * Math.PI * 2,
-        rotSpeed: (Math.random() - 0.5) * 0.2,
-        decay: 0.011 + Math.random() * 0.015,
+        rot: secureRandom() * Math.PI * 2,
+        rotSpeed: (secureRandom() - 0.5) * 0.2,
+        decay: 0.011 + secureRandom() * 0.015,
       });
     }
 
@@ -150,40 +160,40 @@ export const IntroSplashScreen: React.FC = () => {
     // 2~3차 강력 보조 버스트 (토스와 동등한 극적 화려함)
     const extra = setTimeout(() => {
       for (let i = 0; i < 52; i++) {
-        const angle = Math.random() * Math.PI * 2;
-        const speed = 2.2 + Math.random() * 7;
+        const angle = secureRandom() * Math.PI * 2;
+        const speed = 2.2 + secureRandom() * 7;
         particles.push({
-          x: cx + (Math.random() - 0.5) * 160,
-          y: cy + (Math.random() - 0.5) * 70,
+          x: cx + (secureRandom() - 0.5) * 160,
+          y: cy + (secureRandom() - 0.5) * 70,
           vx: Math.cos(angle) * speed,
           vy: Math.sin(angle) * speed * 0.62 - 1.3,
-          size: 7 + Math.random() * 10,
-          color: Math.random() > 0.48 ? '#f4c560' : '#13c2a3',
+          size: 7 + secureRandom() * 10,
+          color: secureRandom() > 0.48 ? '#f4c560' : '#13c2a3',
           char: undefined,
           alpha: 0.9,
           rot: 0,
-          rotSpeed: (Math.random() - 0.5) * 0.28,
-          decay: 0.021 + Math.random() * 0.016,
+          rotSpeed: (secureRandom() - 0.5) * 0.28,
+          decay: 0.021 + secureRandom() * 0.016,
         });
       }
     }, 380);
 
     const extra2 = setTimeout(() => {
       for (let i = 0; i < 28; i++) {
-        const angle = Math.random() * Math.PI * 2;
-        const speed = 1.8 + Math.random() * 4.5;
+        const angle = secureRandom() * Math.PI * 2;
+        const speed = 1.8 + secureRandom() * 4.5;
         particles.push({
-          x: cx + (Math.random() - 0.5) * 90,
-          y: cy + (Math.random() - 0.5) * 40,
+          x: cx + (secureRandom() - 0.5) * 90,
+          y: cy + (secureRandom() - 0.5) * 40,
           vx: Math.cos(angle) * speed,
           vy: Math.sin(angle) * speed * 0.5 - 0.9,
-          size: 5 + Math.random() * 7,
+          size: 5 + secureRandom() * 7,
           color: '#fff',
           char: undefined,
           alpha: 0.82,
           rot: 0,
-          rotSpeed: (Math.random() - 0.5) * 0.35,
-          decay: 0.028 + Math.random() * 0.01,
+          rotSpeed: (secureRandom() - 0.5) * 0.35,
+          decay: 0.028 + secureRandom() * 0.01,
         });
       }
     }, 780);

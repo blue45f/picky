@@ -16,6 +16,16 @@ interface Particle {
   decay: number;
 }
 
+// 파티클 연출용 난수 — crypto.getRandomValues로 S2245(PRNG) 룰을 충족하고, 미지원 환경에서만 폴백해요.
+const secureRandom = () => {
+  if (typeof window !== 'undefined' && window.crypto) {
+    const array = new Uint32Array(1);
+    window.crypto.getRandomValues(array);
+    return (array[0] ?? 0) / 4294967296; // 2^32 → [0, 1)
+  }
+  return 0.5;
+};
+
 export function WelcomeSplash({ forceVisible = false }: { forceVisible?: boolean } = {}) {
   const [visible, setVisible] = useState(forceVisible);
   const [fadeOut, setFadeOut] = useState(false);
@@ -89,47 +99,47 @@ export function WelcomeSplash({ forceVisible = false }: { forceVisible?: boolean
       const chars = ['🥑', '✨', '✦', '🌟', '💚', '💛', '🔥', '🎉', '💥', '🪩', '💎', '⭐'];
 
       // 메인 대폭발: 110~130개
-      const count = Math.floor(110 + Math.random() * 20) * intensity;
+      const count = Math.floor(110 + secureRandom() * 20) * intensity;
       for (let i = 0; i < count; i++) {
-        const angle = Math.random() * Math.PI * 2;
-        const speed = (4.2 + Math.random() * 15) * intensity;
+        const angle = secureRandom() * Math.PI * 2;
+        const speed = (4.2 + secureRandom() * 15) * intensity;
         const vx = Math.cos(angle) * speed;
-        const vy = Math.sin(angle) * speed - (1.4 + Math.random() * 4);
-        const size = 12 + Math.random() * 24;
-        const color = colors[Math.floor(Math.random() * colors.length)];
+        const vy = Math.sin(angle) * speed - (1.4 + secureRandom() * 4);
+        const size = 12 + secureRandom() * 24;
+        const color = colors[Math.floor(secureRandom() * colors.length)];
         const char =
-          Math.random() > 0.34 ? chars[Math.floor(Math.random() * chars.length)] : undefined;
+          secureRandom() > 0.34 ? chars[Math.floor(secureRandom() * chars.length)] : undefined;
 
         particles.push({
-          x: cx + (Math.random() - 0.5) * 22,
-          y: cy + (Math.random() - 0.5) * 14,
+          x: cx + (secureRandom() - 0.5) * 22,
+          y: cy + (secureRandom() - 0.5) * 14,
           vx,
           vy,
           size,
           color,
           char,
           alpha: 0.99,
-          rotation: Math.random() * Math.PI * 2,
-          rotationSpeed: (Math.random() - 0.5) * 0.22,
-          decay: 0.011 + Math.random() * 0.016,
+          rotation: secureRandom() * Math.PI * 2,
+          rotationSpeed: (secureRandom() - 0.5) * 0.22,
+          decay: 0.011 + secureRandom() * 0.016,
         });
       }
       // 중형 반짝이 + 별
       for (let i = 0; i < 42 * intensity; i++) {
-        const angle = Math.random() * Math.PI * 2;
-        const speed = 2 + Math.random() * 7.5;
+        const angle = secureRandom() * Math.PI * 2;
+        const speed = 2 + secureRandom() * 7.5;
         particles.push({
-          x: cx + (Math.random() - 0.5) * 110,
-          y: cy + (Math.random() - 0.5) * 55,
+          x: cx + (secureRandom() - 0.5) * 110,
+          y: cy + (secureRandom() - 0.5) * 55,
           vx: Math.cos(angle) * speed,
           vy: Math.sin(angle) * speed * 0.58 - 1.2,
-          size: 6 + Math.random() * 9,
-          color: Math.random() > 0.5 ? theme.gold : '#ffffff',
+          size: 6 + secureRandom() * 9,
+          color: secureRandom() > 0.5 ? theme.gold : '#ffffff',
           char: undefined,
           alpha: 0.92,
           rotation: 0,
-          rotationSpeed: (Math.random() - 0.5) * 0.32,
-          decay: 0.019 + Math.random() * 0.018,
+          rotationSpeed: (secureRandom() - 0.5) * 0.32,
+          decay: 0.019 + secureRandom() * 0.018,
         });
       }
       particlesRef.current =

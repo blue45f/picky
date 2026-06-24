@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ArrowRight, CheckCheck, LogIn, LogOut, Menu, X, User, ShieldCheck } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 import { AuthModal, type AuthMode } from './AuthModal';
+import { ThemeSwitcher } from './ThemeSwitcher';
 
 const navItems = [
   { path: '/', label: '고민 둘러보기' },
@@ -239,6 +240,7 @@ export const Navbar: React.FC = () => {
             gap: '0.65rem',
           }}
         >
+          <ThemeSwitcher />
           {user ? (
             <>
               <span

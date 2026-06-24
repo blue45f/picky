@@ -1128,7 +1128,8 @@ export const PollList: React.FC = () => {
           </div>
 
           {hotPoll && (
-            <div
+            <button
+              type="button"
               className="hot-poll-card hero-enter"
               style={{
                 ['--enter-i' as string]: 3.5,
@@ -1145,6 +1146,10 @@ export const PollList: React.FC = () => {
                 overflow: 'hidden',
                 marginTop: '0.4rem',
                 maxWidth: '620px',
+                width: '100%',
+                textAlign: 'left',
+                color: 'inherit',
+                font: 'inherit',
               }}
               onClick={() => {
                 setCurrentPoll(hotPoll);
@@ -1242,7 +1247,7 @@ export const PollList: React.FC = () => {
                   );
                 })}
               </div>
-            </div>
+            </button>
           )}
 
           <div

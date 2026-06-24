@@ -368,12 +368,23 @@ export function PollListPage() {
       <div style={{ position: 'relative' }}>
         <Top
           title={
-            <div
+            <button
+              type="button"
               onClick={(e) => {
                 hapticFeedback('success');
                 triggerParticleBurst(e.clientX, e.clientY, { count: 20 });
               }}
-              style={{ display: 'inline-flex', cursor: 'pointer', userSelect: 'none' }}
+              style={{
+                display: 'inline-flex',
+                cursor: 'pointer',
+                userSelect: 'none',
+                background: 'none',
+                border: 'none',
+                padding: 0,
+                color: 'inherit',
+                font: 'inherit',
+                textAlign: 'left',
+              }}
             >
               <Top.TitleParagraph
                 size={22}
@@ -410,7 +421,7 @@ export function PollListPage() {
                   ✦
                 </span>
               </Top.TitleParagraph>
-            </div>
+            </button>
           }
           subtitleBottom={
             <Top.SubtitleParagraph size={15} style={{ opacity: 0.85 }}>

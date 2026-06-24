@@ -38,6 +38,24 @@
     <meta name="twitter:image" content="https://picky-olive.vercel.app/og-default.png" />
     <meta name="twitter:image:alt" content="pickflow 고민 투표 공유 미리보기" />
     <meta name="theme-color" content="#061411" />
+    <script>
+      // 테마 FOUC 가드 — React 마운트 전에 저장된 테마(picky-theme)를 즉시 적용해요.
+      (() => {
+        try {
+          const stored = localStorage.getItem('picky-theme');
+          let theme = 'dark';
+          if (stored) {
+            const t = JSON.parse(stored)?.state?.theme;
+            if (t === 'light' || t === 'dark') theme = t;
+          }
+          document.documentElement.setAttribute('data-theme', theme);
+          const meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute('content', theme === 'light' ? '#f4f7f7' : '#061411');
+        } catch {
+          /* 저장값 파싱 실패 시 기본 다크 테마를 유지해요. */
+        }
+      })();
+    </script>
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
