@@ -497,6 +497,8 @@ export class DatabaseService implements OnModuleInit {
   async getPolls(): Promise<Poll[]> {
     if (this.useSqlDb) {
       const rows = await db.query.polls.findMany({
+        // 홈 목록은 공개(public) 투표만 — unlisted/private는 링크/코드로만 접근한다.
+        where: eq(schema.polls.visibility, 'public'),
         orderBy: [desc(schema.polls.createdAt)],
         with: {
           options: {
@@ -515,6 +517,8 @@ export class DatabaseService implements OnModuleInit {
         endsAt: r.endsAt ? r.endsAt.toISOString() : null,
         totalVotes: r.totalVotes,
         resultsVisibility: r.resultsVisibility as any,
+        visibility: r.visibility as any,
+        requiresCode: r.visibility === 'private',
         creatorId: r.creatorId,
         creatorIsGuest: r.creatorIsGuest,
         categoryId: r.categoryId,
@@ -532,12 +536,14 @@ export class DatabaseService implements OnModuleInit {
           createdAt: c.createdAt.toISOString(),
           selectedOptionId: c.selectedOptionId || undefined,
           selectedOptionText: c.selectedOptionText || undefined,
+          parentId: c.parentId ?? undefined,
         })),
       }));
     }
 
     await this.refresh();
-    return [...this.data.polls];
+    // Blob 경로도 공개 투표만 노출(비공개/링크전용 제외).
+    return this.data.polls.filter((p) => (p.visibility ?? 'public') === 'public');
   }
 
   async getPollById(id: string): Promise<Poll | undefined> {
@@ -562,6 +568,8 @@ export class DatabaseService implements OnModuleInit {
         endsAt: r.endsAt ? r.endsAt.toISOString() : null,
         totalVotes: r.totalVotes,
         resultsVisibility: r.resultsVisibility as any,
+        visibility: r.visibility as any,
+        requiresCode: r.visibility === 'private',
         creatorId: r.creatorId,
         creatorIsGuest: r.creatorIsGuest,
         categoryId: r.categoryId,
@@ -579,6 +587,7 @@ export class DatabaseService implements OnModuleInit {
           createdAt: c.createdAt.toISOString(),
           selectedOptionId: c.selectedOptionId || undefined,
           selectedOptionText: c.selectedOptionText || undefined,
+          parentId: c.parentId ?? undefined,
         })),
       };
     }
@@ -587,7 +596,7 @@ export class DatabaseService implements OnModuleInit {
     return this.data.polls.find((p) => p.id === id);
   }
 
-  async createPoll(poll: Poll) {
+  async createPoll(poll: Poll & { accessCode?: string | null }) {
     if (this.useSqlDb) {
       await db.insert(schema.polls).values({
         id: poll.id,
@@ -597,6 +606,8 @@ export class DatabaseService implements OnModuleInit {
         endsAt: poll.endsAt ? new Date(poll.endsAt) : null,
         totalVotes: poll.totalVotes,
         resultsVisibility: poll.resultsVisibility || 'afterVote',
+        visibility: poll.visibility || 'public',
+        accessCode: poll.accessCode ?? null,
         creatorId: poll.creatorId,
         creatorIsGuest: poll.creatorIsGuest ?? true,
         categoryId: poll.categoryId ?? null,
