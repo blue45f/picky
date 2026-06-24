@@ -61,20 +61,6 @@ const PRESET_CATEGORY_OPTIONS: Array<{
 
 const PRESET_TEMPLATES: PresetTemplate[] = [
   {
-    name: '포트폴리오 상용화',
-    icon: '🚀',
-    category: 'product',
-    question: 'WebstormProjects 개인 프로젝트 중 어떤 것을 가장 먼저 상용 서비스화 시킬까요?',
-    description:
-      '이력서에 등록된 대표 프로젝트 4종 중, 시장 경쟁력과 사업화 잠재력이 가장 뛰어난 서비스를 골라주세요!',
-    options: [
-      { text: 'PromptMarket (프롬프트·스킬 마켓플레이스)' },
-      { text: 'proto-live (바이브코딩 실시간 동시 코딩 공유 플랫폼)' },
-      { text: 'family-care-platform (실버 케어 매칭 서비스 플랫폼)' },
-      { text: 'orbit-ui (유려한 글라스모피즘 리액트 컴포넌트 라이브러리)' },
-    ],
-  },
-  {
     name: '오늘 점심 메뉴 결정',
     icon: '🍔',
     category: 'life',

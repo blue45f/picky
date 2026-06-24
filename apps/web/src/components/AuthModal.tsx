@@ -270,14 +270,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               letterSpacing: 0,
             }}
           >
-            {isLoginMode ? '웰컴 투 피키!' : isRegisterMode ? '피키 회원가입' : '비회원 빠른 시작'}
+            {isLoginMode
+              ? '피키가 기다렸어요! 🥑'
+              : isRegisterMode
+                ? '픽플로우 회원가입'
+                : '비회원 빠른 시작'}
           </h2>
           <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
             {subTitle ??
               (isLoginMode
                 ? '고민을 올리고 SNS 투표 링크를 발급받으세요'
                 : isRegisterMode
-                  ? '가입하고 더 완벽한 이력서/포트폴리오 투표를 시작하세요'
+                  ? '가입하면 만든 고민과 투표 결과를 한곳에 모아둘 수 있어요'
                   : '닉네임만으로 바로 이용을 시작하세요')}
           </p>
         </div>

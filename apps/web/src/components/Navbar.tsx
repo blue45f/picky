@@ -134,11 +134,8 @@ export const Navbar: React.FC = () => {
             </span>
             <span
               style={{
-                letterSpacing: 0,
-                background:
-                  'linear-gradient(90deg, var(--brand-primary-light), var(--brand-primary))',
-                WebkitBackgroundClip: 'text',
-                color: 'transparent',
+                letterSpacing: '-0.01em',
+                color: 'var(--brand-primary-light)',
               }}
             >
               pickflow

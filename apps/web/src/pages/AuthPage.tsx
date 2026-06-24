@@ -1,7 +1,7 @@
 import type { FormEvent } from 'react';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, CircleHelp } from 'lucide-react';
+import { ArrowLeft, LogIn, UserPlus } from 'lucide-react';
 import { Mail, Lock, User, Play, Sparkles } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import * as Tabs from '@radix-ui/react-tabs';
@@ -247,7 +247,7 @@ export const AuthPage: React.FC = () => {
         >
           <div style={{ textAlign: 'center', display: 'grid', gap: '8px', marginBottom: '1rem' }}>
             <p style={{ color: 'var(--brand-accent-gold)', fontWeight: 700, fontSize: '0.74rem' }}>
-              pickflow Auth Flow
+              피키와 함께 🥑
             </p>
             <h1 style={{ fontSize: '1.55rem', margin: 0, letterSpacing: 0 }}>
               {MODE_LABELS[activeMode]}
@@ -552,7 +552,13 @@ export const AuthPage: React.FC = () => {
                   gap: '0.5rem',
                 }}
               >
-                <CircleHelp size={14} />
+                {activeMode === 'login' ? (
+                  <LogIn size={15} />
+                ) : activeMode === 'register' ? (
+                  <UserPlus size={15} />
+                ) : (
+                  <Sparkles size={15} />
+                )}
                 {isLoading ? '처리 중…' : MODE_LABELS[activeMode]}
               </button>
             </form>
