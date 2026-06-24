@@ -30,7 +30,7 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { Poll } from '@picky/shared';
-import { MASCOT, VOICE, categoryMeta } from '@picky/shared';
+import { MASCOT, VOICE, categoryMeta, BETA_NOTICE } from '@picky/shared';
 import { usePollStore } from '../store/usePollStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
@@ -2533,6 +2533,13 @@ export const PollList: React.FC = () => {
             <span className="hero-live-dot" aria-hidden="true" />
             지금 {openPollCount}개 투표 진행 중
           </span>
+
+          <p
+            className="hero-lede hero-enter"
+            style={{ ['--enter-i' as string]: 0.5, fontSize: '0.8rem', fontWeight: 600, margin: 0 }}
+          >
+            🧪 {BETA_NOTICE}
+          </p>
 
           <h1 className="hero-title hero-enter" style={{ ['--enter-i' as string]: 1 }}>
             고민되는 선택, <span className="hero-accent">링크 하나</span>로 빠르게 물어보세요

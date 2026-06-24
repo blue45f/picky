@@ -65,3 +65,6 @@ export const VOICE = {
 
 /** 둥글고 말랑한 형태 기준 라운드 스케일(px) — web·toss 공통 참고값. */
 export const RADIUS = { sm: 12, md: 18, lg: 24, pill: 999 } as const;
+
+/** 베타 기간 데이터 초기화 안내 — web·toss 홈에 공통으로 노출하는 카피. */
+export const BETA_NOTICE = '베타 기간이라 투표 데이터가 초기화될 수 있어요';

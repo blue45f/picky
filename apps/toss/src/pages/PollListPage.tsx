@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Top } from '@toss/tds-mobile';
 import type { Poll } from '../shared';
-import { MASCOT } from '../shared';
+import { MASCOT, BETA_NOTICE } from '../shared';
 import { usePollStore } from '../store/usePollStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { theme, pageShell, stickyActionBar } from '../theme';
@@ -607,9 +607,23 @@ function ListHeader(props: Readonly<{ onTitleTap: (x: number, y: number) => void
           </button>
         }
         subtitleBottom={
-          <Top.SubtitleParagraph size={15} style={{ opacity: 0.85 }}>
-            QR 태그로 친구들과 바로 고민 투표 ⚡️
-          </Top.SubtitleParagraph>
+          <>
+            <Top.SubtitleParagraph size={15} style={{ opacity: 0.85 }}>
+              QR 태그로 친구들과 바로 고민 투표 ⚡️
+            </Top.SubtitleParagraph>
+            <span
+              style={{
+                display: 'block',
+                marginTop: 6,
+                fontSize: 12,
+                fontWeight: 600,
+                color: theme.accent,
+                opacity: 0.85,
+              }}
+            >
+              🧪 {BETA_NOTICE}
+            </span>
+          </>
         }
       />
     </div>
