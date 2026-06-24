@@ -11,6 +11,14 @@
   --bg-surface-glow: oklch(20% 0.028 190);
   --bg-overlay: rgba(9, 12, 18, 0.7);
 
+  /* Interactive surface tokens — 다크 기본값. 라이트 오버라이드는 [data-theme='light'] 에서.
+     입력/선택지/모달이 테마를 따르도록 하드코딩 다크값을 토큰화했다. */
+  --bg-input: oklch(11% 0.015 205);
+  --bg-choice: oklch(16% 0.015 205);
+  --bg-choice-hover: oklch(19% 0.02 198);
+  --bg-choice-selected: oklch(20% 0.035 170);
+  --bg-modal: oklch(19% 0.022 198);
+
   /* Brand Accents */
   --brand-primary: oklch(67% 0.14 165);
   --brand-primary-light: oklch(78% 0.1 165);
@@ -86,6 +94,14 @@
   /* 라이트 배경에서 또렷한 포커스 링(기본 반투명 teal 은 밝은 바탕서 잘 안 보임) */
   --focus-outline: 0 0 0 2.5px oklch(45% 0.13 170 / 0.85);
   --focus-ring: 0 0 0 4px oklch(45% 0.13 170 / 0.22);
+
+  /* 라이트 모드 인터랙티브 표면 — 입력/선택지/모달이 밝은 바탕에서 또렷한 필드로 읽히도록.
+     입력·선택지는 카드보다 살짝 어둡게 두어 '눌리는 면'으로 인지되고, 선택 상태는 민트 틴트. */
+  --bg-input: oklch(96.5% 0.006 205);
+  --bg-choice: oklch(97.5% 0.006 205);
+  --bg-choice-hover: oklch(94.5% 0.012 195);
+  --bg-choice-selected: oklch(93% 0.055 168);
+  --bg-modal: oklch(99.4% 0.004 205);
 }
 
 :root[data-theme='light'] body {
@@ -112,6 +128,54 @@
 :root[data-theme='light'] .hero-shell::before {
   opacity: 0.5;
   filter: blur(18px);
+}
+
+/* ── 라이트 모드 표면/오버레이 보정 ──────────────────────────────────
+   다크 우선으로 만든 흰색 알파 표면·다크 그림자가 밝은 바탕에서 사라지거나
+   과하게 무거워 보이던 문제를 라이트 전용 값으로 교정한다. */
+
+/* 모달: 흰색 테두리/인셋 라인 대신 은은한 다크 테두리 + 가벼운 그림자 */
+:root[data-theme='light'] .modal-content {
+  border-color: var(--bg-card-border);
+  box-shadow:
+    0 24px 60px -12px rgba(15, 23, 30, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+/* 모달 스크림: 칠흑 대신 부드러운 슬레이트 디밍으로 콘텐츠가 떠 보이게 */
+:root[data-theme='light'] .modal-overlay {
+  background-color: rgba(15, 23, 30, 0.42);
+}
+
+/* 스크롤바: 밝은 바탕에서 흰색은 안 보이므로 다크 알파로 반전 */
+:root[data-theme='light'] ::-webkit-scrollbar-thumb {
+  background: rgba(15, 23, 30, 0.16);
+}
+:root[data-theme='light'] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(15, 23, 30, 0.28);
+}
+
+/* 미세 표면 틴트: rgba(흰,0.02~0.06) 배경이 라이트에서 완전히 사라져 타일이 납작해지던 것을
+   옅은 잉크 틴트로 되살려 깊이를 회복한다(테두리는 이미 테마 토큰이라 보임). */
+:root[data-theme='light'] .floating-tag,
+:root[data-theme='light'] .stat-pill,
+:root[data-theme='light'] .insight-tile,
+:root[data-theme='light'] .vote-step,
+:root[data-theme='light'] .share-preview-card,
+:root[data-theme='light'] .share-readiness-item,
+:root[data-theme='light'] .comment-summary-item,
+:root[data-theme='light'] .comment-briefing-card,
+:root[data-theme='light'] .embed-preview-options > span,
+:root[data-theme='light'] .result-image-theme-grid button,
+:root[data-theme='light'] .result-image-content-grid button,
+:root[data-theme='light'] .poll-card-meta-strip > span,
+:root[data-theme='light'] .kpi-item {
+  background: oklch(96% 0.006 205);
+}
+
+/* featured-comment: 골드 좌측 스트라이프는 라이트에서 옅으므로 면 틴트를 살짝 진하게 */
+:root[data-theme='light'] .featured-comment {
+  background: oklch(95% 0.05 95);
 }
 
 * {
@@ -1688,20 +1752,20 @@ body.present-mode .page-shell {
   padding: 14px 18px;
   border-radius: var(--radius-md);
   border: 1px solid var(--bg-card-border);
-  background: oklch(16% 0.015 205);
+  background: var(--bg-choice);
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .choice-card:hover {
   border-color: var(--brand-primary);
-  background: oklch(19% 0.02 198);
+  background: var(--bg-choice-hover);
   transform: translateY(-1px);
 }
 
 .choice-card.selected {
   border-color: var(--brand-primary);
-  background: oklch(20% 0.035 170);
+  background: var(--bg-choice-selected);
   box-shadow: 0 0 16px rgba(20, 184, 166, 0.12);
 }
 
@@ -1884,7 +1948,7 @@ body.present-mode .page-shell {
   width: 100%;
   padding: 12px 16px;
   border-radius: var(--radius-sm);
-  background-color: oklch(11% 0.015 205);
+  background-color: var(--bg-input);
   border: 1px solid var(--bg-card-border);
   color: var(--text-primary);
   font-size: 0.9rem;
@@ -1946,7 +2010,7 @@ body.present-mode .page-shell {
 }
 
 .modal-content {
-  background: oklch(19% 0.022 198);
+  background: var(--bg-modal);
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: var(--radius-md);
   box-shadow:
@@ -2106,8 +2170,8 @@ body.present-mode .page-shell {
     border-radius: 14px !important;
     padding-block: 13px !important;
     font-size: 16px !important;
-    background-color: rgba(255, 255, 255, 0.03) !important;
-    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    background-color: var(--bg-input) !important;
+    border: 1px solid var(--bg-card-border) !important;
   }
 
   /* 버튼 라운드 모바일 최적화 */
