@@ -5,6 +5,7 @@ import {
   FileText,
   Search,
   SlidersHorizontal,
+  ChevronDown,
   Sparkles,
   ArrowRight,
   BarChart3,
@@ -361,6 +362,8 @@ export const PollList: React.FC = () => {
   const [joinCodeMessage, setJoinCodeMessage] = useState('');
   const [recentPollHistory, setRecentPollHistory] = useState(() => getRecentPollHistory());
   const [pinnedPollIds, setPinnedPollIds] = useState<string[]>(() => loadPinnedPollIds());
+  // 데스크탑 전용 운영 도구/인사이트 묶음은 기본 접힘 — 첫 화면은 "투표가 주인공"이 되게 단순하게.
+  const [operatorToolsExpanded, setOperatorToolsExpanded] = useState(false);
 
   // URL↔필터 상태 동기화 레이스 가드: state→URL 으로 우리가 직접 쓴 쿼리스트링을 기록해두고,
   // URL→state 효과가 "자기 자신이 쓴 변경"을 외부 변경으로 오인해 기본값으로 되돌리지 않게 한다.
@@ -1399,8 +1402,7 @@ export const PollList: React.FC = () => {
                 lineHeight: 1.45,
               }}
             >
-              {joinCodeMessage ||
-                'QR을 스캔하지 못하는 환경에서는 코드만 입력해도 참여할 수 있습니다.'}
+              {joinCodeMessage || 'QR을 못 찍는 곳이라면, 코드만 입력해도 바로 참여할 수 있어요.'}
             </span>
           </form>
 
@@ -1766,661 +1768,694 @@ export const PollList: React.FC = () => {
         </div>
       </div>
 
-      <section
-        ref={flowSectionRef}
-        className="desktop-only"
-        aria-label="의사결정 운영 흐름"
+      <button
+        type="button"
+        className="desktop-only ghost-btn"
+        onClick={() => setOperatorToolsExpanded((prev) => !prev)}
+        aria-expanded={operatorToolsExpanded}
         style={{
-          display: 'grid',
-          gap: '0.85rem',
+          alignSelf: 'flex-start',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '8px',
+          padding: '9px 14px',
+          fontSize: '0.78rem',
+          fontWeight: 800,
+          color: 'var(--text-secondary)',
+          borderColor: 'rgba(45, 212, 191, 0.2)',
+          background: 'rgba(45, 212, 191, 0.04)',
         }}
       >
-        <div
+        <SlidersHorizontal size={15} />
+        운영 도구 · 인사이트 {operatorToolsExpanded ? '접기' : '더 보기'} 🛠️
+        <ChevronDown
+          size={15}
           style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'flex-end',
-            gap: '0.9rem',
-            flexWrap: 'wrap',
+            transition: 'transform 0.2s ease',
+            transform: operatorToolsExpanded ? 'rotate(180deg)' : 'none',
           }}
-        >
-          <div style={{ display: 'grid', gap: '0.25rem' }}>
-            <span
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                color: 'var(--brand-accent-teal)',
-                fontSize: '0.68rem',
-                fontWeight: 900,
-                letterSpacing: '0.05em',
-              }}
-            >
-              <Sparkles size={13} />
-              DECISION FLOW
-            </span>
-            <h2
-              style={{
-                margin: 0,
-                color: 'var(--text-primary)',
-                fontSize: '1rem',
-                fontWeight: 900,
-              }}
-            >
-              생성부터 후속 결정까지 한 번에 이어지는 운영 흐름
-            </h2>
-          </div>
-          <button
-            type="button"
-            onClick={() => navigate('/create')}
-            className="btn-primary"
+        />
+      </button>
+
+      {operatorToolsExpanded ? (
+        <>
+          <section
+            ref={flowSectionRef}
+            className="desktop-only"
+            aria-label="의사결정 운영 흐름"
             style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '8px 12px',
-              fontSize: '0.75rem',
-              whiteSpace: 'nowrap',
+              display: 'grid',
+              gap: '0.85rem',
             }}
           >
-            <Plus size={14} />새 투표 만들기
-          </button>
-        </div>
-
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
-            gap: '0.7rem',
-          }}
-        >
-          {decisionFlowCards.map((card) => {
-            const FlowIcon = card.icon;
-
-            return (
-              <article
-                key={card.key}
-                className="press-tile"
-                style={{
-                  minWidth: 0,
-                  minHeight: '168px',
-                  display: 'grid',
-                  gap: '0.55rem',
-                  alignContent: 'start',
-                  border: '1px solid var(--bg-card-border)',
-                  borderRadius: 'var(--radius-sm)',
-                  background: 'rgba(255,255,255,0.028)',
-                  padding: '0.88rem',
-                }}
-              >
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    gap: '0.6rem',
-                  }}
-                >
-                  <span
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      color: card.tone,
-                      fontSize: '0.68rem',
-                      fontWeight: 900,
-                    }}
-                  >
-                    <FlowIcon size={14} />
-                    {card.label}
-                  </span>
-                  <span
-                    style={{
-                      border: '1px solid rgba(255,255,255,0.08)',
-                      borderRadius: '999px',
-                      color: 'var(--text-muted)',
-                      padding: '2px 7px',
-                      fontSize: '0.62rem',
-                      fontWeight: 900,
-                    }}
-                  >
-                    {card.step}
-                  </span>
-                </div>
-                <strong
-                  style={{
-                    color: 'var(--text-primary)',
-                    fontSize: '0.98rem',
-                    lineHeight: 1.32,
-                  }}
-                >
-                  {card.title}
-                </strong>
-                <span
-                  style={{
-                    color: card.tone,
-                    fontSize: '0.8rem',
-                    fontWeight: 900,
-                  }}
-                >
-                  {card.metric}
-                </span>
-                <p
-                  style={{
-                    margin: 0,
-                    color: 'var(--text-secondary)',
-                    fontSize: '0.7rem',
-                    lineHeight: 1.48,
-                  }}
-                >
-                  {card.help}
-                </p>
-                <button
-                  type="button"
-                  className="ghost-btn"
-                  onClick={() => {
-                    if (card.key === 'create') {
-                      navigate('/create');
-                      return;
-                    }
-                    if (card.key === 'launch') {
-                      document.getElementById('join-code-input')?.focus();
-                      return;
-                    }
-                    if (card.key === 'live') {
-                      setSignal('all');
-                      setScope('all');
-                      return;
-                    }
-                    setSortBy('popular');
-                  }}
-                  style={{
-                    justifySelf: 'start',
-                    alignSelf: 'end',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    padding: '5px 9px',
-                    fontSize: '0.66rem',
-                    marginTop: 'auto',
-                  }}
-                >
-                  {card.actionLabel}
-                  <ArrowRight size={12} />
-                </button>
-              </article>
-            );
-          })}
-        </div>
-
-        <div
-          style={{
-            display: 'flex',
-            gap: '0.45rem',
-            flexWrap: 'wrap',
-          }}
-          aria-label="배포 및 분석 채널"
-        >
-          {launchSurfaceChips.map((chip) => {
-            const ChipIcon = chip.icon;
-
-            return (
-              <span
-                key={chip.label}
-                className="stat-pill"
-                style={{
-                  color: 'var(--text-secondary)',
-                  borderColor: 'rgba(45, 212, 191, 0.18)',
-                  background: 'rgba(45, 212, 191, 0.045)',
-                }}
-              >
-                <ChipIcon size={12} />
-                {chip.label}
-              </span>
-            );
-          })}
-        </div>
-      </section>
-
-      <section
-        ref={insightSectionRef}
-        className="content-card desktop-only"
-        style={{
-          padding: '1rem',
-          display: 'grid',
-          gap: '0.85rem',
-          cursor: 'default',
-          borderColor: 'rgba(45, 212, 191, 0.16)',
-          background:
-            'linear-gradient(135deg, rgba(45, 212, 191, 0.045), rgba(250, 204, 21, 0.025))',
-        }}
-        aria-label="투표 운영 인사이트"
-      >
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'flex-start',
-            gap: '0.85rem',
-            flexWrap: 'wrap',
-          }}
-        >
-          <div style={{ display: 'grid', gap: '0.22rem' }}>
-            <span
+            <div
               style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                color: 'var(--brand-accent-teal)',
-                fontSize: '0.68rem',
-                fontWeight: 900,
-                letterSpacing: '0.05em',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-end',
+                gap: '0.9rem',
+                flexWrap: 'wrap',
               }}
             >
-              <Sparkles size={13} />
-              LIVE OPERATIONS
-            </span>
-            <h2
-              style={{
-                margin: 0,
-                color: 'var(--text-primary)',
-                fontSize: '0.98rem',
-                fontWeight: 900,
-              }}
-            >
-              공유 후 응답 흐름 한눈에 보기
-            </h2>
-          </div>
-          <span
-            style={{
-              border: '1px solid rgba(45, 212, 191, 0.26)',
-              borderRadius: '999px',
-              color: 'var(--brand-accent-teal)',
-              background: 'rgba(45, 212, 191, 0.07)',
-              padding: '5px 10px',
-              fontSize: '0.68rem',
-              fontWeight: 900,
-              whiteSpace: 'nowrap',
-            }}
-          >
-            열린 투표 {openPollCount}개
-          </span>
-        </div>
-
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
-            gap: '0.65rem',
-          }}
-        >
-          {operatorInsightCards.map((card) => {
-            const CardIcon = card.icon;
-
-            return (
-              <button
-                key={card.key}
-                type="button"
-                className="press-tile"
-                onClick={() => {
-                  setSignal(card.signal);
-                  setScope('all');
-                }}
-                style={{
-                  border: '1px solid rgba(255, 255, 255, 0.09)',
-                  borderRadius: 'var(--radius-sm)',
-                  background: 'rgba(5, 14, 12, 0.42)',
-                  color: 'var(--text-primary)',
-                  padding: '0.82rem',
-                  display: 'grid',
-                  gap: '0.42rem',
-                  textAlign: 'left',
-                  cursor: 'pointer',
-                  minHeight: '132px',
-                }}
-              >
+              <div style={{ display: 'grid', gap: '0.25rem' }}>
                 <span
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '6px',
-                    color: card.tone,
+                    color: 'var(--brand-accent-teal)',
                     fontSize: '0.68rem',
-                    fontWeight: 900,
-                  }}
-                >
-                  <CardIcon size={14} />
-                  {card.label}
-                </span>
-                <strong
-                  style={{
-                    color: 'var(--text-primary)',
-                    fontSize: '1.28rem',
-                    lineHeight: 1.1,
-                  }}
-                >
-                  {card.value}
-                </strong>
-                <span
-                  style={{
-                    color: 'var(--text-secondary)',
-                    fontSize: '0.68rem',
-                    lineHeight: 1.45,
-                  }}
-                >
-                  {card.help}
-                </span>
-                <span
-                  style={{
-                    color: card.tone,
-                    fontSize: '0.64rem',
-                    fontWeight: 900,
-                    marginTop: 'auto',
-                  }}
-                >
-                  관련 투표 보기
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </section>
-
-      <section
-        className="content-card desktop-only"
-        style={{
-          padding: '1rem',
-          display: 'grid',
-          gap: '0.85rem',
-          cursor: 'default',
-        }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'flex-start',
-            gap: '0.85rem',
-            flexWrap: 'wrap',
-          }}
-        >
-          <div style={{ display: 'grid', gap: '0.2rem' }}>
-            <h2
-              style={{
-                margin: 0,
-                color: 'var(--text-primary)',
-                fontSize: '0.96rem',
-                fontWeight: 900,
-              }}
-            >
-              지금 참여하면 좋은 고민
-            </h2>
-            <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.76rem' }}>
-              참여 대기, 접전, 피드백 활발 상태를 기준으로 바로 들어갈 투표를 추천합니다.
-            </p>
-          </div>
-          <span
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '5px',
-              color: 'var(--brand-accent-teal)',
-              border: '1px solid rgba(45, 212, 191, 0.28)',
-              borderRadius: '999px',
-              background: 'rgba(45, 212, 191, 0.08)',
-              padding: '5px 10px',
-              fontSize: '0.68rem',
-              fontWeight: 900,
-            }}
-          >
-            <Sparkles size={13} />
-            LIVE PICK
-          </span>
-        </div>
-
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
-            gap: '0.7rem',
-          }}
-        >
-          {recommendationCards.map((card) => {
-            const CardIcon = card.icon;
-            const poll = card.poll;
-            return (
-              <article
-                key={card.key}
-                style={{
-                  minWidth: 0,
-                  display: 'grid',
-                  gap: '0.55rem',
-                  alignContent: 'start',
-                  border: '1px solid var(--bg-card-border)',
-                  borderRadius: 'var(--radius-sm)',
-                  background: poll ? 'rgba(255,255,255,0.025)' : 'rgba(250, 204, 21, 0.035)',
-                  padding: '0.85rem',
-                }}
-              >
-                <span
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    color: card.tone,
-                    fontSize: '0.66rem',
                     fontWeight: 900,
                     letterSpacing: '0.05em',
                   }}
                 >
-                  <CardIcon size={13} />
-                  {card.eyebrow}
+                  <Sparkles size={13} />
+                  DECISION FLOW
                 </span>
-                <strong
-                  style={{
-                    color: 'var(--text-primary)',
-                    fontSize: '0.9rem',
-                    lineHeight: 1.38,
-                    overflowWrap: 'anywhere',
-                  }}
-                >
-                  {poll ? poll.question : card.emptyTitle}
-                </strong>
-                <p
+                <h2
                   style={{
                     margin: 0,
-                    color: 'var(--text-muted)',
-                    fontSize: '0.7rem',
-                    lineHeight: 1.45,
-                    display: '-webkit-box',
-                    overflow: 'hidden',
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: 'vertical',
+                    color: 'var(--text-primary)',
+                    fontSize: '1rem',
+                    fontWeight: 900,
                   }}
                 >
-                  {poll ? card.help : card.emptyHelp}
-                </p>
-                <div
-                  style={{
-                    display: 'flex',
-                    gap: '0.4rem',
-                    flexWrap: 'wrap',
-                    color: 'var(--text-muted)',
-                    fontSize: '0.66rem',
-                  }}
-                >
-                  {poll ? (
-                    <>
-                      <span className="stat-pill">{poll.totalVotes}표</span>
-                      <span className="stat-pill">{poll.comments.length}의견</span>
-                      <span className="stat-pill">{formatPollEndAt(poll)}</span>
-                    </>
-                  ) : (
-                    <span className="stat-pill">새 투표 생성 추천</span>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (poll) {
-                      setCurrentPoll(poll);
-                      navigate(`/poll/${poll.id}`);
-                      return;
-                    }
-                    navigate('/create');
-                  }}
-                  className="ghost-btn"
-                  style={{
-                    justifySelf: 'start',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    padding: '6px 10px',
-                    fontSize: '0.7rem',
-                  }}
-                >
-                  {poll ? '바로 참여' : '새 고민 작성'}
-                  <ArrowRight size={13} />
-                </button>
-              </article>
-            );
-          })}
-        </div>
-      </section>
-
-      <section
-        className="content-card desktop-only"
-        style={{
-          padding: '1rem',
-          display: 'grid',
-          gap: '0.85rem',
-          cursor: 'default',
-          borderColor: 'rgba(45, 212, 191, 0.18)',
-          background: 'rgba(45, 212, 191, 0.035)',
-        }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'flex-start',
-            gap: '0.85rem',
-            flexWrap: 'wrap',
-          }}
-        >
-          <div style={{ display: 'grid', gap: '0.2rem' }}>
-            <h2
-              style={{
-                margin: 0,
-                color: 'var(--text-primary)',
-                fontSize: '0.96rem',
-                fontWeight: 900,
-              }}
-            >
-              라이브 응답 큐
-            </h2>
-            <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.76rem' }}>
-              현재 목록에서 먼저 처리해야 할 투표 상태를 한눈에 보고 바로 필터링합니다.
-            </p>
-          </div>
-          <span
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '5px',
-              color: 'var(--brand-accent-teal)',
-              border: '1px solid rgba(45, 212, 191, 0.28)',
-              borderRadius: '999px',
-              background: 'rgba(45, 212, 191, 0.08)',
-              padding: '5px 10px',
-              fontSize: '0.68rem',
-              fontWeight: 900,
-            }}
-          >
-            <Eye size={13} />
-            {openPollCount}개 진행 중
-          </span>
-        </div>
-
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-            gap: '0.6rem',
-          }}
-        >
-          {liveQueueItems.map((item) => {
-            const QueueIcon = item.icon;
-            const active = signal === item.signal;
-            const disabled = item.key !== 'all' && item.count === 0;
-
-            return (
+                  생성부터 후속 결정까지 한 번에 이어지는 운영 흐름
+                </h2>
+              </div>
               <button
-                key={item.key}
                 type="button"
-                onClick={() => {
-                  if (!disabled) {
-                    setSignal(item.signal);
-                  }
-                }}
-                aria-pressed={active}
-                disabled={disabled}
+                onClick={() => navigate('/create')}
+                className="btn-primary"
                 style={{
-                  minWidth: 0,
-                  textAlign: 'left',
-                  display: 'grid',
-                  gap: '0.42rem',
-                  border: active
-                    ? '1px solid rgba(45, 212, 191, 0.46)'
-                    : '1px solid var(--bg-card-border)',
-                  borderRadius: 'var(--radius-sm)',
-                  background: active ? 'rgba(45, 212, 191, 0.1)' : 'rgba(255,255,255,0.025)',
-                  padding: '0.75rem',
-                  color: disabled ? 'var(--text-muted)' : 'var(--text-primary)',
-                  cursor: disabled ? 'not-allowed' : 'pointer',
-                  opacity: disabled ? 0.58 : 1,
-                  fontFamily: 'var(--font-sans)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '8px 12px',
+                  fontSize: '0.75rem',
+                  whiteSpace: 'nowrap',
                 }}
               >
+                <Plus size={14} />새 투표 만들기
+              </button>
+            </div>
+
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
+                gap: '0.7rem',
+              }}
+            >
+              {decisionFlowCards.map((card) => {
+                const FlowIcon = card.icon;
+
+                return (
+                  <article
+                    key={card.key}
+                    className="press-tile"
+                    style={{
+                      minWidth: 0,
+                      minHeight: '168px',
+                      display: 'grid',
+                      gap: '0.55rem',
+                      alignContent: 'start',
+                      border: '1px solid var(--bg-card-border)',
+                      borderRadius: 'var(--radius-sm)',
+                      background: 'rgba(255,255,255,0.028)',
+                      padding: '0.88rem',
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        gap: '0.6rem',
+                      }}
+                    >
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          color: card.tone,
+                          fontSize: '0.68rem',
+                          fontWeight: 900,
+                        }}
+                      >
+                        <FlowIcon size={14} />
+                        {card.label}
+                      </span>
+                      <span
+                        style={{
+                          border: '1px solid rgba(255,255,255,0.08)',
+                          borderRadius: '999px',
+                          color: 'var(--text-muted)',
+                          padding: '2px 7px',
+                          fontSize: '0.62rem',
+                          fontWeight: 900,
+                        }}
+                      >
+                        {card.step}
+                      </span>
+                    </div>
+                    <strong
+                      style={{
+                        color: 'var(--text-primary)',
+                        fontSize: '0.98rem',
+                        lineHeight: 1.32,
+                      }}
+                    >
+                      {card.title}
+                    </strong>
+                    <span
+                      style={{
+                        color: card.tone,
+                        fontSize: '0.8rem',
+                        fontWeight: 900,
+                      }}
+                    >
+                      {card.metric}
+                    </span>
+                    <p
+                      style={{
+                        margin: 0,
+                        color: 'var(--text-secondary)',
+                        fontSize: '0.7rem',
+                        lineHeight: 1.48,
+                      }}
+                    >
+                      {card.help}
+                    </p>
+                    <button
+                      type="button"
+                      className="ghost-btn"
+                      onClick={() => {
+                        if (card.key === 'create') {
+                          navigate('/create');
+                          return;
+                        }
+                        if (card.key === 'launch') {
+                          document.getElementById('join-code-input')?.focus();
+                          return;
+                        }
+                        if (card.key === 'live') {
+                          setSignal('all');
+                          setScope('all');
+                          return;
+                        }
+                        setSortBy('popular');
+                      }}
+                      style={{
+                        justifySelf: 'start',
+                        alignSelf: 'end',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        padding: '5px 9px',
+                        fontSize: '0.66rem',
+                        marginTop: 'auto',
+                      }}
+                    >
+                      {card.actionLabel}
+                      <ArrowRight size={12} />
+                    </button>
+                  </article>
+                );
+              })}
+            </div>
+
+            <div
+              style={{
+                display: 'flex',
+                gap: '0.45rem',
+                flexWrap: 'wrap',
+              }}
+              aria-label="배포 및 분석 채널"
+            >
+              {launchSurfaceChips.map((chip) => {
+                const ChipIcon = chip.icon;
+
+                return (
+                  <span
+                    key={chip.label}
+                    className="stat-pill"
+                    style={{
+                      color: 'var(--text-secondary)',
+                      borderColor: 'rgba(45, 212, 191, 0.18)',
+                      background: 'rgba(45, 212, 191, 0.045)',
+                    }}
+                  >
+                    <ChipIcon size={12} />
+                    {chip.label}
+                  </span>
+                );
+              })}
+            </div>
+          </section>
+
+          <section
+            ref={insightSectionRef}
+            className="content-card desktop-only"
+            style={{
+              padding: '1rem',
+              display: 'grid',
+              gap: '0.85rem',
+              cursor: 'default',
+              borderColor: 'rgba(45, 212, 191, 0.16)',
+              background:
+                'linear-gradient(135deg, rgba(45, 212, 191, 0.045), rgba(250, 204, 21, 0.025))',
+            }}
+            aria-label="투표 운영 인사이트"
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                gap: '0.85rem',
+                flexWrap: 'wrap',
+              }}
+            >
+              <div style={{ display: 'grid', gap: '0.22rem' }}>
                 <span
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: '5px',
-                    color: item.tone,
+                    gap: '6px',
+                    color: 'var(--brand-accent-teal)',
                     fontSize: '0.68rem',
                     fontWeight: 900,
+                    letterSpacing: '0.05em',
                   }}
                 >
-                  <QueueIcon size={13} />
-                  {item.label}
+                  <Sparkles size={13} />
+                  LIVE OPERATIONS
                 </span>
-                <strong style={{ fontSize: '1.28rem', lineHeight: 1, color: item.tone }}>
-                  {item.count}
-                </strong>
-                <small
-                  style={{ color: 'var(--text-muted)', fontSize: '0.66rem', lineHeight: 1.42 }}
-                >
-                  {item.help}
-                </small>
-                <span
+                <h2
                   style={{
-                    justifySelf: 'start',
-                    border: '1px solid rgba(255,255,255,0.08)',
-                    borderRadius: '999px',
-                    padding: '3px 8px',
-                    color: active ? 'var(--brand-accent-teal)' : 'var(--text-secondary)',
-                    fontSize: '0.62rem',
+                    margin: 0,
+                    color: 'var(--text-primary)',
+                    fontSize: '0.98rem',
                     fontWeight: 900,
                   }}
                 >
-                  {active ? '적용 중' : disabled ? '대기 중' : '필터 적용'}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </section>
+                  공유 후 응답 흐름 한눈에 보기
+                </h2>
+              </div>
+              <span
+                style={{
+                  border: '1px solid rgba(45, 212, 191, 0.26)',
+                  borderRadius: '999px',
+                  color: 'var(--brand-accent-teal)',
+                  background: 'rgba(45, 212, 191, 0.07)',
+                  padding: '5px 10px',
+                  fontSize: '0.68rem',
+                  fontWeight: 900,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                열린 투표 {openPollCount}개
+              </span>
+            </div>
+
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
+                gap: '0.65rem',
+              }}
+            >
+              {operatorInsightCards.map((card) => {
+                const CardIcon = card.icon;
+
+                return (
+                  <button
+                    key={card.key}
+                    type="button"
+                    className="press-tile"
+                    onClick={() => {
+                      setSignal(card.signal);
+                      setScope('all');
+                    }}
+                    style={{
+                      border: '1px solid rgba(255, 255, 255, 0.09)',
+                      borderRadius: 'var(--radius-sm)',
+                      background: 'rgba(5, 14, 12, 0.42)',
+                      color: 'var(--text-primary)',
+                      padding: '0.82rem',
+                      display: 'grid',
+                      gap: '0.42rem',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      minHeight: '132px',
+                    }}
+                  >
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        color: card.tone,
+                        fontSize: '0.68rem',
+                        fontWeight: 900,
+                      }}
+                    >
+                      <CardIcon size={14} />
+                      {card.label}
+                    </span>
+                    <strong
+                      style={{
+                        color: 'var(--text-primary)',
+                        fontSize: '1.28rem',
+                        lineHeight: 1.1,
+                      }}
+                    >
+                      {card.value}
+                    </strong>
+                    <span
+                      style={{
+                        color: 'var(--text-secondary)',
+                        fontSize: '0.68rem',
+                        lineHeight: 1.45,
+                      }}
+                    >
+                      {card.help}
+                    </span>
+                    <span
+                      style={{
+                        color: card.tone,
+                        fontSize: '0.64rem',
+                        fontWeight: 900,
+                        marginTop: 'auto',
+                      }}
+                    >
+                      관련 투표 보기
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+
+          <section
+            className="content-card desktop-only"
+            style={{
+              padding: '1rem',
+              display: 'grid',
+              gap: '0.85rem',
+              cursor: 'default',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                gap: '0.85rem',
+                flexWrap: 'wrap',
+              }}
+            >
+              <div style={{ display: 'grid', gap: '0.2rem' }}>
+                <h2
+                  style={{
+                    margin: 0,
+                    color: 'var(--text-primary)',
+                    fontSize: '0.96rem',
+                    fontWeight: 900,
+                  }}
+                >
+                  지금 참여하면 좋은 고민
+                </h2>
+                <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.76rem' }}>
+                  참여 대기, 접전, 피드백 활발 상태를 기준으로 바로 들어갈 투표를 추천합니다.
+                </p>
+              </div>
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  color: 'var(--brand-accent-teal)',
+                  border: '1px solid rgba(45, 212, 191, 0.28)',
+                  borderRadius: '999px',
+                  background: 'rgba(45, 212, 191, 0.08)',
+                  padding: '5px 10px',
+                  fontSize: '0.68rem',
+                  fontWeight: 900,
+                }}
+              >
+                <Sparkles size={13} />
+                LIVE PICK
+              </span>
+            </div>
+
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
+                gap: '0.7rem',
+              }}
+            >
+              {recommendationCards.map((card) => {
+                const CardIcon = card.icon;
+                const poll = card.poll;
+                return (
+                  <article
+                    key={card.key}
+                    style={{
+                      minWidth: 0,
+                      display: 'grid',
+                      gap: '0.55rem',
+                      alignContent: 'start',
+                      border: '1px solid var(--bg-card-border)',
+                      borderRadius: 'var(--radius-sm)',
+                      background: poll ? 'rgba(255,255,255,0.025)' : 'rgba(250, 204, 21, 0.035)',
+                      padding: '0.85rem',
+                    }}
+                  >
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        color: card.tone,
+                        fontSize: '0.66rem',
+                        fontWeight: 900,
+                        letterSpacing: '0.05em',
+                      }}
+                    >
+                      <CardIcon size={13} />
+                      {card.eyebrow}
+                    </span>
+                    <strong
+                      style={{
+                        color: 'var(--text-primary)',
+                        fontSize: '0.9rem',
+                        lineHeight: 1.38,
+                        overflowWrap: 'anywhere',
+                      }}
+                    >
+                      {poll ? poll.question : card.emptyTitle}
+                    </strong>
+                    <p
+                      style={{
+                        margin: 0,
+                        color: 'var(--text-muted)',
+                        fontSize: '0.7rem',
+                        lineHeight: 1.45,
+                        display: '-webkit-box',
+                        overflow: 'hidden',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                      }}
+                    >
+                      {poll ? card.help : card.emptyHelp}
+                    </p>
+                    <div
+                      style={{
+                        display: 'flex',
+                        gap: '0.4rem',
+                        flexWrap: 'wrap',
+                        color: 'var(--text-muted)',
+                        fontSize: '0.66rem',
+                      }}
+                    >
+                      {poll ? (
+                        <>
+                          <span className="stat-pill">{poll.totalVotes}표</span>
+                          <span className="stat-pill">{poll.comments.length}의견</span>
+                          <span className="stat-pill">{formatPollEndAt(poll)}</span>
+                        </>
+                      ) : (
+                        <span className="stat-pill">새 투표 생성 추천</span>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (poll) {
+                          setCurrentPoll(poll);
+                          navigate(`/poll/${poll.id}`);
+                          return;
+                        }
+                        navigate('/create');
+                      }}
+                      className="ghost-btn"
+                      style={{
+                        justifySelf: 'start',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        padding: '6px 10px',
+                        fontSize: '0.7rem',
+                      }}
+                    >
+                      {poll ? '바로 참여' : '새 고민 작성'}
+                      <ArrowRight size={13} />
+                    </button>
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+
+          <section
+            className="content-card desktop-only"
+            style={{
+              padding: '1rem',
+              display: 'grid',
+              gap: '0.85rem',
+              cursor: 'default',
+              borderColor: 'rgba(45, 212, 191, 0.18)',
+              background: 'rgba(45, 212, 191, 0.035)',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                gap: '0.85rem',
+                flexWrap: 'wrap',
+              }}
+            >
+              <div style={{ display: 'grid', gap: '0.2rem' }}>
+                <h2
+                  style={{
+                    margin: 0,
+                    color: 'var(--text-primary)',
+                    fontSize: '0.96rem',
+                    fontWeight: 900,
+                  }}
+                >
+                  라이브 응답 큐
+                </h2>
+                <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.76rem' }}>
+                  현재 목록에서 먼저 처리해야 할 투표 상태를 한눈에 보고 바로 필터링합니다.
+                </p>
+              </div>
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  color: 'var(--brand-accent-teal)',
+                  border: '1px solid rgba(45, 212, 191, 0.28)',
+                  borderRadius: '999px',
+                  background: 'rgba(45, 212, 191, 0.08)',
+                  padding: '5px 10px',
+                  fontSize: '0.68rem',
+                  fontWeight: 900,
+                }}
+              >
+                <Eye size={13} />
+                {openPollCount}개 진행 중
+              </span>
+            </div>
+
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+                gap: '0.6rem',
+              }}
+            >
+              {liveQueueItems.map((item) => {
+                const QueueIcon = item.icon;
+                const active = signal === item.signal;
+                const disabled = item.key !== 'all' && item.count === 0;
+
+                return (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={() => {
+                      if (!disabled) {
+                        setSignal(item.signal);
+                      }
+                    }}
+                    aria-pressed={active}
+                    disabled={disabled}
+                    style={{
+                      minWidth: 0,
+                      textAlign: 'left',
+                      display: 'grid',
+                      gap: '0.42rem',
+                      border: active
+                        ? '1px solid rgba(45, 212, 191, 0.46)'
+                        : '1px solid var(--bg-card-border)',
+                      borderRadius: 'var(--radius-sm)',
+                      background: active ? 'rgba(45, 212, 191, 0.1)' : 'rgba(255,255,255,0.025)',
+                      padding: '0.75rem',
+                      color: disabled ? 'var(--text-muted)' : 'var(--text-primary)',
+                      cursor: disabled ? 'not-allowed' : 'pointer',
+                      opacity: disabled ? 0.58 : 1,
+                      fontFamily: 'var(--font-sans)',
+                    }}
+                  >
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        color: item.tone,
+                        fontSize: '0.68rem',
+                        fontWeight: 900,
+                      }}
+                    >
+                      <QueueIcon size={13} />
+                      {item.label}
+                    </span>
+                    <strong style={{ fontSize: '1.28rem', lineHeight: 1, color: item.tone }}>
+                      {item.count}
+                    </strong>
+                    <small
+                      style={{ color: 'var(--text-muted)', fontSize: '0.66rem', lineHeight: 1.42 }}
+                    >
+                      {item.help}
+                    </small>
+                    <span
+                      style={{
+                        justifySelf: 'start',
+                        border: '1px solid rgba(255,255,255,0.08)',
+                        borderRadius: '999px',
+                        padding: '3px 8px',
+                        color: active ? 'var(--brand-accent-teal)' : 'var(--text-secondary)',
+                        fontSize: '0.62rem',
+                        fontWeight: 900,
+                      }}
+                    >
+                      {active ? '적용 중' : disabled ? '대기 중' : '필터 적용'}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        </>
+      ) : null}
 
       <div
         id="poll-list-anchor"

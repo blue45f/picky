@@ -676,7 +676,27 @@ export function PollListPage() {
 
         {showRecent ? <RecentStrip items={recent} onSelect={goToPoll} /> : null}
 
-        {isInitialLoading ? <ListSkeleton /> : null}
+        {isInitialLoading ? (
+          <>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                marginBottom: 14,
+                color: theme.textMuted,
+                fontSize: 13.5,
+                fontWeight: 600,
+              }}
+            >
+              <span aria-hidden style={{ fontSize: 20 }}>
+                {MASCOT.thinking.emoji}
+              </span>
+              <span>{MASCOT.thinking.line}</span>
+            </div>
+            <ListSkeleton />
+          </>
+        ) : null}
 
         {error && polls.length === 0 && !isInitialLoading ? (
           <div style={{ textAlign: 'center', padding: '32px 0', color: theme.danger }}>
@@ -701,13 +721,24 @@ export function PollListPage() {
 
         {!isInitialLoading && polls.length === 0 && !error ? (
           <div style={{ textAlign: 'center', padding: '56px 0', color: theme.textMuted }}>
-            <div style={{ fontSize: 56, marginBottom: 14 }}>{MASCOT.empty.emoji}</div>
+            <div className="rise" style={{ fontSize: 56, marginBottom: 14 }}>
+              {MASCOT.empty.emoji}
+            </div>
             <p style={{ fontSize: 16.5, color: theme.text, fontWeight: 800, lineHeight: 1.45 }}>
               {MASCOT.empty.line}
             </p>
             <p style={{ fontSize: 13.5, marginTop: 6, lineHeight: 1.5 }}>
               가장 먼저 재미있는 고민 투표를 만들어 볼까요? 🚀
             </p>
+            <Button
+              style={{ marginTop: 18, borderRadius: 16 }}
+              onClick={() => {
+                hapticFeedback('tap');
+                navigate('/create');
+              }}
+            >
+              첫 고민 만들기 ✍️
+            </Button>
           </div>
         ) : null}
 

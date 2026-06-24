@@ -3,6 +3,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   CheckCircle2,
+  ChevronDown,
   Code2,
   Eye,
   FileText,
@@ -496,6 +497,8 @@ export const CreatePoll: React.FC = () => {
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [templateCategory, setTemplateCategory] = useState<PresetCategoryFilter>('all');
   const [templateSearchInput, setTemplateSearchInput] = useState('');
+  // 템플릿 갤러리는 기본 접힘 — 빈 고민으로 바로 시작이 자연스럽도록 질문 입력을 첫 화면에 둔다.
+  const [isTemplateGalleryOpen, setIsTemplateGalleryOpen] = useState(false);
   const [draftSavedAt, setDraftSavedAt] = useState<string | null>(cachedDraft?.savedAt || null);
   const [showEmbedPreview, setShowEmbedPreview] = useState(false);
   const [embedPreviewDevice, setEmbedPreviewDevice] = useState<EmbedPreviewDevice>('desktop');
@@ -974,6 +977,8 @@ export const CreatePoll: React.FC = () => {
         imageUrl: opt.imageUrl || '',
       })),
     );
+    // 템플릿을 고르면 갤러리를 접어 바로 질문 폼으로 시선을 되돌린다.
+    setIsTemplateGalleryOpen(false);
     setTimeout(() => setActivePresetIndex(null), 500);
   };
 
@@ -1237,7 +1242,14 @@ export const CreatePoll: React.FC = () => {
       className="animate-slide-up"
       style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          order: 0,
+        }}
+      >
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
           <h1
             style={{
@@ -1247,10 +1259,10 @@ export const CreatePoll: React.FC = () => {
               letterSpacing: 0,
             }}
           >
-            새로운 고민 올리기
+            새로운 고민 올리기 🥑
           </h1>
           <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-            질문과 선택지들을 등록해보세요. SNS 공유에 최적화된 단축 링크가 발급됩니다.
+            궁금한 걸 바로 물어보세요! 질문만 적어도 공유 링크가 뚝딱 만들어져요.
           </p>
         </div>
 
@@ -1271,238 +1283,278 @@ export const CreatePoll: React.FC = () => {
         </button>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        <span
-          style={{
-            fontSize: '0.75rem',
-            fontWeight: 700,
-            color: 'var(--text-secondary)',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '4px',
-          }}
-        >
-          <Sparkles size={13} style={{ color: 'var(--brand-accent-gold)' }} />
-          빠른 작성을 위한 템플릿 프리셋:
-        </span>
-        <div
-          role="tablist"
-          aria-label="템플릿 카테고리"
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', order: 2 }}>
+        <button
+          type="button"
+          onClick={() => setIsTemplateGalleryOpen((open) => !open)}
+          aria-expanded={isTemplateGalleryOpen}
+          aria-controls="create-template-gallery"
+          className="ghost-btn"
           style={{
             display: 'flex',
-            gap: '6px',
-            flexWrap: 'wrap',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '12px 14px',
+            borderRadius: 'var(--radius-sm)',
+            textAlign: 'left',
+            background: isTemplateGalleryOpen
+              ? 'rgba(232, 200, 77, 0.06)'
+              : 'rgba(255,255,255,0.02)',
+            borderColor: isTemplateGalleryOpen
+              ? 'rgba(232, 200, 77, 0.3)'
+              : 'var(--bg-card-border)',
           }}
         >
-          {PRESET_CATEGORY_OPTIONS.map((category) => {
-            const active = templateCategory === category.value;
+          <Sparkles size={15} style={{ color: 'var(--brand-accent-gold)', flexShrink: 0 }} />
+          <span style={{ display: 'grid', gap: '2px', flex: 1, minWidth: 0 }}>
+            <span style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+              템플릿에서 시작하기 ✨
+            </span>
+            <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)' }}>
+              {isTemplateGalleryOpen
+                ? '마음에 드는 시작점을 고르면 질문과 선택지가 자동으로 채워져요.'
+                : `바로 작성해도 좋고, 준비된 ${PRESET_TEMPLATES.length}개 템플릿으로 시작해도 좋아요.`}
+            </span>
+          </span>
+          <ChevronDown
+            size={16}
+            style={{
+              color: 'var(--text-muted)',
+              flexShrink: 0,
+              transition: 'transform 0.18s ease',
+              transform: isTemplateGalleryOpen ? 'rotate(180deg)' : 'none',
+            }}
+          />
+        </button>
+        {isTemplateGalleryOpen ? (
+          <div
+            id="create-template-gallery"
+            style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}
+          >
+            <div
+              role="tablist"
+              aria-label="템플릿 카테고리"
+              style={{
+                display: 'flex',
+                gap: '6px',
+                flexWrap: 'wrap',
+              }}
+            >
+              {PRESET_CATEGORY_OPTIONS.map((category) => {
+                const active = templateCategory === category.value;
 
-            return (
-              <button
-                key={category.value}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                onClick={() => setTemplateCategory(category.value)}
-                className="ghost-btn"
+                return (
+                  <button
+                    key={category.value}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => setTemplateCategory(category.value)}
+                    className="ghost-btn"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      padding: '6px 10px',
+                      fontSize: '0.68rem',
+                      borderRadius: '999px',
+                      color: active ? 'var(--brand-accent-teal)' : 'var(--text-secondary)',
+                      borderColor: active ? 'rgba(45, 212, 191, 0.35)' : 'var(--bg-card-border)',
+                      background: active ? 'rgba(45, 212, 191, 0.08)' : 'rgba(255,255,255,0.02)',
+                    }}
+                  >
+                    {category.emoji ? <span aria-hidden>{category.emoji}</span> : null}
+                    {category.label}
+                    <span
+                      style={{
+                        color: active ? 'var(--brand-accent-teal)' : 'var(--text-muted)',
+                        fontSize: '0.62rem',
+                        fontWeight: 900,
+                      }}
+                    >
+                      {presetCategoryCounts[category.value]}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <label
+              style={{
+                display: 'grid',
+                gap: '0.35rem',
+                maxWidth: '620px',
+              }}
+            >
+              <span
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '5px',
-                  padding: '6px 10px',
+                  color: 'var(--text-secondary)',
                   fontSize: '0.68rem',
-                  borderRadius: '999px',
-                  color: active ? 'var(--brand-accent-teal)' : 'var(--text-secondary)',
-                  borderColor: active ? 'rgba(45, 212, 191, 0.35)' : 'var(--bg-card-border)',
-                  background: active ? 'rgba(45, 212, 191, 0.08)' : 'rgba(255,255,255,0.02)',
+                  fontWeight: 900,
                 }}
               >
-                {category.emoji ? <span aria-hidden>{category.emoji}</span> : null}
-                {category.label}
-                <span
+                <Search size={13} style={{ color: 'var(--brand-accent-teal)' }} />
+                템플릿 검색
+              </span>
+              <div style={{ position: 'relative' }}>
+                <input
+                  value={templateSearchInput}
+                  onChange={(event) => setTemplateSearchInput(event.target.value)}
+                  placeholder="예: 회의, 일정, 피드백, 수업, 우선순위"
+                  className="form-input"
                   style={{
-                    color: active ? 'var(--brand-accent-teal)' : 'var(--text-muted)',
-                    fontSize: '0.62rem',
-                    fontWeight: 900,
+                    width: '100%',
+                    paddingRight: templateSearchInput ? '76px' : undefined,
+                    minHeight: '40px',
+                    fontSize: '0.78rem',
                   }}
-                >
-                  {presetCategoryCounts[category.value]}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-        <label
-          style={{
-            display: 'grid',
-            gap: '0.35rem',
-            maxWidth: '620px',
-          }}
-        >
-          <span
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '5px',
-              color: 'var(--text-secondary)',
-              fontSize: '0.68rem',
-              fontWeight: 900,
-            }}
-          >
-            <Search size={13} style={{ color: 'var(--brand-accent-teal)' }} />
-            템플릿 검색
-          </span>
-          <div style={{ position: 'relative' }}>
-            <input
-              value={templateSearchInput}
-              onChange={(event) => setTemplateSearchInput(event.target.value)}
-              placeholder="예: 회의, 일정, 피드백, 수업, 우선순위"
-              className="form-input"
-              style={{
-                width: '100%',
-                paddingRight: templateSearchInput ? '76px' : undefined,
-                minHeight: '40px',
-                fontSize: '0.78rem',
-              }}
-            />
-            {templateSearchInput ? (
-              <button
-                type="button"
-                onClick={() => setTemplateSearchInput('')}
-                className="ghost-inline"
-                style={{
-                  position: 'absolute',
-                  right: '10px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  color: 'var(--text-muted)',
-                  fontSize: '0.66rem',
-                }}
-              >
-                지우기
-              </button>
-            ) : null}
-          </div>
-        </label>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
-            gap: '8px',
-          }}
-        >
-          {visiblePresetTemplates.length > 0 ? (
-            visiblePresetTemplates.map(({ template: tmpl, index: idx }) => (
-              <button
-                type="button"
-                key={idx}
-                onClick={() => applyPreset(idx)}
-                className="btn-secondary"
-                style={{
-                  padding: '0.78rem',
-                  fontSize: '0.75rem',
-                  borderRadius: 'var(--radius-sm)',
-                  display: 'grid',
-                  alignItems: 'start',
-                  gap: '0.42rem',
-                  textAlign: 'left',
-                  backgroundColor:
-                    activePresetIndex === idx ? 'rgba(99, 102, 241, 0.15)' : 'transparent',
-                  borderColor:
-                    activePresetIndex === idx ? 'var(--brand-primary)' : 'var(--bg-card-border)',
-                }}
-              >
-                <span
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                  }}
-                >
-                  <span
+                />
+                {templateSearchInput ? (
+                  <button
+                    type="button"
+                    onClick={() => setTemplateSearchInput('')}
+                    className="ghost-inline"
                     style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      color:
-                        activePresetIndex === idx ? 'var(--brand-primary)' : 'var(--text-primary)',
-                      fontWeight: 900,
+                      position: 'absolute',
+                      right: '10px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      color: 'var(--text-muted)',
+                      fontSize: '0.66rem',
                     }}
                   >
-                    <span>{tmpl.icon}</span>
-                    <span>{tmpl.name}</span>
-                  </span>
-                  {activePresetIndex === idx ? (
-                    <CheckCircle2 size={14} style={{ color: 'var(--brand-accent-teal)' }} />
-                  ) : null}
-                </span>
-                <span
-                  style={{
-                    color: 'var(--text-muted)',
-                    fontSize: '0.66rem',
-                    lineHeight: 1.42,
-                    display: '-webkit-box',
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: 'vertical',
-                    overflow: 'hidden',
-                  }}
-                >
-                  {tmpl.question}
-                </span>
-                <span
-                  style={{
-                    color: 'var(--brand-accent-teal)',
-                    fontSize: '0.62rem',
-                    fontWeight: 900,
-                  }}
-                >
-                  {
-                    PRESET_CATEGORY_OPTIONS.find((category) => category.value === tmpl.category)
-                      ?.label
-                  }{' '}
-                  템플릿
-                </span>
-              </button>
-            ))
-          ) : (
+                    지우기
+                  </button>
+                ) : null}
+              </div>
+            </label>
             <div
               style={{
-                gridColumn: '1 / -1',
-                border: '1px dashed rgba(250, 204, 21, 0.28)',
-                borderRadius: 'var(--radius-sm)',
-                background: 'rgba(250, 204, 21, 0.045)',
-                padding: '0.9rem',
                 display: 'grid',
-                gap: '0.5rem',
-                color: 'var(--text-secondary)',
-                fontSize: '0.74rem',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
+                gap: '8px',
               }}
             >
-              <strong style={{ color: 'var(--brand-accent-gold)', fontSize: '0.82rem' }}>
-                조건에 맞는 템플릿이 없습니다
-              </strong>
-              <span>
-                검색어를 줄이거나 전체 카테고리로 돌아가면 더 많은 시작점을 볼 수 있습니다.
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  setTemplateCategory('all');
-                  setTemplateSearchInput('');
-                }}
-                className="ghost-btn"
-                style={{
-                  justifySelf: 'start',
-                  padding: '6px 10px',
-                  fontSize: '0.68rem',
-                }}
-              >
-                전체 템플릿 보기
-              </button>
+              {visiblePresetTemplates.length > 0 ? (
+                visiblePresetTemplates.map(({ template: tmpl, index: idx }) => (
+                  <button
+                    type="button"
+                    key={idx}
+                    onClick={() => applyPreset(idx)}
+                    className="btn-secondary"
+                    style={{
+                      padding: '0.78rem',
+                      fontSize: '0.75rem',
+                      borderRadius: 'var(--radius-sm)',
+                      display: 'grid',
+                      alignItems: 'start',
+                      gap: '0.42rem',
+                      textAlign: 'left',
+                      backgroundColor:
+                        activePresetIndex === idx ? 'rgba(99, 102, 241, 0.15)' : 'transparent',
+                      borderColor:
+                        activePresetIndex === idx
+                          ? 'var(--brand-primary)'
+                          : 'var(--bg-card-border)',
+                    }}
+                  >
+                    <span
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                      }}
+                    >
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          color:
+                            activePresetIndex === idx
+                              ? 'var(--brand-primary)'
+                              : 'var(--text-primary)',
+                          fontWeight: 900,
+                        }}
+                      >
+                        <span>{tmpl.icon}</span>
+                        <span>{tmpl.name}</span>
+                      </span>
+                      {activePresetIndex === idx ? (
+                        <CheckCircle2 size={14} style={{ color: 'var(--brand-accent-teal)' }} />
+                      ) : null}
+                    </span>
+                    <span
+                      style={{
+                        color: 'var(--text-muted)',
+                        fontSize: '0.66rem',
+                        lineHeight: 1.42,
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      {tmpl.question}
+                    </span>
+                    <span
+                      style={{
+                        color: 'var(--brand-accent-teal)',
+                        fontSize: '0.62rem',
+                        fontWeight: 900,
+                      }}
+                    >
+                      {
+                        PRESET_CATEGORY_OPTIONS.find((category) => category.value === tmpl.category)
+                          ?.label
+                      }{' '}
+                      템플릿
+                    </span>
+                  </button>
+                ))
+              ) : (
+                <div
+                  style={{
+                    gridColumn: '1 / -1',
+                    border: '1px dashed rgba(250, 204, 21, 0.28)',
+                    borderRadius: 'var(--radius-sm)',
+                    background: 'rgba(250, 204, 21, 0.045)',
+                    padding: '0.9rem',
+                    display: 'grid',
+                    gap: '0.5rem',
+                    color: 'var(--text-secondary)',
+                    fontSize: '0.74rem',
+                  }}
+                >
+                  <strong style={{ color: 'var(--brand-accent-gold)', fontSize: '0.82rem' }}>
+                    조건에 맞는 템플릿이 없습니다
+                  </strong>
+                  <span>
+                    검색어를 줄이거나 전체 카테고리로 돌아가면 더 많은 시작점을 볼 수 있습니다.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTemplateCategory('all');
+                      setTemplateSearchInput('');
+                    }}
+                    className="ghost-btn"
+                    style={{
+                      justifySelf: 'start',
+                      padding: '6px 10px',
+                      fontSize: '0.68rem',
+                    }}
+                  >
+                    전체 템플릿 보기
+                  </button>
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          </div>
+        ) : null}
 
         <div
           style={{
@@ -1563,6 +1615,7 @@ export const CreatePoll: React.FC = () => {
           display: 'grid',
           gap: '0.9rem',
           cursor: 'default',
+          order: 3,
         }}
       >
         <div
@@ -1774,6 +1827,7 @@ export const CreatePoll: React.FC = () => {
           display: 'grid',
           gap: '0.95rem',
           cursor: 'default',
+          order: 4,
         }}
       >
         <div
@@ -2039,6 +2093,7 @@ export const CreatePoll: React.FC = () => {
           borderColor: canSubmit ? 'rgba(45, 212, 191, 0.22)' : 'rgba(250, 204, 21, 0.2)',
           background: canSubmit ? 'rgba(45, 212, 191, 0.04)' : 'rgba(250, 204, 21, 0.035)',
           cursor: 'default',
+          order: 5,
         }}
       >
         <div
@@ -2276,7 +2331,11 @@ export const CreatePoll: React.FC = () => {
           </span>
           <button
             type="button"
-            onClick={() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })}
+            onClick={() =>
+              document
+                .getElementById('create-poll-form')
+                ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            }
             className="ghost-btn"
             style={{
               display: 'inline-flex',
@@ -2286,13 +2345,14 @@ export const CreatePoll: React.FC = () => {
               fontSize: '0.7rem',
             }}
           >
-            <ArrowLeft size={13} style={{ transform: 'rotate(-90deg)' }} />
+            <ArrowLeft size={13} style={{ transform: 'rotate(90deg)' }} />
             입력 폼으로 이동
           </button>
         </div>
       </section>
 
       <form
+        id="create-poll-form"
         onSubmit={handleCreatePollSubmit}
         className="content-card"
         style={{
@@ -2301,8 +2361,29 @@ export const CreatePoll: React.FC = () => {
           flexDirection: 'column',
           gap: '1.5rem',
           cursor: 'default',
+          order: 1,
         }}
       >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            padding: '12px 14px',
+            borderRadius: 'var(--radius-sm)',
+            border: '1px solid rgba(45, 212, 191, 0.2)',
+            background: 'rgba(45, 212, 191, 0.05)',
+          }}
+        >
+          <span aria-hidden style={{ fontSize: '1.4rem', lineHeight: 1 }}>
+            🥑
+          </span>
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+            안녕하세요, 피키예요! 어떤 게 고민이세요? 아래에 질문만 적어주면 제가 예쁘게
+            정리해드릴게요.
+          </span>
+        </div>
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
           <label style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>
             고민 주제 (질문)

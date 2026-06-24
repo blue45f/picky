@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { HashRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { PollListPage } from './pages/PollListPage';
 import { CreatePollPage } from './pages/CreatePollPage';
 import { PollDetailPage } from './pages/PollDetailPage';
@@ -122,9 +122,11 @@ export function App() {
     void init();
   }, [init]);
 
-  // WebView 정적 번들에서 서버 라우트 의존 없이 동작하도록 HashRouter 사용.
+  // 라우터 규칙을 일반 웹(BrowserRouter)과 통일해 클린 경로(/poll/:id) 사용.
+  // 앱인토스 WebView는 "프로젝트에 설정한 웹 라우터 규칙을 그대로 따른다"(공식 문서),
+  // 진입은 SchemeEntryBridge가 딥링크를 클라이언트 라우팅으로 처리하므로 해시가 불필요.
   return (
-    <HashRouter>
+    <BrowserRouter>
       <SchemeEntryBridge />
       <GlobalParticleCanvas />
       <WelcomeSplash />
@@ -256,6 +258,6 @@ export function App() {
         )}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </HashRouter>
+    </BrowserRouter>
   );
 }

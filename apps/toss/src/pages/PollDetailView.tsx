@@ -184,6 +184,30 @@ export function PollDetailView(props: PollDetailViewProps) {
           ) : null}
         </div>
 
+        {hasVoted && !closed ? (
+          <div
+            className="rise"
+            style={{
+              marginTop: 4,
+              marginBottom: 4,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              padding: '12px 16px',
+              borderRadius: theme.radius,
+              background: theme.accentSoft,
+              border: `1px solid rgba(19, 194, 163, 0.28)`,
+            }}
+          >
+            <span aria-hidden style={{ fontSize: 22 }}>
+              {MASCOT.celebrate.emoji}
+            </span>
+            <span style={{ fontSize: 14, fontWeight: 800, color: theme.accent, lineHeight: 1.4 }}>
+              {MASCOT.celebrate.line}
+            </span>
+          </div>
+        ) : null}
+
         <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
           {displayOptions.map((option) => {
             const percent = optionPercent(option.voteCount, totalVotes);

@@ -784,6 +784,8 @@ export const PollDetail: React.FC = () => {
   const [voteMessage, setVoteMessage] = useState('');
   // 투표 완료 직후 마스코트 축하 한 줄(토스트). 중복 제출 가드와 함께 동작한다.
   const [voteSuccessNote, setVoteSuccessNote] = useState('');
+  // 투표 완료 시 잠깐 떠오르는 시각적 축하(마스코트 팝 + 컨페티). prefers-reduced-motion을 존중한다.
+  const [showVoteCelebration, setShowVoteCelebration] = useState(false);
   const [isSubmittingVote, setIsSubmittingVote] = useState(false);
   const [commentFilter, setCommentFilter] = useState<'all' | number>('all');
   const [resultSummaryMode, setResultSummaryMode] = useState<ResultSummaryMode>('brief');
@@ -1076,6 +1078,9 @@ export const PollDetail: React.FC = () => {
         // 피키 축하 한 줄 — 잠깐 노출 후 사라진다.
         setVoteSuccessNote(`${MASCOT.celebrate.emoji} ${MASCOT.celebrate.line}`);
         window.setTimeout(() => setVoteSuccessNote(''), 3200);
+        // 시각적 축하 연출(마스코트 팝 + 컨페티). 모션을 줄인 환경에선 CSS가 정적으로 처리한다.
+        setShowVoteCelebration(true);
+        window.setTimeout(() => setShowVoteCelebration(false), 1800);
       }
     } finally {
       setIsSubmittingVote(false);
@@ -1652,10 +1657,10 @@ export const PollDetail: React.FC = () => {
   const voteSubmitReady = votedOptionId !== null && !isLoading && !isSubmittingVote && !pollClosed;
   const voteSubmitBusy = isLoading || isSubmittingVote;
   const voteSubmitHint = pollClosed
-    ? '마감된 투표입니다.'
+    ? '아쉽지만 마감된 투표예요.'
     : votedOptionId
-      ? '제출하면 선택과 한마디가 함께 반영됩니다.'
-      : '먼저 선택지를 고르면 제출 버튼이 활성화됩니다.';
+      ? '제출하면 선택과 한마디가 함께 전해져요.'
+      : '먼저 마음에 드는 선택지를 골라볼까요?';
   const commentFilterOptions = currentPoll.options.map((option) => ({
     id: option.id,
     label: option.text,
@@ -2864,6 +2869,81 @@ export const PollDetail: React.FC = () => {
             </p>
           ) : null}
         </div>
+
+        {showVoteCelebration && !isEmbedMode && !isPresentationMode ? (
+          <div className="vote-celebrate" aria-hidden="true">
+            <style>{`
+              .vote-celebrate {
+                position: fixed;
+                inset: 0;
+                z-index: 60;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                pointer-events: none;
+                overflow: hidden;
+              }
+              .vote-celebrate__mascot {
+                font-size: 3.4rem;
+                line-height: 1;
+                filter: drop-shadow(0 10px 24px rgba(45, 212, 191, 0.32));
+                animation: voteCelebratePop 1.6s cubic-bezier(0.2, 0.9, 0.25, 1) forwards;
+              }
+              .vote-celebrate__piece {
+                position: absolute;
+                top: 48%;
+                left: 50%;
+                width: 9px;
+                height: 14px;
+                border-radius: 2px;
+                opacity: 0;
+                animation: voteConfettiFall 1.5s ease-out forwards;
+              }
+              @keyframes voteCelebratePop {
+                0% { transform: scale(0.3) translateY(8px); opacity: 0; }
+                28% { transform: scale(1.18) translateY(-6px); opacity: 1; }
+                55% { transform: scale(1) translateY(0); opacity: 1; }
+                100% { transform: scale(1.02) translateY(-4px); opacity: 0; }
+              }
+              @keyframes voteConfettiFall {
+                0% { transform: translate(-50%, -50%) rotate(0deg) scale(0.6); opacity: 0; }
+                12% { opacity: 1; }
+                100% { transform: translate(var(--cx), var(--cy)) rotate(var(--cr)) scale(1); opacity: 0; }
+              }
+              @media (prefers-reduced-motion: reduce) {
+                .vote-celebrate__mascot {
+                  animation: none;
+                  opacity: 1;
+                }
+                .vote-celebrate__piece { display: none; }
+              }
+            `}</style>
+            {[
+              { x: '-160px', y: '120px', r: '220deg', c: 'var(--brand-accent-teal)' },
+              { x: '150px', y: '130px', r: '-200deg', c: 'var(--brand-accent-gold)' },
+              { x: '-90px', y: '180px', r: '160deg', c: 'var(--brand-accent-coral)' },
+              { x: '110px', y: '175px', r: '-150deg', c: 'var(--brand-primary)' },
+              { x: '-200px', y: '60px', r: '300deg', c: 'var(--brand-accent-gold)' },
+              { x: '200px', y: '70px', r: '-260deg', c: 'var(--brand-accent-teal)' },
+              { x: '0px', y: '210px', r: '120deg', c: 'var(--brand-accent-coral)' },
+              { x: '-40px', y: '-150px', r: '90deg', c: 'var(--brand-primary)' },
+              { x: '60px', y: '-140px', r: '-110deg', c: 'var(--brand-accent-gold)' },
+            ].map((piece, index) => (
+              <span
+                key={index}
+                className="vote-celebrate__piece"
+                style={{
+                  ['--cx' as string]: piece.x,
+                  ['--cy' as string]: piece.y,
+                  ['--cr' as string]: piece.r,
+                  background: piece.c,
+                  animationDelay: `${index * 0.035}s`,
+                }}
+              />
+            ))}
+            <span className="vote-celebrate__mascot">{MASCOT.celebrate.emoji}</span>
+          </div>
+        ) : null}
 
         {/* Results Screen vs Voting Screen */}
         {hasVoted || pollClosed ? (

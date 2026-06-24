@@ -102,6 +102,7 @@ export function CreatePollPage() {
   const [deadlinePreset, setDeadlinePreset] = useState<DeadlinePreset>('none');
   const [customDeadline, setCustomDeadline] = useState('');
   const [endsAtIso, setEndsAtIso] = useState<string | null>(null);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const minCustom = useMemo(() => toDateTimeLocalValue(new Date(Date.now() + 5 * 60_000)), []);
@@ -233,10 +234,76 @@ export function CreatePollPage() {
     }
   };
 
+  const advancedSettings = (
+    <>
+      <div style={{ ...labelRowStyle, marginTop: 0 }}>
+        <span style={labelStyle}>언제 마감할까요? ⏰</span>
+        {deadlinePreview ? (
+          <Chip tone={isDeadlinePast ? 'danger' : 'gold'}>
+            {isDeadlinePast ? '⚠ 지난 시각이에요' : `~ ${deadlinePreview}`}
+          </Chip>
+        ) : null}
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        {DEADLINE_PRESETS.map((preset) => {
+          const active = preset.value === deadlinePreset;
+          return (
+            <button
+              key={preset.value}
+              type="button"
+              className="pressable"
+              aria-pressed={active}
+              onClick={() => selectDeadlinePreset(preset.value)}
+              style={{
+                minHeight: 40,
+                padding: '8px 16px',
+                borderRadius: theme.radiusPill,
+                border: `1px solid ${active ? 'rgba(19,194,163,0.3)' : 'rgba(255,255,255,0.04)'}`,
+                background: active ? theme.accentSoft : 'rgba(255,255,255,0.02)',
+                backdropFilter: 'blur(16px)',
+                WebkitBackdropFilter: 'blur(16px)',
+                color: active ? theme.accent : theme.textMuted,
+                fontSize: 13.5,
+                fontWeight: 700,
+                cursor: 'pointer',
+                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.01)',
+              }}
+            >
+              {preset.label}
+            </button>
+          );
+        })}
+      </div>
+      {deadlinePreset === 'custom' ? (
+        <input
+          type="datetime-local"
+          value={customDeadline}
+          min={minCustom}
+          onChange={(e) => handleCustomDeadlineChange(e.target.value)}
+          style={{ ...fieldStyle, marginTop: 10, colorScheme: 'dark' }}
+          aria-label="마감 시간 직접 선택"
+        />
+      ) : null}
+
+      <span style={{ ...labelStyle, display: 'block', margin: '24px 0 8px' }}>
+        결과는 언제 보여줄까요? 👀
+      </span>
+      <SegmentedControl
+        ariaLabel="결과 공개 시점"
+        options={RESULT_OPTIONS}
+        value={resultsVisibility}
+        onChange={setResultsVisibility}
+      />
+      <p style={{ fontSize: 13, color: theme.textFaint, marginTop: 8, marginLeft: 2 }}>
+        투표 후 바로 확인하거나 언제든 공개할 수 있어요
+      </p>
+    </>
+  );
+
   return (
     <div style={{ minHeight: '100dvh' }}>
       <AppBar
-        title={step === 1 ? '고민 시작하기 💬 (1/2)' : '투표 옵션 설정 🎨 (2/2)'}
+        title={step === 1 ? '무엇이 고민이에요? 💬 (1/2)' : '선택지를 채워요 🎨 (2/2)'}
         onBack={handleBack}
       />
 
@@ -255,6 +322,17 @@ export function CreatePollPage() {
       <div style={{ maxWidth: 520, margin: '0 auto', padding: '0 20px 140px' }}>
         {step === 1 ? (
           <div className="rise" key="step1">
+            <p
+              style={{
+                fontSize: 14,
+                color: theme.textMuted,
+                lineHeight: 1.5,
+                margin: '16px 0 4px',
+              }}
+            >
+              먼저 <strong style={{ color: theme.text }}>고민거리</strong>만 적어주세요. 선택지는
+              다음 단계에서 채워요 🥑
+            </p>
             <div style={labelRowStyle}>
               <label style={labelStyle} htmlFor="poll-question">
                 풀고 싶은 고민 💬
@@ -337,9 +415,95 @@ export function CreatePollPage() {
                 );
               })}
             </div>
+
+            {/* 접이식 고급 옵션 — 마감/결과공개를 1단계에서 미리 정해 단계 왕복을 줄여요 */}
+            <button
+              type="button"
+              className="pressable"
+              aria-expanded={advancedOpen}
+              onClick={() => {
+                hapticFeedback('tickWeak');
+                setAdvancedOpen((prev) => !prev);
+              }}
+              style={{
+                width: '100%',
+                marginTop: 28,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 8,
+                padding: '14px 16px',
+                borderRadius: theme.radiusSm,
+                border: `1px solid ${theme.border}`,
+                background: 'rgba(255,255,255,0.02)',
+                color: theme.text,
+                fontSize: 14,
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                ⚙️ 마감·결과 공개 설정
+                <span style={{ fontSize: 12.5, fontWeight: 600, color: theme.textFaint }}>
+                  {advancedOpen ? '' : '(선택)'}
+                </span>
+              </span>
+              <span
+                aria-hidden
+                style={{
+                  fontSize: 13,
+                  color: theme.textMuted,
+                  transition: 'transform 0.25s ease',
+                  transform: advancedOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                }}
+              >
+                ▾
+              </span>
+            </button>
+            <div
+              className="disclosure-enter"
+              style={{
+                maxHeight: advancedOpen ? 520 : 0,
+                opacity: advancedOpen ? 1 : 0,
+                overflow: 'hidden',
+                marginTop: advancedOpen ? 16 : 0,
+              }}
+            >
+              {advancedSettings}
+            </div>
           </div>
         ) : (
           <div className="rise" key="step2">
+            <p
+              style={{
+                fontSize: 14,
+                color: theme.textMuted,
+                lineHeight: 1.5,
+                margin: '16px 0 12px',
+              }}
+            >
+              친구들이 고를 <strong style={{ color: theme.text }}>선택지</strong>를 채워주세요.
+              사진을 곁들이면 더 즐거워요 📷
+            </p>
+
+            <div style={labelRowStyle}>
+              <label style={labelStyle} htmlFor="poll-question-2">
+                고민 다시 보기 💬
+              </label>
+              <span style={counterStyle}>
+                {question.length}/{QUESTION_MAX}
+              </span>
+            </div>
+            <input
+              id="poll-question-2"
+              style={fieldStyle}
+              value={question}
+              maxLength={QUESTION_MAX}
+              placeholder="어떤 까다로운 고민이 있으신가요? 🤔"
+              aria-label="고민 질문 수정"
+              onChange={(e) => setQuestion(e.target.value)}
+            />
+
             <div style={labelRowStyle}>
               <span style={labelStyle}>투표지 만들기 🎨</span>
               <span style={counterStyle}>
@@ -557,65 +721,39 @@ export function CreatePollPage() {
               </button>
             ) : null}
 
-            <div style={labelRowStyle}>
-              <span style={labelStyle}>언제 마감할까요? ⏰</span>
-              {deadlinePreview ? (
-                <Chip tone={isDeadlinePast ? 'danger' : 'gold'}>
-                  {isDeadlinePast ? '⚠ 지난 시각이에요' : `~ ${deadlinePreview}`}
-                </Chip>
-              ) : null}
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {DEADLINE_PRESETS.map((preset) => {
-                const active = preset.value === deadlinePreset;
-                return (
-                  <button
-                    key={preset.value}
-                    type="button"
-                    className="pressable"
-                    aria-pressed={active}
-                    onClick={() => selectDeadlinePreset(preset.value)}
-                    style={{
-                      minHeight: 40,
-                      padding: '8px 16px',
-                      borderRadius: theme.radiusPill,
-                      border: `1px solid ${active ? 'rgba(19,194,163,0.3)' : 'rgba(255,255,255,0.04)'}`,
-                      background: active ? theme.accentSoft : 'rgba(255,255,255,0.02)',
-                      backdropFilter: 'blur(16px)',
-                      WebkitBackdropFilter: 'blur(16px)',
-                      color: active ? theme.accent : theme.textMuted,
-                      fontSize: 13.5,
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.01)',
-                    }}
-                  >
-                    {preset.label}
-                  </button>
-                );
-              })}
-            </div>
-            {deadlinePreset === 'custom' ? (
-              <input
-                type="datetime-local"
-                value={customDeadline}
-                min={minCustom}
-                onChange={(e) => handleCustomDeadlineChange(e.target.value)}
-                style={{ ...fieldStyle, marginTop: 10, colorScheme: 'dark' }}
-                aria-label="마감 시간 직접 선택"
-              />
-            ) : null}
-
-            <span style={{ ...labelStyle, margin: '24px 0 8px' }}>결과는 언제 보여줄까요? 👀</span>
-            <SegmentedControl
-              ariaLabel="결과 공개 시점"
-              options={RESULT_OPTIONS}
-              value={resultsVisibility}
-              onChange={setResultsVisibility}
-            />
-            <p style={{ fontSize: 13, color: theme.textFaint, marginTop: 8, marginLeft: 2 }}>
-              투표 후 바로 확인하거나 언제든 공개할 수 있어요
-            </p>
+            {/* 1단계에서 고급 옵션을 건드리지 않았을 때만, 2단계에서도 빠르게 펼칠 수 있게 안내 */}
+            <button
+              type="button"
+              className="pressable"
+              onClick={() => {
+                hapticFeedback('tickWeak');
+                setStep(1);
+                setAdvancedOpen(true);
+              }}
+              style={{
+                width: '100%',
+                marginTop: 18,
+                padding: '12px 16px',
+                borderRadius: theme.radiusSm,
+                border: `1px solid ${theme.border}`,
+                background: 'rgba(255,255,255,0.02)',
+                color: theme.textMuted,
+                fontSize: 13.5,
+                fontWeight: 700,
+                cursor: 'pointer',
+                textAlign: 'left',
+              }}
+            >
+              ⚙️ 마감·결과 공개{' '}
+              <span style={{ color: theme.accent }}>
+                {endsAtIso
+                  ? `~ ${deadlinePreview}`
+                  : resultsVisibility === 'always'
+                    ? '항상 공개'
+                    : '투표하고 보기'}
+              </span>{' '}
+              <span style={{ color: theme.textFaint, fontWeight: 600 }}>· 바꾸기</span>
+            </button>
           </div>
         )}
 
