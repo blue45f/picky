@@ -15,6 +15,7 @@ import { Navbar } from './components/Navbar';
 import { RouteAnnouncer } from './components/layout/RouteAnnouncer';
 import { IntroSplashScreen } from './components/IntroSplashScreen';
 import { useAuthStore } from './store/useAuthStore';
+import { pingVisit } from './lib/deskPlatform';
 
 // 라우트 단위 코드 스플리팅 — 초기 번들에서 무거운 페이지(작성/디자인 등)를 분리해요.
 const PollList = lazy(() => import('./pages/PollList').then((m) => ({ default: m.PollList })));
@@ -23,6 +24,7 @@ const CreatePoll = lazy(() =>
 );
 const EditPoll = lazy(() => import('./pages/EditPoll').then((m) => ({ default: m.EditPoll })));
 const Admin = lazy(() => import('./pages/Admin').then((m) => ({ default: m.Admin })));
+const Support = lazy(() => import('./pages/Support').then((m) => ({ default: m.Support })));
 const PollDetail = lazy(() =>
   import('./pages/PollDetail').then((m) => ({ default: m.PollDetail })),
 );
@@ -88,6 +90,8 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     fetchMe();
+    // desk-platform 방문 집계(공개·키 불필요). 실패는 조용히 무시.
+    void pingVisit();
   }, [fetchMe]);
 
   return (
@@ -120,6 +124,7 @@ export const App: React.FC = () => {
               <Route path="/poll/:id" element={<PollDetail />} />
               <Route path="/poll/:id/edit" element={<EditPoll />} />
               <Route path="/admin" element={<Admin />} />
+              <Route path="/support" element={<Support />} />
               <Route path="/share/:id" element={<ShareRouteRedirect />} />
               <Route path="/embed/:id" element={<PollDetail />} />
               <Route path="/present/:id" element={<PollDetail />} />

@@ -8,6 +8,7 @@ import { ThemeSwitcher } from './ThemeSwitcher';
 const navItems = [
   { path: '/', label: '고민 둘러보기' },
   { path: '/create', label: '새 고민 작성' },
+  { path: '/support', label: '고객센터' },
 ];
 
 export const Navbar: React.FC = () => {

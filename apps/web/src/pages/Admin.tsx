@@ -4,6 +4,7 @@ import { BarChart3, Eye, MessageSquare, Pencil, ShieldCheck, Trash2, Users } fro
 import { usePollStore } from '../store/usePollStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { getVisitStats, type VisitStats } from '../lib/deskPlatform';
 import type { Poll } from '@picky/shared';
 
 const resolveAuthorLabel = (poll: Poll, userId?: string): { label: string; tone: string } => {
@@ -51,10 +52,15 @@ export const Admin: React.FC = () => {
 
   const isAdmin = !!user?.isAdmin;
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [visits, setVisits] = useState<VisitStats | null>(null);
 
   useEffect(() => {
     if (isAdmin) {
       fetchPolls();
+      // desk-platform 방문 집계(공개·키 불필요).
+      getVisitStats()
+        .then(setVisits)
+        .catch(() => setVisits(null));
     }
   }, [isAdmin, fetchPolls]);
 
@@ -198,6 +204,29 @@ export const Admin: React.FC = () => {
           <strong style={{ fontSize: '1.4rem', color: 'var(--text-primary)' }}>
             {summary.totalComments}
           </strong>
+        </div>
+        <div style={summaryCardStyle}>
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
+              fontSize: '0.72rem',
+              color: 'var(--text-muted)',
+              fontWeight: 700,
+            }}
+          >
+            <Eye size={13} style={{ color: 'var(--brand-primary-light)' }} />
+            방문 (오늘 · desk-platform)
+          </span>
+          <strong style={{ fontSize: '1.4rem', color: 'var(--text-primary)' }}>
+            {visits ? visits.todayVisits.toLocaleString() : '—'}
+          </strong>
+          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+            {visits
+              ? `오늘 방문자 ${visits.todayUniques.toLocaleString()} · 누적 ${visits.totalVisits.toLocaleString()}`
+              : '집계를 불러오는 중…'}
+          </span>
         </div>
       </section>
 
