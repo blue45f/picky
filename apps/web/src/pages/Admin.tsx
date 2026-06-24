@@ -1,11 +1,34 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { BarChart3, Eye, MessageSquare, Pencil, ShieldCheck, Trash2, Users } from 'lucide-react';
+import {
+  BarChart3,
+  Eye,
+  Inbox,
+  Mail,
+  MessageSquare,
+  Pencil,
+  ShieldCheck,
+  Trash2,
+  Users,
+} from 'lucide-react';
 import { usePollStore } from '../store/usePollStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { getVisitStats, type VisitStats } from '../lib/deskPlatform';
+import {
+  fetchAdminInquiries,
+  updateInquiryStatus,
+  type AdminInquiry,
+  type InquiryStatus,
+} from '../lib/adminInquiry';
 import type { Poll } from '@picky/shared';
+
+const INQUIRY_STATUS_FLOW: { value: InquiryStatus; label: string; tone: string }[] = [
+  { value: 'new', label: '접수', tone: 'var(--brand-accent-gold)' },
+  { value: 'in_progress', label: '처리 중', tone: 'var(--brand-primary-light)' },
+  { value: 'resolved', label: '해결', tone: 'var(--brand-accent-teal)' },
+  { value: 'closed', label: '종료', tone: 'var(--text-muted)' },
+];
 
 const resolveAuthorLabel = (poll: Poll, userId?: string): { label: string; tone: string } => {
   if (userId && poll.creatorId === userId) {
@@ -53,6 +76,22 @@ export const Admin: React.FC = () => {
   const isAdmin = !!user?.isAdmin;
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [visits, setVisits] = useState<VisitStats | null>(null);
+  const [inquiries, setInquiries] = useState<AdminInquiry[]>([]);
+  const [inquiryLoading, setInquiryLoading] = useState(false);
+  const [inquiryError, setInquiryError] = useState<string | null>(null);
+
+  const loadInquiries = useCallback(async () => {
+    setInquiryLoading(true);
+    setInquiryError(null);
+    try {
+      const list = await fetchAdminInquiries();
+      setInquiries(list.items);
+    } catch (err) {
+      setInquiryError(err instanceof Error ? err.message : '문의를 불러오지 못했어요.');
+    } finally {
+      setInquiryLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (isAdmin) {
@@ -61,8 +100,19 @@ export const Admin: React.FC = () => {
       getVisitStats()
         .then(setVisits)
         .catch(() => setVisits(null));
+      // desk-platform 문의 관리(운영자 전용, picky API 프록시).
+      void loadInquiries();
     }
-  }, [isAdmin, fetchPolls]);
+  }, [isAdmin, fetchPolls, loadInquiries]);
+
+  const handleInquiryStatus = async (id: string, status: InquiryStatus) => {
+    try {
+      const updated = await updateInquiryStatus(id, status);
+      setInquiries((prev) => prev.map((item) => (item.id === id ? { ...item, ...updated } : item)));
+    } catch (err) {
+      setInquiryError(err instanceof Error ? err.message : '상태 변경에 실패했어요.');
+    }
+  };
 
   const summary = useMemo(() => {
     const totalVotes = polls.reduce((sum, poll) => sum + (poll.totalVotes || 0), 0);
@@ -381,6 +431,136 @@ export const Admin: React.FC = () => {
           </table>
         </div>
       ) : null}
+
+      <section aria-label="문의 관리" style={{ display: 'grid', gap: '0.75rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <Inbox size={18} style={{ color: 'var(--brand-accent-teal)' }} />
+          <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 800 }}>
+            문의 관리 (desk-platform)
+          </h2>
+          <button
+            type="button"
+            className="ghost-btn"
+            onClick={() => void loadInquiries()}
+            aria-label="문의 새로고침"
+            style={{ marginLeft: 'auto' }}
+          >
+            새로고침
+          </button>
+        </div>
+
+        {inquiryError ? (
+          <p
+            role="alert"
+            style={{ margin: 0, fontSize: '0.82rem', color: 'var(--brand-accent-coral)' }}
+          >
+            {inquiryError}
+          </p>
+        ) : null}
+        {inquiryLoading ? <div className="skeleton" style={{ height: 72 }} /> : null}
+        {!inquiryLoading && inquiries.length === 0 && !inquiryError ? (
+          <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+            접수된 문의가 없어요.
+          </p>
+        ) : null}
+
+        {inquiries.map((inquiry) => {
+          const statusMeta = INQUIRY_STATUS_FLOW.find(
+            (entry) => entry.value === inquiry.status,
+          ) ?? { value: inquiry.status, label: inquiry.status, tone: 'var(--text-muted)' };
+          return (
+            <article
+              key={inquiry.id}
+              style={{
+                display: 'grid',
+                gap: '0.5rem',
+                padding: '0.9rem 1rem',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--bg-card-border)',
+                background: 'rgba(255,255,255,0.02)',
+              }}
+            >
+              <div
+                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}
+              >
+                <span
+                  style={{
+                    fontSize: '0.72rem',
+                    fontWeight: 700,
+                    padding: '0.1rem 0.45rem',
+                    borderRadius: 999,
+                    color: statusMeta.tone,
+                    border: `1px solid ${statusMeta.tone}`,
+                  }}
+                >
+                  {statusMeta.label}
+                </span>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  {inquiry.category}
+                </span>
+                <strong style={{ fontSize: '0.9rem' }}>{inquiry.title}</strong>
+              </div>
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: '0.83rem',
+                  color: 'var(--text-secondary)',
+                  lineHeight: 1.55,
+                  whiteSpace: 'pre-wrap',
+                }}
+              >
+                {inquiry.body}
+              </p>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.6rem',
+                  flexWrap: 'wrap',
+                  fontSize: '0.76rem',
+                  color: 'var(--text-muted)',
+                }}
+              >
+                {inquiry.authorName ? <span>{inquiry.authorName}</span> : null}
+                {inquiry.contactEmail ? (
+                  <a
+                    href={`mailto:${inquiry.contactEmail}`}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '3px',
+                      color: 'var(--brand-primary-light)',
+                    }}
+                  >
+                    <Mail size={12} /> {inquiry.contactEmail}
+                  </a>
+                ) : null}
+                <span style={{ marginLeft: 'auto' }}>{formatDate(inquiry.createdAt)}</span>
+              </div>
+              <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                {INQUIRY_STATUS_FLOW.map((entry) => (
+                  <button
+                    key={entry.value}
+                    type="button"
+                    className="ghost-btn"
+                    disabled={entry.value === inquiry.status}
+                    onClick={() => void handleInquiryStatus(inquiry.id, entry.value)}
+                    aria-label={`상태를 ${entry.label}(으)로 변경`}
+                    style={{
+                      fontSize: '0.74rem',
+                      opacity: entry.value === inquiry.status ? 0.5 : 1,
+                      borderColor:
+                        entry.value === inquiry.status ? entry.tone : 'var(--bg-card-border)',
+                    }}
+                  >
+                    {entry.label}
+                  </button>
+                ))}
+              </div>
+            </article>
+          );
+        })}
+      </section>
     </div>
   );
 };

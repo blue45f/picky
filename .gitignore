@@ -21,3 +21,7 @@ build
 /*.png
 /*-structure.md
 /*-fields.md
+
+# 로컬 운영 계정/토큰 메모(커밋 금지)
+ADMIN-ACCOUNTS.local.md
+*.local.secrets.md

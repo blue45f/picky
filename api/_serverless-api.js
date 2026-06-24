@@ -17670,6 +17670,7 @@ var require_dist2 = __commonJS({
     var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
     var index_exports = {};
     __export(index_exports, {
+      BETA_NOTICE: () => BETA_NOTICE,
       CreatePollSchema: () => CreatePollSchema,
       GuestRegisterSchema: () => GuestRegisterSchema,
       LoginSchema: () => LoginSchema,
@@ -17720,6 +17721,7 @@ var require_dist2 = __commonJS({
       scanHint: "\uCE74\uBA54\uB77C\uB85C \uC2A4\uCE94\uD558\uBA74 \uBC14\uB85C \uCC38\uC5EC\uD560 \uC218 \uC788\uC5B4\uC694"
     };
     var RADIUS = { sm: 12, md: 18, lg: 24, pill: 999 };
+    var BETA_NOTICE = "\uBCA0\uD0C0 \uAE30\uAC04\uC774\uB77C \uD22C\uD45C \uB370\uC774\uD130\uAC00 \uCD08\uAE30\uD654\uB420 \uC218 \uC788\uC5B4\uC694";
     var PollResultsVisibilitySchema = import_zod.z.enum(["afterVote", "always"]);
     var PollAttachmentSchema = import_zod.z.object({
       name: import_zod.z.string().min(1, "\uCCA8\uBD80\uD30C\uC77C \uC774\uB984\uC740 \uD544\uC218\uC785\uB2C8\uB2E4.").max(120, "\uCCA8\uBD80\uD30C\uC77C \uC774\uB984\uC740 120\uC790 \uC774\uD558\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4."),
@@ -18712,6 +18714,163 @@ var require_poll_module = __commonJS({
   }
 });
 
+// apps/api/dist/modules/desk/desk-inquiry.service.js
+var require_desk_inquiry_service = __commonJS({
+  "apps/api/dist/modules/desk/desk-inquiry.service.js"(exports2) {
+    "use strict";
+    var __decorate = exports2 && exports2.__decorate || function(decorators, target, key, desc) {
+      var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+      if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+      else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+      return c > 3 && r && Object.defineProperty(target, key, r), r;
+    };
+    Object.defineProperty(exports2, "__esModule", { value: true });
+    exports2.DeskInquiryService = void 0;
+    var common_1 = require("@nestjs/common");
+    var INQUIRY_STATUSES = ["new", "in_progress", "resolved", "closed"];
+    var DeskInquiryService = class DeskInquiryService {
+      base = (process.env.DESK_PLATFORM_URL?.trim() || "https://desk-platform.vercel.app").replace(/\/+$/, "");
+      appId = (process.env.DESK_INQUIRY_APP_ID?.trim() || "picky").toLowerCase();
+      token = process.env.DESK_INQUIRY_ADMIN_TOKEN?.trim() || "";
+      ensureConfigured() {
+        if (!this.token) {
+          throw new common_1.ServiceUnavailableException("\uBB38\uC758 \uAD00\uB9AC \uD1A0\uD070\uC774 \uC124\uC815\uB418\uC9C0 \uC54A\uC558\uC5B4\uC694. \uC11C\uBC84\uC5D0 DESK_INQUIRY_ADMIN_TOKEN \uD658\uACBD\uBCC0\uC218\uB97C \uC124\uC815\uD574 \uC8FC\uC138\uC694.");
+        }
+      }
+      async readError(res) {
+        try {
+          const data = await res.json();
+          if (Array.isArray(data.message))
+            return data.message.join(", ");
+          if (typeof data.message === "string" && data.message.trim())
+            return data.message;
+        } catch {
+        }
+        return "\uBB38\uC758 \uAD00\uB9AC \uC694\uCCAD\uC5D0 \uC2E4\uD328\uD588\uC5B4\uC694.";
+      }
+      async listAdmin(status) {
+        this.ensureConfigured();
+        const url = new URL(`${this.base}/api/v1/apps/${this.appId}/inquiries/admin`);
+        if (status && INQUIRY_STATUSES.includes(status)) {
+          url.searchParams.set("status", status);
+        }
+        const res = await fetch(url, { headers: { "X-Admin-Token": this.token } });
+        if (!res.ok) {
+          throw new common_1.HttpException(await this.readError(res), res.status);
+        }
+        return res.json();
+      }
+      async updateStatus(id, status) {
+        this.ensureConfigured();
+        if (!INQUIRY_STATUSES.includes(status)) {
+          throw new common_1.BadRequestException(`\uC0C1\uD0DC\uB294 ${INQUIRY_STATUSES.join("/")} \uC911 \uD558\uB098\uC5EC\uC57C \uD569\uB2C8\uB2E4.`);
+        }
+        const res = await fetch(`${this.base}/api/v1/apps/${this.appId}/inquiries/${encodeURIComponent(id)}/status`, {
+          method: "PATCH",
+          headers: { "X-Admin-Token": this.token, "Content-Type": "application/json" },
+          body: JSON.stringify({ status })
+        });
+        if (!res.ok) {
+          throw new common_1.HttpException(await this.readError(res), res.status);
+        }
+        return res.json();
+      }
+    };
+    exports2.DeskInquiryService = DeskInquiryService;
+    exports2.DeskInquiryService = DeskInquiryService = __decorate([
+      (0, common_1.Injectable)()
+    ], DeskInquiryService);
+  }
+});
+
+// apps/api/dist/modules/desk/desk-inquiry.controller.js
+var require_desk_inquiry_controller = __commonJS({
+  "apps/api/dist/modules/desk/desk-inquiry.controller.js"(exports2) {
+    "use strict";
+    var __decorate = exports2 && exports2.__decorate || function(decorators, target, key, desc) {
+      var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+      if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+      else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+      return c > 3 && r && Object.defineProperty(target, key, r), r;
+    };
+    var __metadata = exports2 && exports2.__metadata || function(k, v) {
+      if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+    };
+    var __param = exports2 && exports2.__param || function(paramIndex, decorator) {
+      return function(target, key) {
+        decorator(target, key, paramIndex);
+      };
+    };
+    Object.defineProperty(exports2, "__esModule", { value: true });
+    exports2.DeskInquiryController = void 0;
+    var common_1 = require("@nestjs/common");
+    var auth_guard_1 = require_auth_guard();
+    var desk_inquiry_service_1 = require_desk_inquiry_service();
+    var DeskInquiryController = class DeskInquiryController {
+      deskInquiry;
+      constructor(deskInquiry) {
+        this.deskInquiry = deskInquiry;
+      }
+      list(status) {
+        return this.deskInquiry.listAdmin(status);
+      }
+      updateStatus(id, body) {
+        return this.deskInquiry.updateStatus(id, String(body?.status ?? ""));
+      }
+    };
+    exports2.DeskInquiryController = DeskInquiryController;
+    __decorate([
+      (0, common_1.Get)(),
+      __param(0, (0, common_1.Query)("status")),
+      __metadata("design:type", Function),
+      __metadata("design:paramtypes", [String]),
+      __metadata("design:returntype", void 0)
+    ], DeskInquiryController.prototype, "list", null);
+    __decorate([
+      (0, common_1.Patch)(":id/status"),
+      __param(0, (0, common_1.Param)("id")),
+      __param(1, (0, common_1.Body)()),
+      __metadata("design:type", Function),
+      __metadata("design:paramtypes", [String, Object]),
+      __metadata("design:returntype", void 0)
+    ], DeskInquiryController.prototype, "updateStatus", null);
+    exports2.DeskInquiryController = DeskInquiryController = __decorate([
+      (0, common_1.Controller)("admin/inquiries"),
+      (0, common_1.UseGuards)(auth_guard_1.AdminGuard),
+      __metadata("design:paramtypes", [desk_inquiry_service_1.DeskInquiryService])
+    ], DeskInquiryController);
+  }
+});
+
+// apps/api/dist/modules/desk/desk.module.js
+var require_desk_module = __commonJS({
+  "apps/api/dist/modules/desk/desk.module.js"(exports2) {
+    "use strict";
+    var __decorate = exports2 && exports2.__decorate || function(decorators, target, key, desc) {
+      var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+      if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+      else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+      return c > 3 && r && Object.defineProperty(target, key, r), r;
+    };
+    Object.defineProperty(exports2, "__esModule", { value: true });
+    exports2.DeskModule = void 0;
+    var common_1 = require("@nestjs/common");
+    var auth_module_1 = require_auth_module();
+    var desk_inquiry_controller_1 = require_desk_inquiry_controller();
+    var desk_inquiry_service_1 = require_desk_inquiry_service();
+    var DeskModule = class DeskModule {
+    };
+    exports2.DeskModule = DeskModule;
+    exports2.DeskModule = DeskModule = __decorate([
+      (0, common_1.Module)({
+        imports: [auth_module_1.AuthModule],
+        controllers: [desk_inquiry_controller_1.DeskInquiryController],
+        providers: [desk_inquiry_service_1.DeskInquiryService]
+      })
+    ], DeskModule);
+  }
+});
+
 // apps/api/dist/app.module.js
 var require_app_module = __commonJS({
   "apps/api/dist/app.module.js"(exports2) {
@@ -18728,12 +18887,13 @@ var require_app_module = __commonJS({
     var database_module_1 = require_database_module();
     var poll_module_1 = require_poll_module();
     var auth_module_1 = require_auth_module();
+    var desk_module_1 = require_desk_module();
     var AppModule = class AppModule {
     };
     exports2.AppModule = AppModule;
     exports2.AppModule = AppModule = __decorate([
       (0, common_1.Module)({
-        imports: [database_module_1.DatabaseModule, poll_module_1.PollModule, auth_module_1.AuthModule]
+        imports: [database_module_1.DatabaseModule, poll_module_1.PollModule, auth_module_1.AuthModule, desk_module_1.DeskModule]
       })
     ], AppModule);
   }
