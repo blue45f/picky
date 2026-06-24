@@ -505,6 +505,7 @@ export class DatabaseService implements OnModuleInit {
         resultsVisibility: r.resultsVisibility as any,
         creatorId: r.creatorId,
         creatorIsGuest: r.creatorIsGuest,
+        categoryId: r.categoryId,
         attachments: r.attachments as any,
         options: r.options.map((o) => ({
           id: o.optionIndex,
@@ -551,6 +552,7 @@ export class DatabaseService implements OnModuleInit {
         resultsVisibility: r.resultsVisibility as any,
         creatorId: r.creatorId,
         creatorIsGuest: r.creatorIsGuest,
+        categoryId: r.categoryId,
         attachments: r.attachments as any,
         options: r.options.map((o) => ({
           id: o.optionIndex,
@@ -585,6 +587,7 @@ export class DatabaseService implements OnModuleInit {
         resultsVisibility: poll.resultsVisibility || 'afterVote',
         creatorId: poll.creatorId,
         creatorIsGuest: poll.creatorIsGuest ?? true,
+        categoryId: poll.categoryId ?? null,
         attachments: poll.attachments as any,
       });
       if (poll.options && poll.options.length > 0) {
