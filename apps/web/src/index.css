@@ -2327,6 +2327,37 @@ body.present-mode .page-shell {
   z-index: 2;
 }
 
+/* 핀/최근 미니 카드용 stretched-link — 카드 전체를 덮는 접근성 내비 버튼(키보드+마우스).
+   내부 아이콘 버튼은 z-index 로 위에 떠서 개별 동작(중첩 인터랙티브 위반 없이 카드 활성화). */
+.card-stretch-open {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: inherit;
+}
+.card-stretch-open:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-outline);
+}
+
+/* 작은 아이콘 버튼(핀·삭제·X)의 히트 영역을 WCAG 타깃 크기까지 확장 — 시각 크기는 유지. */
+.icon-hit {
+  min-width: 34px;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+}
+.icon-hit:hover {
+  background: var(--bg-card-hover) !important;
+}
+
 /* 브랜드 마크 클릭 시 통통 튀는 젤리 바운스(토스 타이틀의 즐거운 피드백을 웹에도).
    클릭마다 key 가 바뀌어 재마운트되며 애니메이션이 재생된다. */
 @keyframes brandBounce {

@@ -41,6 +41,13 @@ export const VoteDonutChart: React.FC<VoteDonutChartProps> = ({ options }) => {
   const radius = 46;
   const circumference = 2 * Math.PI * radius;
 
+  // 스크린리더용 분포 요약 — 도넛은 시각 전용이라 텍스트 대안으로 각 선택지 비율을 읽어준다.
+  const distributionLabel = options
+    .filter((opt) => opt.voteCount > 0)
+    .map((opt) => `${opt.text} ${Math.round((opt.voteCount / total) * 100)}%`)
+    .join(', ');
+  const chartLabel = `투표 결과 도넛 차트. 총 ${total}표 — ${distributionLabel}`;
+
   return (
     <div
       style={{
@@ -52,7 +59,15 @@ export const VoteDonutChart: React.FC<VoteDonutChartProps> = ({ options }) => {
         height: '150px',
       }}
     >
-      <svg width="100%" height="100%" viewBox="0 0 120 120" style={{ transform: 'rotate(-90deg)' }}>
+      <svg
+        width="100%"
+        height="100%"
+        viewBox="0 0 120 120"
+        role="img"
+        aria-label={chartLabel}
+        style={{ transform: 'rotate(-90deg)' }}
+      >
+        <title>{chartLabel}</title>
         {options.map((opt, i) => {
           const percent = opt.voteCount / total;
           if (percent === 0) return null;

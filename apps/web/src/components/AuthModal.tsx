@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { X, Mail, Lock, User, LogIn, UserPlus, UserCog, AlertCircle } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 
@@ -47,6 +47,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [password, setPassword] = useState('');
   const [nickname, setNickname] = useState('');
   const [formError, setFormError] = useState('');
+
+  // 접근성: 모달 포커스 트랩·복원에 쓰는 ref. closeRef 는 최신 handleClose 를 가리켜
+  // (handleClose 가 조기 return 아래 정의되므로) 훅에서 안전하게 호출한다.
+  const modalRef = useRef<HTMLDivElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+  const closeRef = useRef<() => void>(() => {});
 
   const isLoginMode = mode === 'login';
   const isRegisterMode = mode === 'register';
@@ -116,6 +122,52 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     clearError();
     clearValidationErrors();
   }, [isOpen, initialMode, guestName, clearError, clearValidationErrors]);
+
+  // 모달 포커스 트랩 + Esc 닫기 + 포커스 복원 (직접 만든 모달이라 직접 구현)
+  useEffect(() => {
+    if (!isOpen) return;
+    previousFocusRef.current = document.activeElement as HTMLElement | null;
+    const node = modalRef.current;
+    const getFocusable = () =>
+      node
+        ? Array.from(
+            node.querySelectorAll<HTMLElement>(
+              'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+            ),
+          )
+        : [];
+    // 여는 클릭의 기본 포커스 처리와 경쟁하지 않도록 다음 프레임에 첫 입력으로 포커스 이동
+    const focusRaf = requestAnimationFrame(() => {
+      const focusables = getFocusable();
+      (focusables.find((el) => el.tagName === 'INPUT') ?? focusables[0])?.focus();
+    });
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeRef.current();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const list = getFocusable();
+      const first = list[0];
+      const last = list[list.length - 1];
+      if (!first || !last) return;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown, true);
+    return () => {
+      cancelAnimationFrame(focusRaf);
+      document.removeEventListener('keydown', onKeyDown, true);
+      previousFocusRef.current?.focus?.();
+    };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -189,6 +241,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     resetForm();
     onClose();
   };
+  closeRef.current = handleClose;
 
   const handleBackdropClick = (event: React.MouseEvent<HTMLDivElement>) => {
     if (event.target === event.currentTarget) {
@@ -214,9 +267,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         padding: '1rem',
       }}
       onMouseDown={handleBackdropClick}
+      role="presentation"
     >
       <div
+        ref={modalRef}
         className="content-card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="auth-modal-title"
         style={{
           width: '100%',
           maxWidth: '400px',
@@ -233,15 +291,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         <button
           type="button"
           onClick={handleClose}
+          aria-label="닫기"
           style={{
             position: 'absolute',
-            top: '1.25rem',
-            right: '1.25rem',
+            top: '1rem',
+            right: '1rem',
             background: 'none',
             border: 'none',
             color: 'var(--text-muted)',
             cursor: 'pointer',
-            padding: '4px',
+            width: '40px',
+            height: '40px',
             borderRadius: '50%',
             display: 'flex',
             alignItems: 'center',
@@ -263,6 +323,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         {/* Header Title */}
         <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '6px' }}>
           <h2
+            id="auth-modal-title"
             style={{
               fontSize: '1.35rem',
               fontWeight: 800,

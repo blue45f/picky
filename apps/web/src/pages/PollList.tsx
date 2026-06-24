@@ -1465,20 +1465,27 @@ export const PollList: React.FC = () => {
                   return (
                     <article
                       key={poll.id}
-                      onClick={() => handleRecentPollOpen(poll.id)}
                       style={{
+                        position: 'relative',
                         border: '1px solid rgba(250, 204, 21, 0.16)',
                         borderRadius: 'var(--radius-sm)',
                         background: 'rgba(5, 14, 12, 0.5)',
                         padding: '0.72rem',
                         display: 'grid',
                         gap: '0.48rem',
-                        cursor: 'pointer',
                         minWidth: 0,
                       }}
                     >
+                      <button
+                        type="button"
+                        className="card-stretch-open"
+                        onClick={() => handleRecentPollOpen(poll.id)}
+                        aria-label={`${poll.question} 열기`}
+                      />
                       <div
                         style={{
+                          position: 'relative',
+                          zIndex: 1,
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
@@ -1502,12 +1509,12 @@ export const PollList: React.FC = () => {
                           type="button"
                           onClick={(event) => handleTogglePinnedPoll(event, poll.id)}
                           aria-label={`${poll.question} 고정 해제`}
+                          className="icon-hit"
                           style={{
                             border: 'none',
                             background: 'transparent',
                             color: 'var(--brand-accent-gold)',
                             cursor: 'pointer',
-                            padding: '2px',
                             display: 'inline-flex',
                           }}
                         >
@@ -1630,20 +1637,27 @@ export const PollList: React.FC = () => {
                   return (
                     <article
                       key={item.id}
-                      onClick={() => handleRecentPollOpen(item.id)}
                       style={{
+                        position: 'relative',
                         border: '1px solid rgba(255, 255, 255, 0.08)',
                         borderRadius: 'var(--radius-sm)',
                         background: 'rgba(5, 14, 12, 0.44)',
                         padding: '0.72rem',
                         display: 'grid',
                         gap: '0.48rem',
-                        cursor: 'pointer',
                         minWidth: 0,
                       }}
                     >
+                      <button
+                        type="button"
+                        className="card-stretch-open"
+                        onClick={() => handleRecentPollOpen(item.id)}
+                        aria-label={`${item.question} 열기`}
+                      />
                       <div
                         style={{
+                          position: 'relative',
+                          zIndex: 1,
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
@@ -1668,6 +1682,7 @@ export const PollList: React.FC = () => {
                             type="button"
                             onClick={(event) => handleTogglePinnedPoll(event, item.id)}
                             aria-label={`${item.question} 고정 ${pinnedPollIds.includes(item.id) ? '해제' : '추가'}`}
+                            className="icon-hit"
                             style={{
                               border: 'none',
                               background: 'transparent',
@@ -1675,7 +1690,6 @@ export const PollList: React.FC = () => {
                                 ? 'var(--brand-accent-gold)'
                                 : 'var(--text-muted)',
                               cursor: 'pointer',
-                              padding: '2px',
                               display: 'inline-flex',
                             }}
                           >
@@ -1685,12 +1699,12 @@ export const PollList: React.FC = () => {
                             type="button"
                             onClick={(event) => handleRemoveRecentPoll(event, item.id)}
                             aria-label={`${item.question} 최근 기록 삭제`}
+                            className="icon-hit"
                             style={{
                               border: 'none',
                               background: 'transparent',
                               color: 'var(--text-muted)',
                               cursor: 'pointer',
-                              padding: '2px',
                               display: 'inline-flex',
                             }}
                           >
