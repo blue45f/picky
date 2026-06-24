@@ -1,7 +1,12 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@toss/tds-mobile';
-import { CreatePollSchema, type CreatePollInput, type PollResultsVisibility } from '../shared';
+import {
+  CreatePollSchema,
+  POLL_CATEGORIES,
+  type CreatePollInput,
+  type PollResultsVisibility,
+} from '../shared';
 import { usePollStore } from '../store/usePollStore';
 import { theme, stickyActionBar } from '../theme';
 import { fromDateTimeLocalValue, toDateTimeLocalValue } from '../lib/format';
@@ -89,6 +94,7 @@ export function CreatePollPage() {
   const [step, setStep] = useState<1 | 2>(1);
   const [question, setQuestion] = useState('');
   const [description, setDescription] = useState('');
+  const [categoryId, setCategoryId] = useState<string | null>(null);
   const [options, setOptions] = useState<OptionDraft[]>(() => [emptyOption(), emptyOption()]);
   const [openImageIndex, setOpenImageIndex] = useState<number | null>(null);
   const [linkDrafts, setLinkDrafts] = useState<Record<number, string>>({});
@@ -193,6 +199,7 @@ export function CreatePollPage() {
     const candidate = {
       question: question.trim(),
       description: description.trim() || null,
+      categoryId,
       resultsVisibility,
       endsAt: endsAtIso,
       options: filledOptions.map((opt) => ({
@@ -281,6 +288,55 @@ export function CreatePollPage() {
               placeholder="친구들이 더 잘 고를 수 있게 힌트를 주세요! (선택) 💡"
               onChange={(e) => setDescription(e.target.value)}
             />
+
+            <span style={{ ...labelStyle, margin: '20px 0 8px' }}>어떤 고민인가요? 🏷️ (선택)</span>
+            <div
+              role="group"
+              aria-label="고민 카테고리 선택"
+              style={{
+                display: 'flex',
+                gap: 8,
+                overflowX: 'auto',
+                paddingBottom: 4,
+                WebkitOverflowScrolling: 'touch',
+                scrollbarWidth: 'none',
+              }}
+            >
+              {POLL_CATEGORIES.map((category) => {
+                const active = categoryId === category.id;
+                return (
+                  <button
+                    key={category.id}
+                    type="button"
+                    className="pressable"
+                    aria-pressed={active}
+                    onClick={() => {
+                      hapticFeedback('tickWeak');
+                      setCategoryId((prev) => (prev === category.id ? null : category.id));
+                    }}
+                    style={{
+                      flexShrink: 0,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      minHeight: 40,
+                      padding: '8px 16px',
+                      borderRadius: theme.radiusPill,
+                      border: `1px solid ${active ? category.color : 'rgba(255,255,255,0.04)'}`,
+                      background: active ? `${category.color}26` : 'rgba(255,255,255,0.02)',
+                      color: active ? category.color : theme.textMuted,
+                      fontSize: 13.5,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    <span aria-hidden>{category.emoji}</span>
+                    {category.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         ) : (
           <div className="rise" key="step2">

@@ -47,13 +47,13 @@ export function PollShareQrSection({ shareUrl, qrUrl, onCopyLink }: PollShareQrS
             onClick={onCopyLink}
             style={{
               fontSize: 13,
-              padding: '7px 14px',
-              borderRadius: 10,
+              padding: '0 16px',
+              borderRadius: 12,
               border: `1px solid ${theme.border}`,
               background: 'rgba(255,255,255,0.04)',
               color: theme.accent,
               cursor: 'pointer',
-              minHeight: 36,
+              minHeight: 44,
               fontWeight: 700,
             }}
           >

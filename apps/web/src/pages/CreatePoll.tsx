@@ -25,7 +25,7 @@ import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { SnsPreviewCard } from '../components/SnsPreviewCard';
 import { ParticipantPreviewPanel } from '../components/ParticipantPreviewPanel';
 import { buildShareablePollSnapshot } from '../lib/pollShare';
-import type { PollResultsVisibility } from '@picky/shared';
+import { POLL_CATEGORIES, type PollResultsVisibility } from '@picky/shared';
 
 interface PresetOption {
   text: string;
@@ -44,13 +44,18 @@ interface PresetTemplate {
   options: PresetOption[];
 }
 
-const PRESET_CATEGORY_OPTIONS: Array<{ value: PresetCategoryFilter; label: string }> = [
+// 템플릿 필터 탭 — @picky/shared POLL_CATEGORIES 를 단일 소스로 라벨/이모지를 가져온다.
+const PRESET_CATEGORY_OPTIONS: Array<{
+  value: PresetCategoryFilter;
+  label: string;
+  emoji?: string;
+}> = [
   { value: 'all', label: '전체' },
-  { value: 'work', label: '업무' },
-  { value: 'education', label: '수업' },
-  { value: 'event', label: '모임' },
-  { value: 'product', label: '제품' },
-  { value: 'life', label: '일상' },
+  ...POLL_CATEGORIES.map((category) => ({
+    value: category.id as PresetCategory,
+    label: category.label,
+    emoji: category.emoji,
+  })),
 ];
 
 const PRESET_TEMPLATES: PresetTemplate[] = [
@@ -488,6 +493,7 @@ export const CreatePoll: React.FC = () => {
       : createDefaultOptions(),
   );
   const [activePresetIndex, setActivePresetIndex] = useState<number | null>(null);
+  const [categoryId, setCategoryId] = useState<string | null>(null);
   const [templateCategory, setTemplateCategory] = useState<PresetCategoryFilter>('all');
   const [templateSearchInput, setTemplateSearchInput] = useState('');
   const [draftSavedAt, setDraftSavedAt] = useState<string | null>(cachedDraft?.savedAt || null);
@@ -959,6 +965,8 @@ export const CreatePoll: React.FC = () => {
     setFormError('');
     setQuestion(template.question);
     setDescription(template.description);
+    // 프리셋이 속한 고민 카테고리를 자동 선택해 칩 UI와 동기화한다.
+    setCategoryId(template.category);
     setAttachments([]);
     setOptions(
       template.options.map((opt) => ({
@@ -976,6 +984,7 @@ export const CreatePoll: React.FC = () => {
     setResultsVisibility('afterVote');
     setOptions(createDefaultOptions());
     setAttachments([]);
+    setCategoryId(null);
     setActivePresetIndex(null);
     setFormError('');
     clearError();
@@ -1206,6 +1215,7 @@ export const CreatePoll: React.FC = () => {
       resultsVisibility,
       options: nonEmptyOptions,
       attachments,
+      categoryId,
     });
 
     if (result) {
@@ -1307,6 +1317,7 @@ export const CreatePoll: React.FC = () => {
                   background: active ? 'rgba(45, 212, 191, 0.08)' : 'rgba(255,255,255,0.02)',
                 }}
               >
+                {category.emoji ? <span aria-hidden>{category.emoji}</span> : null}
                 {category.label}
                 <span
                   style={{
@@ -2343,6 +2354,58 @@ export const CreatePoll: React.FC = () => {
           <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
             {normalizedQuestion.length} / 100
           </span>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <label style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+            고민 카테고리{' '}
+            <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>(선택)</span>
+          </label>
+          <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+            어떤 고민인지 콕 골라주면 피키가 더 잘 정리해드려요 🥑
+          </p>
+          <div
+            role="group"
+            aria-label="고민 카테고리 선택"
+            style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}
+          >
+            {POLL_CATEGORIES.map((category) => {
+              const active = categoryId === category.id;
+              return (
+                <button
+                  key={category.id}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => {
+                    clearError();
+                    setFormError('');
+                    setCategoryId((current) => (current === category.id ? null : category.id));
+                  }}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '8px 14px',
+                    borderRadius: '999px',
+                    fontSize: '0.8rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    transition: 'transform 0.12s ease, box-shadow 0.12s ease',
+                    color: active ? '#fff' : 'var(--text-secondary)',
+                    background: active ? category.color : 'rgba(255,255,255,0.03)',
+                    border: `1.5px solid ${active ? category.color : 'var(--bg-card-border)'}`,
+                    boxShadow: active ? `0 4px 14px ${category.color}55` : 'none',
+                    transform: active ? 'translateY(-1px)' : 'none',
+                  }}
+                >
+                  <span aria-hidden style={{ fontSize: '0.95rem' }}>
+                    {category.emoji}
+                  </span>
+                  {category.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>

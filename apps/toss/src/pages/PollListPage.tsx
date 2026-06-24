@@ -581,9 +581,11 @@ export function PollListPage() {
               border: `1px solid ${theme.border}`,
               borderRadius: theme.radiusSm,
               color: theme.text,
-              padding: '12px 14px 12px 38px',
+              padding: '13px 14px 13px 38px',
               paddingRight: query ? 38 : 14,
-              fontSize: 14,
+              // iOS 줌 방지를 위한 16px 폰트 플로어.
+              fontSize: 16,
+              minHeight: 48,
               outline: 'none',
               boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.02)',
             }}
@@ -715,7 +717,7 @@ export function PollListPage() {
       </div>
 
       <div style={stickyActionBar}>
-        <div style={{ maxWidth: 520, margin: '0 auto' }}>
+        <div style={{ maxWidth: 520, margin: '0 auto', pointerEvents: 'auto' }}>
           <Button
             style={{
               width: '100%',

@@ -17,6 +17,8 @@ export const polls = pgTable('polls', {
   id: text('id').primaryKey(), // 6-character unique short ID
   question: text('question').notNull(),
   description: text('description'),
+  // 고민 카테고리(@picky/shared POLL_CATEGORIES id). nullable·비파괴 — 기존 행/배포에 영향 없음.
+  categoryId: text('category_id'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   endsAt: timestamp('ends_at'),
   totalVotes: integer('total_votes').default(0).notNull(),

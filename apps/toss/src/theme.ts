@@ -33,12 +33,21 @@ export const pageShell: React.CSSProperties = {
   padding: '8px 20px 120px',
 };
 
-/** 하단 고정 액션바(safe-area 포함). */
+/**
+ * 하단 고정 액션바(safe-area 포함).
+ * 위로 18px 페이드 영역을 더 둬서 스크롤 끝 콘텐츠가 바 뒤에서 자연스럽게 사라지게 해요.
+ * 콘텐츠 컨테이너의 bottom padding은 이 바 높이(≈버튼 52 + 상하 24 + safe-area)를
+ * 충분히 덮도록 잡아야 마지막 콘텐츠가 가려지지 않아요.
+ */
 export const stickyActionBar: React.CSSProperties = {
   position: 'fixed',
   left: 0,
   right: 0,
   bottom: 0,
-  padding: '12px 20px calc(12px + env(safe-area-inset-bottom))',
-  background: `linear-gradient(to top, ${theme.bg} 72%, transparent)`,
+  paddingTop: 18,
+  paddingLeft: 20,
+  paddingRight: 20,
+  paddingBottom: 'calc(12px + env(safe-area-inset-bottom))',
+  background: `linear-gradient(to top, ${theme.bg} 0%, ${theme.bg} 78%, transparent 100%)`,
+  pointerEvents: 'none',
 };

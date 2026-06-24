@@ -27,7 +27,7 @@ import {
   Pin,
 } from 'lucide-react';
 import type { Poll } from '@picky/shared';
-import { MASCOT } from '@picky/shared';
+import { MASCOT, VOICE, categoryMeta } from '@picky/shared';
 import { usePollStore } from '../store/usePollStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
@@ -2537,32 +2537,43 @@ export const PollList: React.FC = () => {
             {viewMode === 'stack' ? <LayoutList size={12} /> : <LayoutGrid size={12} />}
             <span style={{ fontSize: '0.7rem' }}>{viewMode === 'stack' ? '넓게' : '요약'}</span>
           </button>
-          {displayScopeOptions.map((option) => (
-            <button
-              key={option.value}
-              onClick={() => setScope(option.value)}
-              className="ghost-btn"
-              disabled={option.value === 'mine' && !userId}
-              title={
-                option.value === 'mine' && !userId
-                  ? '로그인/비회원 닉네임 시작 후 내 항목을 확인할 수 있어요'
-                  : ''
-              }
-              style={{
-                borderColor:
-                  scope === option.value ? 'rgba(99, 102, 241, 0.52)' : 'var(--bg-card-border)',
-                color: scope === option.value ? 'var(--brand-primary-light)' : 'var(--text-muted)',
-                backgroundColor:
-                  scope === option.value ? 'rgba(99, 102, 241, 0.12)' : 'transparent',
-                padding: '6px 10px',
-                opacity: option.value === 'mine' && !userId ? 0.5 : 1,
-              }}
-            >
-              {option.label} ({option.count})
-            </button>
-          ))}
+          <div
+            role="group"
+            aria-label="작성자 범위 필터"
+            style={{ display: 'inline-flex', gap: '6px', flexWrap: 'wrap' }}
+          >
+            {displayScopeOptions.map((option) => (
+              <button
+                key={option.value}
+                onClick={() => setScope(option.value)}
+                className="ghost-btn"
+                disabled={option.value === 'mine' && !userId}
+                aria-pressed={scope === option.value}
+                aria-label={`${option.label} ${option.count}개`}
+                title={
+                  option.value === 'mine' && !userId
+                    ? '로그인/비회원 닉네임 시작 후 내 항목을 확인할 수 있어요'
+                    : ''
+                }
+                style={{
+                  borderColor:
+                    scope === option.value ? 'rgba(99, 102, 241, 0.52)' : 'var(--bg-card-border)',
+                  color:
+                    scope === option.value ? 'var(--brand-primary-light)' : 'var(--text-muted)',
+                  backgroundColor:
+                    scope === option.value ? 'rgba(99, 102, 241, 0.12)' : 'transparent',
+                  padding: '6px 10px',
+                  opacity: option.value === 'mine' && !userId ? 0.5 : 1,
+                }}
+              >
+                {option.label} ({option.count})
+              </button>
+            ))}
+          </div>
 
           <div
+            role="group"
+            aria-label="결정 신호 필터"
             style={{
               flex: '1 1 100%',
               display: 'flex',
@@ -2582,6 +2593,8 @@ export const PollList: React.FC = () => {
                 type="button"
                 onClick={() => setSignal(option.value)}
                 className="ghost-btn"
+                aria-pressed={signal === option.value}
+                aria-label={`${option.label} ${option.count}개`}
                 style={{
                   borderColor:
                     signal === option.value ? 'rgba(45, 212, 191, 0.48)' : 'var(--bg-card-border)',
@@ -2689,8 +2702,26 @@ export const PollList: React.FC = () => {
       {isLoading && visiblePolls.length === 0 ? (
         <div
           className="content-card"
+          role="status"
+          aria-live="polite"
           style={{ padding: '1.75rem', display: 'grid', gap: '0.75rem' }}
         >
+          <p
+            style={{
+              margin: 0,
+              fontSize: '0.82rem',
+              fontWeight: 700,
+              color: 'var(--text-secondary)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '7px',
+            }}
+          >
+            <span aria-hidden="true" style={{ fontSize: '1.1rem' }}>
+              {MASCOT.thinking.emoji}
+            </span>
+            {VOICE.loading}
+          </p>
           {Array.from({ length: 3 }).map((_, index) => (
             <div key={index} style={{ display: 'grid', gap: '0.55rem' }}>
               <div className="skeleton" style={{ height: '0.8rem', width: '42%' }} />
@@ -2715,12 +2746,10 @@ export const PollList: React.FC = () => {
             aria-hidden="true"
             style={{ fontSize: '3.6rem', lineHeight: 1 }}
           >
-            {scope !== 'all' || normalizedQuery ? '🔍' : MASCOT.empty.emoji}
+            {hasActiveFilters ? '🔍' : MASCOT.idle.emoji}
           </span>
           <h3 style={{ fontSize: '1.1rem', fontWeight: 800 }}>
-            {scope !== 'all' || normalizedQuery
-              ? '조건에 맞는 고민이 없어요'
-              : '아직 고민이 없어요'}
+            {hasActiveFilters ? '조건에 맞는 고민이 없어요' : MASCOT.idle.line}
           </h3>
           <p
             style={{
@@ -2730,12 +2759,25 @@ export const PollList: React.FC = () => {
               lineHeight: 1.65,
             }}
           >
-            {scope !== 'all' || normalizedQuery
+            {hasActiveFilters
               ? '검색어나 필터를 바꿔서 다시 찾아볼까요?'
               : userId && isGuest
                 ? '비회원으로도 바로 시작할 수 있어요. 첫 고민을 올리고 친구들에게 링크로 물어보세요 🥑'
                 : '첫 고민을 올리고 친구·동료에게 링크로 빠르게 물어보세요 🥑'}
           </p>
+          {!hasActiveFilters ? (
+            <p
+              style={{
+                fontSize: '0.78rem',
+                color: 'var(--text-muted)',
+                maxWidth: '460px',
+                lineHeight: 1.6,
+                margin: 0,
+              }}
+            >
+              예시처럼 시작해 보세요 — “점심 메뉴 골라줘”, “회의 안건 우선순위”, “주말 일정 투표”.
+            </p>
+          ) : null}
           <div
             style={{
               display: 'flex',
@@ -2784,9 +2826,26 @@ export const PollList: React.FC = () => {
         </div>
       ) : (
         <>
+          <p
+            aria-live="polite"
+            style={{
+              margin: 0,
+              fontSize: '0.74rem',
+              color: 'var(--text-muted)',
+              fontWeight: 700,
+            }}
+          >
+            {hasActiveFilters
+              ? `조건에 맞는 고민 ${visiblePolls.length}개`
+              : `고민 ${visiblePolls.length}개`}
+          </p>
           <div style={{ display: 'grid', gap: '0.9rem' }}>
             {visiblePolls.map((poll) => {
               const creatorLabel = getCreatorLabel(poll.creatorId, poll.creatorIsGuest);
+              // Poll 타입에 categoryId 가 아직 없지만 런타임 데이터엔 실릴 수 있어 방어적으로 읽는다.
+              const pollCategory = categoryMeta(
+                (poll as { categoryId?: string | null }).categoryId,
+              );
               const isMine = userId && poll.creatorId === userId;
               const isCompact = viewMode === 'compact';
               const signalLabel = getPollSignalLabel(poll);
@@ -2837,6 +2896,25 @@ export const PollList: React.FC = () => {
                       }}
                     >
                       <span className="floating-tag">POLL #{poll.id}</span>
+                      {pollCategory ? (
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            fontSize: '0.62rem',
+                            fontWeight: 800,
+                            color: pollCategory.color,
+                            backgroundColor: `${pollCategory.color}1f`,
+                            border: `1px solid ${pollCategory.color}55`,
+                            padding: '2px 8px',
+                            borderRadius: '999px',
+                          }}
+                        >
+                          <span aria-hidden="true">{pollCategory.emoji}</span>
+                          {pollCategory.label}
+                        </span>
+                      ) : null}
                       <span
                         style={{
                           fontSize: '0.62rem',

@@ -112,6 +112,13 @@ export function PollDetailView(props: PollDetailViewProps) {
     </button>
   ) : null;
 
+  // 하단 고정 액션바가 떠 있을 때(미투표·진행중)만 그 높이만큼 바닥 여백을 확보해
+  // QR·링크복사·결과복사 같은 마지막 콘텐츠가 바에 가려지지 않게 해요.
+  const actionBarVisible = !hasVoted && !closed;
+  const bottomPadding = actionBarVisible
+    ? 'calc(96px + env(safe-area-inset-bottom))'
+    : 'calc(32px + env(safe-area-inset-bottom))';
+
   return (
     <div style={{ minHeight: '100dvh' }}>
       <AppBar
@@ -125,7 +132,7 @@ export function PollDetailView(props: PollDetailViewProps) {
         right={rightAction}
       />
 
-      <div style={{ maxWidth: 520, margin: '0 auto', padding: '0 20px 140px' }}>
+      <div style={{ maxWidth: 520, margin: '0 auto', padding: `0 20px ${bottomPadding}` }}>
         {/* Hero main issue question - stands out first like NatePan main post for eye-catch on mobile */}
         <h1
           style={{
@@ -307,7 +314,7 @@ export function PollDetailView(props: PollDetailViewProps) {
           <div
             className="disclosure-enter"
             style={{
-              maxHeight: selectedOptionId !== null ? 220 : 0,
+              maxHeight: selectedOptionId !== null ? 260 : 0,
               opacity: selectedOptionId !== null ? 1 : 0,
               overflow: 'hidden',
               marginTop: selectedOptionId !== null ? 24 : 0,
@@ -340,8 +347,21 @@ export function PollDetailView(props: PollDetailViewProps) {
 
         {comments.length > 0 ? (
           <section style={{ marginTop: 16 }}>
-            <h2 style={{ fontSize: 14, fontWeight: 700, color: theme.textMuted, marginBottom: 12 }}>
-              의견 {formatNumber(comments.length)}개 💬
+            <h2
+              style={{
+                fontSize: 15,
+                fontWeight: 800,
+                color: theme.text,
+                marginBottom: 12,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 7,
+              }}
+            >
+              <span aria-hidden style={{ fontSize: 18 }}>
+                {MASCOT.curious.emoji}
+              </span>
+              친구들 한마디 {formatNumber(comments.length)}개
             </h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {comments.map((c: PollComment) => (
@@ -363,15 +383,34 @@ export function PollDetailView(props: PollDetailViewProps) {
                       justifyContent: 'space-between',
                       alignItems: 'center',
                       gap: 8,
-                      fontSize: 13,
-                      color: theme.textFaint,
                     }}
                   >
-                    <strong style={{ color: theme.textMuted }}>{c.voterName}</strong>
+                    <strong
+                      style={{
+                        color: theme.text,
+                        fontSize: 14,
+                        fontWeight: 800,
+                        minWidth: 0,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {c.voterName}
+                    </strong>
                     {c.selectedOptionText ? (
-                      <span style={{ color: theme.accent, fontWeight: 700, flexShrink: 0 }}>
-                        {c.selectedOptionText} 콕! 찝음
-                      </span>
+                      <Chip tone="accent" style={{ flexShrink: 0, maxWidth: '55%' }}>
+                        <span
+                          style={{
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {c.selectedOptionText}
+                        </span>
+                        콕 찝음 👈
+                      </Chip>
                     ) : null}
                   </div>
                   <p
@@ -400,8 +439,20 @@ export function PollDetailView(props: PollDetailViewProps) {
             gap: 10,
           }}
         >
-          <span style={{ fontSize: 14, fontWeight: 800, color: theme.text }}>
-            {VOICE.sharePrompt} 🌈
+          <span
+            style={{
+              fontSize: 15,
+              fontWeight: 800,
+              color: theme.text,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 7,
+            }}
+          >
+            <span aria-hidden style={{ fontSize: 18 }}>
+              {MASCOT.idle.emoji}
+            </span>
+            {VOICE.sharePrompt}
           </span>
           <div style={{ display: 'flex', gap: 8 }}>
             <button
@@ -488,7 +539,7 @@ export function PollDetailView(props: PollDetailViewProps) {
 
       {!hasVoted && !closed && (
         <div style={stickyActionBar}>
-          <div style={{ maxWidth: 520, margin: '0 auto' }}>
+          <div style={{ maxWidth: 520, margin: '0 auto', pointerEvents: 'auto' }}>
             <Button
               style={{
                 width: '100%',
@@ -516,8 +567,10 @@ const inputStyle: React.CSSProperties = {
   border: `1px solid ${theme.border}`,
   borderRadius: 12,
   color: theme.text,
-  padding: '12px 14px',
-  fontSize: 14,
+  padding: '13px 14px',
+  // iOS는 16px 미만 입력 포커스 시 화면을 강제 확대해요 → 16px 플로어로 줌 방지.
+  fontSize: 16,
+  minHeight: 48,
   outline: 'none',
   transition: 'border-color 0.2s ease',
   boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.02)',

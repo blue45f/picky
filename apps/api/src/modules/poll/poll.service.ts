@@ -7,6 +7,12 @@ import {
 import { DatabaseService } from '../database/database.service';
 import { CreatePollInput, VoteInput, Poll, PollOption, PollComment } from '@picky/shared';
 
+/**
+ * 고민 카테고리(@picky/shared POLL_CATEGORIES id)를 함께 보관·응답하기 위한 확장.
+ * 공유 Poll 타입은 비파괴 유지하고, 카테고리는 nullable 필드로만 더한다.
+ */
+type PollWithCategory = Poll & { categoryId?: string | null };
+
 @Injectable()
 export class PollService {
   constructor(private readonly db: DatabaseService) {}
@@ -69,7 +75,7 @@ export class PollService {
       imageUrl: opt.imageUrl || null,
     }));
 
-    const newPoll: Poll = {
+    const newPoll: PollWithCategory = {
       id: pollId,
       question: input.question,
       description: input.description || null,
@@ -82,6 +88,7 @@ export class PollService {
       resultsVisibility: input.resultsVisibility || 'afterVote',
       creatorId,
       creatorIsGuest,
+      categoryId: input.categoryId || null,
     };
 
     await this.db.createPoll(newPoll);

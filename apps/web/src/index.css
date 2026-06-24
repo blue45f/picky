@@ -67,10 +67,10 @@
   --brand-accent-teal: oklch(45% 0.13 170);
   --brand-accent-coral: oklch(55% 0.18 25);
 
-  /* Typography Ink */
-  --text-primary: oklch(25% 0.018 205);
-  --text-secondary: oklch(42% 0.015 205);
-  --text-muted: oklch(55% 0.012 205);
+  /* Typography Ink — muted 를 더 진하게 해 밝은 배경에서 AA 대비 확보 */
+  --text-primary: oklch(23% 0.018 205);
+  --text-secondary: oklch(40% 0.015 205);
+  --text-muted: oklch(46% 0.014 205);
 
   /* Shadows */
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.06);
@@ -78,6 +78,10 @@
   --shadow-glow: 0 0 24px rgba(20, 184, 166, 0.06);
   --shadow-glow-active: 0 0 32px rgba(20, 184, 166, 0.12);
   --shadow-frost: inset 0 1px 0 rgba(0, 0, 0, 0.04);
+
+  /* 라이트 배경에서 또렷한 포커스 링(기본 반투명 teal 은 밝은 바탕서 잘 안 보임) */
+  --focus-outline: 0 0 0 2.5px oklch(45% 0.13 170 / 0.85);
+  --focus-ring: 0 0 0 4px oklch(45% 0.13 170 / 0.22);
 }
 
 :root[data-theme='light'] body {
@@ -2158,4 +2162,27 @@ body.present-mode .page-shell {
   .hot-poll-card h3 {
     font-size: 1.32rem !important;
   }
+}
+
+/* 읽는(본문성) 작은 텍스트 가독성 하한 — 미세 장식 라벨이 아닌, 실제로 읽어야 하는
+   요약·설명·캡션이 8~9px대라 노안/야외에서 어렵던 것을 12px+로 올린다(데스크탑 포함). */
+.insight-tile > small,
+.comment-summary-item > small,
+.comment-summary-item > span,
+.featured-comment footer,
+.embed-preview-options > span {
+  font-size: 0.76rem;
+}
+.featured-comment p {
+  font-size: 0.82rem;
+}
+
+/* 아이콘 버튼 터치 타깃 — 삭제/지우기 X 등은 시각 크기는 작게 두되 히트 영역을 넓힌다. */
+.upload-preview button {
+  width: 30px;
+  height: 30px;
+}
+.text-inline-action {
+  padding: 6px;
+  margin: -6px;
 }

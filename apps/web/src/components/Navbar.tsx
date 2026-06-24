@@ -77,6 +77,22 @@ export const Navbar: React.FC = () => {
     }
   }, [user, showAuthErrorHint, clearError, setNeedsReauth]);
 
+  // 모바일 메뉴가 열려 있을 때 ESC 로 닫는다.
+  useEffect(() => {
+    if (!mobileOpen) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setMobileOpen(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [mobileOpen]);
+
   return (
     <header className="topbar-shell">
       <nav
@@ -388,7 +404,9 @@ export const Navbar: React.FC = () => {
           <button
             type="button"
             onClick={() => setMobileOpen((prev) => !prev)}
-            aria-label="모바일 메뉴 열기"
+            aria-label={mobileOpen ? '모바일 메뉴 닫기' : '모바일 메뉴 열기'}
+            aria-expanded={mobileOpen}
+            aria-haspopup="menu"
             style={{
               display: 'inline-flex',
               border: '1px solid var(--bg-card-border)',
@@ -409,6 +427,8 @@ export const Navbar: React.FC = () => {
         {mobileOpen ? (
           <div
             className="mobile-menu"
+            role="menu"
+            aria-label="모바일 메뉴"
             style={{
               position: 'absolute',
               top: 'calc(var(--nav-height) - 2px)',
@@ -521,80 +541,6 @@ export const Navbar: React.FC = () => {
                 {item.label}
               </Link>
             ))}
-            <form
-              onSubmit={handleJoinCodeSubmit}
-              aria-label="모바일 참여 코드로 투표 입장"
-              style={{
-                display: 'grid',
-                gap: '0.45rem',
-                border: '1px solid rgba(45, 212, 191, 0.2)',
-                borderRadius: '8px',
-                background: 'rgba(45, 212, 191, 0.055)',
-                padding: '0.75rem',
-              }}
-            >
-              <label
-                htmlFor="mobile-join-code-input"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  color: joinCodeError ? 'var(--brand-accent-gold)' : 'var(--brand-accent-teal)',
-                  fontSize: '0.68rem',
-                  fontWeight: 900,
-                  letterSpacing: '0.05em',
-                }}
-              >
-                JOIN CODE
-                <span style={{ color: 'var(--text-muted)', fontWeight: 700, letterSpacing: 0 }}>
-                  {joinCodeError || '공유받은 코드로 바로 입장'}
-                </span>
-              </label>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <input
-                  id="mobile-join-code-input"
-                  value={joinCodeInput}
-                  onChange={(event) => {
-                    setJoinCodeInput(event.target.value);
-                    if (joinCodeError) {
-                      setJoinCodeError('');
-                    }
-                  }}
-                  placeholder="참여 코드 입력"
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  style={{
-                    flex: 1,
-                    minWidth: 0,
-                    border: '1px solid var(--bg-card-border)',
-                    borderRadius: '8px',
-                    background: 'rgba(255,255,255,0.035)',
-                    color: 'var(--text-primary)',
-                    fontFamily: 'var(--font-sans)',
-                    fontSize: '0.82rem',
-                    fontWeight: 800,
-                    padding: '9px 10px',
-                  }}
-                />
-                <button
-                  type="submit"
-                  style={{
-                    border: '1px solid rgba(45, 212, 191, 0.32)',
-                    borderRadius: '8px',
-                    background: 'rgba(45, 212, 191, 0.12)',
-                    color: 'var(--brand-accent-teal)',
-                    cursor: 'pointer',
-                    fontFamily: 'var(--font-sans)',
-                    fontSize: '0.78rem',
-                    fontWeight: 900,
-                    padding: '9px 12px',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  입장
-                </button>
-              </div>
-            </form>
             {user ? (
               <button
                 type="button"

@@ -40,6 +40,7 @@ import { OpinionTopicCloud } from '../components/OpinionTopicCloud';
 import { ActionItemPlanner } from '../components/ActionItemPlanner';
 import { StakeholderReportBuilder } from '../components/StakeholderReportBuilder';
 import type { Poll, PollResultsVisibility } from '@picky/shared';
+import { MASCOT, VOICE, categoryMeta } from '@picky/shared';
 import {
   resolvePollShareUrl,
   buildPollEmbedCode,
@@ -713,6 +714,7 @@ export const PollDetail: React.FC = () => {
   const error = usePollStore((state) => state.error);
   const fetchPoll = usePollStore((state) => state.fetchPoll);
   const vote = usePollStore((state) => state.vote);
+  const clearError = usePollStore((state) => state.clearError);
   const setCurrentPoll = usePollStore((state) => state.setCurrentPoll);
   const user = useAuthStore((state) => state.user);
   const guestName = useAuthStore((state) => state.guestName);
@@ -780,6 +782,9 @@ export const PollDetail: React.FC = () => {
   const [inviteMessageTone, setInviteMessageTone] = useState<InviteMessageTone>('default');
   const [copyMessage, setCopyMessage] = useState('');
   const [voteMessage, setVoteMessage] = useState('');
+  // 투표 완료 직후 마스코트 축하 한 줄(토스트). 중복 제출 가드와 함께 동작한다.
+  const [voteSuccessNote, setVoteSuccessNote] = useState('');
+  const [isSubmittingVote, setIsSubmittingVote] = useState(false);
   const [commentFilter, setCommentFilter] = useState<'all' | number>('all');
   const [resultSummaryMode, setResultSummaryMode] = useState<ResultSummaryMode>('brief');
   const [commentViewMode, setCommentViewMode] = useState<CommentViewMode>('latest');
@@ -1033,36 +1038,47 @@ export const PollDetail: React.FC = () => {
     };
   }, [fetchPoll, id, isPresentationMode, isPresentAutoRefreshPaused]);
 
-  // Submit Vote
+  // Submit Vote — 진입 즉시 더블 가드(isSubmittingVote + isLoading)로 연타/중복 제출을 막는다.
   const handleVoteSubmit = async () => {
-    if (!id || votedOptionId === null || isLoading) return;
+    if (!id || votedOptionId === null || isLoading || isSubmittingVote) return;
 
     if (isPollClosed(currentPoll)) {
       setVoteMessage('마감된 투표에는 더 이상 참여할 수 없습니다.');
       return;
     }
 
-    const success = await vote(id, {
-      optionId: votedOptionId,
-      voterName: voterName.trim() || null,
-      comment: comment.trim() || null,
-    });
+    setIsSubmittingVote(true);
+    clearError();
+    setVoteMessage('');
 
-    if (success) {
-      const nextHistory = { ...votedHistory, [id]: votedOptionId };
-      setVotedHistory(nextHistory);
-      localStorage.setItem('picky_voted_history', JSON.stringify(nextHistory));
-      localStorage.removeItem(getVoteDraftStorageKey(id));
-      if (currentPoll) {
-        rememberRecentPoll(currentPoll, { hasVoted: true });
+    try {
+      const success = await vote(id, {
+        optionId: votedOptionId,
+        voterName: voterName.trim() || null,
+        comment: comment.trim() || null,
+      });
+
+      if (success) {
+        const nextHistory = { ...votedHistory, [id]: votedOptionId };
+        setVotedHistory(nextHistory);
+        localStorage.setItem('picky_voted_history', JSON.stringify(nextHistory));
+        localStorage.removeItem(getVoteDraftStorageKey(id));
+        if (currentPoll) {
+          rememberRecentPoll(currentPoll, { hasVoted: true });
+        }
+
+        // Reset inputs
+        setVoterName('');
+        setComment('');
+        setVotedOptionId(null);
+        setVoteDraftSavedAt(null);
+        setVoteMessage('');
+        // 피키 축하 한 줄 — 잠깐 노출 후 사라진다.
+        setVoteSuccessNote(`${MASCOT.celebrate.emoji} ${MASCOT.celebrate.line}`);
+        window.setTimeout(() => setVoteSuccessNote(''), 3200);
       }
-
-      // Reset inputs
-      setVoterName('');
-      setComment('');
-      setVotedOptionId(null);
-      setVoteDraftSavedAt(null);
-      setVoteMessage('');
+    } finally {
+      setIsSubmittingVote(false);
     }
   };
 
@@ -1105,7 +1121,7 @@ export const PollDetail: React.FC = () => {
         return;
       }
 
-      if (event.key === 'Enter' && votedOptionId !== null && !isLoading) {
+      if (event.key === 'Enter' && votedOptionId !== null && !isLoading && !isSubmittingVote) {
         event.preventDefault();
         void handleVoteSubmit();
       }
@@ -1121,6 +1137,7 @@ export const PollDetail: React.FC = () => {
     currentPoll,
     id,
     isLoading,
+    isSubmittingVote,
     isPresentationMode,
     votedHistory,
     votedOptionId,
@@ -1507,16 +1524,25 @@ export const PollDetail: React.FC = () => {
 
   if (isLoading && !currentPoll) {
     return (
-      <div style={{ textAlign: 'center', padding: '5rem 0', color: 'var(--text-muted)' }}>
-        <Sparkles
-          size={24}
+      <div
+        role="status"
+        aria-live="polite"
+        style={{ textAlign: 'center', padding: '5rem 0', color: 'var(--text-muted)' }}
+      >
+        <div
+          aria-hidden="true"
           style={{
-            animation: 'spin 2s linear infinite',
-            marginBottom: '8px',
-            color: 'var(--brand-primary)',
+            fontSize: '2rem',
+            marginBottom: '10px',
+            animation: 'pulse 1.6s ease-in-out infinite',
           }}
-        />
-        <p style={{ fontSize: '0.85rem' }}>고민 데이터를 불러오고 있습니다...</p>
+        >
+          {MASCOT.thinking.emoji}
+        </div>
+        <p style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
+          {MASCOT.thinking.line}
+        </p>
+        <p style={{ fontSize: '0.8rem', marginTop: '4px' }}>{VOICE.loading}</p>
       </div>
     );
   }
@@ -1535,10 +1561,12 @@ export const PollDetail: React.FC = () => {
           gap: '1rem',
         }}
       >
-        <AlertCircle size={36} style={{ color: 'var(--brand-accent-coral)' }} />
+        <div aria-hidden="true" style={{ fontSize: '2.6rem' }}>
+          {MASCOT.empty.emoji}
+        </div>
         <div>
           <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '6px' }}>
-            고민 정보를 찾을 수 없습니다
+            고민을 찾지 못했어요
           </h3>
           <p style={{ fontSize: '0.825rem', color: 'var(--text-secondary)' }}>{noPollMessage}</p>
         </div>
@@ -1621,7 +1649,8 @@ export const PollDetail: React.FC = () => {
     : [];
   const voterDisplayName = voterName.trim() || '익명';
   const trimmedCommentLength = comment.trim().length;
-  const voteSubmitReady = votedOptionId !== null && !isLoading && !pollClosed;
+  const voteSubmitReady = votedOptionId !== null && !isLoading && !isSubmittingVote && !pollClosed;
+  const voteSubmitBusy = isLoading || isSubmittingVote;
   const voteSubmitHint = pollClosed
     ? '마감된 투표입니다.'
     : votedOptionId
@@ -1713,7 +1742,7 @@ export const PollDetail: React.FC = () => {
     },
     {
       label: '제출',
-      active: votedOptionId !== null && !isLoading,
+      active: votedOptionId !== null && !voteSubmitBusy,
       icon: Send,
     },
   ];
@@ -2580,6 +2609,36 @@ export const PollDetail: React.FC = () => {
         ) : null}
 
         <div>
+          {(() => {
+            // Poll 타입(@picky/shared)에는 categoryId 가 아직 없지만 런타임 데이터는
+            // CreatePollSchema 를 통해 categoryId 를 실어 보낼 수 있어 방어적으로 읽는다.
+            const categoryId = (currentPoll as { categoryId?: string | null }).categoryId;
+            const category = categoryMeta(categoryId);
+            if (!category) {
+              return null;
+            }
+            return (
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  fontSize: '0.66rem',
+                  fontWeight: 800,
+                  color: category.color,
+                  backgroundColor: `${category.color}1f`,
+                  border: `1px solid ${category.color}55`,
+                  padding: '2px 9px',
+                  borderRadius: '999px',
+                  marginBottom: '8px',
+                  marginRight: '6px',
+                }}
+              >
+                <span aria-hidden="true">{category.emoji}</span>
+                {category.label}
+              </span>
+            );
+          })()}
           <span
             style={{
               fontSize: '0.65rem',
@@ -2781,6 +2840,30 @@ export const PollDetail: React.FC = () => {
             {voteMessage}
           </p>
         ) : null}
+        <div
+          role="status"
+          aria-live="polite"
+          style={{ display: voteSuccessNote ? 'block' : 'none' }}
+        >
+          {voteSuccessNote ? (
+            <p
+              className="animate-slide-up"
+              style={{
+                margin: 0,
+                color: 'var(--brand-accent-teal)',
+                fontSize: '0.85rem',
+                fontWeight: 800,
+                lineHeight: 1.45,
+                background: 'rgba(45, 212, 191, 0.12)',
+                border: '1px solid rgba(45, 212, 191, 0.28)',
+                borderRadius: 'var(--radius-sm)',
+                padding: '10px 12px',
+              }}
+            >
+              {voteSuccessNote}
+            </p>
+          ) : null}
+        </div>
 
         {/* Results Screen vs Voting Screen */}
         {hasVoted || pollClosed ? (
@@ -2793,6 +2876,24 @@ export const PollDetail: React.FC = () => {
               paddingTop: '1.5rem',
             }}
           >
+            {!isEmbedMode ? (
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  alignSelf: 'flex-start',
+                  color: 'var(--brand-accent-teal)',
+                  fontSize: '0.82rem',
+                  fontWeight: 800,
+                }}
+              >
+                <span aria-hidden="true" style={{ fontSize: '1.05rem' }}>
+                  {MASCOT.curious.emoji}
+                </span>
+                {MASCOT.curious.line}
+              </div>
+            ) : null}
             <section
               style={{
                 border: '1px solid var(--bg-card-border)',
@@ -3433,6 +3534,7 @@ export const PollDetail: React.FC = () => {
                     key={opt.id}
                     onClick={() => setVotedOptionId(opt.id)}
                     type="button"
+                    disabled={voteSubmitBusy}
                     aria-pressed={isSelected}
                     className={`choice-card ${isSelected ? 'selected' : ''}`}
                     style={{
@@ -3440,7 +3542,7 @@ export const PollDetail: React.FC = () => {
                       width: '100%',
                       textAlign: 'left',
                       border: 'none',
-                      cursor: 'pointer',
+                      cursor: voteSubmitBusy ? 'progress' : 'pointer',
                       minHeight: opt.imageUrl ? '68px' : '54px',
                     }}
                   >
@@ -3759,6 +3861,8 @@ export const PollDetail: React.FC = () => {
                     value={voterName}
                     onChange={(e) => setVoterName(e.target.value)}
                     maxLength={15}
+                    disabled={voteSubmitBusy}
+                    aria-label="투표자 닉네임 (선택)"
                     className="form-input"
                   />
                   <input
@@ -3767,6 +3871,8 @@ export const PollDetail: React.FC = () => {
                     value={comment}
                     onChange={(e) => setComment(e.target.value)}
                     maxLength={100}
+                    disabled={voteSubmitBusy}
+                    aria-label="선택 사유 한마디 (선택)"
                     className="form-input"
                   />
                 </div>
@@ -3889,11 +3995,12 @@ export const PollDetail: React.FC = () => {
                 </div>
                 <button
                   onClick={handleVoteSubmit}
-                  disabled={votedOptionId === null || isLoading || pollClosed}
+                  disabled={votedOptionId === null || voteSubmitBusy || pollClosed}
+                  aria-busy={voteSubmitBusy}
                   className="btn-primary"
                   style={{ padding: '12px', fontSize: '0.85rem' }}
                 >
-                  {isLoading ? '투표 처리 중...' : '투표 제출 및 한마디 등록'}
+                  {voteSubmitBusy ? '피키가 표를 담는 중… 🥑' : '투표 제출 및 한마디 등록'}
                 </button>
               </div>
             )}

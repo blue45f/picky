@@ -95,6 +95,7 @@ export interface Poll {
   resultsVisibility?: PollResultsVisibility | null;
   creatorId?: string | null;
   creatorIsGuest?: boolean;
+  categoryId?: string | null;
 }
 
 export const RegisterSchema = z
