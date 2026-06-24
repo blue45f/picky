@@ -273,8 +273,8 @@ export const IntroSplashScreen: React.FC = () => {
           animation: pf-reveal 720ms cubic-bezier(0.16,1,0.3,1) 460ms forwards;
         }
         .pf-splash-tag {
-          margin-top: 12px; font-size: 10.5px; font-weight: 700; letter-spacing: 1.8px;
-          color: #13c2a3; opacity: 0.65;
+          margin-top: 12px; font-size: 11px; font-weight: 700; letter-spacing: 1.6px;
+          color: #7af0db;
           opacity:0; animation: pf-reveal 580ms ease 820ms forwards;
         }
         @keyframes pf-reveal { to { opacity:1; transform: translateY(0); } }

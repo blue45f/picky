@@ -2574,7 +2574,7 @@ export const PollList: React.FC = () => {
                 className="ghost-btn"
                 disabled={option.value === 'mine' && !userId}
                 aria-pressed={scope === option.value}
-                aria-label={`${option.label} ${option.count}개`}
+                aria-label={`${option.label} (${option.count})개`}
                 title={
                   option.value === 'mine' && !userId
                     ? '로그인/비회원 닉네임 시작 후 내 항목을 확인할 수 있어요'
@@ -2619,7 +2619,7 @@ export const PollList: React.FC = () => {
                 onClick={() => setSignal(option.value)}
                 className="ghost-btn"
                 aria-pressed={signal === option.value}
-                aria-label={`${option.label} ${option.count}개`}
+                aria-label={`${option.label} (${option.count})개`}
                 style={{
                   borderColor:
                     signal === option.value ? 'rgba(45, 212, 191, 0.48)' : 'var(--bg-card-border)',

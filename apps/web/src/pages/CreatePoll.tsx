@@ -2407,6 +2407,7 @@ export const CreatePoll: React.FC = () => {
 
           <input
             type="text"
+            aria-label="고민 주제 (질문)"
             placeholder="예: 이번 주말 모임, 어디서 만날까요?"
             value={question}
             onChange={(e) => {
@@ -2480,6 +2481,7 @@ export const CreatePoll: React.FC = () => {
             상세 내용 / 고민 배경 (선택)
           </label>
           <textarea
+            aria-label="상세 내용 / 고민 배경 (선택)"
             placeholder="결정을 내리기 힘든 이유나 배경을 적어주면 더 정확한 답을 받을 수 있어요."
             value={description}
             onChange={(e) => {
@@ -2551,6 +2553,7 @@ export const CreatePoll: React.FC = () => {
           </div>
 
           <textarea
+            aria-label="선택지 빠른 붙여넣기"
             value={bulkOptionsText}
             onChange={(event) => setBulkOptionsText(event.target.value)}
             placeholder={'예:\n아침 9시 회의\n오후 2시 회의\n비동기 문서 공유'}
@@ -2987,6 +2990,7 @@ export const CreatePoll: React.FC = () => {
                 <div className="option-input-grid">
                   <input
                     type="text"
+                    aria-label={`선택지 ${index + 1} 내용`}
                     placeholder="내용 입력 (필수)"
                     value={option.text}
                     onChange={(e) => {

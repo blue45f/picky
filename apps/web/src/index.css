@@ -713,6 +713,12 @@ body.present-mode .page-shell {
   border-color: color-mix(in oklab, var(--brand-primary-light) 68%, var(--bg-card-border));
 }
 
+/* Radix 탭 패널 키보드 포커스 링(프로그램적 :focus 깜빡임은 전역 규칙대로 box-shadow 로 처리). */
+[role='tabpanel']:focus-visible {
+  box-shadow: var(--focus-outline);
+  border-radius: var(--radius-sm);
+}
+
 /* 스크린리더 전용(시각적으로 숨김) — 라우트 변경 안내(aria-live), 스킵 링크 기본 상태 등 */
 .sr-only {
   position: absolute;
