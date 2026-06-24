@@ -7,6 +7,23 @@ export const PollResultsVisibilitySchema = z.enum(['afterVote', 'always']);
 
 export type PollResultsVisibility = z.infer<typeof PollResultsVisibilitySchema>;
 
+/**
+ * 투표 공개 범위 — 특정 사람만 참여시키기 위한 접근 제어.
+ * - public: 목록에 노출 + 누구나 참여
+ * - unlisted: 목록 비노출, 링크 아는 사람만 참여(링크 공유 전용)
+ * - private: 접근 코드를 아는 사람만 열람·참여
+ */
+export const PollVisibilitySchema = z.enum(['public', 'unlisted', 'private']);
+
+export type PollVisibility = z.infer<typeof PollVisibilitySchema>;
+
+/** 비공개(private) 투표의 접근 코드. 4~20자. */
+export const PollAccessCodeSchema = z
+  .string()
+  .trim()
+  .min(4, '접근 코드는 최소 4자 이상이어야 합니다.')
+  .max(20, '접근 코드는 최대 20자 이하이어야 합니다.');
+
 export const PollAttachmentSchema = z.object({
   name: z
     .string()
@@ -29,6 +46,8 @@ export const CreatePollSchema = z.object({
   description: z.string().max(500, '설명은 최대 500글자 이하이어야 합니다.').optional().nullable(),
   endsAt: z.string().datetime('마감 시간 형식이 올바르지 않습니다.').optional().nullable(),
   resultsVisibility: PollResultsVisibilitySchema.optional().nullable(),
+  visibility: PollVisibilitySchema.optional(),
+  accessCode: PollAccessCodeSchema.optional().nullable(),
   options: z
     .array(
       z.object({
@@ -71,6 +90,8 @@ export const UpdatePollSchema = z
       .nullable(),
     endsAt: z.string().datetime('마감 시간 형식이 올바르지 않습니다.').optional().nullable(),
     resultsVisibility: PollResultsVisibilitySchema.optional().nullable(),
+    visibility: PollVisibilitySchema.optional(),
+    accessCode: PollAccessCodeSchema.optional().nullable(),
     options: z
       .array(
         z.object({
@@ -124,6 +145,8 @@ export interface PollComment {
   createdAt: string;
   selectedOptionId?: number;
   selectedOptionText?: string;
+  /** 대댓글: 부모 댓글 id. 최상위 댓글이면 null/미설정. */
+  parentId?: number | null;
 }
 
 export type PollAttachment = z.infer<typeof PollAttachmentSchema>;
@@ -139,6 +162,10 @@ export interface Poll {
   endsAt?: string | null;
   totalVotes: number;
   resultsVisibility?: PollResultsVisibility | null;
+  /** 공개 범위(기본 public). private/unlisted면 목록 비노출·접근 제어. */
+  visibility?: PollVisibility | null;
+  /** private 투표라 접근 코드 입력이 필요한지. accessCode 원문은 응답에 절대 포함하지 않음. */
+  requiresCode?: boolean;
   creatorId?: string | null;
   creatorIsGuest?: boolean;
   categoryId?: string | null;

@@ -26,6 +26,9 @@ export const polls = pgTable('polls', {
   creatorId: text('creator_id'),
   creatorIsGuest: boolean('creator_is_guest').default(true).notNull(),
   attachments: jsonb('attachments').default([]).notNull(),
+  // 공개 범위(public/unlisted/private) + 비공개 접근 코드. nullable/default라 비파괴.
+  visibility: text('visibility').default('public').notNull(),
+  accessCode: text('access_code'),
 });
 
 // Poll options table
@@ -51,6 +54,8 @@ export const pollComments = pgTable('poll_comments', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
   selectedOptionId: integer('selected_option_id'),
   selectedOptionText: text('selected_option_text'),
+  // 대댓글: 부모 댓글 id (최상위면 null). 비파괴 추가.
+  parentId: integer('parent_id'),
 });
 
 // Relations definitions

@@ -65,10 +65,13 @@ export class DatabaseService implements OnModuleInit {
             id TEXT PRIMARY KEY,
             question TEXT NOT NULL,
             description TEXT,
+            category_id TEXT,
             created_at TIMESTAMP DEFAULT NOW() NOT NULL,
             ends_at TIMESTAMP,
             total_votes INTEGER DEFAULT 0 NOT NULL,
             results_visibility TEXT DEFAULT 'afterVote' NOT NULL,
+            visibility TEXT DEFAULT 'public' NOT NULL,
+            access_code TEXT,
             creator_id TEXT,
             creator_is_guest BOOLEAN DEFAULT TRUE NOT NULL,
             attachments JSONB DEFAULT '[]'::jsonb NOT NULL
@@ -92,8 +95,17 @@ export class DatabaseService implements OnModuleInit {
             comment TEXT NOT NULL,
             created_at TIMESTAMP DEFAULT NOW() NOT NULL,
             selected_option_id INTEGER,
-            selected_option_text TEXT
+            selected_option_text TEXT,
+            parent_id INTEGER
           );
+        `);
+        // 기존 라이브 테이블에 신규 컬럼을 비파괴·멱등으로 추가한다.
+        // CREATE TABLE IF NOT EXISTS는 이미 존재하는 테이블엔 컬럼을 더하지 않으므로 ALTER가 필요하다.
+        await pool.query(`
+          ALTER TABLE polls ADD COLUMN IF NOT EXISTS category_id TEXT;
+          ALTER TABLE polls ADD COLUMN IF NOT EXISTS visibility TEXT DEFAULT 'public' NOT NULL;
+          ALTER TABLE polls ADD COLUMN IF NOT EXISTS access_code TEXT;
+          ALTER TABLE poll_comments ADD COLUMN IF NOT EXISTS parent_id INTEGER;
         `);
         console.log('✓ Drizzle PostgreSQL database tables verified/created successfully.');
       } catch (err) {
