@@ -2206,6 +2206,7 @@ export const PollDetail: React.FC = () => {
         <div
           className="desktop-only"
           style={{
+            order: 1,
             padding: '1rem',
             background: 'var(--bg-card)',
             borderRadius: 'var(--radius-md)',
@@ -2246,6 +2247,7 @@ export const PollDetail: React.FC = () => {
       <section
         className="desktop-only"
         style={{
+          order: 1,
           border: '1px solid rgba(45, 212, 191, 0.18)',
           borderRadius: 'var(--radius-sm)',
           background:
@@ -2419,10 +2421,11 @@ export const PollDetail: React.FC = () => {
         </div>
       )}
 
-      {/* Main Poll Card */}
+      {/* Main Poll Card — order:-1 로 질문/투표를 최상단 히어로로(토스 정렬). QR·안내는 아래로. */}
       <div
         className="content-card"
         style={{
+          order: -1,
           padding: '2rem',
           display: 'flex',
           flexDirection: 'column',
@@ -2434,6 +2437,7 @@ export const PollDetail: React.FC = () => {
           <section
             className="share-strip desktop-only"
             style={{
+              order: 1,
               display: 'grid',
               gridTemplateColumns: 'minmax(0, 1fr) auto',
               gap: '0.85rem',

@@ -685,7 +685,9 @@ body.present-mode .page-shell {
 
 .page-shell {
   width: 100%;
-  max-width: 1080px;
+  /* 토스 인앱(단일 좁은 컬럼, 520px)의 가독성을 PC에서도 맞추기 위해 집중 컬럼 폭으로 제한.
+     1080px 전면 확장은 PC에서 줄이 너무 길고 산만했음 → 읽기 좋은 단일 컬럼. */
+  max-width: 720px;
   margin: 0 auto;
   padding: 2rem 1.25rem 5rem;
 }
