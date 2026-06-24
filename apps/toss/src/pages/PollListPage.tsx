@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Top } from '@toss/tds-mobile';
 import type { Poll } from '../shared';
@@ -12,6 +12,7 @@ import { hasVotedLocally } from '../lib/votes';
 import { hapticFeedback } from '../lib/toss';
 import { getRecentPollHistory, type RecentPollHistoryItem } from '../lib/pollHistory';
 import { Chip, ProgressBar, SegmentedControl, Skeleton } from '../components/ui';
+import { BannerAd } from '../components/BannerAd';
 import { useCountdown } from '../components/Countdown';
 import { triggerParticleBurst } from '../lib/particles';
 
@@ -763,7 +764,11 @@ function ListBody(
       {showNoMatch ? <NoMatchState /> : null}
       {showEmpty ? <EmptyState onCreate={onCreate} /> : null}
       {visiblePolls.map((poll, index) => (
-        <PollCard key={poll.id} poll={poll} index={index} onClick={() => onSelect(poll.id)} />
+        <Fragment key={poll.id}>
+          <PollCard poll={poll} index={index} onClick={() => onSelect(poll.id)} />
+          {/* 첫 화면 아래(3번째 카드 뒤)에 인앱 배너 광고 — 정책상 진입 직후 전면 광고 금지 */}
+          {index === 2 ? <BannerAd /> : null}
+        </Fragment>
       ))}
     </>
   );
