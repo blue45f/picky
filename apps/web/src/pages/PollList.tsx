@@ -1700,7 +1700,7 @@ function PollResultsRegion(
         >
           {emptyStateHint}
         </p>
-        {!hasActiveFilters ? (
+        {hasActiveFilters ? null : (
           <p
             style={{
               fontSize: '0.78rem',
@@ -1712,7 +1712,7 @@ function PollResultsRegion(
           >
             예시처럼 시작해 보세요 — “점심 메뉴 골라줘”, “회의 안건 우선순위”, “주말 일정 투표”.
           </p>
-        ) : null}
+        )}
         <div
           style={{
             display: 'flex',

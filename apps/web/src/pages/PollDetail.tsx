@@ -4904,12 +4904,13 @@ function buildDecisionConfidence(
     currentPoll.comments.length >= Math.max(2, Math.ceil(currentPoll.totalVotes * 0.35));
   const hasDecisionSignal =
     pollClosed || (currentPoll.totalVotes > 0 && (leadingShare >= 60 || voteGap >= 2));
+  const openVisibilityScore = resultsVisibility === 'always' ? 10 : 6;
   const decisionConfidenceScore = Math.min(
     100,
     (hasEnoughSample ? 35 : Math.min(30, currentPoll.totalVotes * 6)) +
       (hasEnoughFeedback ? 25 : Math.min(20, currentPoll.comments.length * 8)) +
       (hasDecisionSignal ? 25 : Math.min(14, voteGap * 7)) +
-      (pollClosed ? 15 : resultsVisibility === 'always' ? 10 : 6),
+      (pollClosed ? 15 : openVisibilityScore),
   );
   const { decisionConfidenceLabel, decisionConfidenceTone, decisionConfidenceBarGradient } =
     buildDecisionConfidenceBands(decisionConfidenceScore);
@@ -6477,6 +6478,12 @@ function MobileVoteBar(
   }>,
 ) {
   const { votedOptionId, isSubmittingVote, handleVoteSubmit } = props;
+  let voteButtonLabel = '이 선택지로 투표하기';
+  if (isSubmittingVote) {
+    voteButtonLabel = '투표 등록 중...';
+  } else if (votedOptionId === null) {
+    voteButtonLabel = '선택지를 골라 투표해 주세요';
+  }
   return (
     <>
       <div className="mobile-only" aria-hidden="true" style={{ height: '78px' }} />
@@ -6488,11 +6495,7 @@ function MobileVoteBar(
           className="btn-primary"
           style={{ width: '100%', padding: '14px', fontSize: '0.95rem' }}
         >
-          {isSubmittingVote
-            ? '투표 등록 중...'
-            : votedOptionId === null
-              ? '선택지를 골라 투표해 주세요'
-              : '이 선택지로 투표하기'}
+          {voteButtonLabel}
         </button>
       </div>
     </>

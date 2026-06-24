@@ -3279,6 +3279,12 @@ type MobileSubmitBarProps = Readonly<{
 }>;
 
 function MobileSubmitBar({ canSubmit, isLoading }: MobileSubmitBarProps) {
+  let submitLabel = '질문과 선택지 2개를 입력해 주세요';
+  if (isLoading) {
+    submitLabel = '고민 등록 중...';
+  } else if (canSubmit) {
+    submitLabel = '고민 등록 및 링크 생성';
+  }
   return (
     <>
       {/* 모바일 전용 고정 제출 바 — 긴 폼에서도 1차 액션을 항상 손 닿는 곳에.
@@ -3292,11 +3298,7 @@ function MobileSubmitBar({ canSubmit, isLoading }: MobileSubmitBarProps) {
           className="btn-primary"
           style={{ width: '100%', padding: '14px', fontSize: '0.95rem' }}
         >
-          {isLoading
-            ? '고민 등록 중...'
-            : canSubmit
-              ? '고민 등록 및 링크 생성'
-              : '질문과 선택지 2개를 입력해 주세요'}
+          {submitLabel}
         </button>
       </div>
     </>
