@@ -39,7 +39,7 @@ const normalizeApiBase = (rawBase: string): string => {
 const PREFERRED_API_BASE_KEY = 'picky_api_base_preferred';
 
 const getPreferredApiBase = (): string | undefined => {
-  if (typeof globalThis.window === 'undefined') {
+  if (!('window' in globalThis)) {
     return undefined;
   }
 
@@ -52,7 +52,7 @@ const getPreferredApiBase = (): string | undefined => {
 };
 
 const persistPreferredApiBase = (base: string) => {
-  if (typeof globalThis.window === 'undefined') {
+  if (!('window' in globalThis)) {
     return;
   }
 
@@ -67,7 +67,7 @@ const persistPreferredApiBase = (base: string) => {
 const dedupe = <T>(items: T[]): T[] => Array.from(new Set(items));
 
 const getWindowApiCandidates = (): string[] => {
-  if (typeof globalThis.window === 'undefined') {
+  if (!('window' in globalThis)) {
     return [];
   }
 
@@ -76,7 +76,7 @@ const getWindowApiCandidates = (): string[] => {
 };
 
 const getLocalDevApiCandidates = (): string[] => {
-  if (typeof globalThis.window === 'undefined') {
+  if (!('window' in globalThis)) {
     return [];
   }
 
@@ -92,7 +92,7 @@ const getLocalDevApiCandidates = (): string[] => {
 };
 
 const getCustomApiCandidateFromWindow = (): string[] => {
-  if (typeof globalThis.window === 'undefined') {
+  if (!('window' in globalThis)) {
     return [];
   }
 
@@ -105,7 +105,7 @@ const getCustomApiCandidateFromWindow = (): string[] => {
 };
 
 const getVercelApiCandidates = (): string[] => {
-  if (typeof globalThis.window === 'undefined') {
+  if (!('window' in globalThis)) {
     return [];
   }
 
@@ -164,7 +164,7 @@ const getApiCandidates = (): string[] => {
   const baseCandidates = getWindowApiCandidates();
   const localDevCandidates = getLocalDevApiCandidates();
 
-  if (typeof globalThis.window === 'undefined') {
+  if (!('window' in globalThis)) {
     return ['/api', ...preferred];
   }
 
@@ -208,7 +208,7 @@ const shouldRetryOnFailure = (
   }
 
   const isVercelFallbackProbe =
-    typeof globalThis.window !== 'undefined' &&
+    'window' in globalThis &&
     globalThis.location.hostname.endsWith('.vercel.app') &&
     base.includes(`${globalThis.location.host}/api`) &&
     !base.includes('-api.vercel.app');
@@ -229,7 +229,7 @@ const isApiDebugEnabled = (): boolean => {
     return true;
   }
 
-  if (typeof globalThis.window === 'undefined') {
+  if (!('window' in globalThis)) {
     return false;
   }
 
@@ -333,8 +333,7 @@ export const requestApi = async (path: string, init: RequestInit = {}): Promise<
   let lastError: Error | null = null;
   const trace: ApiTraceEntry[] = [];
   const debug = isApiDebugEnabled();
-  const isProdLike =
-    typeof globalThis.window !== 'undefined' && globalThis.location.hostname.includes('vercel.app');
+  const isProdLike = 'window' in globalThis && globalThis.location.hostname.includes('vercel.app');
   const ctx: ApiAttemptContext = {
     path,
     init,

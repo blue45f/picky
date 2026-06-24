@@ -28,7 +28,7 @@ const isRecentPollHistoryItem = (value: unknown): value is RecentPollHistoryItem
 };
 
 const readRecentPollHistory = (): RecentPollHistoryItem[] => {
-  if (typeof globalThis.window === 'undefined') {
+  if (!('window' in globalThis)) {
     return [];
   }
 
@@ -50,7 +50,7 @@ const readRecentPollHistory = (): RecentPollHistoryItem[] => {
 };
 
 const writeRecentPollHistory = (items: RecentPollHistoryItem[]) => {
-  if (typeof globalThis.window === 'undefined') {
+  if (!('window' in globalThis)) {
     return;
   }
 

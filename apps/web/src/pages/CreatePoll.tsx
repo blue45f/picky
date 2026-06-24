@@ -288,7 +288,7 @@ const resolveDeadlinePresetValue = (preset: DeadlinePreset): string => {
 };
 
 const loadDraftFromStorage = (): PollDraft | null => {
-  if (typeof globalThis.window === 'undefined') {
+  if (!('window' in globalThis)) {
     return null;
   }
 
@@ -384,7 +384,7 @@ const loadDraftFromStorage = (): PollDraft | null => {
 };
 
 const clearDraftStorage = () => {
-  if (typeof globalThis.window === 'undefined') {
+  if (!('window' in globalThis)) {
     return;
   }
 
@@ -392,7 +392,7 @@ const clearDraftStorage = () => {
 };
 
 const saveDraftToStorage = (draft: PollDraft) => {
-  if (typeof globalThis.window === 'undefined') {
+  if (!('window' in globalThis)) {
     return;
   }
 

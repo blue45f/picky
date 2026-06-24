@@ -44,7 +44,7 @@ interface PollStoreFactoryOptions {
 const LOCAL_POLL_CACHE_KEY = 'picky_local_polls';
 
 const loadCachedPolls = (): Poll[] => {
-  if (typeof globalThis.window === 'undefined') {
+  if (!('window' in globalThis)) {
     return [];
   }
 
@@ -140,7 +140,7 @@ const loadCachedPolls = (): Poll[] => {
 };
 
 const persistCachedPolls = (polls: Poll[]) => {
-  if (typeof globalThis.window === 'undefined') {
+  if (!('window' in globalThis)) {
     return;
   }
 

@@ -19,7 +19,7 @@ export const globalParticles: Particle[] = [];
 
 // 파티클 연출용 난수 — crypto.getRandomValues로 S2245(PRNG) 룰을 충족하고, 미지원 환경에서만 폴백해요.
 const secureRandom = () => {
-  if (typeof globalThis.window !== 'undefined' && globalThis.crypto) {
+  if ('window' in globalThis && globalThis.crypto) {
     const array = new Uint32Array(1);
     globalThis.crypto.getRandomValues(array);
     return (array[0] ?? 0) / 4294967296; // 2^32 → [0, 1)

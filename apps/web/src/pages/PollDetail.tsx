@@ -54,6 +54,8 @@ import {
 import type { KakaoShareDiagnostics, KakaoShareReadinessItem } from '../lib/pollShare';
 import { buildQrSvgDataUri } from '../lib/qrCode';
 import { rememberRecentPoll } from '../lib/pollHistory';
+
+type EmbedCodeMode = 'standard' | 'compact' | 'popup';
 const POLL_AUTHOR_LABELS: {
   mine: string;
   otherMember: string;
@@ -2908,10 +2910,10 @@ function KakaoShareDiagnosticsPanel(
 function ShareEmbedCodeSection(
   props: Readonly<{
     currentPoll: Poll;
-    embedCodeMode: 'standard' | 'compact' | 'popup';
-    setEmbedCodeMode: React.Dispatch<React.SetStateAction<'standard' | 'compact' | 'popup'>>;
+    embedCodeMode: EmbedCodeMode;
+    setEmbedCodeMode: React.Dispatch<React.SetStateAction<EmbedCodeMode>>;
     embedCodeModes: ReadonlyArray<{
-      id: 'standard' | 'compact' | 'popup';
+      id: EmbedCodeMode;
       label: string;
       title: string;
       description: string;
@@ -3148,10 +3150,10 @@ function PollShareModal(
     setCopyMessage: React.Dispatch<React.SetStateAction<string>>;
     snsPreviewPlatform: 'x' | 'kakao';
     setSnsPreviewPlatform: React.Dispatch<React.SetStateAction<'x' | 'kakao'>>;
-    embedCodeMode: 'standard' | 'compact' | 'popup';
-    setEmbedCodeMode: React.Dispatch<React.SetStateAction<'standard' | 'compact' | 'popup'>>;
+    embedCodeMode: EmbedCodeMode;
+    setEmbedCodeMode: React.Dispatch<React.SetStateAction<EmbedCodeMode>>;
     embedCodeModes: ReadonlyArray<{
-      id: 'standard' | 'compact' | 'popup';
+      id: EmbedCodeMode;
       label: string;
       title: string;
       description: string;
@@ -3176,8 +3178,6 @@ function PollShareModal(
     handleCopyLinkClick: (pollId: string) => void;
     handleKakaoShareClick: () => void;
     handleNativeShareClick: () => void;
-    handleShareModalBackdropMouseDown: (event: React.MouseEvent<HTMLDivElement>) => void;
-    handleShareModalBackdropKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => void;
   }>,
 ) {
   const {
@@ -3204,20 +3204,30 @@ function PollShareModal(
     handleCopyLinkClick,
     handleKakaoShareClick,
     handleNativeShareClick,
-    handleShareModalBackdropMouseDown,
-    handleShareModalBackdropKeyDown,
   } = props;
 
   return (
-    <div
-      className="modal-overlay"
-      role="button"
-      tabIndex={0}
-      aria-label="공유 창 닫기"
-      onMouseDown={handleShareModalBackdropMouseDown}
-      onKeyDown={handleShareModalBackdropKeyDown}
-    >
-      <div className="modal-content animate-slide-up" style={{ maxWidth: '520px' }}>
+    <div className="modal-overlay">
+      <button
+        type="button"
+        aria-label="공유 창 닫기"
+        onClick={handleCloseShareModal}
+        style={{
+          position: 'absolute',
+          inset: 0,
+          width: '100%',
+          height: '100%',
+          background: 'transparent',
+          border: 'none',
+          padding: 0,
+          margin: 0,
+          cursor: 'default',
+        }}
+      />
+      <div
+        className="modal-content animate-slide-up"
+        style={{ maxWidth: '520px', position: 'relative', zIndex: 1 }}
+      >
         <div style={{ textAlign: 'center', marginBottom: '1.25rem' }}>
           <Sparkles size={32} style={{ color: 'var(--brand-accent-gold)', marginBottom: '8px' }} />
           <h3
@@ -3619,8 +3629,6 @@ function ResultImagePreviewModal(
     resultImageContentOptions: ResultImageContentOptions;
     copiedId: string | null;
     closeResultImagePreview: () => void;
-    handleResultImagePreviewBackdropClick: (event: React.MouseEvent<HTMLDivElement>) => void;
-    handleResultImagePreviewBackdropKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => void;
     handleResultImageThemeChange: (nextTheme: ResultImageTheme) => void;
     handleResultImageContentToggle: (targetOption: ResultImageContentKey) => void;
     handleDownloadPreviewImageClick: () => void;
@@ -3634,23 +3642,33 @@ function ResultImagePreviewModal(
     resultImageContentOptions,
     copiedId,
     closeResultImagePreview,
-    handleResultImagePreviewBackdropClick,
-    handleResultImagePreviewBackdropKeyDown,
     handleResultImageThemeChange,
     handleResultImageContentToggle,
     handleDownloadPreviewImageClick,
     handleCopyJoinCodeClick,
   } = props;
   return (
-    <div
-      className="modal-overlay"
-      role="button"
-      tabIndex={0}
-      aria-label="미리보기 닫기"
-      onMouseDown={handleResultImagePreviewBackdropClick}
-      onKeyDown={handleResultImagePreviewBackdropKeyDown}
-    >
-      <div className="modal-content animate-slide-up" style={{ maxWidth: '760px' }}>
+    <div className="modal-overlay">
+      <button
+        type="button"
+        aria-label="미리보기 닫기"
+        onClick={closeResultImagePreview}
+        style={{
+          position: 'absolute',
+          inset: 0,
+          width: '100%',
+          height: '100%',
+          background: 'transparent',
+          border: 'none',
+          padding: 0,
+          margin: 0,
+          cursor: 'default',
+        }}
+      />
+      <div
+        className="modal-content animate-slide-up"
+        style={{ maxWidth: '760px', position: 'relative', zIndex: 1 }}
+      >
         <div
           style={{
             display: 'flex',
@@ -6490,7 +6508,9 @@ function MobileVoteBar(
       <div className="sticky-action-bar mobile-only">
         <button
           type="button"
-          onClick={() => void handleVoteSubmit()}
+          onClick={() => {
+            handleVoteSubmit();
+          }}
           disabled={votedOptionId === null || isSubmittingVote}
           className="btn-primary"
           style={{ width: '100%', padding: '14px', fontSize: '0.95rem' }}
@@ -6624,7 +6644,7 @@ export const PollDetail: React.FC = () => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [showShareModal, setShowShareModal] = useState(showShareParam);
   const [snsPreviewPlatform, setSnsPreviewPlatform] = useState<'x' | 'kakao'>('x');
-  const [embedCodeMode, setEmbedCodeMode] = useState<'standard' | 'compact' | 'popup'>('standard');
+  const [embedCodeMode, setEmbedCodeMode] = useState<EmbedCodeMode>('standard');
   const [inviteMessageTone, setInviteMessageTone] = useState<InviteMessageTone>('default');
   const [copyMessage, setCopyMessage] = useState('');
   const [voteMessage, setVoteMessage] = useState('');
@@ -6683,7 +6703,7 @@ export const PollDetail: React.FC = () => {
   }, [user?.id, guestName, id]);
 
   useEffect(() => {
-    if (!currentPoll || !id || typeof globalThis.window === 'undefined') {
+    if (!currentPoll || !id || !('window' in globalThis)) {
       return;
     }
 
@@ -6734,7 +6754,7 @@ export const PollDetail: React.FC = () => {
   }, [currentPoll?.id, id, votedHistory]);
 
   useEffect(() => {
-    if (!currentPoll || !id || typeof globalThis.window === 'undefined') {
+    if (!currentPoll || !id || !('window' in globalThis)) {
       return;
     }
 
@@ -7195,19 +7215,6 @@ export const PollDetail: React.FC = () => {
     setResultImagePreviewUrl('');
   };
 
-  const handleResultImagePreviewBackdropClick = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (event.target === event.currentTarget) {
-      closeResultImagePreview();
-    }
-  };
-
-  const handleResultImagePreviewBackdropKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
-      event.preventDefault();
-      closeResultImagePreview();
-    }
-  };
-
   const handleResultImageThemeChange = (nextTheme: ResultImageTheme) => {
     setResultImageTheme(nextTheme);
 
@@ -7370,19 +7377,6 @@ export const PollDetail: React.FC = () => {
       const nextParams = new URLSearchParams(searchParams);
       nextParams.delete('showShare');
       setSearchParams(nextParams);
-    }
-  };
-
-  const handleShareModalBackdropMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (event.target === event.currentTarget) {
-      handleCloseShareModal();
-    }
-  };
-
-  const handleShareModalBackdropKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
-      event.preventDefault();
-      handleCloseShareModal();
     }
   };
 
@@ -7604,8 +7598,6 @@ export const PollDetail: React.FC = () => {
               resultImageContentOptions={resultImageContentOptions}
               copiedId={copiedId}
               closeResultImagePreview={closeResultImagePreview}
-              handleResultImagePreviewBackdropClick={handleResultImagePreviewBackdropClick}
-              handleResultImagePreviewBackdropKeyDown={handleResultImagePreviewBackdropKeyDown}
               handleResultImageThemeChange={handleResultImageThemeChange}
               handleResultImageContentToggle={handleResultImageContentToggle}
               handleDownloadPreviewImageClick={handleDownloadPreviewImageClick}
@@ -7676,8 +7668,6 @@ export const PollDetail: React.FC = () => {
           handleCopyLinkClick={handleCopyLinkClick}
           handleKakaoShareClick={handleKakaoShareClick}
           handleNativeShareClick={handleNativeShareClick}
-          handleShareModalBackdropMouseDown={handleShareModalBackdropMouseDown}
-          handleShareModalBackdropKeyDown={handleShareModalBackdropKeyDown}
         />
       )}
 

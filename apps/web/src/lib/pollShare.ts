@@ -42,7 +42,7 @@ const normalizeOrigin = (value: string | null | undefined): string | null => {
 };
 
 const getRuntimeOrigin = (): string | null => {
-  if (typeof globalThis.window === 'undefined') {
+  if (!('window' in globalThis)) {
     return null;
   }
 
@@ -172,7 +172,7 @@ const waitForKakaoSdk = async () => {
   const startedAt = Date.now();
 
   while (
-    typeof globalThis.window !== 'undefined' &&
+    'window' in globalThis &&
     !globalThis.window.Kakao &&
     Date.now() - startedAt < KAKAO_SDK_WAIT_TIMEOUT_MS
   ) {
@@ -616,7 +616,7 @@ export const sharePollToKakao = async (
   const shareMessageText = buildPollShareMessage(poll);
   const kakaoKey = import.meta.env.VITE_KAKAO_JAVASCRIPT_KEY?.trim();
 
-  if (kakaoKey && typeof globalThis.window !== 'undefined') {
+  if (kakaoKey && 'window' in globalThis) {
     const sharedViaKakao = await trySharePollViaKakaoSdk(
       poll,
       shareUrl,

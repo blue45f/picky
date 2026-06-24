@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 const prefersReducedMotion = () =>
-  typeof globalThis.window !== 'undefined' &&
+  'window' in globalThis &&
   typeof globalThis.matchMedia === 'function' &&
   globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches;
 

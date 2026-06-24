@@ -29,9 +29,8 @@ interface OptionDraft {
   imageUrl: string | null;
 }
 
-let optionIdSeq = 0;
 const emptyOption = (): OptionDraft => ({
-  id: `opt-${(optionIdSeq += 1)}`,
+  id: `opt-${globalThis.crypto.randomUUID()}`,
   text: '',
   imageUrl: null,
 });

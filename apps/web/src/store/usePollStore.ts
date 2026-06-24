@@ -18,7 +18,7 @@ const isLocalPollFallbackAllowed = () => {
     return true;
   }
 
-  if (typeof globalThis.window === 'undefined') {
+  if (!('window' in globalThis)) {
     return false;
   }
 

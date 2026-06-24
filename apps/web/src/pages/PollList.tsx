@@ -61,7 +61,7 @@ const PINNED_POLLS_STORAGE_KEY = 'picky_pinned_poll_ids_v1'; // gitleaks:allow �
 const MAX_PINNED_POLLS = 6;
 
 const loadPinnedPollIds = (): string[] => {
-  if (typeof globalThis.window === 'undefined') {
+  if (!('window' in globalThis)) {
     return [];
   }
 
@@ -77,7 +77,7 @@ const loadPinnedPollIds = (): string[] => {
 };
 
 const savePinnedPollIds = (pollIds: string[]) => {
-  if (typeof globalThis.window === 'undefined') {
+  if (!('window' in globalThis)) {
     return;
   }
 
@@ -3540,7 +3540,7 @@ export const PollList: React.FC = () => {
           >
             <span className="empty-state-icon" aria-hidden="true">
               🥑
-            </span>
+            </span>{' '}
             고민을 불러오지 못했어요
           </strong>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.78rem', margin: 0 }}>

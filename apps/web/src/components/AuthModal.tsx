@@ -231,7 +231,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   // 접근성: 모달 포커스 트랩·복원에 쓰는 ref. closeRef 는 최신 handleClose 를 가리켜
   // (handleClose 가 조기 return 아래 정의되므로) 훅에서 안전하게 호출한다.
-  const modalRef = useRef<HTMLDivElement>(null);
+  const modalRef = useRef<HTMLDialogElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const closeRef = useRef<() => void>(() => {});
 
@@ -395,22 +395,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   };
   closeRef.current = handleClose;
 
-  const handleBackdropClick = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (event.target === event.currentTarget) {
-      handleClose();
-    }
-  };
-
-  const handleBackdropKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.target !== event.currentTarget) {
-      return;
-    }
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      handleClose();
-    }
-  };
-
   const modalTitle = getModalTitle(mode);
   const defaultSubTitle = getDefaultSubTitle(mode);
 
@@ -440,16 +424,27 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         zIndex: 1000,
         padding: '1rem',
       }}
-      onMouseDown={handleBackdropClick}
-      onKeyDown={handleBackdropKeyDown}
-      role="button"
-      tabIndex={-1}
-      aria-label="모달 닫기"
     >
-      <div
+      <button
+        type="button"
+        aria-label="모달 닫기"
+        onClick={handleClose}
+        style={{
+          position: 'absolute',
+          inset: 0,
+          width: '100%',
+          height: '100%',
+          background: 'transparent',
+          border: 'none',
+          padding: 0,
+          margin: 0,
+          cursor: 'default',
+        }}
+      />
+      <dialog
         ref={modalRef}
+        open
         className="content-card"
-        role="dialog"
         aria-modal="true"
         aria-labelledby="auth-modal-title"
         style={{
@@ -457,6 +452,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           maxWidth: '400px',
           padding: '2rem',
           position: 'relative',
+          inset: 'auto',
+          margin: 0,
+          zIndex: 1,
           display: 'flex',
           flexDirection: 'column',
           gap: '1.5rem',
@@ -644,7 +642,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <SubmitLabel mode={mode} isLoading={isLoading} />
           </button>
         </form>
-      </div>
+      </dialog>
     </div>
   );
 };
