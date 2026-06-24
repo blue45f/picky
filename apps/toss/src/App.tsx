@@ -134,7 +134,7 @@ export function App() {
       <SchemeEntryBridge />
       <GlobalParticleCanvas />
       <WelcomeSplash />
-      <main>
+      <main style={{ background: '#05100e', minHeight: '100dvh', position: 'relative' }}>
         {/* 스크린리더용 페이지 제목(landmark + h1) — 시각적으로는 숨김 */}
         <h1
           style={{

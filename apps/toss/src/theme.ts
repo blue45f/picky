@@ -1,14 +1,14 @@
 /** 피키 브랜드 토큰 (다크 + 에메랄드 + 글래스모피즘 기반 프리미엄 UI 적용). */
 export const theme = {
   bg: '#05100e',
-  surface: 'rgba(12, 31, 26, 0.72)', // 영롱한 반투명 글래스
-  surfaceAlt: 'rgba(16, 42, 35, 0.88)',
+  surface: 'rgba(14, 33, 28, 0.95)', // 거의 불투명한 다크 카드 — 가독성 우선(글래스 haze 제거)
+  surfaceAlt: 'rgba(18, 45, 38, 0.97)',
   surfaceStrong: 'rgba(20, 51, 41, 0.95)',
   border: 'rgba(255, 255, 255, 0.05)', // 은은한 흰색 오버레이
   borderStrong: 'rgba(255, 255, 255, 0.12)',
   text: '#f4fbf8',
-  textMuted: '#9fb4ad',
-  textFaint: '#8fa8a0',
+  textMuted: '#c5d8d1', // 보조 텍스트 — 고대비(다크 카드 위 ~11:1)
+  textFaint: '#abc3bc', // 3차 텍스트 — 또렷하게(~9:1)
   accent: '#13c2a3',
   accentStrong: '#2ee0bf',
   accentSoft: 'rgba(19, 194, 163, 0.22)',
