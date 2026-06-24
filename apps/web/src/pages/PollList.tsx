@@ -1016,21 +1016,6 @@ export const PollList: React.FC = () => {
     }
   };
 
-  const handlePollCardActivate = (event: React.KeyboardEvent<HTMLElement>, pollId: string) => {
-    if (event.key !== 'Enter' && event.key !== ' ') {
-      return;
-    }
-
-    event.preventDefault();
-    const target = visiblePolls.find((poll) => poll.id === pollId);
-    if (!target) {
-      return;
-    }
-
-    setCurrentPoll(target);
-    navigate(`/poll/${pollId}`);
-  };
-
   const handleRecentPollOpen = (pollId: string) => {
     const target = polls.find((poll) => poll.id === pollId);
     if (target) {
@@ -1197,7 +1182,7 @@ export const PollList: React.FC = () => {
                   {hotPoll.totalVotes}명 참여 중
                 </span>
               </div>
-              <h3
+              <h2
                 style={{
                   margin: 0,
                   fontSize: '1.2rem',
@@ -1207,7 +1192,7 @@ export const PollList: React.FC = () => {
                 }}
               >
                 {hotPoll.question}
-              </h3>
+              </h2>
               {hotPoll.description && (
                 <p
                   style={{
@@ -1480,15 +1465,7 @@ export const PollList: React.FC = () => {
                   return (
                     <article
                       key={poll.id}
-                      role="button"
-                      tabIndex={0}
                       onClick={() => handleRecentPollOpen(poll.id)}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter' || event.key === ' ') {
-                          event.preventDefault();
-                          handleRecentPollOpen(poll.id);
-                        }
-                      }}
                       style={{
                         border: '1px solid rgba(250, 204, 21, 0.16)',
                         borderRadius: 'var(--radius-sm)',
@@ -1653,15 +1630,7 @@ export const PollList: React.FC = () => {
                   return (
                     <article
                       key={item.id}
-                      role="button"
-                      tabIndex={0}
                       onClick={() => handleRecentPollOpen(item.id)}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter' || event.key === ' ') {
-                          event.preventDefault();
-                          handleRecentPollOpen(item.id);
-                        }
-                      }}
                       style={{
                         border: '1px solid rgba(255, 255, 255, 0.08)',
                         borderRadius: 'var(--radius-sm)',
@@ -2896,22 +2865,24 @@ export const PollList: React.FC = () => {
                 <article
                   key={poll.id}
                   className="poll-card"
-                  role="button"
-                  tabIndex={0}
-                  aria-label={`${poll.question} 투표 페이지로 이동`}
-                  onClick={() => {
-                    setCurrentPoll(poll);
-                    navigate(`/poll/${poll.id}`);
-                  }}
-                  onKeyDown={(event) => handlePollCardActivate(event, poll.id)}
                   style={{
                     textAlign: 'left',
-                    textDecoration: 'none',
                     padding: isCompact ? '1.05rem' : '1.25rem',
                     width: '100%',
                     border: isMine ? '1px solid rgba(99, 102, 241, 0.45)' : undefined,
                   }}
                 >
+                  {/* 카드 전체를 덮는 접근성 내비 버튼(키보드+마우스). 내부 액션 버튼은
+                      .poll-card 의 z-index 규칙으로 이 오버레이 위에 떠서 따로 동작한다. */}
+                  <button
+                    type="button"
+                    className="poll-card-open"
+                    aria-label={`${poll.question} 투표 페이지로 이동`}
+                    onClick={() => {
+                      setCurrentPoll(poll);
+                      navigate(`/poll/${poll.id}`);
+                    }}
+                  />
                   <div
                     style={{
                       display: 'flex',

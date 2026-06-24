@@ -14,6 +14,8 @@
   /* Brand Accents */
   --brand-primary: oklch(67% 0.14 165);
   --brand-primary-light: oklch(78% 0.1 165);
+  /* 다크모드 teal 버튼 위 잉크(진한 색) — 흰 글자는 대비 부족(2.6:1)이라 진한 잉크로 AA 확보 */
+  --on-brand-primary: oklch(22% 0.05 195);
   --brand-accent-gold: oklch(78% 0.14 85);
   --brand-accent-teal: oklch(72% 0.15 170);
   --brand-accent-coral: oklch(64% 0.18 25);
@@ -63,6 +65,8 @@
   /* Brand Accents slightly darkened for contrast in light mode */
   --brand-primary: oklch(50% 0.12 165);
   --brand-primary-light: oklch(40% 0.14 165);
+  /* 라이트모드는 짙은 teal 버튼이라 흰 글자가 대비 충족 */
+  --on-brand-primary: oklch(100% 0 0);
   --brand-accent-gold: oklch(55% 0.12 85);
   --brand-accent-teal: oklch(45% 0.13 170);
   --brand-accent-coral: oklch(55% 0.18 25);
@@ -1710,7 +1714,8 @@ body.present-mode .page-shell {
 /* Premium Buttons */
 .btn-primary {
   background: var(--brand-primary);
-  color: oklch(100% 0 0);
+  /* 테마별 잉크: 다크모드(밝은 teal)엔 진한 잉크, 라이트모드(짙은 teal)엔 흰색 — 둘 다 AA 충족 */
+  color: var(--on-brand-primary);
   border: none;
   font-weight: 600;
   cursor: pointer;
@@ -2233,4 +2238,23 @@ body.present-mode .page-shell {
   body {
     animation: none !important;
   }
+}
+
+/* 피드 카드 stretched-link — 카드 전체를 덮는 접근성 내비 버튼(키보드+마우스).
+   내부 액션 버튼/링크는 z-index 로 오버레이 위에 떠서 개별 동작(중첩 인터랙티브 위반 해소). */
+.poll-card-open {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: inherit;
+  width: 100%;
+  padding: 0;
+}
+.poll-card button:not(.poll-card-open),
+.poll-card a {
+  position: relative;
+  z-index: 2;
 }
