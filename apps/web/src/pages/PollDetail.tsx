@@ -2782,671 +2782,6 @@ export const PollDetail: React.FC = () => {
           </p>
         ) : null}
 
-        <section
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-            gap: '0.55rem',
-            borderTop: '1px solid rgba(255, 255, 255, 0.05)',
-            paddingTop: '0.95rem',
-          }}
-        >
-          <div className="insight-tile">
-            <span>
-              <Info size={13} />
-              진행 상태
-            </span>
-            <strong
-              style={{ color: pollClosed ? 'var(--text-muted)' : 'var(--brand-accent-teal)' }}
-            >
-              {pollClosed ? '마감됨' : '참여 가능'}
-            </strong>
-            <small>{endAtLabel}</small>
-          </div>
-          <div className="insight-tile">
-            <span>
-              <Eye size={13} />
-              결과 공개
-            </span>
-            <strong>{RESULTS_VISIBILITY_LABELS[resultsVisibility]}</strong>
-            <small>
-              {resultsVisibility === 'always'
-                ? '공유 직후부터 흐름을 볼 수 있습니다.'
-                : '투표 완료 후 결과를 볼 수 있습니다.'}
-            </small>
-          </div>
-        </section>
-
-        {canViewResults ? (
-          <section
-            style={{
-              display: 'grid',
-              gap: '0.85rem',
-              border: '1px solid rgba(45, 212, 191, 0.18)',
-              borderRadius: 'var(--radius-sm)',
-              background: 'rgba(45, 212, 191, 0.045)',
-              padding: '1rem',
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                gap: '0.85rem',
-                alignItems: 'flex-start',
-                flexWrap: 'wrap',
-              }}
-            >
-              <div style={{ display: 'grid', gap: '0.25rem' }}>
-                <span
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    color: 'var(--brand-accent-teal)',
-                    fontSize: '0.68rem',
-                    fontWeight: 900,
-                    letterSpacing: '0.05em',
-                  }}
-                >
-                  <Gauge size={13} />
-                  운영 체크리스트
-                </span>
-                <h3
-                  style={{
-                    margin: 0,
-                    color: 'var(--text-primary)',
-                    fontSize: '0.98rem',
-                    fontWeight: 900,
-                  }}
-                >
-                  지금 단계: {operationPhase}
-                </h3>
-                <p
-                  style={{
-                    margin: 0,
-                    color: 'var(--text-secondary)',
-                    fontSize: '0.76rem',
-                    lineHeight: 1.55,
-                  }}
-                >
-                  공유, 의견 수집, 결과 정리, 현장 참여 준비 상태를 한 번에 확인합니다.
-                </p>
-              </div>
-              <span
-                style={{
-                  border: '1px solid rgba(45, 212, 191, 0.28)',
-                  borderRadius: '999px',
-                  color:
-                    completedOperationCount === operationChecklist.length
-                      ? 'var(--brand-accent-teal)'
-                      : 'var(--brand-accent-gold)',
-                  background:
-                    completedOperationCount === operationChecklist.length
-                      ? 'rgba(45, 212, 191, 0.08)'
-                      : 'rgba(250, 204, 21, 0.08)',
-                  padding: '5px 10px',
-                  fontSize: '0.68rem',
-                  fontWeight: 900,
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {completedOperationCount}/{operationChecklist.length} 준비됨
-              </span>
-            </div>
-
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-                gap: '0.65rem',
-              }}
-            >
-              {operationChecklist.map((item) => (
-                <article
-                  key={item.key}
-                  style={{
-                    display: 'grid',
-                    gap: '0.55rem',
-                    alignContent: 'start',
-                    border: '1px solid var(--bg-card-border)',
-                    borderRadius: 'var(--radius-sm)',
-                    background: item.passed
-                      ? 'rgba(45, 212, 191, 0.06)'
-                      : 'rgba(255,255,255,0.025)',
-                    padding: '0.75rem',
-                  }}
-                >
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                    }}
-                  >
-                    <span
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '5px',
-                        color: item.passed
-                          ? 'var(--brand-accent-teal)'
-                          : 'var(--brand-accent-gold)',
-                        fontSize: '0.74rem',
-                        fontWeight: 900,
-                      }}
-                    >
-                      {item.passed ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}
-                      {item.label}
-                    </span>
-                    <small style={{ color: 'var(--text-muted)', fontSize: '0.66rem' }}>
-                      {item.value}
-                    </small>
-                  </div>
-                  <p
-                    style={{
-                      margin: 0,
-                      minHeight: '2.5em',
-                      color: 'var(--text-secondary)',
-                      fontSize: '0.7rem',
-                      lineHeight: 1.45,
-                    }}
-                  >
-                    {item.help}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (item.action === 'share') {
-                        setShowShareModal(true);
-                      } else if (item.action === 'copyLink') {
-                        handleCopyLinkClick(currentPoll.id);
-                      } else if (item.action === 'resultImage') {
-                        handlePreviewResultImageClick();
-                      } else {
-                        window.open(`/present/${encodeURIComponent(currentPoll.id)}`, '_blank');
-                      }
-                    }}
-                    className="ghost-btn"
-                    style={{
-                      justifySelf: 'start',
-                      padding: '5px 9px',
-                      fontSize: '0.68rem',
-                    }}
-                  >
-                    {item.actionLabel}
-                  </button>
-                </article>
-              ))}
-            </div>
-          </section>
-        ) : null}
-
-        {!isEmbedMode && !isPresentationMode
-          ? (() => {
-              const tools = [
-                { key: 'audience', label: '🚀 공유 준비', available: true },
-                { key: 'followup', label: '🧭 후속 결정', available: canViewResults },
-                { key: 'actions', label: '✅ 액션 아이템', available: canViewResults },
-                { key: 'report', label: '📝 리포트', available: canViewResults },
-                { key: 'facilitation', label: '🎙️ 라이브 진행', available: canViewResults },
-                { key: 'topics', label: '💬 의견 토픽', available: canViewResults },
-              ].filter((tool) => tool.available);
-              const activeTool = tools.some((tool) => tool.key === activeToolTab)
-                ? activeToolTab
-                : tools[0]?.key;
-
-              return (
-                <section
-                  className="content-card"
-                  style={{
-                    padding: '1.1rem',
-                    display: 'grid',
-                    gap: toolsExpanded ? '1rem' : '0.5rem',
-                  }}
-                >
-                  <button
-                    type="button"
-                    onClick={() => setToolsExpanded((value) => !value)}
-                    aria-expanded={toolsExpanded}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: '0.75rem',
-                      width: '100%',
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                      padding: 0,
-                      color: 'var(--text-primary)',
-                    }}
-                  >
-                    <span style={{ fontWeight: 800, fontSize: '0.95rem' }}>🧰 결과 활용 도구</span>
-                    <span
-                      style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700 }}
-                    >
-                      {toolsExpanded ? '접기 ▲' : '펼치기 ▼'}
-                    </span>
-                  </button>
-
-                  {toolsExpanded ? (
-                    <>
-                      <div
-                        role="tablist"
-                        aria-label="결과 활용 도구"
-                        style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}
-                      >
-                        {tools.map((tool) => {
-                          const selected = tool.key === activeTool;
-                          return (
-                            <button
-                              key={tool.key}
-                              type="button"
-                              role="tab"
-                              aria-selected={selected}
-                              onClick={() => setActiveToolTab(tool.key)}
-                              className="ghost-btn"
-                              style={{
-                                fontSize: '0.72rem',
-                                fontWeight: 700,
-                                borderColor: selected
-                                  ? 'var(--brand-primary)'
-                                  : 'var(--bg-card-border)',
-                                color: selected ? 'var(--brand-primary)' : 'var(--text-muted)',
-                                background: selected ? 'rgba(20, 184, 166, 0.08)' : 'transparent',
-                              }}
-                            >
-                              {tool.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-
-                      {activeTool === 'audience' ? (
-                        <AudienceLaunchKit
-                          poll={currentPoll}
-                          shareUrl={shareUrl}
-                          endAtLabel={endAtLabel}
-                          resultsVisibilityLabel={RESULTS_VISIBILITY_LABELS[resultsVisibility]}
-                          canViewResults={canViewResults}
-                        />
-                      ) : null}
-                      {activeTool === 'followup' ? (
-                        <DecisionFollowUpPanel
-                          poll={currentPoll}
-                          shareUrl={shareUrl}
-                          pollClosed={pollClosed}
-                        />
-                      ) : null}
-                      {activeTool === 'actions' ? (
-                        <ActionItemPlanner poll={currentPoll} shareUrl={shareUrl} />
-                      ) : null}
-                      {activeTool === 'report' ? (
-                        <StakeholderReportBuilder
-                          poll={currentPoll}
-                          shareUrl={shareUrl}
-                          pollClosed={pollClosed}
-                        />
-                      ) : null}
-                      {activeTool === 'facilitation' ? (
-                        <LiveFacilitationConsole
-                          poll={currentPoll}
-                          shareUrl={shareUrl}
-                          pollClosed={pollClosed}
-                        />
-                      ) : null}
-                      {activeTool === 'topics' ? <OpinionTopicCloud poll={currentPoll} /> : null}
-                    </>
-                  ) : (
-                    <p
-                      style={{
-                        margin: 0,
-                        fontSize: '0.76rem',
-                        color: 'var(--text-muted)',
-                        lineHeight: 1.5,
-                      }}
-                    >
-                      공유 준비
-                      {canViewResults
-                        ? ' · 후속 결정 · 액션 아이템 · 리포트 · 라이브 진행 · 의견 토픽'
-                        : ''}
-                      을 한 곳에서 펼쳐 볼 수 있어요.
-                    </p>
-                  )}
-                </section>
-              );
-            })()
-          : null}
-
-        {!hasVoted && !pollClosed && resultsVisibility === 'always' ? (
-          <section
-            style={{
-              border: '1px solid rgba(45, 212, 191, 0.22)',
-              borderRadius: 'var(--radius-sm)',
-              background: 'rgba(45, 212, 191, 0.055)',
-              padding: '1rem',
-              display: 'grid',
-              gap: '0.85rem',
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: '0.75rem',
-                flexWrap: 'wrap',
-              }}
-            >
-              <h3
-                style={{
-                  margin: 0,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  color: 'var(--text-primary)',
-                  fontSize: '0.92rem',
-                }}
-              >
-                <BarChart3 size={15} style={{ color: 'var(--brand-accent-teal)' }} />
-                실시간 결과 미리보기
-              </h3>
-              <span className="stat-pill">현재 {currentPoll.totalVotes}표</span>
-            </div>
-            <div style={{ display: 'grid', gap: '0.55rem' }}>
-              {currentPoll.options.map((option) => {
-                const percentage =
-                  currentPoll.totalVotes > 0
-                    ? Math.round((option.voteCount / currentPoll.totalVotes) * 100)
-                    : 0;
-                return (
-                  <div key={option.id} style={{ display: 'grid', gap: '0.25rem' }}>
-                    <div
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        gap: '0.75rem',
-                        color: 'var(--text-secondary)',
-                        fontSize: '0.73rem',
-                        fontWeight: 700,
-                      }}
-                    >
-                      <span style={{ overflowWrap: 'anywhere' }}>{option.text}</span>
-                      <span style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
-                        {percentage}% · {option.voteCount}표
-                      </span>
-                    </div>
-                    <div
-                      style={{
-                        height: '7px',
-                        borderRadius: '999px',
-                        overflow: 'hidden',
-                        background: 'rgba(255,255,255,0.06)',
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: `${percentage}%`,
-                          height: '100%',
-                          borderRadius: 'inherit',
-                          background:
-                            'linear-gradient(90deg, var(--brand-accent-teal), var(--brand-accent-gold))',
-                        }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.7rem' }}>
-              이 투표는 생성자가 결과를 항상 공개하도록 설정했습니다. 흐름을 확인한 뒤에도 바로
-              참여할 수 있습니다.
-            </p>
-          </section>
-        ) : null}
-
-        {canViewResults ? (
-          <section className="comment-briefing-card">
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: '0.75rem',
-                flexWrap: 'wrap',
-              }}
-            >
-              <h3
-                style={{
-                  margin: 0,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  color: 'var(--text-primary)',
-                  fontSize: '0.92rem',
-                }}
-              >
-                <MessageSquare size={15} style={{ color: 'var(--brand-accent-gold)' }} />
-                의견 요약
-              </h3>
-              <div
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'flex-end',
-                  gap: '0.45rem',
-                  flexWrap: 'wrap',
-                }}
-              >
-                <span className="stat-pill">총 {currentPoll.comments.length}개 의견</span>
-                <fieldset
-                  style={{
-                    display: 'inline-flex',
-                    border: '1px solid var(--bg-card-border)',
-                    borderRadius: '999px',
-                    overflow: 'hidden',
-                    background: 'rgba(255,255,255,0.025)',
-                    padding: 0,
-                    margin: 0,
-                    minInlineSize: 0,
-                  }}
-                >
-                  <legend style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden' }}>
-                    결과 요약 복사 형식
-                  </legend>
-                  {RESULT_SUMMARY_OPTIONS.map((option) => {
-                    const active = resultSummaryMode === option.value;
-                    return (
-                      <button
-                        key={option.value}
-                        type="button"
-                        onClick={() => setResultSummaryMode(option.value)}
-                        style={{
-                          border: 'none',
-                          borderRight:
-                            option.value === 'brief' ? '1px solid var(--bg-card-border)' : 'none',
-                          background: active ? 'rgba(45, 212, 191, 0.12)' : 'transparent',
-                          color: active ? 'var(--brand-accent-teal)' : 'var(--text-muted)',
-                          padding: '5px 9px',
-                          cursor: 'pointer',
-                          fontSize: '0.66rem',
-                          fontWeight: 800,
-                          fontFamily: 'var(--font-sans)',
-                        }}
-                        aria-pressed={active}
-                      >
-                        {option.label}
-                      </button>
-                    );
-                  })}
-                </fieldset>
-                <button
-                  type="button"
-                  onClick={handleCopyResultSummaryClick}
-                  className="ghost-btn"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    padding: '5px 9px',
-                    fontSize: '0.68rem',
-                  }}
-                >
-                  {summaryCopied ? <Check size={12} /> : <Copy size={12} />}
-                  {summaryCopied ? '요약 복사됨' : '요약 복사'}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleCopyMarkdownReportClick}
-                  className="ghost-btn"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    padding: '5px 9px',
-                    fontSize: '0.68rem',
-                  }}
-                >
-                  {markdownReportCopied ? <Check size={12} /> : <ClipboardList size={12} />}
-                  {markdownReportCopied ? '회의록 복사됨' : '회의록 복사'}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleDownloadResultCsvClick}
-                  className="ghost-btn"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    padding: '5px 9px',
-                    fontSize: '0.68rem',
-                  }}
-                >
-                  {resultCsvSaved ? <Check size={12} /> : <FileText size={12} />}
-                  {resultCsvSaved ? 'CSV 저장됨' : 'CSV 저장'}
-                </button>
-                <button
-                  type="button"
-                  onClick={handlePreviewResultImageClick}
-                  className="ghost-btn"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    padding: '5px 9px',
-                    fontSize: '0.68rem',
-                  }}
-                >
-                  {resultImageSaved ? <Check size={12} /> : <Download size={12} />}
-                  {resultImageSaved ? '이미지 저장됨' : '이미지 미리보기'}
-                </button>
-              </div>
-            </div>
-
-            {showResultActionMessage ? (
-              <p
-                style={{
-                  margin: 0,
-                  color: resultActionHasError
-                    ? 'var(--brand-accent-coral)'
-                    : 'var(--brand-accent-teal)',
-                  fontSize: '0.7rem',
-                  fontWeight: 700,
-                }}
-              >
-                {copyMessage}
-              </p>
-            ) : null}
-
-            {featuredComment ? (
-              <blockquote className="featured-comment">
-                <p>{featuredComment.comment}</p>
-                <footer>
-                  {featuredComment.voterName} ·{' '}
-                  {featuredComment.selectedOptionText || '선택지 정보 없음'}
-                </footer>
-              </blockquote>
-            ) : (
-              <div className="featured-comment empty">
-                <p>
-                  아직 남겨진 의견이 없습니다. 첫 번째 참여자가 선택 이유를 남기면 요약에
-                  반영됩니다.
-                </p>
-              </div>
-            )}
-
-            <div className="comment-summary-grid">
-              {commentSummaryRows.map(({ option, comments, latestComment }) => (
-                <div key={option.id} className="comment-summary-item">
-                  <span>{option.text}</span>
-                  <strong>{comments.length}개 의견</strong>
-                  <small>{latestComment?.comment || '아직 선택 이유가 없습니다.'}</small>
-                </div>
-              ))}
-            </div>
-          </section>
-        ) : (
-          <section
-            className="comment-briefing-card"
-            aria-label="결과 공개 대기 안내"
-            style={{
-              borderColor: 'rgba(232, 200, 77, 0.24)',
-              background:
-                'linear-gradient(135deg, rgba(232, 200, 77, 0.1), rgba(45, 212, 191, 0.04))',
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: '0.8rem',
-              }}
-            >
-              <span
-                style={{
-                  width: '34px',
-                  height: '34px',
-                  borderRadius: '12px',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: 'var(--brand-accent-gold)',
-                  background: 'rgba(232, 200, 77, 0.12)',
-                  border: '1px solid rgba(232, 200, 77, 0.24)',
-                  flexShrink: 0,
-                }}
-              >
-                <Eye size={17} />
-              </span>
-              <div style={{ display: 'grid', gap: '0.35rem' }}>
-                <h3
-                  style={{
-                    margin: 0,
-                    color: 'var(--text-primary)',
-                    fontSize: '0.94rem',
-                    fontWeight: 800,
-                  }}
-                >
-                  투표 후 결과와 의견이 공개됩니다
-                </h3>
-                <p
-                  style={{
-                    margin: 0,
-                    color: 'var(--text-secondary)',
-                    fontSize: '0.78rem',
-                    lineHeight: 1.55,
-                  }}
-                >
-                  생성자가 참여 후 공개로 설정했습니다. 선택지를 고르고 한마디를 남기면 결과 요약,
-                  선택지별 의견, 공유용 결과 이미지를 확인할 수 있습니다.
-                </p>
-              </div>
-            </div>
-          </section>
-        )}
-
         {/* Results Screen vs Voting Screen */}
         {hasVoted || pollClosed ? (
           <div
@@ -4563,6 +3898,671 @@ export const PollDetail: React.FC = () => {
               </div>
             )}
           </div>
+        )}
+
+        <section
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+            gap: '0.55rem',
+            borderTop: '1px solid rgba(255, 255, 255, 0.05)',
+            paddingTop: '0.95rem',
+          }}
+        >
+          <div className="insight-tile">
+            <span>
+              <Info size={13} />
+              진행 상태
+            </span>
+            <strong
+              style={{ color: pollClosed ? 'var(--text-muted)' : 'var(--brand-accent-teal)' }}
+            >
+              {pollClosed ? '마감됨' : '참여 가능'}
+            </strong>
+            <small>{endAtLabel}</small>
+          </div>
+          <div className="insight-tile">
+            <span>
+              <Eye size={13} />
+              결과 공개
+            </span>
+            <strong>{RESULTS_VISIBILITY_LABELS[resultsVisibility]}</strong>
+            <small>
+              {resultsVisibility === 'always'
+                ? '공유 직후부터 흐름을 볼 수 있습니다.'
+                : '투표 완료 후 결과를 볼 수 있습니다.'}
+            </small>
+          </div>
+        </section>
+
+        {canViewResults ? (
+          <section
+            style={{
+              display: 'grid',
+              gap: '0.85rem',
+              border: '1px solid rgba(45, 212, 191, 0.18)',
+              borderRadius: 'var(--radius-sm)',
+              background: 'rgba(45, 212, 191, 0.045)',
+              padding: '1rem',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                gap: '0.85rem',
+                alignItems: 'flex-start',
+                flexWrap: 'wrap',
+              }}
+            >
+              <div style={{ display: 'grid', gap: '0.25rem' }}>
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    color: 'var(--brand-accent-teal)',
+                    fontSize: '0.68rem',
+                    fontWeight: 900,
+                    letterSpacing: '0.05em',
+                  }}
+                >
+                  <Gauge size={13} />
+                  운영 체크리스트
+                </span>
+                <h3
+                  style={{
+                    margin: 0,
+                    color: 'var(--text-primary)',
+                    fontSize: '0.98rem',
+                    fontWeight: 900,
+                  }}
+                >
+                  지금 단계: {operationPhase}
+                </h3>
+                <p
+                  style={{
+                    margin: 0,
+                    color: 'var(--text-secondary)',
+                    fontSize: '0.76rem',
+                    lineHeight: 1.55,
+                  }}
+                >
+                  공유, 의견 수집, 결과 정리, 현장 참여 준비 상태를 한 번에 확인합니다.
+                </p>
+              </div>
+              <span
+                style={{
+                  border: '1px solid rgba(45, 212, 191, 0.28)',
+                  borderRadius: '999px',
+                  color:
+                    completedOperationCount === operationChecklist.length
+                      ? 'var(--brand-accent-teal)'
+                      : 'var(--brand-accent-gold)',
+                  background:
+                    completedOperationCount === operationChecklist.length
+                      ? 'rgba(45, 212, 191, 0.08)'
+                      : 'rgba(250, 204, 21, 0.08)',
+                  padding: '5px 10px',
+                  fontSize: '0.68rem',
+                  fontWeight: 900,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {completedOperationCount}/{operationChecklist.length} 준비됨
+              </span>
+            </div>
+
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                gap: '0.65rem',
+              }}
+            >
+              {operationChecklist.map((item) => (
+                <article
+                  key={item.key}
+                  style={{
+                    display: 'grid',
+                    gap: '0.55rem',
+                    alignContent: 'start',
+                    border: '1px solid var(--bg-card-border)',
+                    borderRadius: 'var(--radius-sm)',
+                    background: item.passed
+                      ? 'rgba(45, 212, 191, 0.06)'
+                      : 'rgba(255,255,255,0.025)',
+                    padding: '0.75rem',
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                    }}
+                  >
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        color: item.passed
+                          ? 'var(--brand-accent-teal)'
+                          : 'var(--brand-accent-gold)',
+                        fontSize: '0.74rem',
+                        fontWeight: 900,
+                      }}
+                    >
+                      {item.passed ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}
+                      {item.label}
+                    </span>
+                    <small style={{ color: 'var(--text-muted)', fontSize: '0.66rem' }}>
+                      {item.value}
+                    </small>
+                  </div>
+                  <p
+                    style={{
+                      margin: 0,
+                      minHeight: '2.5em',
+                      color: 'var(--text-secondary)',
+                      fontSize: '0.7rem',
+                      lineHeight: 1.45,
+                    }}
+                  >
+                    {item.help}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (item.action === 'share') {
+                        setShowShareModal(true);
+                      } else if (item.action === 'copyLink') {
+                        handleCopyLinkClick(currentPoll.id);
+                      } else if (item.action === 'resultImage') {
+                        handlePreviewResultImageClick();
+                      } else {
+                        window.open(`/present/${encodeURIComponent(currentPoll.id)}`, '_blank');
+                      }
+                    }}
+                    className="ghost-btn"
+                    style={{
+                      justifySelf: 'start',
+                      padding: '5px 9px',
+                      fontSize: '0.68rem',
+                    }}
+                  >
+                    {item.actionLabel}
+                  </button>
+                </article>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {!isEmbedMode && !isPresentationMode
+          ? (() => {
+              const tools = [
+                { key: 'audience', label: '🚀 공유 준비', available: true },
+                { key: 'followup', label: '🧭 후속 결정', available: canViewResults },
+                { key: 'actions', label: '✅ 액션 아이템', available: canViewResults },
+                { key: 'report', label: '📝 리포트', available: canViewResults },
+                { key: 'facilitation', label: '🎙️ 라이브 진행', available: canViewResults },
+                { key: 'topics', label: '💬 의견 토픽', available: canViewResults },
+              ].filter((tool) => tool.available);
+              const activeTool = tools.some((tool) => tool.key === activeToolTab)
+                ? activeToolTab
+                : tools[0]?.key;
+
+              return (
+                <section
+                  className="content-card"
+                  style={{
+                    padding: '1.1rem',
+                    display: 'grid',
+                    gap: toolsExpanded ? '1rem' : '0.5rem',
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setToolsExpanded((value) => !value)}
+                    aria-expanded={toolsExpanded}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '0.75rem',
+                      width: '100%',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: 0,
+                      color: 'var(--text-primary)',
+                    }}
+                  >
+                    <span style={{ fontWeight: 800, fontSize: '0.95rem' }}>🧰 결과 활용 도구</span>
+                    <span
+                      style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700 }}
+                    >
+                      {toolsExpanded ? '접기 ▲' : '펼치기 ▼'}
+                    </span>
+                  </button>
+
+                  {toolsExpanded ? (
+                    <>
+                      <div
+                        role="tablist"
+                        aria-label="결과 활용 도구"
+                        style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}
+                      >
+                        {tools.map((tool) => {
+                          const selected = tool.key === activeTool;
+                          return (
+                            <button
+                              key={tool.key}
+                              type="button"
+                              role="tab"
+                              aria-selected={selected}
+                              onClick={() => setActiveToolTab(tool.key)}
+                              className="ghost-btn"
+                              style={{
+                                fontSize: '0.72rem',
+                                fontWeight: 700,
+                                borderColor: selected
+                                  ? 'var(--brand-primary)'
+                                  : 'var(--bg-card-border)',
+                                color: selected ? 'var(--brand-primary)' : 'var(--text-muted)',
+                                background: selected ? 'rgba(20, 184, 166, 0.08)' : 'transparent',
+                              }}
+                            >
+                              {tool.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {activeTool === 'audience' ? (
+                        <AudienceLaunchKit
+                          poll={currentPoll}
+                          shareUrl={shareUrl}
+                          endAtLabel={endAtLabel}
+                          resultsVisibilityLabel={RESULTS_VISIBILITY_LABELS[resultsVisibility]}
+                          canViewResults={canViewResults}
+                        />
+                      ) : null}
+                      {activeTool === 'followup' ? (
+                        <DecisionFollowUpPanel
+                          poll={currentPoll}
+                          shareUrl={shareUrl}
+                          pollClosed={pollClosed}
+                        />
+                      ) : null}
+                      {activeTool === 'actions' ? (
+                        <ActionItemPlanner poll={currentPoll} shareUrl={shareUrl} />
+                      ) : null}
+                      {activeTool === 'report' ? (
+                        <StakeholderReportBuilder
+                          poll={currentPoll}
+                          shareUrl={shareUrl}
+                          pollClosed={pollClosed}
+                        />
+                      ) : null}
+                      {activeTool === 'facilitation' ? (
+                        <LiveFacilitationConsole
+                          poll={currentPoll}
+                          shareUrl={shareUrl}
+                          pollClosed={pollClosed}
+                        />
+                      ) : null}
+                      {activeTool === 'topics' ? <OpinionTopicCloud poll={currentPoll} /> : null}
+                    </>
+                  ) : (
+                    <p
+                      style={{
+                        margin: 0,
+                        fontSize: '0.76rem',
+                        color: 'var(--text-muted)',
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      공유 준비
+                      {canViewResults
+                        ? ' · 후속 결정 · 액션 아이템 · 리포트 · 라이브 진행 · 의견 토픽'
+                        : ''}
+                      을 한 곳에서 펼쳐 볼 수 있어요.
+                    </p>
+                  )}
+                </section>
+              );
+            })()
+          : null}
+
+        {!hasVoted && !pollClosed && resultsVisibility === 'always' ? (
+          <section
+            style={{
+              border: '1px solid rgba(45, 212, 191, 0.22)',
+              borderRadius: 'var(--radius-sm)',
+              background: 'rgba(45, 212, 191, 0.055)',
+              padding: '1rem',
+              display: 'grid',
+              gap: '0.85rem',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '0.75rem',
+                flexWrap: 'wrap',
+              }}
+            >
+              <h3
+                style={{
+                  margin: 0,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.92rem',
+                }}
+              >
+                <BarChart3 size={15} style={{ color: 'var(--brand-accent-teal)' }} />
+                실시간 결과 미리보기
+              </h3>
+              <span className="stat-pill">현재 {currentPoll.totalVotes}표</span>
+            </div>
+            <div style={{ display: 'grid', gap: '0.55rem' }}>
+              {currentPoll.options.map((option) => {
+                const percentage =
+                  currentPoll.totalVotes > 0
+                    ? Math.round((option.voteCount / currentPoll.totalVotes) * 100)
+                    : 0;
+                return (
+                  <div key={option.id} style={{ display: 'grid', gap: '0.25rem' }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        gap: '0.75rem',
+                        color: 'var(--text-secondary)',
+                        fontSize: '0.73rem',
+                        fontWeight: 700,
+                      }}
+                    >
+                      <span style={{ overflowWrap: 'anywhere' }}>{option.text}</span>
+                      <span style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                        {percentage}% · {option.voteCount}표
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        height: '7px',
+                        borderRadius: '999px',
+                        overflow: 'hidden',
+                        background: 'rgba(255,255,255,0.06)',
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: `${percentage}%`,
+                          height: '100%',
+                          borderRadius: 'inherit',
+                          background:
+                            'linear-gradient(90deg, var(--brand-accent-teal), var(--brand-accent-gold))',
+                        }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.7rem' }}>
+              이 투표는 생성자가 결과를 항상 공개하도록 설정했습니다. 흐름을 확인한 뒤에도 바로
+              참여할 수 있습니다.
+            </p>
+          </section>
+        ) : null}
+
+        {canViewResults ? (
+          <section className="comment-briefing-card">
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '0.75rem',
+                flexWrap: 'wrap',
+              }}
+            >
+              <h3
+                style={{
+                  margin: 0,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.92rem',
+                }}
+              >
+                <MessageSquare size={15} style={{ color: 'var(--brand-accent-gold)' }} />
+                의견 요약
+              </h3>
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'flex-end',
+                  gap: '0.45rem',
+                  flexWrap: 'wrap',
+                }}
+              >
+                <span className="stat-pill">총 {currentPoll.comments.length}개 의견</span>
+                <fieldset
+                  style={{
+                    display: 'inline-flex',
+                    border: '1px solid var(--bg-card-border)',
+                    borderRadius: '999px',
+                    overflow: 'hidden',
+                    background: 'rgba(255,255,255,0.025)',
+                    padding: 0,
+                    margin: 0,
+                    minInlineSize: 0,
+                  }}
+                >
+                  <legend style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden' }}>
+                    결과 요약 복사 형식
+                  </legend>
+                  {RESULT_SUMMARY_OPTIONS.map((option) => {
+                    const active = resultSummaryMode === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setResultSummaryMode(option.value)}
+                        style={{
+                          border: 'none',
+                          borderRight:
+                            option.value === 'brief' ? '1px solid var(--bg-card-border)' : 'none',
+                          background: active ? 'rgba(45, 212, 191, 0.12)' : 'transparent',
+                          color: active ? 'var(--brand-accent-teal)' : 'var(--text-muted)',
+                          padding: '5px 9px',
+                          cursor: 'pointer',
+                          fontSize: '0.66rem',
+                          fontWeight: 800,
+                          fontFamily: 'var(--font-sans)',
+                        }}
+                        aria-pressed={active}
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                </fieldset>
+                <button
+                  type="button"
+                  onClick={handleCopyResultSummaryClick}
+                  className="ghost-btn"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    padding: '5px 9px',
+                    fontSize: '0.68rem',
+                  }}
+                >
+                  {summaryCopied ? <Check size={12} /> : <Copy size={12} />}
+                  {summaryCopied ? '요약 복사됨' : '요약 복사'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCopyMarkdownReportClick}
+                  className="ghost-btn"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    padding: '5px 9px',
+                    fontSize: '0.68rem',
+                  }}
+                >
+                  {markdownReportCopied ? <Check size={12} /> : <ClipboardList size={12} />}
+                  {markdownReportCopied ? '회의록 복사됨' : '회의록 복사'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDownloadResultCsvClick}
+                  className="ghost-btn"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    padding: '5px 9px',
+                    fontSize: '0.68rem',
+                  }}
+                >
+                  {resultCsvSaved ? <Check size={12} /> : <FileText size={12} />}
+                  {resultCsvSaved ? 'CSV 저장됨' : 'CSV 저장'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handlePreviewResultImageClick}
+                  className="ghost-btn"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    padding: '5px 9px',
+                    fontSize: '0.68rem',
+                  }}
+                >
+                  {resultImageSaved ? <Check size={12} /> : <Download size={12} />}
+                  {resultImageSaved ? '이미지 저장됨' : '이미지 미리보기'}
+                </button>
+              </div>
+            </div>
+
+            {showResultActionMessage ? (
+              <p
+                style={{
+                  margin: 0,
+                  color: resultActionHasError
+                    ? 'var(--brand-accent-coral)'
+                    : 'var(--brand-accent-teal)',
+                  fontSize: '0.7rem',
+                  fontWeight: 700,
+                }}
+              >
+                {copyMessage}
+              </p>
+            ) : null}
+
+            {featuredComment ? (
+              <blockquote className="featured-comment">
+                <p>{featuredComment.comment}</p>
+                <footer>
+                  {featuredComment.voterName} ·{' '}
+                  {featuredComment.selectedOptionText || '선택지 정보 없음'}
+                </footer>
+              </blockquote>
+            ) : (
+              <div className="featured-comment empty">
+                <p>
+                  아직 남겨진 의견이 없습니다. 첫 번째 참여자가 선택 이유를 남기면 요약에
+                  반영됩니다.
+                </p>
+              </div>
+            )}
+
+            <div className="comment-summary-grid">
+              {commentSummaryRows.map(({ option, comments, latestComment }) => (
+                <div key={option.id} className="comment-summary-item">
+                  <span>{option.text}</span>
+                  <strong>{comments.length}개 의견</strong>
+                  <small>{latestComment?.comment || '아직 선택 이유가 없습니다.'}</small>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : (
+          <section
+            className="comment-briefing-card"
+            aria-label="결과 공개 대기 안내"
+            style={{
+              borderColor: 'rgba(232, 200, 77, 0.24)',
+              background:
+                'linear-gradient(135deg, rgba(232, 200, 77, 0.1), rgba(45, 212, 191, 0.04))',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '0.8rem',
+              }}
+            >
+              <span
+                style={{
+                  width: '34px',
+                  height: '34px',
+                  borderRadius: '12px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'var(--brand-accent-gold)',
+                  background: 'rgba(232, 200, 77, 0.12)',
+                  border: '1px solid rgba(232, 200, 77, 0.24)',
+                  flexShrink: 0,
+                }}
+              >
+                <Eye size={17} />
+              </span>
+              <div style={{ display: 'grid', gap: '0.35rem' }}>
+                <h3
+                  style={{
+                    margin: 0,
+                    color: 'var(--text-primary)',
+                    fontSize: '0.94rem',
+                    fontWeight: 800,
+                  }}
+                >
+                  투표 후 결과와 의견이 공개됩니다
+                </h3>
+                <p
+                  style={{
+                    margin: 0,
+                    color: 'var(--text-secondary)',
+                    fontSize: '0.78rem',
+                    lineHeight: 1.55,
+                  }}
+                >
+                  생성자가 참여 후 공개로 설정했습니다. 선택지를 고르고 한마디를 남기면 결과 요약,
+                  선택지별 의견, 공유용 결과 이미지를 확인할 수 있습니다.
+                </p>
+              </div>
+            </div>
+          </section>
         )}
       </div>
 
