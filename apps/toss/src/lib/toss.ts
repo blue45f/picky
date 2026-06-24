@@ -96,7 +96,7 @@ export async function requestAppReview(): Promise<boolean> {
   }
 }
 
-/** 이 미니앱으로 돌아오는 딥링크 스킴(intoss://pickflow ...). */
+/** 이 미니앱으로 돌아오는 딥링크 스킴(intoss://picky ...). */
 export function getMiniAppSchemeUri(): string | null {
   try {
     return getSchemeUri();
@@ -132,7 +132,7 @@ const isAllowedPollId = (value: string): boolean => {
 };
 
 /**
- * 진입 스킴(intoss://pickflow/poll/<id> 등)을 앱 내부 경로로 해석.
+ * 진입 스킴(intoss://picky/poll/<id> 등)을 앱 내부 경로로 해석.
  * 딥링크로 들어왔을 때 해당 투표/작성 화면으로 바로 이동시키기 위한 화이트리스트 파서.
  * @returns 안전한 내부 경로(`/poll/:id` · `/create`) 또는 null
  */

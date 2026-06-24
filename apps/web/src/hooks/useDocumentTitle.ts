@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 
-const BASE = 'pickflow';
+const BASE = 'picky';
 const DEFAULT_TITLE = `${BASE} - 고민 투표 공유 플랫폼`;
 
 /**

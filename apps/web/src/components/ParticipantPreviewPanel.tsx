@@ -276,7 +276,7 @@ export function ParticipantPreviewPanel({
                 fontWeight: 900,
               }}
             >
-              <span>pickflow</span>
+              <span>picky</span>
               <span>{resultsVisibility === 'always' ? 'LIVE RESULTS' : 'VOTE FIRST'}</span>
             </div>
             <div style={{ display: 'grid', gap: '0.78rem', padding: '0.95rem' }}>

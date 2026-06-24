@@ -51,7 +51,7 @@ const buildLaunchVariants = ({
       id: 'kakao',
       label: '카카오톡 단체방',
       description: '친구/팀 채팅방에 짧게 던질 초대문',
-      body: `[pickflow 투표]\n${poll.question}${description}\n\n${statusLine}\n${resultLine}\n\n참여 링크: ${shareUrl}\n참여 코드: ${joinCode}`,
+      body: `[picky 투표]\n${poll.question}${description}\n\n${statusLine}\n${resultLine}\n\n참여 링크: ${shareUrl}\n참여 코드: ${joinCode}`,
     },
     {
       id: 'meeting',

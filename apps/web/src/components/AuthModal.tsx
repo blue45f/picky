@@ -51,7 +51,7 @@ const getModalTitle = (mode: AuthMode): string => {
     return '피키가 기다렸어요! 🥑';
   }
   if (mode === 'register') {
-    return '픽플로우 회원가입';
+    return '피키 회원가입';
   }
   return '비회원 빠른 시작';
 };

@@ -62,11 +62,11 @@ function XPreviewCard({
         </div>
         <div>
           <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'white' }}>pickflow</span>
-            <span style={{ fontSize: '0.7rem', color: '#8899a6' }}>@pickflow_io · 방금</span>
+            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'white' }}>picky</span>
+            <span style={{ fontSize: '0.7rem', color: '#8899a6' }}>@picky_io · 방금</span>
           </div>
           <p style={{ fontSize: '0.8rem', color: 'white', marginTop: '2px', lineHeight: 1.38 }}>
-            30초만 투자해 선택해 주세요. 결과는 pickflow에서 바로 확인됩니다.
+            30초만 투자해 선택해 주세요. 결과는 picky에서 바로 확인됩니다.
           </p>
         </div>
       </div>
@@ -146,7 +146,7 @@ function XPreviewCard({
           </strong>
         </div>
         <div style={{ padding: '10px' }}>
-          <div style={{ fontSize: '0.65rem', color: '#8899a6', fontWeight: 600 }}>PICKFLOW.IO</div>
+          <div style={{ fontSize: '0.65rem', color: '#8899a6', fontWeight: 600 }}>PICKY.IO</div>
           <div
             style={{
               fontSize: '0.85rem',
@@ -427,7 +427,7 @@ function KakaoPreviewCard({
           }}
         >
           <span>{previewReady ? '투표하러 가기' : '질문과 선택지 입력 필요'}</span>
-          <span>pickflow.io</span>
+          <span>picky.io</span>
         </div>
       </div>
     </div>

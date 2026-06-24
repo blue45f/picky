@@ -184,7 +184,7 @@ export function LiveFacilitationConsole({
     ];
 
     const liveBrief = [
-      `[pickflow 진행자 노트]`,
+      `[picky 진행자 노트]`,
       `질문: ${poll.question}`,
       `참여: ${poll.totalVotes}/${targetVotes}명 (${voteProgress}%)`,
       leader ? `선두: ${leader.text} (${leader.voteCount}표, ${leaderShare}%)` : '선두: 아직 없음',

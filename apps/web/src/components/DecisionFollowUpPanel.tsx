@@ -284,7 +284,7 @@ export function DecisionFollowUpPanel({ poll, shareUrl, pollClosed }: DecisionFo
         label: '결정 공지',
         description: '결과를 확정하고 팀/참여자에게 알리는 문구',
         icon: 'ready',
-        body: `[pickflow 결정 공지]\n${poll.question}\n\n최종안: ${leaderLine}\n참여: ${totalVotes}명 · 의견 ${comments.length}개\n격차: ${voteGap}표 (${voteGapShare}%)\n판정: ${stateMeta[state].label}\n근거: ${stateMeta[state].summary}\n후속 액션: ${stateMeta[state].nextStep}\n\n결과 링크: ${shareUrl}`,
+        body: `[picky 결정 공지]\n${poll.question}\n\n최종안: ${leaderLine}\n참여: ${totalVotes}명 · 의견 ${comments.length}개\n격차: ${voteGap}표 (${voteGapShare}%)\n판정: ${stateMeta[state].label}\n근거: ${stateMeta[state].summary}\n후속 액션: ${stateMeta[state].nextStep}\n\n결과 링크: ${shareUrl}`,
       },
     ];
 

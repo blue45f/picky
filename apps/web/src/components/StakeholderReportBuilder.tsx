@@ -116,7 +116,7 @@ const buildReportText = ({
 
   if (audience === 'participants') {
     return [
-      `[pickflow 결과 공유]`,
+      `[picky 결과 공유]`,
       `질문: ${poll.question}`,
       `결과: ${leaderLine}`,
       `참여: ${poll.totalVotes}명 · 의견 ${poll.comments.length}개`,
@@ -129,7 +129,7 @@ const buildReportText = ({
 
   if (audience === 'retrospective') {
     return [
-      `[pickflow 운영 회고]`,
+      `[picky 운영 회고]`,
       `질문: ${poll.question}`,
       `참여: ${poll.totalVotes}명`,
       `의견: ${poll.comments.length}개`,
@@ -153,7 +153,7 @@ const buildReportText = ({
   }
 
   return [
-    `[pickflow 의사결정 리포트]`,
+    `[picky 의사결정 리포트]`,
     `질문: ${poll.question}`,
     `권고안: ${leaderLine}`,
     `참여: ${poll.totalVotes}명 · 의견 ${poll.comments.length}개`,

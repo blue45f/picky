@@ -296,7 +296,7 @@ export const DesignSystem: React.FC = () => {
               textTransform: 'uppercase',
             }}
           >
-            Pickflow Design System
+            Picky Design System
           </span>
           <h1
             style={{

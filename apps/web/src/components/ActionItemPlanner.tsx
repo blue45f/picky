@@ -148,7 +148,7 @@ export function ActionItemPlanner({ poll, shareUrl }: ActionItemPlannerProps) {
         : '대표 의견이 아직 없습니다.';
 
     const markdown = [
-      `[pickflow 액션 플랜]`,
+      `[picky 액션 플랜]`,
       `질문: ${poll.question}`,
       `결정안: ${selectedDecision}`,
       `담당자: ${assignee}`,
@@ -209,13 +209,13 @@ export function ActionItemPlanner({ poll, shareUrl }: ActionItemPlannerProps) {
     const nextDate = new Date(`${dueDate || getLocalDateValue(7)}T00:00:00`);
     nextDate.setDate(nextDate.getDate() + 1);
     const endDate = nextDate.toISOString().slice(0, 10).replace(/-/g, '');
-    const uid = `pickflow-${poll.id}-${dateStamp}@pickflow.local`;
+    const uid = `picky-${poll.id}-${dateStamp}@picky.local`;
     const description = `${plan.markdown}\n\n${plan.announcement}`;
-    const summaryText = `[pickflow] ${poll.question} 후속 점검`;
+    const summaryText = `[picky] ${poll.question} 후속 점검`;
     const ics = [
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
-      'PRODID:-//pickflow//Action Plan//KO',
+      'PRODID:-//picky//Action Plan//KO',
       'CALSCALE:GREGORIAN',
       'METHOD:PUBLISH',
       'BEGIN:VEVENT',
@@ -230,7 +230,7 @@ export function ActionItemPlanner({ poll, shareUrl }: ActionItemPlannerProps) {
       'END:VCALENDAR',
     ].join('\r\n');
 
-    downloadTextFile(`pickflow-${poll.id}-action-plan.ics`, ics, 'text/calendar;charset=utf-8');
+    downloadTextFile(`picky-${poll.id}-action-plan.ics`, ics, 'text/calendar;charset=utf-8');
     setDownloaded(true);
     globalThis.setTimeout(() => setDownloaded(false), 2200);
   };

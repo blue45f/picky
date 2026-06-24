@@ -1,12 +1,12 @@
 import type { Poll } from '@picky/shared';
 
-const SHARE_PREFIX = '[픽플로우 투표] ';
-const DEFAULT_SHARE_TITLE = 'pickflow - 고민 투표 공유 플랫폼';
+const SHARE_PREFIX = '[피키 투표] ';
+const DEFAULT_SHARE_TITLE = 'picky - 고민 투표 공유 플랫폼';
 const DEFAULT_SHARE_DESCRIPTION =
   '고민을 선택지 투표로 만들고 링크로 공유해 빠르게 의견을 모아보세요.';
 const KAKAO_SDK_WAIT_TIMEOUT_MS = 2200;
 const DEFAULT_OG_IMAGE_PATH = '/og-default.png';
-const DEFAULT_TWITTER_SITE = '@pickflow_io';
+const DEFAULT_TWITTER_SITE = '@picky_io';
 
 const safeEncode = (value: string): string => encodeURIComponent(value);
 
@@ -274,7 +274,7 @@ const EMBED_MODE_CONFIG: Record<
 
 export const buildPollEmbedCode = (poll: Poll, mode: PollEmbedMode = 'standard'): string => {
   const embedUrl = resolvePollEmbedUrl(poll);
-  const frameId = `pickflow-poll-${mode}-${poll.id.replace(/[^a-zA-Z0-9_-]/g, '') || 'embed'}`;
+  const frameId = `picky-poll-${mode}-${poll.id.replace(/[^a-zA-Z0-9_-]/g, '') || 'embed'}`;
   const safeFrameId = escapeHtmlAttribute(frameId);
   const safeEmbedUrl = escapeHtmlAttribute(embedUrl);
   const scriptFrameId = escapeScriptString(frameId);
@@ -294,7 +294,7 @@ export const buildPollEmbedCode = (poll: Poll, mode: PollEmbedMode = 'standard')
 <div id="${safeOverlayId}" hidden style="position:fixed;inset:0;z-index:9999;background:rgba(4,12,10,.72);backdrop-filter:blur(10px);padding:20px;box-sizing:border-box">
   <div style="width:min(960px,100%);height:min(760px,100%);margin:0 auto;background:#061411;border-radius:16px;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.35);position:relative">
     <button id="${safeCloseId}" type="button" aria-label="투표 닫기" style="position:absolute;top:12px;right:12px;z-index:2;width:34px;height:34px;border:1px solid rgba(255,255,255,.18);border-radius:999px;background:rgba(0,0,0,.34);color:white;cursor:pointer">x</button>
-    <iframe id="${safeFrameId}" src="${safeEmbedUrl}" title="pickflow poll" width="100%" height="720" style="border:0;width:100%;height:100%;overflow:hidden" loading="lazy"></iframe>
+    <iframe id="${safeFrameId}" src="${safeEmbedUrl}" title="picky poll" width="100%" height="720" style="border:0;width:100%;height:100%;overflow:hidden" loading="lazy"></iframe>
   </div>
 </div>
 <script>
@@ -326,14 +326,14 @@ export const buildPollEmbedCode = (poll: Poll, mode: PollEmbedMode = 'standard')
 
   const config = EMBED_MODE_CONFIG[mode];
 
-  return `<iframe id="${safeFrameId}" src="${safeEmbedUrl}" title="pickflow poll" width="100%" height="${config.height}" style="border:0;border-radius:${config.radius}px;overflow:hidden" loading="lazy"></iframe>
+  return `<iframe id="${safeFrameId}" src="${safeEmbedUrl}" title="picky poll" width="100%" height="${config.height}" style="border:0;border-radius:${config.radius}px;overflow:hidden" loading="lazy"></iframe>
 <script>
 (function () {
   var frame = document.getElementById('${scriptFrameId}');
   if (!frame) return;
   window.addEventListener('message', function (event) {
     if (event.source !== frame.contentWindow) return;
-    if (!event.data || event.data.type !== 'pickflow:embed-resize') return;
+    if (!event.data || event.data.type !== 'picky:embed-resize') return;
     if (typeof event.data.height !== 'number') return;
     frame.style.height = Math.max(${config.minHeight}, Math.min(${config.maxHeight}, event.data.height)) + 'px';
   });
@@ -358,11 +358,11 @@ export const updatePollMetaTags = (poll: Poll | null | undefined) => {
     return;
   }
 
-  const title = poll ? `${poll.question} | pickflow` : DEFAULT_SHARE_TITLE;
+  const title = poll ? `${poll.question} | picky` : DEFAULT_SHARE_TITLE;
   const description = poll?.description || DEFAULT_SHARE_DESCRIPTION;
   const url = poll ? resolvePollShareUrl(poll) : globalThis.location.href;
   const imageUrl = resolvePollImageUrl(poll);
-  const imageAlt = poll ? `${poll.question} 투표 미리보기` : 'pickflow 고민 투표 공유 미리보기';
+  const imageAlt = poll ? `${poll.question} 투표 미리보기` : 'picky 고민 투표 공유 미리보기';
   const publishedTime = poll?.createdAt || new Date().toISOString();
   const updatedTime =
     (poll as (Poll & { updatedAt?: string }) | null | undefined)?.updatedAt || publishedTime;
@@ -372,7 +372,7 @@ export const updatePollMetaTags = (poll: Poll | null | undefined) => {
   setMetaContent('meta[name="description"]', description);
   setMetaContent('meta[name="robots"]', 'index, follow');
   setMetaContent('meta[property="og:type"]', 'website');
-  setMetaContent('meta[property="og:site_name"]', 'pickflow');
+  setMetaContent('meta[property="og:site_name"]', 'picky');
   setMetaContent('meta[property="og:locale"]', 'ko_KR');
   setMetaContent('meta[property="og:title"]', title);
   setMetaContent('meta[property="og:description"]', description);

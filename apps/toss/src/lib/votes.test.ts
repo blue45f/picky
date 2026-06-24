@@ -34,7 +34,7 @@ describe('votes (localStorage-backed)', () => {
   });
 
   it('treats corrupt stored values as no vote', () => {
-    localStorage.setItem('pickflow_voted_z', 'not-a-number');
+    localStorage.setItem('picky_voted_z', 'not-a-number');
     expect(getVotedOptionId('z')).toBeNull();
   });
 });

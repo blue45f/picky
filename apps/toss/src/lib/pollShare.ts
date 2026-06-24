@@ -2,7 +2,7 @@ import type { Poll } from '../shared';
 import { optionPercent, optionsByVotes } from './poll';
 import { shareMessage } from './toss';
 
-const SHARE_PREFIX = '[픽플로우 투표] ';
+const SHARE_PREFIX = '[피키 투표] ';
 
 // 공유 링크가 외부(토스 밖)에서도 열려야 하므로, 공개 웹 오리진으로 폴백해요.
 // 미니앱 WebView 호스트(*.tossmini.com)나 localhost는 공유 대상이 아니에요.

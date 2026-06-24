@@ -17,7 +17,7 @@ import { useToast } from '../components/Toast';
 import { triggerParticleBurst } from '../lib/particles';
 import { PollDetailView } from './PollDetailView';
 
-const REVIEW_ASKED_KEY = 'pickflow_review_asked';
+const REVIEW_ASKED_KEY = 'picky_review_asked';
 
 const maybeRequestReview = () => {
   if (typeof localStorage === 'undefined' || localStorage.getItem(REVIEW_ASKED_KEY)) {
@@ -32,7 +32,8 @@ const maybeRequestReview = () => {
 export function PollDetailPage() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
-  const { currentPoll, isLoading, error, fetchPoll, vote, deletePoll } = usePollStore();
+  const { currentPoll, isLoading, error, fetchPoll, vote, deletePoll, deleteComment } =
+    usePollStore();
   const { displayName, setDisplayName } = useIdentity();
   const myId = useAuthStore((state) => state.user?.id ?? null);
   const { showToast } = useToast();
@@ -80,6 +81,8 @@ export function PollDetailPage() {
   }, [poll, showResults]);
   const leader = poll && showResults && poll.totalVotes > 0 ? leadingOption(poll) : null;
   const isOwner = Boolean(poll && myId && poll.creatorId === myId);
+  const isAdmin = Boolean(useAuthStore.getState().user?.isAdmin);
+  const canManage = isOwner || isAdmin;
 
   const shareUrl = poll ? resolvePollShareUrl(poll) : '';
 
@@ -141,6 +144,24 @@ export function PollDetailPage() {
     const ok = await copyText(buildPollResultText(poll));
     hapticFeedback(ok ? 'tap' : 'error');
     showToast(ok ? '투표 결과를 복사했어요 📊' : '복사에 실패했어요 😢');
+  };
+
+  const handleEdit = () => {
+    if (!poll) return;
+    hapticFeedback('tap');
+    navigate(`/poll/${poll.id}/edit`);
+  };
+
+  const handleDeleteComment = async (commentId: number) => {
+    if (!poll) return;
+    const ok = await deleteComment(poll.id, commentId);
+    if (ok) {
+      hapticFeedback('success');
+      showToast('한마디를 지웠어요 🧹');
+    } else {
+      hapticFeedback('error');
+      showToast('한마디를 지우지 못했어요 😢');
+    }
   };
 
   const handleDelete = async () => {
@@ -205,8 +226,11 @@ export function PollDetailPage() {
       displayOptions={displayOptions}
       winnerId={winnerId}
       isOwner={isOwner}
+      canManage={canManage}
       confirmDelete={confirmDelete}
       onDelete={handleDelete}
+      onEdit={handleEdit}
+      onDeleteComment={handleDeleteComment}
       remaining={remaining}
       shareUrl={shareUrl}
       onShare={handleShare}

@@ -208,7 +208,7 @@ const buildSummaryText = (
     .join('\n');
 
   return [
-    `[pickflow 의견 토픽 브리핑]`,
+    `[picky 의견 토픽 브리핑]`,
     `질문: ${poll.question}`,
     `의견 수: ${poll.comments.length}개`,
     `전체 반복 키워드: ${keywordLine}`,

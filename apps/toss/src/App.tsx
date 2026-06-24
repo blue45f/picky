@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from
 import { PollListPage } from './pages/PollListPage';
 import { CreatePollPage } from './pages/CreatePollPage';
 import { PollDetailPage } from './pages/PollDetailPage';
+import { EditPollPage } from './pages/EditPollPage';
 import { PollDetailView } from './pages/PollDetailView';
 import { useIdentity } from './store/useIdentity';
 import { parseEntryRoute } from './lib/toss';
@@ -10,7 +11,7 @@ import { globalParticles } from './lib/particles';
 import { WelcomeSplash } from './components/WelcomeSplash';
 import { fixturePoll } from './verif/fixturePoll';
 
-/** 딥링크(intoss://pickflow/poll/:id)로 진입했을 때 해당 화면으로 한 번 라우팅. */
+/** 딥링크(intoss://picky/poll/:id)로 진입했을 때 해당 화면으로 한 번 라우팅. */
 function SchemeEntryBridge() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -30,7 +31,7 @@ function SchemeEntryBridge() {
   return null;
 }
 
-/** 픽플로우 전역 터치/성공 파티클 캔버스 */
+/** 피키 전역 터치/성공 파티클 캔버스 */
 function GlobalParticleCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -147,12 +148,13 @@ export function App() {
             border: 0,
           }}
         >
-          픽플로우 — 고민을 투표로 빠르게 결정
+          피키 — 고민을 투표로 빠르게 결정
         </h1>
         <Routes>
           <Route path="/" element={<PollListPage />} />
           <Route path="/create" element={<CreatePollPage />} />
           <Route path="/poll/:id" element={<PollDetailPage />} />
+          <Route path="/poll/:id/edit" element={<EditPollPage />} />
           {/* Verif preview routes (no API, for honest full-context screenshots) */}
           {import.meta.env.VITE_VERIF_PREVIEW === '1' && (
             <>
@@ -214,7 +216,7 @@ export function App() {
                     }}
                   >
                     <div style={{ fontSize: 20, fontWeight: 800, margin: '8px 0 12px' }}>
-                      픽플로우 🥑
+                      피키 🥑
                     </div>
                     <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 16 }}>
                       QR 태그로 친구들과 바로 고민 투표 ⚡️

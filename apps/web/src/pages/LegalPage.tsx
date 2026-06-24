@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 /**
- * 이용약관 / 개인정보처리방침 — 에이치준랩스 사업자 정보 + pickflow 실제 운영 기준으로 작성.
+ * 이용약관 / 개인정보처리방침 — 에이치준랩스 사업자 정보 + picky 실제 운영 기준으로 작성.
  * (수집 항목·localStorage 사용·Vercel/Neon 처리위탁·토스 익명 식별키 등 실제 데이터 흐름 반영)
  * 법령·서비스 변경 시 갱신한다.
  */
@@ -15,7 +15,7 @@ const BUSINESS = {
   address: '서울특별시 송파구 가락로34길 13, 101호',
   category: '정보통신업 · 응용 소프트웨어 개발 및 공급업',
   startDate: '2026년 6월 22일',
-  service: 'pickflow(픽플로우)',
+  service: 'picky(피키)',
 };
 
 type Section = { heading: string; body: string[] };

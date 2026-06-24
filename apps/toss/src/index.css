@@ -1,8 +1,8 @@
 :root {
-  --pickflow-bg: #05100e;
-  --pickflow-accent: #13c2a3;
-  --pickflow-gradient-accent: linear-gradient(135deg, #13c2a3 0%, #2ee0bf 100%);
-  --pickflow-gradient-gold: linear-gradient(135deg, #f4c560 0%, #ffde92 100%);
+  --picky-bg: #05100e;
+  --picky-accent: #13c2a3;
+  --picky-gradient-accent: linear-gradient(135deg, #13c2a3 0%, #2ee0bf 100%);
+  --picky-gradient-gold: linear-gradient(135deg, #f4c560 0%, #ffde92 100%);
   color-scheme: dark;
 }
 
@@ -53,8 +53,7 @@ body {
   background:
     radial-gradient(circle at 10% 0%, rgba(19, 194, 163, 0.18), transparent 45%),
     radial-gradient(circle at 90% 85%, rgba(244, 197, 96, 0.1), transparent 50%),
-    radial-gradient(circle at 50% 50%, rgba(19, 194, 163, 0.05), transparent 60%),
-    var(--pickflow-bg);
+    radial-gradient(circle at 50% 50%, rgba(19, 194, 163, 0.05), transparent 60%), var(--picky-bg);
   background-size: 200% 200%;
   background-attachment: fixed;
   animation: pf-aurora 15s ease-in-out infinite;
@@ -83,7 +82,7 @@ a {
 }
 
 :focus-visible {
-  outline: 2px solid var(--pickflow-accent);
+  outline: 2px solid var(--picky-accent);
   outline-offset: 2px;
   border-radius: 8px;
 }
@@ -130,7 +129,7 @@ a {
   position: absolute;
   animation: pf-sparkle 2.2s ease-in-out infinite;
   pointer-events: none;
-  color: var(--pickflow-accent);
+  color: var(--picky-accent);
   font-weight: 400;
 }
 

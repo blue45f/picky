@@ -337,7 +337,7 @@ export function WelcomeSplash({ forceVisible = false }: { forceVisible?: boolean
               animation: 'pf-gradient-shift 2.1s linear infinite',
             }}
           >
-            픽플로우
+            피키
           </h1>
           <p
             style={{

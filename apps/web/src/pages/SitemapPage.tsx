@@ -36,7 +36,7 @@ export const SitemapPage: React.FC = () => (
       >
         BETA Sitemap
       </p>
-      <h1 style={{ margin: '0.4rem 0 0.5rem' }}>pickflow 사이트맵</h1>
+      <h1 style={{ margin: '0.4rem 0 0.5rem' }}>picky 사이트맵</h1>
       <p style={{ color: 'var(--text-muted)', lineHeight: 1.7 }}>
         고민 목록, 작성, 투표, 공유, 디자인 시스템까지 주요 경로를 한 화면에 정리했습니다.
       </p>

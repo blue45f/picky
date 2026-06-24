@@ -32,7 +32,7 @@ export const IntroSplashScreen: React.FC = () => {
     return () => clearTimeout(timer);
   }, [isVisible]);
 
-  // 픽플로우 전용 화려 파티클 + 중앙 버스트 (에메랄드/골드/아보카도)
+  // 피키 전용 화려 파티클 + 중앙 버스트 (에메랄드/골드/아보카도)
   useEffect(() => {
     if (!isVisible) return;
 
@@ -229,7 +229,7 @@ export const IntroSplashScreen: React.FC = () => {
           </div>
         </div>
 
-        <h1 className="pf-splash-title">픽플로우</h1>
+        <h1 className="pf-splash-title">피키</h1>
         <p className="pf-splash-subtitle">친구들과 나누는 재미있는 고민 투표 🔥</p>
 
         <div className="pf-splash-tag">QR 태그로 즉시 참여 · 한 표로 결정 ⚡️</div>

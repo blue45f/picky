@@ -1,6 +1,6 @@
 /** 기기 로컬 투표 기록 (중복 투표 방지 + 참여 표시). */
 
-const votedKey = (pollId: string) => `pickflow_voted_${pollId}`;
+const votedKey = (pollId: string) => `picky_voted_${pollId}`;
 
 /** 이 기기에서 해당 고민에 선택한 옵션 ID. 미투표면 null. */
 export const getVotedOptionId = (pollId: string): number | null => {

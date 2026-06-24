@@ -1,9 +1,9 @@
-# @picky/toss — 픽플로우 앱인토스 미니앱
+# @picky/toss — 피키 앱인토스 미니앱
 
 picky(PickFlow) 웹 서비스를 [앱인토스](https://apps-in-toss.toss.im/) WebView 미니앱으로 포팅한 앱이에요.
 `@apps-in-toss/web-framework` + TDS(`@toss/tds-mobile`) 기반 Vite + React 19.
 
-- 콘솔 appName: `pickflow` (딥링크 `intoss://pickflow`)
+- 콘솔 appName: `picky` (딥링크 `intoss://picky`)
 - 데스크톱 웹(`apps/web`)과 동일 백엔드(`apps/api`)를 사용하고, 화면은 모바일 인앱 UX로 재구현했어요.
 
 ## 화면
@@ -24,7 +24,7 @@ picky(PickFlow) 웹 서비스를 [앱인토스](https://apps-in-toss.toss.im/) W
 # 1) 백엔드(API)를 먼저 띄워요 (별도 터미널, 루트에서)
 pnpm dev:api                # http://localhost:3000
 
-# 2) 미니앱 개발 서버 (샌드박스앱에서 intoss://pickflow 로 접근)
+# 2) 미니앱 개발 서버 (샌드박스앱에서 intoss://picky 로 접근)
 pnpm --filter @picky/toss dev
 ```
 
@@ -40,16 +40,16 @@ cp apps/toss/.env.example apps/toss/.env.local
 ```sh
 # 운영용 환경변수로 .ait 번들 생성
 VITE_API_BASE_URL=https://<prod-api> pnpm --filter @picky/toss build
-# → apps/toss/pickflow.ait (콘솔 '앱 출시'에서 업로드 → 검토 요청)
+# → apps/toss/picky.ait (콘솔 '앱 출시'에서 업로드 → 검토 요청)
 ```
 
 검토 전 체크리스트(공식 비게임 가이드 기준):
 
 - ✅ iframe 미사용 / 핀치줌 비활성(`index.html` viewport) / TDS 사용 / 번들 ≤100MB
 - ⏳ 콘솔 `granite.config.ts`의 `brand.icon`을 업로드한 로고의 static URL로 교체
-- ⏳ picky API CORS 허용 오리진에 `https://pickflow.apps.tossmini.com`(실서비스)와
-  `https://pickflow.private-apps.tossmini.com`(QR 테스트) 추가 — 현재 API는 `origin: '*'`라 충족
-- ⏳ 실기기 샌드박스 테스트(`intoss://pickflow`) 후 토스앱 최종 테스트 → 검토 요청
+- ⏳ picky API CORS 허용 오리진에 `https://picky.apps.tossmini.com`(실서비스)와
+  `https://picky.private-apps.tossmini.com`(QR 테스트) 추가 — 현재 API는 `origin: '*'`라 충족
+- ⏳ 실기기 샌드박스 테스트(`intoss://picky`) 후 토스앱 최종 테스트 → 검토 요청
 
 ## 인증
 

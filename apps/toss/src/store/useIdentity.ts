@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { getStableUserKey, getTossEnv, type TossEnv } from '../lib/toss';
 import { useAuthStore } from './useAuthStore';
 
-const NAME_KEY = 'pickflow_display_name';
+const NAME_KEY = 'picky_display_name';
 
 const loadName = (): string => {
   if (typeof localStorage === 'undefined') {

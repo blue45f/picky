@@ -27,8 +27,14 @@ interface PollDetailViewProps {
   displayOptions: PollOption[];
   winnerId: number | null;
   isOwner: boolean;
+  /** 본인 글이거나 어드민이면 수정/삭제/댓글관리 가능. 미전달 시 isOwner로 폴백. */
+  canManage?: boolean;
   confirmDelete: boolean;
   onDelete: () => void;
+  /** 수정 화면 진입(소유자/어드민). 미전달 시 수정 버튼 미노출. */
+  onEdit?: () => void;
+  /** 댓글 삭제(소유자/어드민). 미전달 시 댓글 삭제 버튼 미노출. */
+  onDeleteComment?: (commentId: number) => void;
   remaining: number | null;
   shareUrl: string;
   onShare: () => void;
@@ -248,8 +254,44 @@ function OptionList(
   );
 }
 
-function CommentCard(props: Readonly<{ comment: PollComment }>) {
-  const { comment: c } = props;
+function CommentDeleteButton(props: Readonly<{ onClick: () => void }>) {
+  const { onClick } = props;
+  return (
+    <button
+      type="button"
+      className="pressable"
+      aria-label="이 한마디 삭제하기"
+      onClick={onClick}
+      style={{
+        flexShrink: 0,
+        minWidth: 28,
+        minHeight: 28,
+        display: 'grid',
+        placeItems: 'center',
+        background: 'none',
+        border: 'none',
+        color: theme.textFaint ?? theme.textMuted,
+        fontSize: 13,
+        fontWeight: 700,
+        cursor: 'pointer',
+        padding: '4px 6px',
+        borderRadius: theme.radiusSm,
+      }}
+    >
+      🗑
+    </button>
+  );
+}
+
+function CommentCard(
+  props: Readonly<{
+    comment: PollComment;
+    canManage: boolean;
+    onDelete?: (commentId: number) => void;
+  }>,
+) {
+  const { comment: c, canManage, onDelete } = props;
+  const showDelete = canManage && Boolean(onDelete);
   return (
     <div
       style={{
@@ -283,20 +325,25 @@ function CommentCard(props: Readonly<{ comment: PollComment }>) {
         >
           {c.voterName}
         </strong>
-        {c.selectedOptionText ? (
-          <Chip tone="accent" style={{ flexShrink: 0, maxWidth: '55%' }}>
-            <span
-              style={{
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {c.selectedOptionText}
-            </span>
-            <span>콕 찝음 👈</span>
-          </Chip>
-        ) : null}
+        <div
+          style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, maxWidth: '60%' }}
+        >
+          {c.selectedOptionText ? (
+            <Chip tone="accent" style={{ flexShrink: 1, minWidth: 0 }}>
+              <span
+                style={{
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {c.selectedOptionText}
+              </span>
+              <span>콕 찝음 👈</span>
+            </Chip>
+          ) : null}
+          {showDelete ? <CommentDeleteButton onClick={() => onDelete?.(c.id)} /> : null}
+        </div>
       </div>
       <p style={{ margin: '6px 0 0', fontSize: 14, lineHeight: 1.5, color: theme.text }}>
         {c.comment}
@@ -305,8 +352,14 @@ function CommentCard(props: Readonly<{ comment: PollComment }>) {
   );
 }
 
-function CommentsSection(props: Readonly<{ comments: PollComment[] }>) {
-  const { comments } = props;
+function CommentsSection(
+  props: Readonly<{
+    comments: PollComment[];
+    canManage: boolean;
+    onDeleteComment?: (commentId: number) => void;
+  }>,
+) {
+  const { comments, canManage, onDeleteComment } = props;
   if (comments.length === 0) {
     return null;
   }
@@ -330,7 +383,7 @@ function CommentsSection(props: Readonly<{ comments: PollComment[] }>) {
       </h2>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {comments.map((c) => (
-          <CommentCard key={c.id} comment={c} />
+          <CommentCard key={c.id} comment={c} canManage={canManage} onDelete={onDeleteComment} />
         ))}
       </div>
     </section>
@@ -526,7 +579,7 @@ function ShareSection(
         {shareUrl ? (
           <PollShareQrSection
             shareUrl={shareUrl}
-            qrUrl={isInToss() ? `intoss://pickflow/poll/${pollId}` : shareUrl}
+            qrUrl={isInToss() ? `intoss://picky/poll/${pollId}` : shareUrl}
             onCopyLink={onCopy}
           />
         ) : null}
@@ -589,17 +642,64 @@ function DeleteAction(props: Readonly<{ confirmDelete: boolean; onDelete: () => 
   );
 }
 
+function EditAction(props: Readonly<{ onEdit: () => void }>) {
+  const { onEdit } = props;
+  return (
+    <button
+      type="button"
+      className="pressable"
+      aria-label="고민 수정하기"
+      onClick={onEdit}
+      style={{
+        minHeight: 44,
+        background: 'none',
+        border: 'none',
+        color: theme.textFaint ?? theme.textMuted,
+        fontSize: 14,
+        fontWeight: 700,
+        cursor: 'pointer',
+        padding: '8px 10px',
+        borderRadius: theme.radiusSm,
+        transition: 'all 0.2s ease',
+      }}
+    >
+      수정 ✏️
+    </button>
+  );
+}
+
+function HeaderActions(
+  props: Readonly<{
+    canManage: boolean;
+    confirmDelete: boolean;
+    onDelete: () => void;
+    onEdit?: () => void;
+  }>,
+) {
+  const { canManage, confirmDelete, onDelete, onEdit } = props;
+  if (!canManage) {
+    return null;
+  }
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+      {onEdit ? <EditAction onEdit={onEdit} /> : null}
+      <DeleteAction confirmDelete={confirmDelete} onDelete={onDelete} />
+    </div>
+  );
+}
+
 function DetailHeader(
   props: Readonly<{
     closed: boolean;
     remaining: number | null;
-    isOwner: boolean;
+    canManage: boolean;
     confirmDelete: boolean;
     onDelete: () => void;
+    onEdit?: () => void;
     onBack: () => void;
   }>,
 ) {
-  const { closed, remaining, isOwner, confirmDelete, onDelete, onBack } = props;
+  const { closed, remaining, canManage, confirmDelete, onDelete, onEdit, onBack } = props;
   return (
     <AppBar
       onBack={onBack}
@@ -609,7 +709,14 @@ function DetailHeader(
           {closed ? null : <CountdownChip remaining={remaining} />}
         </div>
       }
-      right={isOwner ? <DeleteAction confirmDelete={confirmDelete} onDelete={onDelete} /> : null}
+      right={
+        <HeaderActions
+          canManage={canManage}
+          confirmDelete={confirmDelete}
+          onDelete={onDelete}
+          onEdit={onEdit}
+        />
+      }
     />
   );
 }
@@ -698,8 +805,11 @@ export function PollDetailView(props: Readonly<PollDetailViewProps>) {
     displayOptions,
     winnerId,
     isOwner,
+    canManage: canManageProp,
     confirmDelete,
     onDelete,
+    onEdit,
+    onDeleteComment,
     remaining,
     shareUrl,
     onShare,
@@ -709,6 +819,9 @@ export function PollDetailView(props: Readonly<PollDetailViewProps>) {
     totalVotes,
     comments,
   } = props;
+
+  // 신규 canManage(소유자|어드민)가 없으면 기존 isOwner로 폴백해 호환을 지켜요.
+  const canManage = canManageProp ?? isOwner;
 
   if (!poll) {
     return <PollEmptyState />;
@@ -726,9 +839,10 @@ export function PollDetailView(props: Readonly<PollDetailViewProps>) {
       <DetailHeader
         closed={closed}
         remaining={remaining}
-        isOwner={isOwner}
+        canManage={canManage}
         confirmDelete={confirmDelete}
         onDelete={onDelete}
+        onEdit={onEdit}
         onBack={onBack}
       />
 
@@ -763,7 +877,11 @@ export function PollDetailView(props: Readonly<PollDetailViewProps>) {
           />
         )}
 
-        <CommentsSection comments={comments} />
+        <CommentsSection
+          comments={comments}
+          canManage={canManage}
+          onDeleteComment={onDeleteComment}
+        />
 
         <ShareSection
           pollId={poll.id}

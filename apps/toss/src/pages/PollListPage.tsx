@@ -578,7 +578,7 @@ function ListHeader(props: Readonly<{ onTitleTap: (x: number, y: number) => void
                 alignItems: 'center',
               }}
             >
-              <span>픽플로우 🥑</span>
+              <span>피키 🥑</span>
               <span
                 className="sparkle-icon"
                 style={{ top: -6, left: -14, fontSize: 16, animationDelay: '0.1s' }}

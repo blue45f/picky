@@ -1,4 +1,4 @@
-/** 픽플로우 미니앱 공용 UI 프리미티브. TDS 셰임 드리프트 없이 일관된 디자인을 유지해요. */
+/** 피키 미니앱 공용 UI 프리미티브. TDS 셰임 드리프트 없이 일관된 디자인을 유지해요. */
 import type { CSSProperties, ReactNode } from 'react';
 import { theme } from '../theme';
 import { RADIUS } from '../shared';
