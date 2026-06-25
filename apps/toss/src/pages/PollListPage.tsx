@@ -568,6 +568,8 @@ function ListHeader(props: Readonly<{ onTitleTap: (x: number, y: number) => void
           <button
             type="button"
             onClick={(e) => onTitleTap(e.clientX, e.clientY)}
+            // 마우스 클릭 시 포커스 링이 생기지 않게(키보드 포커스는 유지 — a11y).
+            onMouseDown={(e) => e.preventDefault()}
             style={{
               display: 'inline-flex',
               cursor: 'pointer',

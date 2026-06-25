@@ -14,6 +14,7 @@ import { Heart } from 'lucide-react';
 import { Navbar } from './components/Navbar';
 import { RouteAnnouncer } from './components/layout/RouteAnnouncer';
 import { IntroSplashScreen } from './components/IntroSplashScreen';
+import { GlobalParticleCanvas } from './components/GlobalParticleCanvas';
 import { useAuthStore } from './store/useAuthStore';
 import { pingVisit } from './lib/deskPlatform';
 
@@ -98,6 +99,7 @@ export const App: React.FC = () => {
   return (
     <BrowserRouter>
       <IntroSplashScreen />
+      <GlobalParticleCanvas />
       <div
         style={{
           minHeight: '100vh',

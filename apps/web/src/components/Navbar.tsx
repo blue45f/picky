@@ -4,6 +4,7 @@ import { ArrowRight, CheckCheck, LogIn, LogOut, Menu, X, User, ShieldCheck } fro
 import { useAuthStore } from '../store/useAuthStore';
 import { AuthModal, type AuthMode } from './AuthModal';
 import { ThemeSwitcher } from './ThemeSwitcher';
+import { triggerParticleBurst } from '../lib/particles';
 
 const navItems = [
   { path: '/', label: '고민 둘러보기' },
@@ -111,7 +112,14 @@ export const Navbar: React.FC = () => {
       >
         <Link
           to="/"
-          onClick={() => setBrandPop((prev) => prev + 1)}
+          aria-label="picky 홈"
+          // 토스 인앱과 동일하게 클릭 시 "팡" 파티클을 터뜨려요.
+          onClick={(e) => {
+            setBrandPop((prev) => prev + 1);
+            triggerParticleBurst(e.clientX, e.clientY, { count: 20 });
+          }}
+          // 마우스 클릭 시 포커스 링이 생기지 않게(키보드 포커스는 유지 — a11y).
+          onMouseDown={(e) => e.preventDefault()}
           style={{
             textDecoration: 'none',
             color: 'var(--text-primary)',
