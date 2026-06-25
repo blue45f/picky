@@ -42,6 +42,7 @@ import {
   getRecentPollHistory,
   removeRecentPollHistoryItem,
 } from '../lib/pollHistory';
+import { CountdownChip, useCountdown } from '../components/Countdown';
 
 type SortMode = 'latest' | 'popular' | 'commented';
 type ScopeMode = 'all' | 'mine' | 'guest';
@@ -520,6 +521,7 @@ function PollCardDescription(props: Readonly<{ poll: Poll; isCompact: boolean }>
 function PollCard(
   props: Readonly<{
     poll: Poll;
+    index: number;
     userId?: string;
     viewMode: ViewMode;
     copiedPollId: string | null;
@@ -538,6 +540,7 @@ function PollCard(
 ) {
   const {
     poll,
+    index,
     userId,
     viewMode,
     copiedPollId,
@@ -548,6 +551,8 @@ function PollCard(
     handleCopyPollEmbed,
   } = props;
   const creatorLabel = getCreatorLabel(poll.creatorId, poll.creatorIsGuest);
+  // 부모(PollCard)가 남은 ms를 1초마다 틱하고, CountdownChip은 표시만 한다(자체 타이머 없음 = 누수 방지).
+  const remaining = useCountdown(poll.endsAt);
   // Poll 타입에 categoryId 가 아직 없지만 런타임 데이터엔 실릴 수 있어 방어적으로 읽는다.
   const pollCategory = categoryMeta((poll as { categoryId?: string | null }).categoryId);
   const isMine = userId && poll.creatorId === userId;
@@ -559,12 +564,14 @@ function PollCard(
 
   return (
     <article
-      className="poll-card"
+      className="poll-card poll-card-rise"
       style={{
         textAlign: 'left',
         padding: isCompact ? '1.05rem' : '1.25rem',
         width: '100%',
         border: isMine ? '1px solid rgba(99, 102, 241, 0.45)' : undefined,
+        // 젤리팝 진입을 인덱스별로 지연(최대 8개까지만 계단식). reduced-motion에선 CSS가 무력화.
+        animationDelay: `${Math.min(index, 8) * 75}ms`,
       }}
     >
       {/* 카드 전체를 덮는 접근성 내비 버튼(키보드+마우스). 내부 액션 버튼은
@@ -720,6 +727,7 @@ function PollCard(
           <TimerReset size={12} />
           {endAtLabel}
         </span>
+        <CountdownChip remaining={remaining} closedFallback />
         <span>
           <Eye size={12} />
           {resultsVisibilityLabel}
@@ -1772,10 +1780,11 @@ function PollResultsRegion(
           : `고민 ${visiblePolls.length}개`}
       </p>
       <div style={{ display: 'grid', gap: '0.9rem' }}>
-        {visiblePolls.map((poll) => (
+        {visiblePolls.map((poll, index) => (
           <PollCard
             key={poll.id}
             poll={poll}
+            index={index}
             userId={userId}
             viewMode={viewMode}
             copiedPollId={copiedPollId}
@@ -1803,9 +1812,139 @@ function PollResultsRegion(
   );
 }
 
+// 보여줄 페이지 번호 윈도우(현재 페이지 주변 ±2)를 만든다.
+const buildPageWindow = (current: number, totalPages: number): number[] => {
+  const windowSize = 5;
+  let start = Math.max(1, current - 2);
+  const end = Math.min(totalPages, start + windowSize - 1);
+  start = Math.max(1, end - windowSize + 1);
+
+  const pages: number[] = [];
+  for (let p = start; p <= end; p += 1) {
+    pages.push(p);
+  }
+  return pages;
+};
+
+function PollPagination(
+  props: Readonly<{
+    page: number;
+    limit: number;
+    total: number;
+    hasMore: boolean;
+    isLoading: boolean;
+    onGoToPage: (page: number) => void;
+  }>,
+) {
+  const { page, limit, total, hasMore, isLoading, onGoToPage } = props;
+  const totalPages = Math.max(1, Math.ceil(total / Math.max(1, limit)));
+
+  // 페이지가 하나뿐이고 다음 페이지도 없으면 컨트롤을 감춘다(기존 단순 화면 보존).
+  if (totalPages <= 1 && !hasMore) {
+    return null;
+  }
+
+  const pageNumbers = buildPageWindow(page, totalPages);
+  const canPrev = page > 1;
+  const canNext = hasMore || page < totalPages;
+
+  return (
+    <nav
+      aria-label="고민 목록 페이지"
+      style={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '0.4rem',
+        marginTop: '0.4rem',
+      }}
+    >
+      <button
+        type="button"
+        className="ghost-btn"
+        onClick={() => onGoToPage(page - 1)}
+        disabled={!canPrev || isLoading}
+        aria-label="이전 페이지"
+        style={{
+          padding: '7px 12px',
+          fontSize: '0.74rem',
+          opacity: !canPrev || isLoading ? 0.5 : 1,
+          cursor: !canPrev || isLoading ? 'not-allowed' : 'pointer',
+        }}
+      >
+        이전
+      </button>
+
+      {pageNumbers.map((pageNumber) => {
+        const isCurrent = pageNumber === page;
+        return (
+          <button
+            key={pageNumber}
+            type="button"
+            onClick={() => onGoToPage(pageNumber)}
+            disabled={isLoading}
+            aria-label={`${pageNumber}페이지`}
+            aria-current={isCurrent ? 'page' : undefined}
+            className={isCurrent ? 'btn-primary' : 'ghost-btn'}
+            style={{
+              minWidth: '38px',
+              padding: '7px 11px',
+              fontSize: '0.74rem',
+              fontWeight: isCurrent ? 800 : 600,
+              cursor: isLoading ? 'progress' : 'pointer',
+            }}
+          >
+            {pageNumber}
+          </button>
+        );
+      })}
+
+      <button
+        type="button"
+        className="ghost-btn"
+        onClick={() => onGoToPage(page + 1)}
+        disabled={!canNext || isLoading}
+        aria-label="다음 페이지"
+        style={{
+          padding: '7px 12px',
+          fontSize: '0.74rem',
+          opacity: !canNext || isLoading ? 0.5 : 1,
+          cursor: !canNext || isLoading ? 'not-allowed' : 'pointer',
+        }}
+      >
+        다음
+      </button>
+
+      <span
+        aria-live="polite"
+        style={{
+          marginLeft: '0.35rem',
+          fontSize: '0.7rem',
+          color: 'var(--text-muted)',
+          fontWeight: 700,
+        }}
+      >
+        {page} / {totalPages} 페이지 · 총 {total}개
+      </span>
+    </nav>
+  );
+}
+
 export const PollList: React.FC = () => {
   useDocumentTitle('고민 둘러보기');
-  const { polls, isLoading, fetchPolls, error, setCurrentPoll } = usePollStore();
+  const {
+    polls,
+    isLoading,
+    fetchPolls,
+    error,
+    setCurrentPoll,
+    page,
+    limit,
+    total,
+    hasMore,
+    goToPage,
+  } = usePollStore();
   const userId = useAuthStore((state) => state.user?.id);
   const isGuest = useAuthStore((state) => state.user?.isGuest);
   const navigate = useNavigate();
@@ -1918,9 +2057,18 @@ export const PollList: React.FC = () => {
     }
   }, [query, sortBy, scope, signal, userId, searchParams, setSearchParams]);
 
+  // 검색(q)·정렬(sort)·진행상태(status)를 서버측으로 보낸다(#W2). status는 signal 중 '마감'만 서버 필터로
+  // 매핑하고, 나머지 파생 신호(접전·신규·피드백 등)·스코프(내 글/비회원)는 결과에 대한 클라 보조필터로 둔다.
+  const serverStatus: 'all' | 'closed' = signal === 'closed' ? 'closed' : 'all';
+  const serverFilters = useMemo(
+    () => ({ q: query.trim(), sort: sortBy, status: serverStatus, category: null }),
+    [query, sortBy, serverStatus],
+  );
+
+  // 검색/정렬/상태 변경 시 1페이지부터 서버 질의를 다시 보낸다(필터를 함께 전달).
   useEffect(() => {
-    fetchPolls();
-  }, [fetchPolls]);
+    fetchPolls(1, serverFilters);
+  }, [fetchPolls, serverFilters]);
 
   // Keyboard shortcuts — "/" focuses search, "c" opens the create flow, "g"
   // jumps to the JOIN CODE field. Ignored while typing in an input/textarea so
@@ -2013,6 +2161,8 @@ export const PollList: React.FC = () => {
   );
 
   const visiblePolls = useMemo(() => {
+    // 검색(q)·정렬(sort)·마감상태는 서버가 이미 적용한 현재 페이지(polls)다(#W2).
+    // 여기서는 서버에 없는 보조필터(스코프=내 글/비회원, 파생 신호=접전·신규 등)만 결과에 덧입힌다.
     let next = [...polls];
 
     if (scope === 'mine' && userId) {
@@ -2023,35 +2173,13 @@ export const PollList: React.FC = () => {
       next = next.filter((poll) => isGuestCreator(poll.creatorId, poll.creatorIsGuest));
     }
 
-    if (signal !== 'all') {
+    // 'closed'는 서버 status로 처리되므로 클라에서 중복 적용하지 않는다.
+    if (signal !== 'all' && signal !== 'closed') {
       next = next.filter((poll) => matchesSignalMode(poll, signal));
     }
 
-    if (normalizedQuery) {
-      next = next.filter((poll) => {
-        const inId = poll.id.toLowerCase().includes(normalizedQuery);
-        const inQuestion = poll.question.toLowerCase().includes(normalizedQuery);
-        const inDescription = (poll.description || '').toLowerCase().includes(normalizedQuery);
-        return inId || inQuestion || inDescription;
-      });
-    }
-
-    switch (sortBy) {
-      case 'popular':
-        next = next.sort((a, b) => b.totalVotes - a.totalVotes);
-        break;
-      case 'commented':
-        next = next.sort((a, b) => b.comments.length - a.comments.length);
-        break;
-      default:
-        next = next.sort(
-          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-        );
-        break;
-    }
-
     return next;
-  }, [polls, scope, signal, sortBy, normalizedQuery, userId]);
+  }, [polls, scope, signal, userId]);
 
   const totalVotes = useMemo(() => polls.reduce((acc, poll) => acc + poll.totalVotes, 0), [polls]);
   const totalComments = useMemo(
@@ -3525,6 +3653,18 @@ export const PollList: React.FC = () => {
         handleCopyPollEmbed={handleCopyPollEmbed}
       />
 
+      <PollPagination
+        page={page}
+        limit={limit}
+        total={total}
+        hasMore={hasMore}
+        isLoading={isLoading}
+        onGoToPage={(nextPage) => {
+          void goToPage(nextPage);
+          globalThis.scrollTo?.({ top: 0, behavior: 'smooth' });
+        }}
+      />
+
       {error ? (
         <div
           role="alert"
@@ -3556,7 +3696,7 @@ export const PollList: React.FC = () => {
           <p style={{ color: 'var(--text-muted)', fontSize: '0.68rem', margin: 0 }}>{error}</p>
           <button
             type="button"
-            onClick={fetchPolls}
+            onClick={() => void fetchPolls(page)}
             className="btn-primary"
             style={{
               width: 'fit-content',

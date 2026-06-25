@@ -49,7 +49,7 @@ export function PollDetailPage() {
   const urlCode = searchParams.get('code') ?? undefined;
   const { currentPoll, isLoading, error, fetchPoll, vote, deletePoll, deleteComment, addComment } =
     usePollStore();
-  const { displayName, setDisplayName } = useIdentity();
+  const { displayName, setDisplayName, userKey } = useIdentity();
   const myId = useAuthStore((state) => state.user?.id ?? null);
   const { showToast } = useToast();
 
@@ -142,6 +142,8 @@ export function PollDetailPage() {
       optionId: selectedOptionId,
       voterName: trimmedName || null,
       comment: comment.trim() || null,
+      // 서버측 1인1표(#12): 안정 식별키(getAnonymousKey 해시). null이면 미전송 → 레거시 허용.
+      voterKey: userKey ?? null,
     });
     if (ok) {
       rememberVote(poll.id, selectedOptionId);

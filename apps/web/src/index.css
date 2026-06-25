@@ -1692,6 +1692,25 @@ body.present-mode .page-shell {
   box-shadow: var(--shadow-md), var(--shadow-glow);
 }
 
+/* 목록 카드 계단식(stagger) 진입 — 토스 미니앱의 'rise' 젤리팝을 웹으로 이식.
+   reduced-motion 사용자에겐 아래 미디어쿼리에서 animation:none 으로 무력화된다. */
+@keyframes pollCardRise {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .poll-card-rise {
+    animation: pollCardRise 0.5s var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)) both;
+  }
+}
+
 .form-stack {
   display: grid;
   gap: 1rem;
@@ -1866,6 +1885,7 @@ body.present-mode .page-shell {
   .upload-dropzone::after,
   .upload-preview,
   .poll-card,
+  .poll-card-rise,
   .choice-card,
   .btn-primary,
   .btn-secondary,

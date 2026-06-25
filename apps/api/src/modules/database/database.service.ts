@@ -1,13 +1,34 @@
 import { Injectable, OnModuleInit, ServiceUnavailableException } from '@nestjs/common';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { Poll } from '@picky/shared';
+import { Poll, PaginatedPolls, PollListSort, PollListStatus } from '@picky/shared';
 import { get as getBlob, put as putBlob } from '@vercel/blob';
 import { createClient, type VercelKV } from '@vercel/kv';
 import { Pool } from 'pg';
 import { db, pool } from '../../db/index';
 import * as schema from '../../db/schema';
-import { eq, desc, sql } from 'drizzle-orm';
+import { eq, and, desc, asc, sql, count, ilike, or, isNull, type SQL } from 'drizzle-orm';
+
+/** Blob 경로에서 비표시 1인1표 메타를 폴 객체에 덧붙이기 위한 내부 확장 타입. */
+type PollWithVotedKeys = Poll & { votedKeys?: string[] };
+
+/**
+ * 목록 질의 옵션(서버 1-base page + limit + 검색/정렬/필터).
+ * 검색·정렬·필터를 서버측 WHERE/ORDER BY로 처리해 현재 페이지에만 적용되던 누락을 없앤다(#W2).
+ */
+export interface GetPollsOptions {
+  page: number;
+  limit: number;
+  q?: string;
+  sort?: PollListSort;
+  status?: PollListStatus;
+  category?: string | null;
+}
+
+/** castVote 결과 — recorded=false 면 (pollId,voterKey) 중복이라 카운트 미증가(409). */
+export interface CastVoteResult {
+  recorded: boolean;
+}
 
 interface DatabaseState {
   polls: Poll[];
@@ -98,6 +119,20 @@ export class DatabaseService implements OnModuleInit {
             selected_option_text TEXT,
             parent_id INTEGER
           );
+        `);
+        // 서버측 1인1표(#12). (poll_id, voter_key) 유니크로 재투표를 막는다. 비파괴·멱등.
+        await pool.query(`
+          CREATE TABLE IF NOT EXISTS poll_votes (
+            id SERIAL PRIMARY KEY,
+            poll_id TEXT NOT NULL REFERENCES polls(id) ON DELETE CASCADE,
+            voter_key TEXT NOT NULL,
+            option_index INTEGER NOT NULL,
+            created_at TIMESTAMP DEFAULT NOW() NOT NULL
+          );
+        `);
+        await pool.query(`
+          CREATE UNIQUE INDEX IF NOT EXISTS poll_votes_poll_voter_unique_idx
+          ON poll_votes (poll_id, voter_key);
         `);
         // 기존 라이브 테이블에 신규 컬럼을 비파괴·멱등으로 추가한다.
         // CREATE TABLE IF NOT EXISTS는 이미 존재하는 테이블엔 컬럼을 더하지 않으므로 ALTER가 필요하다.
@@ -374,6 +409,16 @@ export class DatabaseService implements OnModuleInit {
     };
   }
 
+  /** Blob 경로 응답에서 비표시 메타(votedKeys 등)를 제거해 외부로 새지 않게 한다. */
+  private stripPollMeta(poll: Poll | undefined): Poll | undefined {
+    if (!poll) {
+      return poll;
+    }
+    const next: PollWithVotedKeys = { ...(poll as PollWithVotedKeys) };
+    delete next.votedKeys;
+    return next;
+  }
+
   private async loadFromKv(): Promise<DatabaseState | null> {
     if (!this.storageClient) {
       return null;
@@ -515,56 +560,204 @@ export class DatabaseService implements OnModuleInit {
     this.data = nextState;
   }
 
-  async getPolls(): Promise<Poll[]> {
+  /**
+   * 공개(public) 투표 목록을 서버측 페이지네이션 + 검색/정렬/필터로 반환한다(#10·#W2).
+   * 검색(q)·정렬(sort)·상태(status)·카테고리(category)를 WHERE/ORDER BY로 처리한 뒤
+   * 페이지네이션해 "현재 페이지만 필터"되던 스케일 누락을 없앤다. SQL·Blob 양 경로 동일 의미.
+   */
+  async getPolls(options: GetPollsOptions): Promise<PaginatedPolls> {
+    const page = Math.max(1, Math.floor(options.page) || 1);
+    const limit = Math.max(1, Math.floor(options.limit) || 1);
+    const offset = (page - 1) * limit;
+    const q = (options.q ?? '').trim();
+    const sort: PollListSort = options.sort ?? 'latest';
+    const status: PollListStatus = options.status ?? 'all';
+    const category = (options.category ?? '').trim() || null;
+    const nowIso = new Date().toISOString();
+
     if (this.useSqlDb) {
+      // 홈 목록은 공개(public) 투표만 — unlisted/private는 링크/코드로만 접근한다.
+      const conditions: SQL[] = [eq(schema.polls.visibility, 'public')];
+      if (q) {
+        const like = `%${q.replaceAll('%', '\\%').replaceAll('_', '\\_')}%`;
+        const search = or(
+          ilike(schema.polls.question, like),
+          ilike(schema.polls.description, like),
+        );
+        if (search) conditions.push(search);
+      }
+      if (category) {
+        conditions.push(eq(schema.polls.categoryId, category));
+      }
+      if (status === 'open') {
+        // 마감 없음(NULL) 또는 마감 시각이 미래.
+        const open = or(isNull(schema.polls.endsAt), sql`${schema.polls.endsAt} > NOW()`);
+        if (open) conditions.push(open);
+      } else if (status === 'closed') {
+        conditions.push(
+          sql`${schema.polls.endsAt} IS NOT NULL AND ${schema.polls.endsAt} <= NOW()`,
+        );
+      }
+      const where = and(...conditions);
+
+      const countRows = await db.select({ value: count() }).from(schema.polls).where(where);
+      const total = countRows[0]?.value ?? 0;
+
       const rows = await db.query.polls.findMany({
-        // 홈 목록은 공개(public) 투표만 — unlisted/private는 링크/코드로만 접근한다.
-        where: eq(schema.polls.visibility, 'public'),
-        orderBy: [desc(schema.polls.createdAt)],
+        where,
+        orderBy: this.buildPollOrderBy(sort),
+        limit,
+        offset,
         with: {
           options: {
-            orderBy: (opt, { asc }) => [asc(opt.optionIndex)],
+            orderBy: (opt, { asc: ascFn }) => [ascFn(opt.optionIndex)],
           },
           comments: {
-            orderBy: (cmt, { asc }) => [asc(cmt.createdAt)],
+            orderBy: (cmt, { asc: ascFn }) => [ascFn(cmt.createdAt)],
           },
         },
       });
-      return rows.map((r) => ({
-        id: r.id,
-        question: r.question,
-        description: r.description,
-        createdAt: r.createdAt.toISOString(),
-        endsAt: r.endsAt ? r.endsAt.toISOString() : null,
-        totalVotes: r.totalVotes,
-        resultsVisibility: r.resultsVisibility as any,
-        visibility: r.visibility as any,
-        requiresCode: r.visibility === 'private',
-        creatorId: r.creatorId,
-        creatorIsGuest: r.creatorIsGuest,
-        categoryId: r.categoryId,
-        attachments: r.attachments as any,
-        options: r.options.map((o) => ({
-          id: o.optionIndex,
-          text: o.text,
-          voteCount: o.voteCount,
-          imageUrl: o.imageUrl,
-        })),
-        comments: r.comments.map((c) => ({
-          id: c.id,
-          voterName: c.voterName,
-          comment: c.comment,
-          createdAt: c.createdAt.toISOString(),
-          selectedOptionId: c.selectedOptionId || undefined,
-          selectedOptionText: c.selectedOptionText || undefined,
-          parentId: c.parentId ?? undefined,
-        })),
-      }));
+      const items: Poll[] = rows.map((r) => this.mapPollRow(r));
+      return { items, total, page, limit, hasMore: offset + items.length < total };
     }
 
     await this.refresh();
-    // Blob 경로도 공개 투표만 노출(비공개/링크전용 제외).
-    return this.data.polls.filter((p) => (p.visibility ?? 'public') === 'public');
+    // Blob 경로도 SQL과 같은 의미로 공개+검색+상태+카테고리 필터 후 정렬·slice 한다.
+    const needle = q.toLowerCase();
+    const filtered = this.data.polls.filter((p) => {
+      if ((p.visibility ?? 'public') !== 'public') return false;
+      if (category && (p.categoryId ?? null) !== category) return false;
+      if (needle) {
+        const inQuestion = p.question.toLowerCase().includes(needle);
+        const inDescription = (p.description ?? '').toLowerCase().includes(needle);
+        if (!inQuestion && !inDescription) return false;
+      }
+      if (status !== 'all') {
+        const closed = Boolean(p.endsAt) && p.endsAt! <= nowIso;
+        if (status === 'open' && closed) return false;
+        if (status === 'closed' && !closed) return false;
+      }
+      return true;
+    });
+    const sorted = this.sortPollsInMemory(filtered, sort, nowIso);
+    const total = sorted.length;
+    const items = sorted.slice(offset, offset + limit).map((p) => this.stripPollMeta(p) as Poll);
+    return { items, total, page, limit, hasMore: offset + items.length < total };
+  }
+
+  /** SQL ORDER BY 절을 정렬 키로 매핑한다. commented는 댓글 수 서브쿼리로 집계. */
+  private buildPollOrderBy(sort: PollListSort): SQL[] {
+    switch (sort) {
+      case 'popular':
+        return [desc(schema.polls.totalVotes), desc(schema.polls.createdAt)];
+      case 'commented': {
+        const commentCount = sql<number>`(
+          SELECT COUNT(*) FROM ${schema.pollComments}
+          WHERE ${schema.pollComments.pollId} = ${schema.polls.id}
+        )`;
+        return [desc(commentCount), desc(schema.polls.createdAt)];
+      }
+      case 'closing': {
+        // 열린 것(마감 미래/없음) 우선, 그 안에서 마감 가까운 순. 마감된 건 뒤로 최신순.
+        const closingRank = sql`CASE WHEN ${schema.polls.endsAt} IS NOT NULL AND ${schema.polls.endsAt} > NOW() THEN 0 ELSE 1 END`;
+        return [asc(closingRank), asc(schema.polls.endsAt), desc(schema.polls.createdAt)];
+      }
+      default:
+        return [desc(schema.polls.createdAt)];
+    }
+  }
+
+  /** Blob/in-memory 정렬 — SQL ORDER BY와 같은 의미. 원본을 변형하지 않게 복사 후 정렬. */
+  private sortPollsInMemory(polls: Poll[], sort: PollListSort, nowIso: string): Poll[] {
+    const byCreatedDesc = (a: Poll, b: Poll) =>
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    const next = [...polls];
+    switch (sort) {
+      case 'popular':
+        return next.sort((a, b) => b.totalVotes - a.totalVotes || byCreatedDesc(a, b));
+      case 'commented':
+        return next.sort((a, b) => b.comments.length - a.comments.length || byCreatedDesc(a, b));
+      case 'closing':
+        return next.sort((a, b) => {
+          const aOpen = Boolean(a.endsAt) && a.endsAt! > nowIso;
+          const bOpen = Boolean(b.endsAt) && b.endsAt! > nowIso;
+          const aHasEnd = Boolean(a.endsAt);
+          const bHasEnd = Boolean(b.endsAt);
+          // 열림(마감 미래) 우선, 다음 마감없음(진행중), 마지막 마감됨.
+          const rank = (open: boolean, hasEnd: boolean) => (open ? 0 : hasEnd ? 2 : 1);
+          const ra = rank(aOpen, aHasEnd);
+          const rb = rank(bOpen, bHasEnd);
+          if (ra !== rb) return ra - rb;
+          if (aOpen && bOpen) {
+            return new Date(a.endsAt!).getTime() - new Date(b.endsAt!).getTime();
+          }
+          return byCreatedDesc(a, b);
+        });
+      default:
+        return next.sort(byCreatedDesc);
+    }
+  }
+
+  /** Drizzle polls 행(options/comments 포함)을 공유 Poll 응답 형태로 변환한다. */
+  private mapPollRow(r: {
+    id: string;
+    question: string;
+    description: string | null;
+    createdAt: Date;
+    endsAt: Date | null;
+    totalVotes: number;
+    resultsVisibility: string;
+    visibility: string;
+    creatorId: string | null;
+    creatorIsGuest: boolean;
+    categoryId: string | null;
+    attachments: unknown;
+    options: Array<{
+      optionIndex: number;
+      text: string;
+      voteCount: number;
+      imageUrl: string | null;
+    }>;
+    comments: Array<{
+      id: number;
+      voterName: string;
+      comment: string;
+      createdAt: Date;
+      selectedOptionId: number | null;
+      selectedOptionText: string | null;
+      parentId: number | null;
+    }>;
+  }): Poll {
+    return {
+      id: r.id,
+      question: r.question,
+      description: r.description,
+      createdAt: r.createdAt.toISOString(),
+      endsAt: r.endsAt ? r.endsAt.toISOString() : null,
+      totalVotes: r.totalVotes,
+      resultsVisibility: r.resultsVisibility as any,
+      visibility: r.visibility as any,
+      requiresCode: r.visibility === 'private',
+      creatorId: r.creatorId,
+      creatorIsGuest: r.creatorIsGuest,
+      categoryId: r.categoryId,
+      attachments: r.attachments as any,
+      options: r.options.map((o) => ({
+        id: o.optionIndex,
+        text: o.text,
+        voteCount: o.voteCount,
+        imageUrl: o.imageUrl,
+      })),
+      comments: r.comments.map((c) => ({
+        id: c.id,
+        voterName: c.voterName,
+        comment: c.comment,
+        createdAt: c.createdAt.toISOString(),
+        selectedOptionId: c.selectedOptionId || undefined,
+        selectedOptionText: c.selectedOptionText || undefined,
+        parentId: c.parentId ?? undefined,
+      })),
+    };
   }
 
   async getPollById(id: string): Promise<Poll | undefined> {
@@ -573,48 +766,46 @@ export class DatabaseService implements OnModuleInit {
         where: eq(schema.polls.id, id),
         with: {
           options: {
-            orderBy: (opt, { asc }) => [asc(opt.optionIndex)],
+            orderBy: (opt, { asc: ascFn }) => [ascFn(opt.optionIndex)],
           },
           comments: {
-            orderBy: (cmt, { asc }) => [asc(cmt.createdAt)],
+            orderBy: (cmt, { asc: ascFn }) => [ascFn(cmt.createdAt)],
           },
         },
       });
       if (!r) return undefined;
-      return {
-        id: r.id,
-        question: r.question,
-        description: r.description,
-        createdAt: r.createdAt.toISOString(),
-        endsAt: r.endsAt ? r.endsAt.toISOString() : null,
-        totalVotes: r.totalVotes,
-        resultsVisibility: r.resultsVisibility as any,
-        visibility: r.visibility as any,
-        requiresCode: r.visibility === 'private',
-        creatorId: r.creatorId,
-        creatorIsGuest: r.creatorIsGuest,
-        categoryId: r.categoryId,
-        attachments: r.attachments as any,
-        options: r.options.map((o) => ({
-          id: o.optionIndex,
-          text: o.text,
-          voteCount: o.voteCount,
-          imageUrl: o.imageUrl,
-        })),
-        comments: r.comments.map((c) => ({
-          id: c.id,
-          voterName: c.voterName,
-          comment: c.comment,
-          createdAt: c.createdAt.toISOString(),
-          selectedOptionId: c.selectedOptionId || undefined,
-          selectedOptionText: c.selectedOptionText || undefined,
-          parentId: c.parentId ?? undefined,
-        })),
-      };
+      const poll = this.mapPollRow(r);
+      // 단건 상세에만 작성자 닉네임을 해석해 채운다(목록엔 비움). creatorId 없으면/유저 없으면 null.
+      poll.creatorNickname = await this.resolveCreatorNickname(r.creatorId);
+      return poll;
     }
 
     await this.refresh();
-    return this.data.polls.find((p) => p.id === id);
+    const found = this.stripPollMeta(this.data.polls.find((p) => p.id === id));
+    if (!found) return found;
+    return { ...found, creatorNickname: this.resolveCreatorNicknameFromMemory(found.creatorId) };
+  }
+
+  /** creatorId → users.nickname 해석(SQL). 없거나 유저를 못 찾으면 null. */
+  private async resolveCreatorNickname(creatorId: string | null): Promise<string | null> {
+    const trimmed = (creatorId ?? '').trim();
+    if (!trimmed) return null;
+    const rows = await db
+      .select({ nickname: schema.users.nickname })
+      .from(schema.users)
+      .where(eq(schema.users.id, trimmed))
+      .limit(1);
+    const nickname = rows[0]?.nickname?.trim();
+    return nickname ? nickname : null;
+  }
+
+  /** creatorId → 메모리(Blob) 사용자 닉네임 해석. 없거나 못 찾으면 null. */
+  private resolveCreatorNicknameFromMemory(creatorId: string | null | undefined): string | null {
+    const trimmed = (creatorId ?? '').trim();
+    if (!trimmed) return null;
+    const user = this.data.users.find((u) => u.id === trimmed);
+    const nickname = user?.nickname?.trim();
+    return nickname ? nickname : null;
   }
 
   /** 비공개 투표 접근 코드 검증. accessCode 원문은 외부로 절대 노출하지 않고 내부 비교만 한다. */
@@ -677,60 +868,6 @@ export class DatabaseService implements OnModuleInit {
       polls: [poll, ...this.data.polls],
     };
     await this.commit(next);
-  }
-
-  async updatePoll(poll: Poll) {
-    if (this.useSqlDb) {
-      await db
-        .update(schema.polls)
-        .set({
-          totalVotes: poll.totalVotes,
-        })
-        .where(eq(schema.polls.id, poll.id));
-
-      for (const opt of poll.options) {
-        await db
-          .update(schema.pollOptions)
-          .set({
-            voteCount: opt.voteCount,
-          })
-          .where(
-            sql`${schema.pollOptions.pollId} = ${poll.id} AND ${schema.pollOptions.optionIndex} = ${opt.id}`,
-          );
-      }
-
-      const existingComments = await db
-        .select({ id: schema.pollComments.id })
-        .from(schema.pollComments)
-        .where(eq(schema.pollComments.pollId, poll.id));
-      const existingIds = new Set(existingComments.map((c) => c.id));
-
-      const newComments = poll.comments.filter((c) => !existingIds.has(c.id));
-      if (newComments.length > 0) {
-        await db.insert(schema.pollComments).values(
-          newComments.map((c) => ({
-            pollId: poll.id,
-            voterName: c.voterName,
-            comment: c.comment,
-            createdAt: new Date(c.createdAt),
-            selectedOptionId: c.selectedOptionId || null,
-            selectedOptionText: c.selectedOptionText || null,
-            parentId: c.parentId ?? null,
-          })),
-        );
-      }
-      return;
-    }
-
-    await this.refresh();
-    const nextPolls = [...this.data.polls];
-    const idx = nextPolls.findIndex((p) => p.id === poll.id);
-    if (idx === -1) {
-      return;
-    }
-
-    nextPolls[idx] = poll;
-    await this.commit({ ...this.data, polls: nextPolls });
   }
 
   async deletePoll(id: string): Promise<boolean> {
@@ -825,6 +962,150 @@ export class DatabaseService implements OnModuleInit {
     );
     await this.commit({ ...this.data, polls: nextPolls });
     return true;
+  }
+
+  /**
+   * 서버측 1인1표(#12) + 원자적 카운트 증가(#B1).
+   *
+   * 프로덕션 SQL 경로는 dedup row 기록과 vote_count/total_votes 증가를 **하나의 트랜잭션**으로 묶고
+   * 카운트를 **상대 증가**(`+ 1`)로 처리해 — ①카운트 증가 실패 시 키만 남아 표가 유실되고 영구 409로
+   * 잠기는 문제와 ②동시 투표 시 read-modify-write 클로버로 집계가 누락되는 문제를 함께 막는다(원자적·동시성 안전).
+   * Blob/in-memory 경로는 dev 폴백이라 뮤텍스가 없어 best-effort dedup이다(단일 프로세스 가정).
+   *
+   * - voterKey가 있으면 dedup INSERT가 성공(=첫 투표)했을 때만 카운트를 올린다. 충돌이면 recorded=false(409).
+   * - voterKey가 비어 있으면(레거시·키 미지원) dedup 없이 카운트만 올린다(recorded=true).
+   * - 댓글 추가/재조회는 호출부(PollService)가 별도로 처리한다.
+   *
+   * @returns recorded=true 면 표가 반영됨, false 면 중복이라 미반영(409로 막아야 함).
+   */
+  async castVote(
+    pollId: string,
+    voterKey: string | null | undefined,
+    optionIndex: number,
+  ): Promise<CastVoteResult> {
+    const key = (voterKey ?? '').trim();
+
+    if (this.useSqlDb) {
+      return db.transaction(async (tx) => {
+        if (key) {
+          // dedup row 를 먼저 기록 — 유니크 충돌이면 행이 안 들어가고(=중복) 카운트도 올리지 않는다.
+          const inserted = await tx
+            .insert(schema.pollVotes)
+            .values({ pollId, voterKey: key, optionIndex })
+            .onConflictDoNothing({
+              target: [schema.pollVotes.pollId, schema.pollVotes.voterKey],
+            })
+            .returning({ id: schema.pollVotes.id });
+          if (inserted.length === 0) {
+            return { recorded: false };
+          }
+        }
+        // 상대 증가(절대값 쓰기 금지) — 같은 트랜잭션에서 옵션·폴 카운트를 함께 올린다.
+        await tx
+          .update(schema.pollOptions)
+          .set({ voteCount: sql`${schema.pollOptions.voteCount} + 1` })
+          .where(
+            and(
+              eq(schema.pollOptions.pollId, pollId),
+              eq(schema.pollOptions.optionIndex, optionIndex),
+            ),
+          );
+        await tx
+          .update(schema.polls)
+          .set({ totalVotes: sql`${schema.polls.totalVotes} + 1` })
+          .where(eq(schema.polls.id, pollId));
+        return { recorded: true };
+      });
+    }
+
+    // Blob/in-memory 경로(dev 폴백) — 키 기록과 카운트 증가를 한 commit으로 묶지만 뮤텍스가 없어 best-effort(단일 프로세스 가정).
+    await this.refresh();
+    const nextPolls = [...this.data.polls];
+    const idx = nextPolls.findIndex((p) => p.id === pollId);
+    if (idx === -1) {
+      // 폴이 없으면 호출부(vote)가 별도로 404를 던진다. 여기선 미반영으로 둔다.
+      return { recorded: false };
+    }
+    const target = nextPolls[idx] as PollWithVotedKeys;
+    if (key) {
+      const votedKeys = Array.isArray(target.votedKeys) ? target.votedKeys : [];
+      if (votedKeys.includes(key)) {
+        return { recorded: false };
+      }
+    }
+    const option = target.options.find((o) => o.id === optionIndex);
+    if (!option) {
+      // 호출부가 옵션 검증을 먼저 하지만 방어적으로 미반영.
+      return { recorded: false };
+    }
+    const nextOptions = target.options.map((o) =>
+      o.id === optionIndex ? { ...o, voteCount: o.voteCount + 1 } : o,
+    );
+    const nextVotedKeys = key
+      ? [...(Array.isArray(target.votedKeys) ? target.votedKeys : []), key]
+      : target.votedKeys;
+    nextPolls[idx] = {
+      ...target,
+      options: nextOptions,
+      totalVotes: target.totalVotes + 1,
+      ...(nextVotedKeys ? { votedKeys: nextVotedKeys } : {}),
+    } as PollWithVotedKeys;
+    await this.commit({ ...this.data, polls: nextPolls });
+    return { recorded: true };
+  }
+
+  /**
+   * 폴에 새 댓글(의견/답글)만 추가한다. 카운트는 castVote가 이미 원자적으로 올렸으므로 건드리지 않는다.
+   * SQL은 단일 INSERT, Blob은 commit. 새 댓글의 DB serial id 정합은 호출부 재조회로 맞춘다.
+   */
+  async appendComment(
+    pollId: string,
+    comment: {
+      voterName: string;
+      comment: string;
+      createdAt: string;
+      selectedOptionId?: number | null;
+      selectedOptionText?: string | null;
+      parentId?: number | null;
+    },
+  ): Promise<void> {
+    if (this.useSqlDb) {
+      await db.insert(schema.pollComments).values({
+        pollId,
+        voterName: comment.voterName,
+        comment: comment.comment,
+        createdAt: new Date(comment.createdAt),
+        selectedOptionId: comment.selectedOptionId ?? null,
+        selectedOptionText: comment.selectedOptionText ?? null,
+        parentId: comment.parentId ?? null,
+      });
+      return;
+    }
+
+    await this.refresh();
+    const nextPolls = [...this.data.polls];
+    const idx = nextPolls.findIndex((p) => p.id === pollId);
+    if (idx === -1) {
+      return;
+    }
+    const target = nextPolls[idx] as PollWithVotedKeys;
+    const nextId = target.comments.reduce((max, c) => Math.max(max, c.id), 0) + 1;
+    nextPolls[idx] = {
+      ...target,
+      comments: [
+        ...target.comments,
+        {
+          id: nextId,
+          voterName: comment.voterName,
+          comment: comment.comment,
+          createdAt: comment.createdAt,
+          selectedOptionId: comment.selectedOptionId ?? undefined,
+          selectedOptionText: comment.selectedOptionText ?? undefined,
+          parentId: comment.parentId ?? null,
+        },
+      ],
+    } as PollWithVotedKeys;
+    await this.commit({ ...this.data, polls: nextPolls });
   }
 
   async getUsers(): Promise<DatabaseUser[]> {

@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 import { usePollStore } from '../store/usePollStore';
 import { useAuthStore } from '../store/useAuthStore';
+import { getVoterKey } from '../lib/voterKey';
 import { VoteDonutChart, OPTION_COLORS } from '../components/VoteDonutChart';
 import { SnsPreviewCard } from '../components/SnsPreviewCard';
 import { AudienceLaunchKit } from '../components/AudienceLaunchKit';
@@ -57,6 +58,7 @@ import {
 import type { KakaoShareDiagnostics, KakaoShareReadinessItem } from '../lib/pollShare';
 import { buildQrSvgDataUri } from '../lib/qrCode';
 import { rememberRecentPoll } from '../lib/pollHistory';
+import { CountdownChip, useCountdown } from '../components/Countdown';
 
 type EmbedCodeMode = 'standard' | 'compact' | 'popup';
 const POLL_AUTHOR_LABELS: {
@@ -5800,6 +5802,8 @@ function buildPollViewModel(
 
 function PollQuestionHeader(props: Readonly<{ currentPoll: Poll; creatorLabel: string }>) {
   const { currentPoll, creatorLabel } = props;
+  // 헤더가 남은 ms를 1초마다 틱하고, CountdownChip은 표시만 한다(자체 타이머 없음).
+  const remaining = useCountdown(currentPoll.endsAt);
   return (
     <div>
       {(() => {
@@ -5860,6 +5864,25 @@ function PollQuestionHeader(props: Readonly<{ currentPoll: Poll; creatorLabel: s
       >
         {creatorLabel}
       </span>
+
+      <span style={{ marginLeft: '6px', verticalAlign: 'middle', display: 'inline-flex' }}>
+        <CountdownChip remaining={remaining} closedFallback />
+      </span>
+
+      {/* 실제 작성자 닉네임(서버 해석). 없으면 '익명'. 게스트 배지는 위 creatorLabel로 병기됨. */}
+      <p
+        style={{
+          margin: '8px 0 0',
+          fontSize: '0.78rem',
+          color: 'var(--text-secondary)',
+          fontWeight: 600,
+        }}
+      >
+        작성자{' '}
+        <strong style={{ color: 'var(--text-primary)' }}>
+          {currentPoll.creatorNickname?.trim() || '익명'}
+        </strong>
+      </p>
 
       <h2
         style={{
@@ -7213,6 +7236,7 @@ export const PollDetail: React.FC = () => {
         optionId: votedOptionId,
         voterName: voterName.trim() || null,
         comment: comment.trim() || null,
+        voterKey: getVoterKey(),
       });
 
       if (success) {

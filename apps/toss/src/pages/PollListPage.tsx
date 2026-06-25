@@ -6,11 +6,12 @@ import { MASCOT, BETA_NOTICE } from '../shared';
 import { usePollStore } from '../store/usePollStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { theme, pageShell, stickyActionBar } from '../theme';
-import { formatNumber, formatRelativeTime, getRemainingMs } from '../lib/format';
+import { formatNumber, formatRelativeTime } from '../lib/format';
 import { isPollClosed, leadingOption, optionPercent } from '../lib/poll';
 import { hasVotedLocally } from '../lib/votes';
 import { hapticFeedback } from '../lib/toss';
 import { getRecentPollHistory, type RecentPollHistoryItem } from '../lib/pollHistory';
+import { countPollsBySignal, filterPollsBySignal, type PollSignal } from '../lib/pollSignal';
 import { Chip, ProgressBar, SegmentedControl, Skeleton } from '../components/ui';
 import { BannerAd } from '../components/BannerAd';
 import { useCountdown } from '../components/Countdown';
@@ -30,6 +31,77 @@ const SORT_OPTIONS = [
   { value: 'popular', label: '인기순 🌟' },
   { value: 'closing', label: '마감임박 ⌛️' },
 ] as const satisfies ReadonlyArray<{ value: SortKey; label: string }>;
+
+// 발견성 signal 칩 — 서버 쿼리와 무관한 클라 파생 필터(현재 페이지에 적용). 핵심 5종으로 한정.
+const SIGNAL_OPTIONS = [
+  { value: 'all', label: '전체' },
+  { value: 'closeRace', label: '접전 ⚔️' },
+  { value: 'fresh', label: '신규 ✨' },
+  { value: 'closingSoon', label: '마감임박 ⌛️' },
+  { value: 'feedbackRich', label: '한마디 많은 💬' },
+] as const satisfies ReadonlyArray<{ value: PollSignal; label: string }>;
+
+function SignalChips(
+  props: Readonly<{
+    polls: Poll[];
+    signal: PollSignal;
+    onChange: (value: PollSignal) => void;
+  }>,
+) {
+  const { polls, signal, onChange } = props;
+  return (
+    <div
+      role="group"
+      aria-label="발견성 필터"
+      style={{
+        display: 'flex',
+        gap: 8,
+        overflowX: 'auto',
+        margin: '0 -20px 18px',
+        padding: '0 20px 4px',
+        scrollbarWidth: 'none',
+      }}
+    >
+      {SIGNAL_OPTIONS.map((option) => {
+        const active = option.value === signal;
+        const count = countPollsBySignal(polls, option.value);
+        // 'all'이 아닌데 0건이면 비활성(혼란 방지). 현재 선택 중이면 비활성화하지 않음.
+        const disabled = option.value !== 'all' && count === 0 && !active;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            className="pressable"
+            aria-pressed={active}
+            disabled={disabled}
+            onClick={() => onChange(option.value)}
+            style={{
+              flexShrink: 0,
+              minHeight: 40,
+              padding: '8px 14px',
+              borderRadius: theme.radiusPill,
+              border: `1px solid ${active ? theme.accent : theme.border}`,
+              background: active ? theme.accentSoft : 'rgba(255,255,255,0.04)',
+              color: active ? theme.accent : theme.textMuted,
+              fontSize: 13.5,
+              fontWeight: 700,
+              cursor: disabled ? 'not-allowed' : 'pointer',
+              opacity: disabled ? 0.45 : 1,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {option.label}
+            {option.value === 'all' ? null : (
+              <span style={{ marginLeft: 6, color: theme.textFaint, fontWeight: 600 }}>
+                {count}
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 function PollCard({
   poll,
@@ -775,15 +847,129 @@ function ListBody(
   );
 }
 
+// 현재 페이지 주변 ±2 번호 윈도우.
+function buildTossPageWindow(current: number, totalPages: number): number[] {
+  const windowSize = 5;
+  let start = Math.max(1, current - 2);
+  const end = Math.min(totalPages, start + windowSize - 1);
+  start = Math.max(1, end - windowSize + 1);
+  const pages: number[] = [];
+  for (let p = start; p <= end; p += 1) {
+    pages.push(p);
+  }
+  return pages;
+}
+
+function ListPagination(
+  props: Readonly<{
+    page: number;
+    limit: number;
+    total: number;
+    hasMore: boolean;
+    isLoading: boolean;
+    onGoToPage: (page: number) => void;
+  }>,
+) {
+  const { page, limit, total, hasMore, isLoading, onGoToPage } = props;
+  const totalPages = Math.max(1, Math.ceil(total / Math.max(1, limit)));
+  if (totalPages <= 1 && !hasMore) {
+    return null;
+  }
+
+  const pageNumbers = buildTossPageWindow(page, totalPages);
+  const canPrev = page > 1;
+  const canNext = hasMore || page < totalPages;
+
+  const pillStyle = (active: boolean, disabled: boolean): React.CSSProperties => ({
+    minWidth: 40,
+    padding: '8px 12px',
+    borderRadius: theme.radiusPill,
+    border: `1px solid ${active ? theme.accent : theme.border}`,
+    background: active ? theme.accentSoft : 'transparent',
+    color: active ? theme.accentStrong : theme.textMuted,
+    fontSize: 13,
+    fontWeight: active ? 800 : 600,
+    cursor: disabled ? 'not-allowed' : 'pointer',
+    opacity: disabled ? 0.45 : 1,
+  });
+
+  return (
+    <nav
+      aria-label="고민 목록 페이지"
+      style={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        marginTop: 18,
+      }}
+    >
+      <button
+        type="button"
+        onClick={() => onGoToPage(page - 1)}
+        disabled={!canPrev || isLoading}
+        aria-label="이전 페이지"
+        style={pillStyle(false, !canPrev || isLoading)}
+      >
+        이전
+      </button>
+
+      {pageNumbers.map((pageNumber) => {
+        const isCurrent = pageNumber === page;
+        return (
+          <button
+            key={pageNumber}
+            type="button"
+            onClick={() => onGoToPage(pageNumber)}
+            disabled={isLoading}
+            aria-label={`${pageNumber}페이지`}
+            aria-current={isCurrent ? 'page' : undefined}
+            style={pillStyle(isCurrent, isLoading)}
+          >
+            {pageNumber}
+          </button>
+        );
+      })}
+
+      <button
+        type="button"
+        onClick={() => onGoToPage(page + 1)}
+        disabled={!canNext || isLoading}
+        aria-label="다음 페이지"
+        style={pillStyle(false, !canNext || isLoading)}
+      >
+        다음
+      </button>
+
+      <span
+        aria-live="polite"
+        style={{
+          width: '100%',
+          textAlign: 'center',
+          marginTop: 6,
+          fontSize: 12,
+          color: theme.textFaint,
+        }}
+      >
+        {page} / {totalPages} 페이지 · 총 {formatNumber(total)}개
+      </span>
+    </nav>
+  );
+}
+
 export function PollListPage() {
   const navigate = useNavigate();
-  const { polls, isLoading, error, fetchPolls } = usePollStore();
+  const { polls, isLoading, error, fetchPolls, page, limit, total, hasMore, goToPage } =
+    usePollStore();
   const myId = useAuthStore((state) => state.user?.id ?? null);
 
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [sortKey, setSortKey] = useState<SortKey>('recent');
   const [myOnly, setMyOnly] = useState(false);
+  // 발견성 signal — 서버 쿼리와 무관한 클라 파생 필터(현재 페이지에만 적용).
+  const [signal, setSignal] = useState<PollSignal>('all');
   const [recent, setRecent] = useState<RecentPollHistoryItem[]>([]);
 
   const myPollCount = useMemo(
@@ -792,9 +978,25 @@ export function PollListPage() {
   );
 
   useEffect(() => {
-    fetchPolls().catch(() => {});
     setRecent(getRecentPollHistory());
-  }, [fetchPolls]);
+  }, []);
+
+  // 검색(q)·상태(status)·정렬(sort)을 서버측으로 보낸다(#W2). recent→latest 매핑.
+  // myOnly(내 글만)는 식별 기반이라 결과에 대한 클라 보조필터로 남긴다.
+  const serverFilters = useMemo(
+    () => ({
+      q: query.trim(),
+      sort: sortKey === 'recent' ? ('latest' as const) : sortKey,
+      status: statusFilter,
+      category: null,
+    }),
+    [query, sortKey, statusFilter],
+  );
+
+  // 검색/상태/정렬 변경 시 1페이지부터 서버 질의를 다시 보낸다(필터를 함께 전달).
+  useEffect(() => {
+    fetchPolls(1, serverFilters).catch(() => {});
+  }, [fetchPolls, serverFilters]);
 
   const totalVotes = useMemo(() => polls.reduce((sum, poll) => sum + poll.totalVotes, 0), [polls]);
 
@@ -808,39 +1010,20 @@ export function PollListPage() {
     });
   }, [polls]);
 
-  const visiblePolls = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-    const filtered = polls.filter((poll) => {
-      if (myOnly && (!myId || poll.creatorId !== myId)) return false;
-      const closed = isPollClosed(poll);
-      if (statusFilter === 'open' && closed) return false;
-      if (statusFilter === 'closed' && !closed) return false;
-      if (!normalizedQuery) return true;
-      return (
-        poll.question.toLowerCase().includes(normalizedQuery) ||
-        (poll.description ?? '').toLowerCase().includes(normalizedQuery)
-      );
-    });
-
-    const sorted = [...filtered];
-    if (sortKey === 'popular') {
-      sorted.sort((a, b) => b.totalVotes - a.totalVotes);
-    } else if (sortKey === 'closing') {
-      sorted.sort((a, b) => {
-        const ra = getRemainingMs(a.endsAt);
-        const rb = getRemainingMs(b.endsAt);
-        const aActive = ra != null && ra > 0;
-        const bActive = rb != null && rb > 0;
-        if (aActive && bActive) return ra! - rb!;
-        if (aActive) return -1;
-        if (bActive) return 1;
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-      });
-    } else {
-      sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  // 서버 쿼리(q/sort/status) 적용 후 현재 페이지에 보조필터(myOnly=내 글만)만 덧입힌 기준 목록.
+  // signal 칩 카운트도 이 목록을 기준으로 세서, 화면에 보이는 모수와 일치하게 한다.
+  const scopedPolls = useMemo(() => {
+    if (!myOnly) {
+      return polls;
     }
-    return sorted;
-  }, [polls, query, statusFilter, sortKey, myOnly, myId]);
+    return polls.filter((poll) => myId != null && poll.creatorId === myId);
+  }, [polls, myOnly, myId]);
+
+  const visiblePolls = useMemo(
+    // signal은 서버에 없는 클라 파생 필터라 마지막에 현재 페이지(scopedPolls)에 적용한다(#W2).
+    () => filterPollsBySignal(scopedPolls, signal),
+    [scopedPolls, signal],
+  );
 
   const goToPoll = (id: string) => {
     hapticFeedback('tickWeak');
@@ -885,6 +1068,10 @@ export function PollListPage() {
           onToggleMyOnly={toggleMyOnly}
         />
 
+        {scopedPolls.length > 0 ? (
+          <SignalChips polls={scopedPolls} signal={signal} onChange={setSignal} />
+        ) : null}
+
         {showRecent ? <RecentStrip items={recent} onSelect={goToPoll} /> : null}
 
         <ListBody
@@ -895,6 +1082,19 @@ export function PollListPage() {
           onRetry={retryFetch}
           onCreate={goToCreate}
           onSelect={goToPoll}
+        />
+
+        <ListPagination
+          page={page}
+          limit={limit}
+          total={total}
+          hasMore={hasMore}
+          isLoading={isLoading}
+          onGoToPage={(nextPage) => {
+            hapticFeedback('tickWeak');
+            void goToPage(nextPage);
+            globalThis.scrollTo?.({ top: 0, behavior: 'smooth' });
+          }}
         />
 
         <button

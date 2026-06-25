@@ -1,5 +1,6 @@
 import type { Poll } from '../shared';
 import { optionPercent, optionsByVotes } from './poll';
+import { extractKeywords } from './keywords';
 import { buildTossShareLink, shareMessage } from './toss';
 
 const SHARE_PREFIX = '[피키 투표] ';
@@ -93,6 +94,32 @@ export const sharePoll = async (
   return shareMessage(message);
 };
 
+/**
+ * 선택지별 '대표 이유'(한마디에서 추출한 상위 키워드 3개) 블록.
+ * 한글 토크나이저(keywords.ts)로 각 선택지에 달린 한마디만 모아 키워드를 뽑아요.
+ * 키워드가 하나도 없으면(=관련 한마디 없음) 빈 배열을 반환해 결과 텍스트에 덧붙이지 않아요.
+ */
+const buildOptionKeywordLines = (poll: Poll): string[] => {
+  const comments = poll.comments ?? [];
+  if (comments.length === 0) {
+    return [];
+  }
+  const lines = optionsByVotes(poll)
+    .map((option) => {
+      const texts = comments
+        .filter((comment) => comment.selectedOptionId === option.id)
+        .map((comment) => comment.comment)
+        .filter(Boolean);
+      const keywords = extractKeywords(texts, 3);
+      if (keywords.length === 0) {
+        return null;
+      }
+      return `- ${option.text}: ${keywords.map((keyword) => keyword.word).join(', ')}`;
+    })
+    .filter((line): line is string => line !== null);
+  return lines;
+};
+
 /** 득표순 결과를 사람이 읽기 좋은 텍스트로. 공유 링크 포함(토스 안이면 토스 링크 전달 권장). */
 export const buildPollResultText = (poll: Poll, shareUrlOverride?: string): string => {
   const lines = optionsByVotes(poll).map((option, index) => {
@@ -100,11 +127,14 @@ export const buildPollResultText = (poll: Poll, shareUrlOverride?: string): stri
     const crown = index === 0 && option.voteCount > 0 ? '👑 ' : '';
     return `${crown}${option.text} — ${percent}% (${option.voteCount}표)`;
   });
+  const keywordLines = buildOptionKeywordLines(poll);
+  const reasonBlock = keywordLines.length > 0 ? ['', '[선택지별 대표 이유]', ...keywordLines] : [];
   return [
     `${SHARE_PREFIX}${poll.question}`,
     `총 ${poll.totalVotes}표`,
     '',
     ...lines,
+    ...reasonBlock,
     '',
     shareUrlOverride || resolvePollShareUrl(poll),
   ].join('\n');

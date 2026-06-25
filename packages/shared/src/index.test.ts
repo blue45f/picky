@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { CreatePollSchema, VoteSchema } from './index';
+import { CreatePollSchema, VoteSchema, PollListSortSchema, PollListStatusSchema } from './index';
 
 describe('Shared Schemas', () => {
   describe('CreatePollSchema', () => {
@@ -56,6 +56,50 @@ describe('Shared Schemas', () => {
       };
       const result = VoteSchema.safeParse(input);
       expect(result.success).toBe(true);
+    });
+
+    it('should accept an optional voterKey for one-person-one-vote', () => {
+      const input = {
+        optionId: 1,
+        voterKey: 'stable-anon-key-123',
+      };
+      const result = VoteSchema.safeParse(input);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.voterKey).toBe('stable-anon-key-123');
+      }
+    });
+
+    it('should reject an overly long voterKey', () => {
+      const input = {
+        optionId: 1,
+        voterKey: 'x'.repeat(257),
+      };
+      const result = VoteSchema.safeParse(input);
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe('PollListSortSchema / PollListStatusSchema (server-side filters)', () => {
+    it('accepts every supported sort key', () => {
+      for (const sort of ['latest', 'popular', 'commented', 'closing']) {
+        expect(PollListSortSchema.safeParse(sort).success).toBe(true);
+      }
+    });
+
+    it('rejects an unknown sort key', () => {
+      expect(PollListSortSchema.safeParse('trending').success).toBe(false);
+    });
+
+    it('accepts every supported status key', () => {
+      for (const status of ['all', 'open', 'closed']) {
+        expect(PollListStatusSchema.safeParse(status).success).toBe(true);
+      }
+    });
+
+    it('falls back to latest/all via .catch for invalid input', () => {
+      expect(PollListSortSchema.catch('latest').parse('nope')).toBe('latest');
+      expect(PollListStatusSchema.catch('all').parse('nope')).toBe('all');
     });
   });
 });

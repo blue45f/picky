@@ -127,6 +127,11 @@ export const VoteSchema = z.object({
     .optional()
     .nullable(),
   comment: z.string().max(100, '의견은 최대 100자 이하이어야 합니다.').optional().nullable(),
+  /**
+   * 서버측 1인1표 식별키. 안정적 익명 키(토스 getAnonymousKey 해시 / 웹 localStorage UUID)를 보내면
+   * (pollId, voterKey) 단위로 재투표를 막는다. 없으면(레거시·키 미지원) 기존처럼 허용한다.
+   */
+  voterKey: z.string().max(256, '식별키가 너무 깁니다.').optional().nullable(),
 });
 
 export type VoteInput = z.infer<typeof VoteSchema>;
@@ -178,7 +183,53 @@ export interface Poll {
   requiresCode?: boolean;
   creatorId?: string | null;
   creatorIsGuest?: boolean;
+  /**
+   * 작성자(회원/게스트) 표시용 닉네임. creatorId→users.nickname 으로 서버가 해석해 넣는다.
+   * 작성자가 없거나(익명) 사용자를 못 찾으면 null. 단건 상세 응답에만 채우고 목록엔 비운다.
+   * voterKey/accessCode 같은 비밀 메타와 달리 닉네임은 공개 표시값이라 노출해도 안전하다.
+   */
+  creatorNickname?: string | null;
   categoryId?: string | null;
+}
+
+/** 목록 페이지네이션 질의 한계값. limit는 1~50, 기본 20. page는 1-base, 기본 1. */
+export const POLLS_PAGE_DEFAULT_LIMIT = 20;
+export const POLLS_PAGE_MAX_LIMIT = 50;
+
+/**
+ * 목록 정렬 키(서버측 ORDER BY 매핑). 기존 클라 정렬 옵션과 1:1 대응한다.
+ * - latest: 최신순(createdAt desc)
+ * - popular: 투표 많은순(totalVotes desc)
+ * - commented: 댓글 많은순(comments count desc)
+ * - closing: 마감 임박순(열린 것 우선, 마감 가까운 순)
+ */
+export const PollListSortSchema = z.enum(['latest', 'popular', 'commented', 'closing']);
+export type PollListSort = z.infer<typeof PollListSortSchema>;
+
+/** 목록 진행 상태 필터. open=마감 전, closed=마감됨, all=전체. */
+export const PollListStatusSchema = z.enum(['all', 'open', 'closed']);
+export type PollListStatus = z.infer<typeof PollListStatusSchema>;
+
+/** GET /polls 서버측 검색/정렬/필터 질의(페이지네이션 포함). 전부 선택값 — 누락 시 기본값. */
+export interface PollListQuery {
+  page: number;
+  limit: number;
+  q: string;
+  sort: PollListSort;
+  status: PollListStatus;
+  category: string | null;
+}
+
+/**
+ * GET /polls 페이지네이션 응답 봉투.
+ * 기존엔 Poll[] 배열을 그대로 돌려줬지만, 목록 급증에 대비해 서버측 LIMIT/OFFSET로 잘라서 준다.
+ */
+export interface PaginatedPolls {
+  items: Poll[];
+  total: number;
+  page: number;
+  limit: number;
+  hasMore: boolean;
 }
 
 export const RegisterSchema = z

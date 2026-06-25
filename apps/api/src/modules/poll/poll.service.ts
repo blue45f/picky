@@ -1,6 +1,7 @@
 import {
   Injectable,
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
@@ -10,10 +11,26 @@ import {
   UpdatePollInput,
   VoteInput,
   CreateCommentInput,
+  PaginatedPolls,
   Poll,
   PollOption,
-  PollComment,
+  PollListSort,
+  PollListStatus,
+  PollListSortSchema,
+  PollListStatusSchema,
+  POLLS_PAGE_DEFAULT_LIMIT,
+  POLLS_PAGE_MAX_LIMIT,
 } from '@picky/shared';
+
+/** GET /polls 서버측 검색/정렬/필터 파라미터(전부 선택값). */
+export interface GetPollsParams {
+  page?: number;
+  limit?: number;
+  q?: string;
+  sort?: string;
+  status?: string;
+  category?: string;
+}
 
 /**
  * 고민 카테고리(@picky/shared POLL_CATEGORIES id)를 함께 보관·응답하기 위한 확장.
@@ -49,8 +66,32 @@ export class PollService {
     return id;
   }
 
-  async getPolls(): Promise<Poll[]> {
-    return this.db.getPolls();
+  /**
+   * 공개 투표 목록을 서버측 페이지네이션 + 검색/정렬/필터로 반환한다(#10·#W2).
+   * page는 1-base(기본 1), limit는 기본 20·최대 50으로 클램프한다.
+   * q/sort/status/category 는 서버 WHERE/ORDER BY로 처리해 현재 페이지 누락을 없앤다.
+   */
+  async getPolls(params: GetPollsParams = {}): Promise<PaginatedPolls> {
+    const { page, limit, q, sort, status, category } = params;
+    const safePage =
+      Number.isFinite(page) && (page as number) >= 1 ? Math.floor(page as number) : 1;
+    const rawLimit =
+      Number.isFinite(limit) && (limit as number) >= 1
+        ? Math.floor(limit as number)
+        : POLLS_PAGE_DEFAULT_LIMIT;
+    const safeLimit = Math.min(rawLimit, POLLS_PAGE_MAX_LIMIT);
+    const safeSort: PollListSort = PollListSortSchema.catch('latest').parse(sort);
+    const safeStatus: PollListStatus = PollListStatusSchema.catch('all').parse(status);
+    const safeCategory = (category ?? '').trim() || null;
+    const safeQuery = (q ?? '').trim().slice(0, 100);
+    return this.db.getPolls({
+      page: safePage,
+      limit: safeLimit,
+      q: safeQuery,
+      sort: safeSort,
+      status: safeStatus,
+      category: safeCategory,
+    });
   }
 
   async getPoll(id: string): Promise<Poll> {
@@ -293,27 +334,25 @@ export class PollService {
       throw new BadRequestException(`올바르지 않은 선택지 ID(${input.optionId})입니다.`);
     }
 
-    // Increment vote count
-    option.voteCount += 1;
-    poll.totalVotes += 1;
+    // 서버측 1인1표(#12) + 원자적 카운트(#B1): dedup 기록과 vote_count/total_votes 상대 증가를
+    // 하나의 트랜잭션(SQL)/단일 commit(Blob)으로 묶는다. 중복이면 recorded=false → 409로 차단.
+    const { recorded } = await this.db.castVote(id, input.voterKey, input.optionId);
+    if (!recorded) {
+      throw new ConflictException('이미 참여한 투표예요');
+    }
 
-    // Add comment if present
+    // 한마디(댓글)는 카운트와 분리해 추가한다(카운트는 castVote가 이미 원자적으로 반영).
     if (input.comment?.trim()) {
-      // length+1은 삭제 갭에서 기존 serial id와 충돌해 SQL 경로에서 조용히 누락될 수 있다 → max+1 사용.
-      const commentId = poll.comments.reduce((max, c) => Math.max(max, c.id), 0) + 1;
-      const newComment: PollComment = {
-        id: commentId,
+      await this.db.appendComment(id, {
         voterName: input.voterName?.trim() ? input.voterName.trim() : '익명',
         comment: input.comment.trim(),
         createdAt: new Date().toISOString(),
         selectedOptionId: input.optionId,
         selectedOptionText: option.text,
-      };
-      poll.comments.push(newComment);
+      });
     }
 
-    await this.db.updatePoll(poll);
-    // 새 댓글이 DB serial id를 갖도록 재조회(직후 답글 parentId 정합성).
+    // 최신 카운트·DB serial id 정합을 위해 재조회한다.
     return (await this.db.getPollById(id)) ?? poll;
   }
 
@@ -336,17 +375,12 @@ export class PollService {
       }
     }
 
-    const commentId = poll.comments.reduce((max, c) => Math.max(max, c.id), 0) + 1;
-    const newComment: PollComment = {
-      id: commentId,
+    await this.db.appendComment(id, {
       voterName: input.voterName?.trim() ? input.voterName.trim() : '익명',
       comment: input.comment.trim(),
       createdAt: new Date().toISOString(),
       parentId,
-    };
-    poll.comments.push(newComment);
-
-    await this.db.updatePoll(poll);
+    });
     // 새 댓글이 DB serial id를 갖도록 재조회(직후 답글 parentId 정합성).
     return (await this.db.getPollById(id)) ?? poll;
   }

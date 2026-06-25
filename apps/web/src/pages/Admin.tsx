@@ -67,18 +67,36 @@ export const Admin: React.FC = () => {
   useDocumentTitle('운영자 게시물 관리');
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
-  const polls = usePollStore((state) => state.polls);
-  const isLoading = usePollStore((state) => state.isLoading);
-  const error = usePollStore((state) => state.error);
-  const fetchPolls = usePollStore((state) => state.fetchPolls);
+  // 운영 집계는 페이지네이션(20개)에 묶이면 안 되므로 전체 비페이지네이션 fetch를 쓴다(#W3).
+  const fetchAllPolls = usePollStore((state) => state.fetchAllPolls);
   const deletePoll = usePollStore((state) => state.deletePoll);
+  const storeError = usePollStore((state) => state.error);
 
   const isAdmin = !!user?.isAdmin;
+  const [polls, setPolls] = useState<Poll[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [visits, setVisits] = useState<VisitStats | null>(null);
   const [inquiries, setInquiries] = useState<AdminInquiry[]>([]);
   const [inquiryLoading, setInquiryLoading] = useState(false);
   const [inquiryError, setInquiryError] = useState<string | null>(null);
+
+  // 삭제 등 store 작업 오류는 store.error, 목록 적재 오류는 loadError로 합쳐 배너에 노출한다.
+  const error = loadError ?? storeError;
+
+  const loadPolls = useCallback(async () => {
+    setIsLoading(true);
+    setLoadError(null);
+    try {
+      const all = await fetchAllPolls();
+      setPolls(all);
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : '고민 목록을 불러오지 못했어요.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [fetchAllPolls]);
 
   const loadInquiries = useCallback(async () => {
     setInquiryLoading(true);
@@ -95,7 +113,7 @@ export const Admin: React.FC = () => {
 
   useEffect(() => {
     if (isAdmin) {
-      fetchPolls();
+      void loadPolls();
       // desk-platform 방문 집계(공개·키 불필요).
       getVisitStats()
         .then(setVisits)
@@ -103,7 +121,7 @@ export const Admin: React.FC = () => {
       // desk-platform 문의 관리(운영자 전용, picky API 프록시).
       void loadInquiries();
     }
-  }, [isAdmin, fetchPolls, loadInquiries]);
+  }, [isAdmin, loadPolls, loadInquiries]);
 
   const handleInquiryStatus = async (id: string, status: InquiryStatus) => {
     try {
@@ -164,6 +182,8 @@ export const Admin: React.FC = () => {
       // store.error 에 사유가 세팅되며 상단 배너로 노출된다.
       return;
     }
+    // 로컬 집계에서도 삭제 반영(store.polls 페이지네이션과 분리돼 있으므로 직접 제거).
+    setPolls((prev) => prev.filter((item) => item.id !== poll.id));
   };
 
   return (

@@ -37,8 +37,24 @@ export class PollController {
   constructor(private readonly pollService: PollService) {}
 
   @Get()
-  getPolls() {
-    return this.pollService.getPolls();
+  getPolls(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('q') q?: string,
+    @Query('sort') sort?: string,
+    @Query('status') status?: string,
+    @Query('category') category?: string,
+  ) {
+    const parsedPage = page === undefined ? undefined : Number(page);
+    const parsedLimit = limit === undefined ? undefined : Number(limit);
+    return this.pollService.getPolls({
+      page: parsedPage,
+      limit: parsedLimit,
+      q,
+      sort,
+      status,
+      category,
+    });
   }
 
   @Post()

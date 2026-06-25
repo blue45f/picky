@@ -8,6 +8,7 @@ import { theme, stickyActionBar } from '../theme';
 import { AppBar, Chip, ProgressBar } from '../components/ui';
 import { CountdownChip } from '../components/Countdown';
 import { PollShareQrSection } from '../components/PollShareQrSection';
+import { OPTION_COLORS, VoteDonutChart } from '../components/VoteDonutChart';
 
 interface PollDetailViewProps {
   poll: Poll | null;
@@ -258,6 +259,90 @@ function OptionList(
           onSelect={onSelect}
         />
       ))}
+    </div>
+  );
+}
+
+/**
+ * 결과 도넛 차트 섹션 — 진행바(선택지별) 위에 전체 분포를 한눈에 보여줘요.
+ * `displayOptions`는 득표순 정렬본이라 도넛 조각/범례 색이 OptionList 순서와 1:1로 맞아요.
+ * 총 0표면 빈 도넛을 그리지 않도록 숨김 가드를 둬요(차트 컴포넌트도 방어적으로 null 반환).
+ */
+function ResultDonutSection(props: Readonly<{ options: PollOption[]; totalVotes: number }>) {
+  const { options, totalVotes } = props;
+  if (totalVotes < 1) {
+    return null;
+  }
+  const legendOptions = options.filter((option) => option.voteCount > 0);
+  return (
+    <div
+      className="rise"
+      style={{
+        marginTop: 14,
+        padding: '18px 16px',
+        borderRadius: theme.radius,
+        background: theme.surface,
+        border: `1px solid ${theme.border}`,
+        boxShadow: '0 4px 16px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.03)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 16,
+      }}
+    >
+      <div style={{ flexShrink: 0 }}>
+        <VoteDonutChart options={options} />
+      </div>
+      <ul
+        style={{
+          flex: 1,
+          minWidth: 0,
+          listStyle: 'none',
+          margin: 0,
+          padding: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 8,
+        }}
+      >
+        {legendOptions.map((option) => {
+          const colorIndex = options.findIndex((candidate) => candidate.id === option.id);
+          const color = OPTION_COLORS[colorIndex % OPTION_COLORS.length];
+          return (
+            <li
+              key={option.id}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}
+            >
+              <span
+                aria-hidden
+                style={{
+                  flexShrink: 0,
+                  width: 10,
+                  height: 10,
+                  borderRadius: 999,
+                  background: color,
+                }}
+              />
+              <span
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: theme.textMuted,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {option.text}
+              </span>
+              <span style={{ flexShrink: 0, fontSize: 13, fontWeight: 800, color: theme.text }}>
+                {optionPercent(option.voteCount, totalVotes)}%
+              </span>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }
@@ -960,9 +1045,10 @@ function PollHero(
     description: string | null | undefined;
     totalVotes: number;
     leader: PollOption | null;
+    creatorNickname: string | null | undefined;
   }>,
 ) {
-  const { question, description, totalVotes, leader } = props;
+  const { question, description, totalVotes, leader, creatorNickname } = props;
   return (
     <>
       {/* Hero main issue question - stands out first like NatePan main post for eye-catch on mobile */}
@@ -978,6 +1064,13 @@ function PollHero(
       >
         {question}
       </h1>
+      {/* 작성자 닉네임(서버 해석). 없으면 '익명'. */}
+      <p style={{ margin: '0 0 8px', fontSize: 13, color: theme.textMuted, fontWeight: 600 }}>
+        작성자{' '}
+        <span style={{ color: theme.text, fontWeight: 800 }}>
+          {creatorNickname?.trim() || '익명'}
+        </span>
+      </p>
       {description ? (
         <p
           style={{
@@ -1088,9 +1181,14 @@ export function PollDetailView(props: Readonly<PollDetailViewProps>) {
           description={poll.description}
           totalVotes={totalVotes}
           leader={leader}
+          creatorNickname={poll.creatorNickname}
         />
 
         {hasVoted && !closed ? <VoteCelebration /> : null}
+
+        {showResults ? (
+          <ResultDonutSection options={displayOptions} totalVotes={totalVotes} />
+        ) : null}
 
         <OptionList
           displayOptions={displayOptions}

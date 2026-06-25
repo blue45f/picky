@@ -14,15 +14,51 @@ type StoreSet<T> = (
 type StoreGet<T> = () => T;
 type StoreStateCreator<T> = (set: StoreSet<T>, get: StoreGet<T>) => T;
 
+/** 목록 페이지네이션 기본값 — 서버 기본(limit 20)과 맞춘다. */
+export const POLLS_PAGE_SIZE = 20;
+
+/** 서버측 검색/정렬/필터(#W2). 정렬키는 서버 PollListSort, 상태는 open/closed/all. */
+export type PollListSortMode = 'latest' | 'popular' | 'commented' | 'closing';
+export type PollListStatusMode = 'all' | 'open' | 'closed';
+
+export interface PollListFilters {
+  q: string;
+  sort: PollListSortMode;
+  status: PollListStatusMode;
+  category: string | null;
+}
+
+const DEFAULT_POLL_FILTERS: PollListFilters = {
+  q: '',
+  sort: 'latest',
+  status: 'all',
+  category: null,
+};
+
 export interface PollState {
   polls: Poll[];
   currentPoll: Poll | null;
   isLoading: boolean;
   error: string | null;
+  // 서버측 페이지네이션(#10) 상태. polls는 "현재 페이지" 항목이다.
+  page: number;
+  limit: number;
+  total: number;
+  hasMore: boolean;
+  // 서버측 검색/정렬/필터(#W2) — 마지막으로 적용한 필터(페이지 이동 시 재사용).
+  filters: PollListFilters;
   setCurrentPoll: (poll: Poll | null) => void;
   clearError: () => void;
 
-  fetchPolls: () => Promise<void>;
+  fetchPolls: (page?: number, filters?: Partial<PollListFilters>) => Promise<void>;
+  /**
+   * 운영자 전용 — 페이지네이션 없이 전체 공개 고민을 한 번에 가져온다(#W3).
+   * 공유 `polls`(페이지네이션 대상) 상태를 건드리지 않고 결과 배열만 반환한다.
+   */
+  fetchAllPolls: () => Promise<Poll[]>;
+  goToPage: (page: number) => Promise<void>;
+  nextPage: () => Promise<void>;
+  prevPage: () => Promise<void>;
   fetchPoll: (id: string, code?: string) => Promise<Poll | null>;
   createPoll: (input: CreatePollInput) => Promise<Poll | null>;
   updatePoll: (id: string, patch: UpdatePollInput) => Promise<Poll | null>;
@@ -175,15 +211,49 @@ const removePollFromCache = (pollId: string) => {
   persistCachedPolls(next);
 };
 
-const mergePollsWithLocalCache = (remotePolls: Poll[]) => {
-  const cached = loadCachedPolls();
-  const cachedMap = new Map<string, Poll>(cached.map((poll) => [poll.id, poll]));
-  const nextPolls = remotePolls.filter((poll) => {
-    cachedMap.delete(poll.id);
-    return true;
-  });
+const isPollClosedByDate = (poll: Poll) => {
+  if (!poll.endsAt) {
+    return false;
+  }
+  const endsAtTime = new Date(poll.endsAt).getTime();
+  return Number.isFinite(endsAtTime) && Date.now() >= endsAtTime;
+};
 
-  return [...nextPolls, ...cachedMap.values()];
+/** 오프라인 작성분(local-*)을 활성 서버 필터와 같은 의미로 클라에서 거른다(#W2 일관성). */
+const localPollMatchesFilters = (poll: Poll, filters?: PollListFilters) => {
+  if (!filters) {
+    return true;
+  }
+  const needle = filters.q.trim().toLowerCase();
+  if (needle) {
+    const inQuestion = poll.question.toLowerCase().includes(needle);
+    const inDescription = (poll.description || '').toLowerCase().includes(needle);
+    if (!inQuestion && !inDescription) return false;
+  }
+  if (filters.category && (poll.categoryId ?? null) !== filters.category) {
+    return false;
+  }
+  if (filters.status !== 'all') {
+    const closed = isPollClosedByDate(poll);
+    if (filters.status === 'open' && closed) return false;
+    if (filters.status === 'closed' && !closed) return false;
+  }
+  return true;
+};
+
+const mergePollsWithLocalCache = (remotePolls: Poll[], filters?: PollListFilters) => {
+  // 서버측 페이지네이션(#10) 이후로는 오프라인 작성분(`local-*`)만 합친다.
+  // (서버가 아는 폴은 페이지 경계를 넘어 1페이지로 새지 않도록 합치지 않는다.)
+  // 검색/필터(#W2)가 켜져 있으면 로컬분도 같은 기준으로 걸러 결과 일관성을 지킨다.
+  const remoteIds = new Set(remotePolls.map((poll) => poll.id));
+  const localOnly = loadCachedPolls().filter(
+    (poll) =>
+      poll.id.startsWith('local-') &&
+      !remoteIds.has(poll.id) &&
+      localPollMatchesFilters(poll, filters),
+  );
+
+  return [...remotePolls, ...localOnly];
 };
 
 const findPollFromLocalCache = (pollId: string): Poll | undefined => {
@@ -347,6 +417,44 @@ const setAuthSessionExpired = async (
 const getAuthToken = (useAuthStore: PollAuthStore) =>
   useAuthStore.getState().token || localStorage.getItem('picky_token');
 
+interface ParsedPollsPage {
+  items: Poll[];
+  total: number;
+  page: number;
+  limit: number;
+  hasMore: boolean;
+}
+
+/**
+ * GET /polls 응답을 페이지네이션 봉투로 정규화한다.
+ * 신규 형태 { items, total, page, limit, hasMore } 우선, 구버전 배열 응답도 하위호환으로 받아준다.
+ */
+const parsePollsPage = (
+  data: any,
+  requestedPage: number,
+  fallbackLimit: number,
+): ParsedPollsPage => {
+  if (Array.isArray(data)) {
+    const items = data.filter((item): item is Poll => isPollPayload(item));
+    return {
+      items,
+      total: items.length,
+      page: 1,
+      limit: items.length || fallbackLimit,
+      hasMore: false,
+    };
+  }
+
+  const rawItems = Array.isArray(data?.items) ? data.items : [];
+  const items = rawItems.filter((item: any): item is Poll => isPollPayload(item));
+  const total = typeof data?.total === 'number' ? data.total : items.length;
+  const limit = typeof data?.limit === 'number' && data.limit > 0 ? data.limit : fallbackLimit;
+  const page = typeof data?.page === 'number' && data.page >= 1 ? data.page : requestedPage;
+  const hasMore =
+    typeof data?.hasMore === 'boolean' ? data.hasMore : (page - 1) * limit + items.length < total;
+  return { items, total, page, limit, hasMore };
+};
+
 const excludePollById = (polls: Poll[], pollId: string): Poll[] =>
   polls.filter((poll) => poll.id !== pollId);
 
@@ -375,6 +483,11 @@ export const createPollStoreState =
     currentPoll: null,
     isLoading: false,
     error: null,
+    page: 1,
+    limit: POLLS_PAGE_SIZE,
+    total: 0,
+    hasMore: false,
+    filters: { ...DEFAULT_POLL_FILTERS },
     setCurrentPoll: (poll: Poll | null) => {
       if (!poll) {
         set({ currentPoll: null });
@@ -386,31 +499,103 @@ export const createPollStoreState =
     },
     clearError: () => set({ error: null }),
 
-    fetchPolls: async () => {
-      set({ isLoading: true, error: null });
+    fetchPolls: async (requestedPage?: number, filterPatch?: Partial<PollListFilters>) => {
+      const limit = get().limit || POLLS_PAGE_SIZE;
+      const targetPage = Math.max(1, Math.floor(requestedPage ?? 1) || 1);
+      // 마지막 필터에 patch를 병합해 서버 질의에 반영하고, 다음 페이지 이동에서도 재사용한다.
+      const nextFilters: PollListFilters = { ...get().filters, ...filterPatch };
+      const params = new URLSearchParams({
+        page: String(targetPage),
+        limit: String(limit),
+      });
+      if (nextFilters.q.trim()) params.set('q', nextFilters.q.trim());
+      if (nextFilters.sort !== 'latest') params.set('sort', nextFilters.sort);
+      if (nextFilters.status !== 'all') params.set('status', nextFilters.status);
+      if (nextFilters.category) params.set('category', nextFilters.category);
+      set({ isLoading: true, error: null, filters: nextFilters });
       try {
-        const res = await requestApi('/polls');
+        const res = await requestApi(`/polls?${params.toString()}`);
         if (!res.ok) {
           const errData = await parseApiPayload(res);
-          const fallback = mergePollsWithLocalCache([]);
+          // 실패 시 1페이지에서만 로컬 캐시로 폴백(오프라인 작성 고민 보존).
+          const fallback =
+            targetPage === 1 ? mergePollsWithLocalCache([], nextFilters) : get().polls;
           set({
             polls: fallback,
             isLoading: false,
+            page: targetPage,
             error: resolvePollErrorMessage(errData, '고민 목록을 가져오는데 실패했습니다.'),
           });
           return;
         }
         const data = await parseApiPayload(res);
-        const parsed = Array.isArray(data)
-          ? data.filter((item): item is Poll => isPollPayload(item))
-          : [];
+        const parsed = parsePollsPage(data, targetPage, limit);
 
-        const merged = mergePollsWithLocalCache(parsed);
-        set({ polls: merged, isLoading: false });
+        // 1페이지에만 로컬 캐시(오프라인 작성 등)를 합쳐 노출한다. 다른 페이지는 서버 결과 그대로.
+        const polls =
+          parsed.page === 1 ? mergePollsWithLocalCache(parsed.items, nextFilters) : parsed.items;
+        set({
+          polls,
+          isLoading: false,
+          page: parsed.page,
+          limit: parsed.limit,
+          total: parsed.total,
+          hasMore: parsed.hasMore,
+        });
       } catch (err: any) {
-        const fallback = mergePollsWithLocalCache([]);
-        set({ polls: fallback, error: err.message || '에러가 발생했습니다.', isLoading: false });
+        const fallback = targetPage === 1 ? mergePollsWithLocalCache([], nextFilters) : get().polls;
+        set({
+          polls: fallback,
+          page: targetPage,
+          error: err.message || '에러가 발생했습니다.',
+          isLoading: false,
+        });
       }
+    },
+
+    fetchAllPolls: async () => {
+      // 운영자 전체 집계(#W3) — 서버 최대 limit(50)로 페이지를 순회해 전부 모은다.
+      const ADMIN_PAGE_LIMIT = 50;
+      const aggregate: Poll[] = [];
+      const seen = new Set<string>();
+      let page = 1;
+      // 안전 상한: 무한 루프 방지(50 × 200 = 1만 건까지).
+      for (let guard = 0; guard < 200; guard += 1) {
+        const res = await requestApi(`/polls?page=${page}&limit=${ADMIN_PAGE_LIMIT}`);
+        if (!res.ok) {
+          break;
+        }
+        const parsed = parsePollsPage(await parseApiPayload(res), page, ADMIN_PAGE_LIMIT);
+        for (const poll of parsed.items) {
+          if (!seen.has(poll.id)) {
+            seen.add(poll.id);
+            aggregate.push(poll);
+          }
+        }
+        if (!parsed.hasMore || parsed.items.length === 0) {
+          break;
+        }
+        page += 1;
+      }
+      return aggregate;
+    },
+
+    goToPage: async (page: number) => {
+      await get().fetchPolls(Math.max(1, Math.floor(page) || 1));
+    },
+
+    nextPage: async () => {
+      if (!get().hasMore) {
+        return;
+      }
+      await get().fetchPolls(get().page + 1);
+    },
+
+    prevPage: async () => {
+      if (get().page <= 1) {
+        return;
+      }
+      await get().fetchPolls(get().page - 1);
     },
 
     fetchPoll: async (id, code) => {

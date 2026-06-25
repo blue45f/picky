@@ -60,6 +60,18 @@ export const pollComments = pgTable('poll_comments', {
   parentId: integer('parent_id'),
 });
 
+// Poll votes table — 서버측 1인1표. (poll_id, voter_key) 유니크로 재투표를 막는다.
+// voter_key 는 안정적 익명 키(토스 getAnonymousKey 해시 / 웹 localStorage UUID). 비파괴 추가.
+export const pollVotes = pgTable('poll_votes', {
+  id: serial('id').primaryKey(),
+  pollId: text('poll_id')
+    .references(() => polls.id, { onDelete: 'cascade' })
+    .notNull(),
+  voterKey: text('voter_key').notNull(),
+  optionIndex: integer('option_index').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
 // Relations definitions
 export const usersRelations = relations(users, ({ many }) => ({
   polls: many(polls),
@@ -84,6 +96,13 @@ export const pollOptionsRelations = relations(pollOptions, ({ one }) => ({
 export const pollCommentsRelations = relations(pollComments, ({ one }) => ({
   poll: one(polls, {
     fields: [pollComments.pollId],
+    references: [polls.id],
+  }),
+}));
+
+export const pollVotesRelations = relations(pollVotes, ({ one }) => ({
+  poll: one(polls, {
+    fields: [pollVotes.pollId],
     references: [polls.id],
   }),
 }));

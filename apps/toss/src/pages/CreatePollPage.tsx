@@ -13,6 +13,7 @@ import { theme, stickyActionBar } from '../theme';
 import { fromDateTimeLocalValue, toDateTimeLocalValue } from '../lib/format';
 import { fileToDownscaledDataUrl, isUsableImageUrl } from '../lib/image';
 import { hapticFeedback } from '../lib/toss';
+import { evaluatePollReadiness } from '../lib/pollReadiness';
 import { AppBar, Chip, SegmentedControl } from '../components/ui';
 
 const MAX_OPTIONS = 10;
@@ -634,9 +635,104 @@ function OptionCard(
   );
 }
 
+/**
+ * 참가 준비도 카드 — 질문/선택지/배경설명을 점검해 안내만 해요(제출은 막지 않음).
+ * 점수에 따라 색만 바뀌고, 항목별 통과 여부와 짧은 도움말을 보여줘요.
+ */
+function ReadinessCard(
+  props: Readonly<{ question: string; description: string; options: OptionDraft[] }>,
+) {
+  const { question, description, options } = props;
+  const readiness = useMemo(
+    () =>
+      evaluatePollReadiness({
+        question,
+        description,
+        optionTexts: options.map((option) => option.text),
+      }),
+    [question, description, options],
+  );
+
+  let scoreColor: string = theme.success;
+  if (readiness.score < 60) {
+    scoreColor = theme.danger;
+  } else if (readiness.score < 80) {
+    scoreColor = theme.gold;
+  }
+
+  return (
+    <section
+      aria-label="참가 준비도"
+      style={{
+        marginTop: 22,
+        padding: 16,
+        borderRadius: theme.radiusSm,
+        background: 'rgba(255,255,255,0.02)',
+        border: `1px solid ${theme.border}`,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 12,
+      }}
+    >
+      <div
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}
+      >
+        <span style={{ fontSize: 13.5, fontWeight: 800, color: theme.text }}>📋 참가 준비도</span>
+        <span style={{ fontSize: 18, fontWeight: 900, color: scoreColor }}>{readiness.score}%</span>
+      </div>
+      <p style={{ margin: 0, fontSize: 12.5, color: theme.textFaint, lineHeight: 1.5 }}>
+        공유 전 응답 부담을 낮추는 점검이에요. 통과하지 않아도 그대로 올릴 수 있어요 🙂
+      </p>
+      <ul
+        style={{
+          listStyle: 'none',
+          margin: 0,
+          padding: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 8,
+        }}
+      >
+        {readiness.items.map((item) => (
+          <li
+            key={item.label}
+            style={{
+              display: 'flex',
+              gap: 10,
+              alignItems: 'flex-start',
+              padding: '10px 12px',
+              borderRadius: 12,
+              background: item.passed ? theme.accentSoft : theme.goldSoft,
+            }}
+          >
+            <span aria-hidden style={{ flexShrink: 0, fontSize: 14, lineHeight: 1.4 }}>
+              {item.passed ? '✅' : '💡'}
+            </span>
+            <span style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <span
+                style={{
+                  fontSize: 13,
+                  fontWeight: 800,
+                  color: item.passed ? theme.accent : theme.gold,
+                }}
+              >
+                {item.label}
+              </span>
+              <span style={{ fontSize: 12.5, color: theme.textMuted, lineHeight: 1.45 }}>
+                {item.help}
+              </span>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 function Step2Form(
   props: Readonly<{
     question: string;
+    description: string;
     options: OptionDraft[];
     filledOptionCount: number;
     openImageIndex: number | null;
@@ -656,6 +752,7 @@ function Step2Form(
 ) {
   const {
     question,
+    description,
     options,
     filledOptionCount,
     openImageIndex,
@@ -754,6 +851,8 @@ function Step2Form(
           + 선택지 추가하기 ✏️
         </button>
       ) : null}
+
+      <ReadinessCard question={question} description={description} options={options} />
 
       {/* 1단계에서 고급 옵션을 건드리지 않았을 때만, 2단계에서도 빠르게 펼칠 수 있게 안내 */}
       <button
@@ -1065,6 +1164,7 @@ export function CreatePollPage() {
         ) : (
           <Step2Form
             question={question}
+            description={description}
             options={options}
             filledOptionCount={filledOptions.length}
             openImageIndex={openImageIndex}
