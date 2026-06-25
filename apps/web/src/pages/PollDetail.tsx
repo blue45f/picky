@@ -1151,6 +1151,64 @@ type DecisionConfidenceItem = {
   help: string;
 };
 
+/** 투표 후 '나는 다수파/소수파' 사회적 비교 배지 — 기존 % 데이터만 재활용한다. */
+function SocialComparisonBadge(
+  props: Readonly<{ currentPoll: Poll; votedOptionId: number | null }>,
+) {
+  const { currentPoll, votedOptionId } = props;
+  const totalVotes = currentPoll.totalVotes;
+  if (votedOptionId == null || totalVotes < 1) {
+    return null;
+  }
+  const voted = currentPoll.options.find((option) => option.id === votedOptionId);
+  if (!voted) {
+    return null;
+  }
+  const percent = Math.round((voted.voteCount / totalVotes) * 100);
+  const topVote = currentPoll.options.reduce((max, option) => Math.max(max, option.voteCount), 0);
+  const isMajority = voted.voteCount === topVote && voted.voteCount > 0;
+  const avg = 100 / Math.max(1, currentPoll.options.length);
+  const isMinority = !isMajority && percent < avg;
+
+  let emoji = '🙌';
+  let title = `전체의 ${percent}%가 나와 같은 선택을 했어요`;
+  let gold = false;
+  if (isMajority) {
+    emoji = '👑';
+    title = '다수파예요! 가장 많은 사람들과 같은 선택';
+    gold = true;
+  } else if (isMinority) {
+    emoji = '🦄';
+    title = `희귀 취향! 단 ${percent}%만 고른 소수파의 멋`;
+  }
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.75rem',
+        padding: '0.85rem 1rem',
+        borderRadius: 'var(--radius-sm)',
+        background: gold ? 'rgba(250, 204, 21, 0.08)' : 'rgba(45, 212, 191, 0.08)',
+        border: `1px solid ${gold ? 'rgba(250, 204, 21, 0.3)' : 'rgba(45, 212, 191, 0.3)'}`,
+      }}
+    >
+      <span aria-hidden style={{ fontSize: '1.6rem', flexShrink: 0 }}>
+        {emoji}
+      </span>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+          {title}
+        </div>
+        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+          내 선택: {voted.text}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PollResultsScreen(
   props: Readonly<{
     currentPoll: Poll;
@@ -1328,6 +1386,11 @@ function PollResultsScreen(
         >
           {decisionHint}
         </p>
+
+        <SocialComparisonBadge
+          currentPoll={currentPoll}
+          votedOptionId={votedHistory[currentPoll.id] ?? null}
+        />
 
         <section
           aria-label="의사결정 신뢰도"
@@ -3860,6 +3923,149 @@ function ResultImagePreviewModal(
   );
 }
 
+// 댓글/대댓글 단일 카드 — isReply 면 들여쓰기·연한 배경으로 답글임을 시각화한다.
+function CommentCard(
+  props: Readonly<{
+    comm: Poll['comments'][number];
+    canManage: boolean;
+    onDeleteComment: (commentId: number) => void;
+    onReplyToggle?: () => void;
+    isReply?: boolean;
+  }>,
+) {
+  const { comm, canManage, onDeleteComment, onReplyToggle, isReply = false } = props;
+  return (
+    <div
+      className="content-card"
+      style={{
+        padding: isReply ? '0.75rem 1rem' : '1rem',
+        marginLeft: isReply ? '1.5rem' : 0,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '6px',
+        cursor: 'default',
+        background: isReply ? 'rgba(255,255,255,0.02)' : undefined,
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            flexWrap: 'wrap',
+          }}
+        >
+          <span
+            style={{
+              fontSize: '0.825rem',
+              fontWeight: 700,
+              color: 'var(--text-primary)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+            }}
+          >
+            {isReply ? (
+              <span aria-hidden style={{ color: 'var(--text-muted)' }}>
+                ↳
+              </span>
+            ) : (
+              <User size={12} style={{ color: 'var(--text-muted)' }} />
+            )}
+            <span>{comm.voterName}</span>
+          </span>
+          {comm.selectedOptionText && (
+            <span
+              style={{
+                fontSize: '0.65rem',
+                backgroundColor: 'rgba(99, 102, 241, 0.12)',
+                color: 'var(--brand-primary-light)',
+                padding: '1px 6px',
+                borderRadius: '4px',
+                fontWeight: 700,
+                border: '1px solid rgba(99, 102, 241, 0.15)',
+              }}
+            >
+              {comm.selectedOptionText} 선택
+            </span>
+          )}
+        </div>
+        <span style={{ fontSize: '0.675rem', color: 'var(--text-muted)' }}>
+          {new Date(comm.createdAt).toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit',
+          })}
+        </span>
+      </div>
+      <p
+        style={{
+          fontSize: '0.825rem',
+          color: 'var(--text-secondary)',
+          lineHeight: 1.5,
+        }}
+      >
+        {comm.comment}
+      </p>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: '0.5rem',
+        }}
+      >
+        {onReplyToggle && !isReply ? (
+          <button
+            type="button"
+            onClick={onReplyToggle}
+            className="ghost-inline"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              fontSize: '0.72rem',
+              fontWeight: 700,
+              color: 'var(--brand-accent-teal)',
+            }}
+          >
+            <MessageSquare size={12} />
+            답글 달기
+          </button>
+        ) : (
+          <span />
+        )}
+        {canManage ? (
+          <button
+            type="button"
+            onClick={() => onDeleteComment(comm.id)}
+            className="ghost-btn"
+            aria-label={`${comm.voterName} 님의 댓글 삭제`}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              padding: '4px 9px',
+              fontSize: '0.7rem',
+              color: 'var(--brand-accent-coral)',
+              borderColor: 'rgba(239, 68, 68, 0.28)',
+            }}
+          >
+            <Trash2 size={12} />
+            삭제
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 function PollFeedbackList(
   props: Readonly<{
     currentPoll: Poll;
@@ -3872,6 +4078,7 @@ function PollFeedbackList(
     emptyCommentMessage: string;
     canManage: boolean;
     onDeleteComment: (commentId: number) => void;
+    onAddReply: (parentId: number, text: string) => Promise<void> | void;
   }>,
 ) {
   const {
@@ -3885,7 +4092,31 @@ function PollFeedbackList(
     emptyCommentMessage,
     canManage,
     onDeleteComment,
+    onAddReply,
   } = props;
+  const [replyingTo, setReplyingTo] = React.useState<number | null>(null);
+  const [replyText, setReplyText] = React.useState('');
+
+  // 대댓글 트리 — 최상위 댓글(parentId 없음)만 목록에 두고, 각 댓글의 답글을 아래로 들여쓴다.
+  const repliesByParent = new Map<number, Poll['comments']>();
+  for (const item of currentPoll.comments) {
+    if (item.parentId != null) {
+      const bucket = repliesByParent.get(item.parentId) ?? [];
+      bucket.push(item);
+      repliesByParent.set(item.parentId, bucket);
+    }
+  }
+  const visibleTopLevel = visibleComments.filter((item) => item.parentId == null);
+
+  const submitReply = async (parentId: number) => {
+    const text = replyText.trim();
+    if (!text) {
+      return;
+    }
+    await onAddReply(parentId, text);
+    setReplyText('');
+    setReplyingTo(null);
+  };
   return (
     <div style={{ marginTop: '0.5rem' }}>
       <div
@@ -4013,102 +4244,61 @@ function PollFeedbackList(
               {emptyCommentMessage}
             </div>
           ) : null}
-          {visibleComments.map((comm) => (
-            <div
-              key={comm.id}
-              className="content-card"
-              style={{
-                padding: '1rem',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '6px',
-                cursor: 'default',
-              }}
-            >
+          {visibleTopLevel.map((comm) => {
+            const replies = repliesByParent.get(comm.id) ?? [];
+            return (
               <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                }}
+                key={comm.id}
+                style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}
               >
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    flexWrap: 'wrap',
+                <CommentCard
+                  comm={comm}
+                  canManage={canManage}
+                  onDeleteComment={onDeleteComment}
+                  onReplyToggle={() => {
+                    setReplyingTo((prev) => (prev === comm.id ? null : comm.id));
+                    setReplyText('');
                   }}
-                >
-                  <span
-                    style={{
-                      fontSize: '0.825rem',
-                      fontWeight: 700,
-                      color: 'var(--text-primary)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                    }}
-                  >
-                    <User size={12} style={{ color: 'var(--text-muted)' }} />
-                    <span>{comm.voterName}</span>
-                  </span>
-                  {comm.selectedOptionText && (
-                    <span
-                      style={{
-                        fontSize: '0.65rem',
-                        backgroundColor: 'rgba(99, 102, 241, 0.12)',
-                        color: 'var(--brand-primary-light)',
-                        padding: '1px 6px',
-                        borderRadius: '4px',
-                        fontWeight: 700,
-                        border: '1px solid rgba(99, 102, 241, 0.15)',
+                />
+                {replies.map((reply) => (
+                  <CommentCard
+                    key={reply.id}
+                    comm={reply}
+                    canManage={canManage}
+                    onDeleteComment={onDeleteComment}
+                    isReply
+                  />
+                ))}
+                {replyingTo === comm.id ? (
+                  <div style={{ display: 'flex', gap: '0.5rem', marginLeft: '1.5rem' }}>
+                    <input
+                      type="text"
+                      value={replyText}
+                      onChange={(event) => setReplyText(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          void submitReply(comm.id);
+                        }
                       }}
+                      placeholder="따뜻한 답글을 남겨요 💬"
+                      maxLength={100}
+                      aria-label="답글 입력"
+                      className="form-input"
+                      style={{ flex: 1, minWidth: 0, fontSize: '0.8rem' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => void submitReply(comm.id)}
+                      className="btn-primary"
+                      style={{ flexShrink: 0, padding: '8px 14px', fontSize: '0.8rem' }}
                     >
-                      {comm.selectedOptionText} 선택
-                    </span>
-                  )}
-                </div>
-                <span style={{ fontSize: '0.675rem', color: 'var(--text-muted)' }}>
-                  {new Date(comm.createdAt).toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </span>
+                      등록
+                    </button>
+                  </div>
+                ) : null}
               </div>
-              <p
-                style={{
-                  fontSize: '0.825rem',
-                  color: 'var(--text-secondary)',
-                  lineHeight: 1.5,
-                }}
-              >
-                {comm.comment}
-              </p>
-              {canManage ? (
-                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                  <button
-                    type="button"
-                    onClick={() => onDeleteComment(comm.id)}
-                    className="ghost-btn"
-                    aria-label={`${comm.voterName} 님의 댓글 삭제`}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      padding: '4px 9px',
-                      fontSize: '0.7rem',
-                      color: 'var(--brand-accent-coral)',
-                      borderColor: 'rgba(239, 68, 68, 0.28)',
-                    }}
-                  >
-                    <Trash2 size={12} />
-                    삭제
-                  </button>
-                </div>
-              ) : null}
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
@@ -6613,6 +6803,7 @@ export const PollDetail: React.FC = () => {
   const setCurrentPoll = usePollStore((state) => state.setCurrentPoll);
   const deletePoll = usePollStore((state) => state.deletePoll);
   const deleteComment = usePollStore((state) => state.deleteComment);
+  const addComment = usePollStore((state) => state.addComment);
   const user = useAuthStore((state) => state.user);
   const guestName = useAuthStore((state) => state.guestName);
 
@@ -6690,10 +6881,44 @@ export const PollDetail: React.FC = () => {
     deleteComment(id, commentId);
   };
 
+  // 대댓글(답글) 작성 — 부모 댓글 id 를 함께 보내 공유 스토어가 트리를 갱신한다.
+  const handleAddReply = async (parentId: number, text: string) => {
+    if (!id) {
+      return;
+    }
+    await addComment(id, {
+      comment: text,
+      parentId,
+      voterName: (user?.nickname || guestName || '').trim() || null,
+    });
+  };
+
+  // 비공개 투표 잠금 해제 — 코드로 재조회하면 성공 시 서버가 requiresCode=false 로 응답해 게이트가 풀린다.
+  const handleUnlockCode = async () => {
+    if (!id) {
+      return;
+    }
+    const trimmed = codeInput.trim();
+    if (trimmed.length < 4) {
+      setCodeError('코드는 4자 이상이에요.');
+      return;
+    }
+    setCodeError(null);
+    const result = await fetchPoll(id, trimmed);
+    if (!result || result.requiresCode) {
+      setCodeError('코드가 맞지 않아요. 🔒');
+    }
+  };
+
   // Modal share check
   const showShareParam =
     !isEmbedMode && !isPresentationMode && searchParams.get('showShare') === 'true';
   const snapshotParam = searchParams.get('snapshot');
+
+  // 비공개(private) 투표 코드 게이트 — URL ?code= 를 초기 조회에 전달하고, 입력으로 잠금 해제한다.
+  const urlCode = searchParams.get('code') ?? undefined;
+  const [codeInput, setCodeInput] = useState('');
+  const [codeError, setCodeError] = useState<string | null>(null);
 
   // Forms
   const [votedOptionId, setVotedOptionId] = useState<number | null>(null);
@@ -6751,9 +6976,9 @@ export const PollDetail: React.FC = () => {
     restorePollFromSnapshot(snapshotParam);
 
     if (id) {
-      fetchPoll(id);
+      fetchPoll(id, urlCode);
     }
-  }, [id, fetchPoll, snapshotParam]);
+  }, [id, fetchPoll, snapshotParam, urlCode]);
 
   useEffect(() => {
     if (showShareParam) {
@@ -7514,6 +7739,87 @@ export const PollDetail: React.FC = () => {
     );
   }
 
+  // 비공개(private) 투표 — 올바른 코드 전까지 질문만 보여주고 선택지/결과를 가린다.
+  if (currentPoll.requiresCode) {
+    return (
+      <div
+        className="content-card animate-slide-up"
+        style={{
+          textAlign: 'center',
+          padding: '3rem 2rem',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '1rem',
+          maxWidth: '420px',
+          margin: '0 auto',
+        }}
+      >
+        <div aria-hidden="true" style={{ fontSize: '2.6rem' }}>
+          🔒
+        </div>
+        <div>
+          <h2
+            style={{
+              fontSize: '1.1rem',
+              fontWeight: 800,
+              color: 'var(--text-primary)',
+              marginBottom: '6px',
+            }}
+          >
+            비공개 고민이에요
+          </h2>
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+            {currentPoll.question}
+          </p>
+          <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+            참여하려면 접근 코드를 입력해 주세요.
+          </p>
+        </div>
+        <input
+          type="text"
+          value={codeInput}
+          onChange={(event) => {
+            setCodeError(null);
+            setCodeInput(event.target.value);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              void handleUnlockCode();
+            }
+          }}
+          placeholder="접근 코드"
+          maxLength={20}
+          aria-label="비공개 투표 접근 코드"
+          className="form-input"
+          style={{ width: '100%', textAlign: 'center', fontSize: '0.95rem' }}
+        />
+        {codeError ? (
+          <p role="alert" style={{ fontSize: '0.78rem', color: 'var(--brand-accent-coral)' }}>
+            {codeError}
+          </p>
+        ) : null}
+        <button
+          type="button"
+          onClick={() => void handleUnlockCode()}
+          disabled={isLoading}
+          className="btn-primary"
+          style={{ width: '100%', padding: '12px', fontSize: '0.9rem' }}
+        >
+          들어가기 🔓
+        </button>
+        <button
+          type="button"
+          onClick={() => navigate('/')}
+          className="btn-secondary"
+          style={{ width: '100%', padding: '10px', fontSize: '0.85rem' }}
+        >
+          목록으로 돌아가기
+        </button>
+      </div>
+    );
+  }
+
   const vm = buildPollViewModel({
     currentPoll,
     hasVoted,
@@ -7712,6 +8018,7 @@ export const PollDetail: React.FC = () => {
             emptyCommentMessage={emptyCommentMessage}
             canManage={canManagePoll}
             onDeleteComment={handleDeleteComment}
+            onAddReply={handleAddReply}
           />
 
           {resultImagePreviewUrl ? (

@@ -9,6 +9,7 @@ import {
   FileText,
   ImageIcon,
   Link2,
+  Lock,
   Monitor,
   Plus,
   Search,
@@ -26,7 +27,7 @@ import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { SnsPreviewCard } from '../components/SnsPreviewCard';
 import { ParticipantPreviewPanel } from '../components/ParticipantPreviewPanel';
 import { buildShareablePollSnapshot } from '../lib/pollShare';
-import { POLL_CATEGORIES, type PollResultsVisibility } from '@picky/shared';
+import { POLL_CATEGORIES, type PollResultsVisibility, type PollVisibility } from '@picky/shared';
 
 interface PresetOption {
   text: string;
@@ -220,6 +221,8 @@ interface PollDraft {
   description: string;
   endsAtLocal: string;
   resultsVisibility: PollResultsVisibility;
+  visibility: PollVisibility;
+  accessCode: string;
   options: OptionInput[];
   attachments: AttachmentInput[];
   savedAt: string;
@@ -244,6 +247,33 @@ const RESULT_VISIBILITY_OPTIONS: Array<{
 
 const isResultsVisibility = (value: unknown): value is PollResultsVisibility => {
   return value === 'afterVote' || value === 'always';
+};
+
+// 공개 범위 — 목록 노출/링크전용/접근코드 비공개. 비공개 선택 시 접근 코드 입력을 노출한다.
+const VISIBILITY_OPTIONS: Array<{
+  value: PollVisibility;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: 'public',
+    label: '공개 🌍',
+    description: '목록에 노출되고 누구나 참여할 수 있어요.',
+  },
+  {
+    value: 'unlisted',
+    label: '링크전용 🔗',
+    description: '목록엔 안 보이고, 링크를 받은 사람만 참여해요.',
+  },
+  {
+    value: 'private',
+    label: '비공개 🔒',
+    description: '접근 코드를 아는 사람만 참여할 수 있어요.',
+  },
+];
+
+const isVisibility = (value: unknown): value is PollVisibility => {
+  return value === 'public' || value === 'unlisted' || value === 'private';
 };
 
 const resolveIsoEndAt = (value: string): string | null => {
@@ -309,6 +339,8 @@ const loadDraftFromStorage = (): PollDraft | null => {
     const resultsVisibility = isResultsVisibility(parsed.resultsVisibility)
       ? parsed.resultsVisibility
       : 'afterVote';
+    const visibility = isVisibility(parsed.visibility) ? parsed.visibility : 'public';
+    const accessCode = typeof parsed.accessCode === 'string' ? parsed.accessCode : '';
     const options = Array.isArray(parsed.options)
       ? parsed.options
           .map((item: unknown) => {
@@ -374,6 +406,8 @@ const loadDraftFromStorage = (): PollDraft | null => {
       description,
       endsAtLocal,
       resultsVisibility,
+      visibility,
+      accessCode,
       options,
       attachments,
       savedAt: typeof parsed.savedAt === 'string' ? parsed.savedAt : new Date().toISOString(),
@@ -2946,6 +2980,10 @@ type PollSettingsSectionProps = Readonly<{
   isEndsAtInvalid: boolean;
   resultsVisibility: PollResultsVisibility;
   setResultsVisibility: (value: PollResultsVisibility) => void;
+  visibility: PollVisibility;
+  setVisibility: (value: PollVisibility) => void;
+  accessCode: string;
+  setAccessCode: (value: string) => void;
 }>;
 
 function PollSettingsSection({
@@ -2956,6 +2994,10 @@ function PollSettingsSection({
   isEndsAtInvalid,
   resultsVisibility,
   setResultsVisibility,
+  visibility,
+  setVisibility,
+  accessCode,
+  setAccessCode,
 }: PollSettingsSectionProps) {
   return (
     <section
@@ -3079,6 +3121,74 @@ function PollSettingsSection({
             })}
           </div>
         </div>
+      </div>
+
+      <div style={{ display: 'grid', gap: '0.45rem' }}>
+        <span
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '5px',
+            color: 'var(--text-secondary)',
+            fontSize: '0.76rem',
+            fontWeight: 800,
+          }}
+        >
+          <Lock size={13} style={{ color: 'var(--brand-accent-teal)' }} />
+          공개 범위
+        </span>
+        <div className="result-mode-grid">
+          {VISIBILITY_OPTIONS.map((option) => {
+            const active = visibility === option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => {
+                  clearError();
+                  setFormError('');
+                  setVisibility(option.value);
+                }}
+                className="result-mode-button"
+                aria-pressed={active}
+                style={{
+                  borderColor: active ? 'rgba(45, 212, 191, 0.42)' : 'var(--bg-card-border)',
+                  background: active ? 'rgba(45, 212, 191, 0.08)' : 'rgba(255,255,255,0.02)',
+                }}
+              >
+                <strong
+                  style={{
+                    color: active ? 'var(--brand-accent-teal)' : 'var(--text-primary)',
+                  }}
+                >
+                  {option.label}
+                </strong>
+                <span>{option.description}</span>
+              </button>
+            );
+          })}
+        </div>
+        {visibility === 'private' ? (
+          <label style={{ display: 'grid', gap: '0.35rem', marginTop: '0.2rem' }}>
+            <span style={{ color: 'var(--text-secondary)', fontSize: '0.72rem', fontWeight: 700 }}>
+              접근 코드 (4~20자)
+            </span>
+            <input
+              type="text"
+              value={accessCode}
+              onChange={(event) => {
+                clearError();
+                setFormError('');
+                setAccessCode(event.target.value);
+              }}
+              placeholder="참여자에게 따로 알려줄 코드를 정해주세요"
+              maxLength={20}
+              className="form-input"
+              aria-label="비공개 투표 접근 코드"
+              style={{ fontSize: '0.82rem' }}
+            />
+          </label>
+        ) : null}
       </div>
     </section>
   );
@@ -3327,6 +3437,8 @@ export const CreatePoll: React.FC = () => {
   const [resultsVisibility, setResultsVisibility] = useState<PollResultsVisibility>(
     cachedDraft?.resultsVisibility || 'afterVote',
   );
+  const [visibility, setVisibility] = useState<PollVisibility>(cachedDraft?.visibility || 'public');
+  const [accessCode, setAccessCode] = useState(cachedDraft?.accessCode || '');
   const [options, setOptions] = useState<OptionInput[]>(
     cachedDraft?.options && cachedDraft.options.length >= 2
       ? [...cachedDraft.options]
@@ -3431,6 +3543,8 @@ export const CreatePoll: React.FC = () => {
       description.trim() ||
       endsAtLocal.trim() ||
       resultsVisibility !== 'afterVote' ||
+      visibility !== 'public' ||
+      accessCode.trim() ||
       nonEmptyOptions.length > 0 ||
       options.some((option) => option.imageUrl || option.text.trim()) ||
       attachments.length > 0,
@@ -3440,6 +3554,8 @@ export const CreatePoll: React.FC = () => {
     description,
     endsAtLocal,
     resultsVisibility,
+    visibility,
+    accessCode,
     options,
     nonEmptyOptions.length,
     attachments.length,
@@ -3456,6 +3572,8 @@ export const CreatePoll: React.FC = () => {
         description: description.trim(),
         endsAtLocal,
         resultsVisibility,
+        visibility,
+        accessCode,
         options: options.map((option) => ({
           id: option.id,
           text: option.text.trim(),
@@ -3473,7 +3591,17 @@ export const CreatePoll: React.FC = () => {
     return () => {
       clearTimeout(timer);
     };
-  }, [question, description, endsAtLocal, resultsVisibility, options, attachments, hasDraft]);
+  }, [
+    question,
+    description,
+    endsAtLocal,
+    resultsVisibility,
+    visibility,
+    accessCode,
+    options,
+    attachments,
+    hasDraft,
+  ]);
 
   const handleRestoreDraft = () => {
     if (!cachedDraft) {
@@ -3485,6 +3613,8 @@ export const CreatePoll: React.FC = () => {
     setDescription(nextDraft.description);
     setEndsAtLocal(nextDraft.endsAtLocal || '');
     setResultsVisibility(nextDraft.resultsVisibility || 'afterVote');
+    setVisibility(nextDraft.visibility || 'public');
+    setAccessCode(nextDraft.accessCode || '');
     setOptions(nextDraft.options.length >= 2 ? [...nextDraft.options] : createDefaultOptions());
     setAttachments(nextDraft.attachments || []);
     setDraftSavedAt(nextDraft.savedAt);
@@ -3736,6 +3866,8 @@ export const CreatePoll: React.FC = () => {
     setDescription('');
     setEndsAtLocal('');
     setResultsVisibility('afterVote');
+    setVisibility('public');
+    setAccessCode('');
     setOptions(createDefaultOptions());
     setAttachments([]);
     setCategoryId(null);
@@ -3961,11 +4093,22 @@ export const CreatePoll: React.FC = () => {
       return;
     }
 
+    const trimmedAccessCode = accessCode.trim();
+    if (
+      visibility === 'private' &&
+      (trimmedAccessCode.length < 4 || trimmedAccessCode.length > 20)
+    ) {
+      setFormError('비공개 투표의 접근 코드는 4~20자로 입력해 주세요.');
+      return;
+    }
+
     const result = await createPoll({
       question: normalizedQuestion,
       description: normalizedDescription || null,
       endsAt: normalizedEndsAt,
       resultsVisibility,
+      visibility,
+      accessCode: visibility === 'private' ? trimmedAccessCode : null,
       options: nonEmptyOptions,
       attachments,
       categoryId,
@@ -4151,6 +4294,10 @@ export const CreatePoll: React.FC = () => {
           isEndsAtInvalid={isEndsAtInvalid}
           resultsVisibility={resultsVisibility}
           setResultsVisibility={setResultsVisibility}
+          visibility={visibility}
+          setVisibility={setVisibility}
+          accessCode={accessCode}
+          setAccessCode={setAccessCode}
         />
 
         <ParticipantPreviewPanel
