@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@toss/tds-mobile';
 import {
+  COMMENT_PASSWORD_MAX,
+  COMMENT_PASSWORD_MIN,
   CreatePollSchema,
   DEADLINE_PRESETS,
   POLL_CATEGORIES,
@@ -1035,66 +1037,84 @@ function CreatedPrivateScreen(
 }
 
 /**
- * 작성 로그인 게이트 화면 — 토스 SSO(식별 로그인)가 아직 안 잡혔거나 게스트 세션일 때만 보여요.
- * 토스는 보통 진입 시 자동 SSO라 거의 안 뜨지만, 식별 실패(네트워크 등) 시 '고아 고민'·작성 401을
- * 막기 위한 방어 화면이에요. 웹 CreatePoll 게이트와 같은 정책(로그인 회원만 작성)을 토스 톤으로 맞춰요.
- * 토스엔 별도 로그인 페이지가 없어 SSO 재시도 버튼으로 식별을 다시 잡아요(투표·댓글은 게이트와 무관).
+ * 게스트(비회원) 작성 시 노출하는 관리 비밀번호 입력 + 로그인 안내.
+ * 회원은 JWT 로 식별하므로 이 블록을 띄우지 않는다. 게스트는 이 비번(6~20자)으로
+ * 어느 기기서든 자신이 만든 고민을 수정/삭제할 수 있다(댓글 관리 비번과 동일 모델).
+ * 더 편한 관리를 원하면 토스 로그인으로 전환할 수 있게 보조 버튼도 함께 제공한다.
  */
-function CreateLoginGate(
+function GuestManageField(
   props: Readonly<{
-    isGuest: boolean;
+    value: string;
+    onChange: (value: string) => void;
     retrying: boolean;
-    onRetry: () => void;
-    onBack: () => void;
+    onLogin: () => void;
   }>,
 ) {
-  const { isGuest, retrying, onRetry, onBack } = props;
+  const { value, onChange, retrying, onLogin } = props;
+  const trimmed = value.trim();
+  const tooShort = trimmed.length > 0 && trimmed.length < COMMENT_PASSWORD_MIN;
   return (
-    <div style={{ minHeight: '100dvh' }}>
-      <AppBar title="로그인이 필요해요 🔒" onBack={onBack} />
-      <div style={{ maxWidth: 520, margin: '0 auto', padding: '8px 20px 40px' }}>
-        <div className="rise" style={{ textAlign: 'center', padding: '24px 0 8px' }}>
-          <div style={{ fontSize: 52, marginBottom: 12 }} aria-hidden>
-            🔒
-          </div>
-          <h2 style={{ fontSize: 20, fontWeight: 900, color: theme.text, margin: '0 0 10px' }}>
-            로그인하고 고민을 올려보세요 🥑
-          </h2>
-          <p style={{ fontSize: FONT.body, color: theme.textMuted, lineHeight: 1.6, margin: 0 }}>
-            고민(투표) <strong style={{ color: theme.text }}>작성·수정·삭제</strong>는 토스로
-            로그인한 뒤에 할 수 있어요. 내가 올린 고민을 계정에 모아 안전하게 관리할 수 있어요.
-            {isGuest ? ' 지금은 임시(게스트) 상태라, 토스 로그인 후 작성할 수 있어요.' : ''}
-          </p>
-          <p
-            style={{
-              fontSize: FONT.small,
-              color: theme.textFaint,
-              lineHeight: 1.55,
-              marginTop: 12,
-            }}
-          >
-            투표와 한마디(댓글)는 로그인 없이도 자유롭게 참여할 수 있어요.
-          </p>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 24 }}>
-          <Button
-            style={{
-              width: '100%',
-              borderRadius: 16,
-              boxShadow: '0 8px 24px rgba(19, 194, 163, 0.25)',
-            }}
-            loading={retrying}
-            disabled={retrying}
-            onClick={onRetry}
-          >
-            토스로 로그인하고 작성하기 🚀
-          </Button>
-          <Button variant="weak" style={{ width: '100%', borderRadius: 16 }} onClick={onBack}>
-            목록으로 돌아가기 🔙
-          </Button>
-        </div>
+    <div
+      style={{
+        marginTop: 20,
+        padding: '16px',
+        borderRadius: theme.radiusSm,
+        border: `1px solid ${theme.border}`,
+        background: 'rgba(255,255,255,0.02)',
+      }}
+    >
+      <div style={{ ...labelRowStyle, marginTop: 0 }}>
+        <label style={labelStyle} htmlFor="guest-poll-password">
+          관리 비밀번호 🔑
+        </label>
+        <span style={counterStyle}>
+          {COMMENT_PASSWORD_MIN}~{COMMENT_PASSWORD_MAX}자
+        </span>
       </div>
+      <input
+        id="guest-poll-password"
+        type="password"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        maxLength={COMMENT_PASSWORD_MAX}
+        placeholder="이 고민을 관리할 비밀번호 (6~20자)"
+        autoComplete="new-password"
+        aria-label="비회원 고민 관리 비밀번호"
+        style={{ ...fieldStyle, marginTop: 0 }}
+      />
+      <p
+        style={{
+          fontSize: 13,
+          color: tooShort ? theme.danger : theme.textFaint,
+          margin: '8px 2px 0',
+        }}
+      >
+        {tooShort
+          ? `비밀번호는 최소 ${COMMENT_PASSWORD_MIN}자 이상이어야 해요.`
+          : '비회원이라 비밀번호로 본인을 확인해요. 이 비번이 있으면 다른 기기에서도 이 고민을 수정/삭제할 수 있어요.'}
+      </p>
+      <button
+        type="button"
+        className="pressable"
+        onClick={onLogin}
+        disabled={retrying}
+        style={{
+          marginTop: 12,
+          width: '100%',
+          minHeight: 44,
+          padding: '10px 14px',
+          borderRadius: theme.radiusSm,
+          border: `1px solid rgba(19,194,163,0.3)`,
+          background: theme.accentSoft,
+          color: theme.accent,
+          fontSize: FONT.small,
+          fontWeight: 700,
+          cursor: retrying ? 'default' : 'pointer',
+          opacity: retrying ? 0.6 : 1,
+        }}
+      >
+        {retrying ? '로그인 중…' : '토스로 로그인하면 비번 없이 관리할 수 있어요 🚀'}
+      </button>
     </div>
   );
 }
@@ -1102,13 +1122,14 @@ function CreateLoginGate(
 export function CreatePollPage() {
   const navigate = useNavigate();
   const { createPoll, isLoading } = usePollStore();
-  // 하이브리드 정체성 정책(웹 CreatePoll 게이트와 정렬): 작성은 실로그인(토스 SSO) 회원만 통과.
-  // 토스는 진입 시 자동 SSO라 보통 user+token 이 있지만, 식별 실패/게스트면 방어적으로 작성을 막아요.
+  // 정체성 정책(댓글과 동일 저마찰 모델): 회원은 JWT(creatorId)로, 게스트는 관리 비밀번호로 본인 식별.
+  // 토스는 진입 시 자동 SSO라 보통 회원으로 통과하지만, 게스트(isGuest)·식별 실패여도 비번을 받아 작성할 수 있다.
+  // 서버는 OptionalAuthGuard 로 받아 회원=비번 무시, 게스트=비번 필수(6~20자, 없으면 400)로 처리한다.
   const user = useAuthStore((state) => state.user);
-  const token = useAuthStore((state) => state.token);
   const setDisplayName = useIdentity((state) => state.setDisplayName);
   const displayName = useIdentity((state) => state.displayName);
-  const canCreate = Boolean(user) && Boolean(token) && !user?.isGuest;
+  // 회원(실로그인): 토큰이 있고 isGuest 가 아니어야 함. 그 외(게스트·익명)는 비번 기반 게스트 작성 경로.
+  const isMember = Boolean(user) && !user?.isGuest;
   const [retryingLogin, setRetryingLogin] = useState(false);
 
   // 토스 SSO 식별 재시도 — useIdentity.init 은 1회 가드라, 여기선 같은 SSO 경로(loginWithToss)를
@@ -1154,6 +1175,9 @@ export function CreatePollPage() {
   const [resultsVisibility, setResultsVisibility] = useState<PollResultsVisibility>('afterVote');
   const [visibility, setVisibility] = useState<PollVisibility>('public');
   const [accessCode, setAccessCode] = useState('');
+  // 게스트(비회원) 관리 비밀번호 — 회원은 JWT 로 식별하므로 미사용. 게스트는 이 비번(6~20자)으로
+  // 어느 기기서든 자신이 만든 고민을 수정/삭제할 수 있다(댓글 관리 비번과 동일 모델).
+  const [guestPassword, setGuestPassword] = useState('');
   const [deadlinePreset, setDeadlinePreset] = useState<DeadlinePreset>('none');
   const [customDeadline, setCustomDeadline] = useState('');
   const [endsAtIso, setEndsAtIso] = useState<string | null>(null);
@@ -1170,6 +1194,13 @@ export function CreatePollPage() {
 
   const filledOptions = options.filter((opt) => opt.text.trim().length > 0);
   const canSubmit = question.trim().length >= 2 && filledOptions.length >= MIN_OPTIONS;
+  // 게스트 비번 충족 여부 — 회원은 비번 불필요(true). 게스트는 6~20자여야 작성 가능.
+  const guestPasswordValid =
+    guestPassword.trim().length >= COMMENT_PASSWORD_MIN &&
+    guestPassword.trim().length <= COMMENT_PASSWORD_MAX;
+  // 작성 가능 여부(정체성 게이트만) — 회원은 항상, 게스트는 관리 비번이 충족돼야 한다.
+  // 폼 내용 충족(canSubmit)과 분리해 버튼·제출 가드에서 함께 평가한다.
+  const canCreate = isMember || guestPasswordValid;
 
   const selectDeadlinePreset = (value: DeadlinePreset) => {
     setDeadlinePreset(value);
@@ -1245,10 +1276,13 @@ export function CreatePollPage() {
     if (isLoading) return;
     setError(null);
 
-    // 방어적 인증 가드 — 버튼은 비활성이지만, 제출 직전 세션이 풀렸을 수도 있어 한 번 더 확인해요.
+    // 게스트 정체성 가드 — 버튼은 비활성이지만, 제출 직전 한 번 더 확인한다(회원은 항상 통과).
+    // 게스트는 관리 비번이 6~20자여야 작성할 수 있다(서버도 비번 없는 게스트 작성을 400으로 거부).
     if (!canCreate) {
       hapticFeedback('error');
-      setError('작성하려면 토스 로그인이 필요해요. 잠시 후 다시 시도해 주세요 🔒');
+      setError(
+        `비회원은 관리 비밀번호(${COMMENT_PASSWORD_MIN}~${COMMENT_PASSWORD_MAX}자)를 정해야 고민을 올릴 수 있어요 🔒`,
+      );
       return;
     }
 
@@ -1279,6 +1313,8 @@ export function CreatePollPage() {
         text: opt.text.trim(),
         imageUrl: opt.imageUrl || null,
       })),
+      // 게스트만 관리 비번을 싣는다(회원은 JWT 식별이라 미전송 — 서버도 회원 비번은 무시·미저장).
+      password: isMember ? null : guestPassword.trim() || null,
     };
 
     const parsed = CreatePollSchema.safeParse(candidate);
@@ -1376,18 +1412,8 @@ export function CreatePollPage() {
     setStep(1);
   };
 
-  // 작성 로그인 게이트 — 미인증/게스트면 폼 대신 로그인 유도 화면을 보여줘요(작성만 막고 둘러보긴 가능).
-  if (!canCreate) {
-    return (
-      <CreateLoginGate
-        isGuest={Boolean(user?.isGuest)}
-        retrying={retryingLogin}
-        onRetry={() => void retryLogin()}
-        onBack={() => navigate('/')}
-      />
-    );
-  }
-
+  // 작성 게이트 제거 — 게스트도 관리 비밀번호로 작성할 수 있다(댓글과 동일 모델). 회원은 JWT 식별.
+  // 게스트면 Step2 에 비번 입력(GuestManageField)을 띄워 받고, 로그인 전환도 함께 권한다.
   if (createdPrivatePoll) {
     return (
       <CreatedPrivateScreen
@@ -1474,6 +1500,16 @@ export function CreatePollPage() {
             onEditAdvanced={editAdvancedFromStep2}
           />
         )}
+
+        {/* 게스트(비회원)면 Step2 에 관리 비밀번호 입력을 띄운다 — 회원은 JWT 식별이라 미노출. */}
+        {step === 2 && !isMember ? (
+          <GuestManageField
+            value={guestPassword}
+            onChange={setGuestPassword}
+            retrying={retryingLogin}
+            onLogin={() => void retryLogin()}
+          />
+        ) : null}
 
         {error ? (
           <p style={{ color: theme.danger, fontSize: 13, marginTop: 16 }} role="alert">

@@ -82,8 +82,8 @@ describe('canManageComment policy (정책차이는 인자)', () => {
   });
 });
 
-describe('resolveCommentManageAffordance (직접 관리 vs 비번 잠금)', () => {
-  it('direct manage (no password prompt) for my own comment', () => {
+describe('resolveCommentManageAffordance (수정/삭제 분리 — 서버 매트릭스 일치)', () => {
+  it('direct edit+delete (no password prompt) for my own comment', () => {
     expect(
       resolveCommentManageAffordance({
         mine: true,
@@ -91,22 +91,34 @@ describe('resolveCommentManageAffordance (직접 관리 vs 비번 잠금)', () =
         isAdmin: false,
         hasPassword: false,
       }),
-    ).toEqual({ canManage: true, needsPassword: false });
+    ).toEqual({ canEdit: true, canDelete: true, needsPassword: false });
   });
 
-  it('direct manage for owner/admin even if the comment has a password', () => {
+  it('poll owner can DELETE but NOT edit a stranger comment (server matrix)', () => {
+    // 폴 소유자는 모더레이션 삭제만 가능하고 남의 글 수정은 불가 — canEdit=false, canDelete=true.
     expect(
       resolveCommentManageAffordance({
         mine: false,
         isPollOwner: true,
         isAdmin: false,
-        hasPassword: true,
+        hasPassword: false,
       }),
-    ).toEqual({ canManage: true, needsPassword: false });
+    ).toEqual({ canEdit: false, canDelete: true, needsPassword: false });
   });
 
-  it('password-gated manage for a different device when the comment has a password', () => {
-    // 같은 기기 본인이 아니어도 비번이 걸린 댓글이면 자물쇠 흐름으로 관리 가능.
+  it('admin can edit+delete directly even if the comment has a password', () => {
+    expect(
+      resolveCommentManageAffordance({
+        mine: false,
+        isPollOwner: false,
+        isAdmin: true,
+        hasPassword: true,
+      }),
+    ).toEqual({ canEdit: true, canDelete: true, needsPassword: false });
+  });
+
+  it('password-gated edit+delete for a different device when the comment has a password', () => {
+    // 같은 기기 본인이 아니어도 비번이 걸린 댓글이면 자물쇠 흐름으로 수정·삭제 가능.
     expect(
       resolveCommentManageAffordance({
         mine: false,
@@ -114,7 +126,7 @@ describe('resolveCommentManageAffordance (직접 관리 vs 비번 잠금)', () =
         isAdmin: false,
         hasPassword: true,
       }),
-    ).toEqual({ canManage: true, needsPassword: true });
+    ).toEqual({ canEdit: true, canDelete: true, needsPassword: true });
   });
 
   it('no affordance for a stranger on a comment without a password', () => {
@@ -125,6 +137,6 @@ describe('resolveCommentManageAffordance (직접 관리 vs 비번 잠금)', () =
         isAdmin: false,
         hasPassword: false,
       }),
-    ).toEqual({ canManage: false, needsPassword: false });
+    ).toEqual({ canEdit: false, canDelete: false, needsPassword: false });
   });
 });

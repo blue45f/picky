@@ -458,6 +458,56 @@ body.present-mode .page-shell {
   background: linear-gradient(90deg, var(--brand-accent-teal), var(--brand-accent-gold));
 }
 
+/* afterVote 정책 폴을 진행 중 발표할 때 — 분포 대신 가림 안내 + 선택지 목록만 노출한다. */
+.present-results-hidden {
+  display: grid;
+  gap: 0.85rem;
+  place-items: center;
+  text-align: center;
+  border: 1px dashed rgba(255, 255, 255, 0.16);
+  border-radius: var(--radius-sm);
+  padding: clamp(1.4rem, 3vw, 2.6rem);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.present-results-hidden > svg {
+  color: var(--brand-accent-gold);
+}
+
+.present-results-hidden strong {
+  color: var(--text-primary);
+  font-size: clamp(1.1rem, 2.4vw, 2rem);
+  font-weight: 900;
+}
+
+.present-results-hidden p {
+  margin: 0;
+  max-width: 32ch;
+  color: var(--text-secondary);
+  font-size: clamp(0.85rem, 1.3vw, 1.1rem);
+  line-height: 1.55;
+}
+
+.present-results-hidden ul {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  list-style: none;
+}
+
+.present-results-hidden li {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-sm);
+  padding: clamp(0.65rem, 1.2vw, 1rem);
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--text-primary);
+  font-size: clamp(0.95rem, 1.8vw, 1.6rem);
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
 .present-side-panel {
   display: grid;
   align-content: start;

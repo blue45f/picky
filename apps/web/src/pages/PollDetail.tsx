@@ -60,6 +60,7 @@ import {
   buildConsensusNarrative as buildConsensusNarrative_shared,
   buildDecisionMemo,
   COMMENT_PASSWORD_MAX,
+  COMMENT_PASSWORD_MIN,
   RESULTS_VISIBILITY_LABELS as SHARED_RESULTS_VISIBILITY_LABELS,
 } from '@picky/shared';
 // 결과 카드 이미지(순수 Canvas) 드로잉은 packages/client 로 단일화했어요.
@@ -699,6 +700,11 @@ function PollPresentationView(
     copiedId: string | null;
     copyMessage: string;
     handleCopyLinkClick: (pollId: string) => void;
+    /**
+     * 결과(분포·선두·결정 신호·대표 의견)를 발표 화면에 노출해도 되는지.
+     * '투표 후 공개(afterVote)' 정책 폴은 마감 전엔 작성자/어드민이 아닌 한 가려, 진행 중 결과 누출을 막는다.
+     */
+    resultsRevealed: boolean;
   }>,
 ) {
   const {
@@ -720,6 +726,7 @@ function PollPresentationView(
     copiedId,
     copyMessage,
     handleCopyLinkClick,
+    resultsRevealed,
   } = props;
 
   return (
@@ -776,7 +783,7 @@ function PollPresentationView(
         </div>
         <div>
           <span>상태</span>
-          <strong>{pollClosed ? '마감' : consensusLabel}</strong>
+          <strong>{pollClosed ? '마감' : resultsRevealed ? consensusLabel : '진행 중'}</strong>
         </div>
         <div>
           <span>참여 코드</span>
@@ -786,37 +793,55 @@ function PollPresentationView(
 
       <div className="present-grid">
         <section className="present-results-panel">
-          {sortedOptionsByVotes.map((option, index) => {
-            const percentage = optionPercent(option.voteCount, currentPoll.totalVotes);
-            return (
-              <article key={option.id} className={index === 0 ? 'leader' : undefined}>
-                <div>
-                  <span>{index + 1}</span>
-                  <strong>{option.text}</strong>
-                  <small>
-                    {option.voteCount}표 · {percentage}%
-                  </small>
-                </div>
-                <div className="present-result-bar">
-                  <span style={{ width: `${percentage}%` }} />
-                </div>
-              </article>
-            );
-          })}
+          {resultsRevealed ? (
+            sortedOptionsByVotes.map((option, index) => {
+              const percentage = optionPercent(option.voteCount, currentPoll.totalVotes);
+              return (
+                <article key={option.id} className={index === 0 ? 'leader' : undefined}>
+                  <div>
+                    <span>{index + 1}</span>
+                    <strong>{option.text}</strong>
+                    <small>
+                      {option.voteCount}표 · {percentage}%
+                    </small>
+                  </div>
+                  <div className="present-result-bar">
+                    <span style={{ width: `${percentage}%` }} />
+                  </div>
+                </article>
+              );
+            })
+          ) : (
+            // afterVote 정책 폴은 마감 전엔 분포를 가린다 — 선택지 목록만 보여 참여를 유도한다.
+            <div className="present-results-hidden" role="status">
+              <Lock size={22} />
+              <strong>결과는 마감 후 공개돼요</strong>
+              <p>이 고민은 참여한 사람에게만 결과를 보여주는 설정이에요. 지금은 분포를 가렸어요.</p>
+              <ul>
+                {sortedOptionsByVotes.map((option) => (
+                  <li key={option.id}>{option.text}</li>
+                ))}
+              </ul>
+            </div>
+          )}
         </section>
 
         <aside className="present-side-panel">
           <div>
             <span>결정 신호</span>
-            <strong>{consensusLabel}</strong>
-            <p>{decisionHint}</p>
+            <strong>{resultsRevealed ? consensusLabel : '집계 중'}</strong>
+            <p>{resultsRevealed ? decisionHint : '마감 후 결정 신호를 공개해요.'}</p>
           </div>
           <div>
             <span>대표 의견</span>
-            <strong>{featuredComment?.voterName || '의견 대기'}</strong>
+            <strong>
+              {resultsRevealed ? featuredComment?.voterName || '의견 대기' : '집계 중'}
+            </strong>
             <p>
-              {featuredComment?.comment ||
-                '아직 의견이 없습니다. 참여 링크를 공유해 선택 이유를 받아보세요.'}
+              {resultsRevealed
+                ? featuredComment?.comment ||
+                  '아직 의견이 없습니다. 참여 링크를 공유해 선택 이유를 받아보세요.'
+                : '마감 후 대표 의견을 공개해요.'}
             </p>
           </div>
           <div>
@@ -1877,8 +1902,10 @@ function CommentPasswordDisclosure(
   const { value, onChange, disabled = false, idPrefix } = props;
   const [open, setOpen] = React.useState(false);
   const trimmedLength = value.trim().length;
-  // 1~3자(너무 짧음)면 친절하게 안내만 — 제출 자체는 상위에서 막는다(비번은 보내지 않음).
-  const tooShort = trimmedLength > 0 && trimmedLength < 4;
+  // 최소 미만(너무 짧음)이면 친절하게 안내만 — 제출 자체는 상위에서 막는다(비번은 보내지 않음).
+  // 신규 비번 설정이므로 생성 최소 길이(COMMENT_PASSWORD_MIN)를 기준으로 한다(검증 경로와 분리).
+  const tooShort = trimmedLength > 0 && trimmedLength < COMMENT_PASSWORD_MIN;
+  const hasPassword = trimmedLength >= COMMENT_PASSWORD_MIN;
   const inputId = `${idPrefix}-comment-password`;
 
   return (
@@ -1897,11 +1924,11 @@ function CommentPasswordDisclosure(
           alignSelf: 'flex-start',
           fontSize: '0.7rem',
           fontWeight: 800,
-          color: trimmedLength >= 4 ? 'var(--brand-accent-teal)' : 'var(--text-secondary)',
+          color: hasPassword ? 'var(--brand-accent-teal)' : 'var(--text-secondary)',
         }}
       >
         <Lock size={12} />
-        {trimmedLength >= 4 ? '관리 비번 설정됨 (선택)' : '다른 기기서 관리하려면 비번 설정 (선택)'}
+        {hasPassword ? '관리 비번 설정됨 (선택)' : '다른 기기서 관리하려면 비번 설정 (선택)'}
       </button>
       {open ? (
         <div style={{ display: 'grid', gap: '0.3rem' }}>
@@ -1912,18 +1939,19 @@ function CommentPasswordDisclosure(
             onChange={(event) => onChange(event.target.value)}
             maxLength={COMMENT_PASSWORD_MAX}
             disabled={disabled}
-            placeholder="관리 비밀번호 (4~20자, 선택)"
+            placeholder={`관리 비밀번호 (${COMMENT_PASSWORD_MIN}~${COMMENT_PASSWORD_MAX}자, 선택)`}
             aria-label="댓글 관리 비밀번호 (선택)"
             autoComplete="new-password"
             className="form-input"
             style={{ fontSize: '0.8rem' }}
           />
           <small style={{ color: 'var(--text-muted)', fontSize: '0.66rem', lineHeight: 1.45 }}>
-            비번을 설정하면 다른 기기·브라우저에서도 이 한마디를 수정/삭제할 수 있어요. (4~20자)
+            비번을 설정하면 다른 기기·브라우저에서도 이 한마디를 수정/삭제할 수 있어요. (
+            {COMMENT_PASSWORD_MIN}~{COMMENT_PASSWORD_MAX}자)
           </small>
           {tooShort ? (
             <small style={{ color: 'var(--brand-accent-coral)', fontSize: '0.66rem' }}>
-              비번은 4자 이상이어야 해요. (비우면 설정 없이 등록됩니다)
+              비번은 {COMMENT_PASSWORD_MIN}자 이상이어야 해요. (비우면 설정 없이 등록됩니다)
             </small>
           ) : null}
         </div>
@@ -3795,7 +3823,10 @@ function ResultImagePreviewModal(
 function CommentCard(
   props: Readonly<{
     comm: Poll['comments'][number];
-    canManage: boolean;
+    /** 수정 가능(본인/어드민/비번잠금) — 서버 매트릭스: 폴 소유자는 남의 글 수정 불가. */
+    canEdit: boolean;
+    /** 삭제 가능(본인/폴 소유자/어드민/비번잠금). */
+    canDelete: boolean;
     /** 비번 잠금 댓글(다른 기기)이라 수정/삭제 전 비밀번호 입력이 필요한지. 본인/소유자/어드민이면 false. */
     needsPassword?: boolean;
     onDeleteComment: (commentId: number, password?: string) => void;
@@ -3810,7 +3841,8 @@ function CommentCard(
 ) {
   const {
     comm,
-    canManage,
+    canEdit: canEditGrant,
+    canDelete,
     needsPassword = false,
     onDeleteComment,
     onEditComment,
@@ -3822,7 +3854,9 @@ function CommentCard(
   const [isSaving, setIsSaving] = React.useState(false);
   // 비번 잠금 수정 흐름: 수정 진입 시 입력받은 비번을 저장 → 저장 시 함께 전송한다.
   const [unlockPassword, setUnlockPassword] = React.useState<string | null>(null);
-  const canEdit = canManage && Boolean(onEditComment);
+  // 수정 버튼은 수정 권한 + 수정 핸들러가 있을 때만. 삭제 버튼은 삭제 권한만으로 노출한다.
+  const canEdit = canEditGrant && Boolean(onEditComment);
+  const canManage = canEdit || canDelete;
 
   // 비번 잠금 댓글이면 관리(수정/삭제) 전에 비밀번호를 받는다. 취소(null)·빈값이면 중단.
   const promptPassword = (): string | null => {
@@ -4059,28 +4093,30 @@ function CommentCard(
                 수정
               </button>
             ) : null}
-            <button
-              type="button"
-              onClick={requestDelete}
-              className="ghost-btn"
-              aria-label={
-                needsPassword
-                  ? `${comm.voterName} 님의 댓글 삭제 (비밀번호 필요)`
-                  : `${comm.voterName} 님의 댓글 삭제`
-              }
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '4px',
-                padding: '4px 9px',
-                fontSize: '0.7rem',
-                color: 'var(--brand-accent-coral)',
-                borderColor: 'rgba(239, 68, 68, 0.28)',
-              }}
-            >
-              {needsPassword ? <Lock size={12} /> : <Trash2 size={12} />}
-              삭제
-            </button>
+            {canDelete ? (
+              <button
+                type="button"
+                onClick={requestDelete}
+                className="ghost-btn"
+                aria-label={
+                  needsPassword
+                    ? `${comm.voterName} 님의 댓글 삭제 (비밀번호 필요)`
+                    : `${comm.voterName} 님의 댓글 삭제`
+                }
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '4px 9px',
+                  fontSize: '0.7rem',
+                  color: 'var(--brand-accent-coral)',
+                  borderColor: 'rgba(239, 68, 68, 0.28)',
+                }}
+              >
+                {needsPassword ? <Lock size={12} /> : <Trash2 size={12} />}
+                삭제
+              </button>
+            ) : null}
           </div>
         ) : null}
       </div>
@@ -4101,13 +4137,14 @@ function PollFeedbackList(
     /** 폴 권한(소유자/어드민) — 댓글별 콜백이 없을 때의 폴백. */
     canManage: boolean;
     /**
-     * 댓글별 관리(수정/삭제) 어포던스 판정 — 본인/소유자/어드민은 직접(needsPassword=false),
-     * 비번 잠금 댓글(다른 기기)은 비번 입력(needsPassword=true)으로. hasPassword 로 자물쇠 여부 판단.
+     * 댓글별 관리(수정/삭제) 어포던스 판정 — 서버 매트릭스와 1:1(수정/삭제 분리).
+     * 본인/어드민/비번잠금은 수정 가능, 본인/소유자/어드민/비번잠금은 삭제 가능.
+     * 비번 잠금 댓글(다른 기기)은 needsPassword=true 로 비번 입력 흐름을 거친다.
      */
     resolveCommentAffordance?: (
       commentId: number,
       hasPassword: boolean,
-    ) => { canManage: boolean; needsPassword: boolean };
+    ) => { canEdit: boolean; canDelete: boolean; needsPassword: boolean };
     pollClosed: boolean;
     onDeleteComment: (commentId: number, password?: string) => void;
     onEditComment?: (
@@ -4135,12 +4172,13 @@ function PollFeedbackList(
     onAddReply,
   } = props;
   // 댓글별 어포던스 — 콜백이 있으면 그걸(본인/소유자/어드민/비번잠금), 없으면 폴 권한(canManage)으로 폴백.
+  // 폴백은 폴 소유자/어드민 모더레이션 맥락이라 수정·삭제 모두 canManage 로 둔다(서버가 최종 강제).
   const resolveAffordance = (
     comm: Poll['comments'][number],
-  ): { canManage: boolean; needsPassword: boolean } =>
+  ): { canEdit: boolean; canDelete: boolean; needsPassword: boolean } =>
     resolveCommentAffordance
       ? resolveCommentAffordance(comm.id, Boolean(comm.hasPassword))
-      : { canManage, needsPassword: false };
+      : { canEdit: canManage, canDelete: canManage, needsPassword: false };
   const [replyingTo, setReplyingTo] = React.useState<number | null>(null);
   const [replyText, setReplyText] = React.useState('');
   // 답글에 "선택" 관리 비밀번호(다른 기기서 본인 답글 관리용). 비우면 비번 없이 등록.
@@ -4165,16 +4203,22 @@ function PollFeedbackList(
     if (!text || isSubmittingReply) {
       return;
     }
-    // 관리 비번은 "선택" — 비우면 그대로. 단 1~3자(너무 짧음)면 친절히 막는다(서버 400 선제 차단).
+    // 관리 비번은 "선택" — 비우면 그대로. 단 생성 최소 미만(너무 짧음)이면 친절히 막는다(서버 400 선제 차단).
     const trimmedPassword = replyPassword.trim();
-    if (trimmedPassword.length > 0 && trimmedPassword.length < 4) {
-      setReplyPasswordError('관리 비번은 4자 이상이어야 해요. (비우면 비번 없이 등록됩니다)');
+    if (trimmedPassword.length > 0 && trimmedPassword.length < COMMENT_PASSWORD_MIN) {
+      setReplyPasswordError(
+        `관리 비번은 ${COMMENT_PASSWORD_MIN}자 이상이어야 해요. (비우면 비번 없이 등록됩니다)`,
+      );
       return;
     }
     setReplyPasswordError('');
     setIsSubmittingReply(true);
     try {
-      await onAddReply(parentId, text, trimmedPassword.length >= 4 ? trimmedPassword : undefined);
+      await onAddReply(
+        parentId,
+        text,
+        trimmedPassword.length >= COMMENT_PASSWORD_MIN ? trimmedPassword : undefined,
+      );
       setReplyText('');
       setReplyPassword('');
       setReplyingTo(null);
@@ -4328,6 +4372,7 @@ function PollFeedbackList(
           ) : null}
           {visibleTopLevel.map((comm) => {
             const replies = repliesByParent.get(comm.id) ?? [];
+            const commAffordance = resolveAffordance(comm);
             return (
               <div
                 key={comm.id}
@@ -4335,8 +4380,9 @@ function PollFeedbackList(
               >
                 <CommentCard
                   comm={comm}
-                  canManage={resolveAffordance(comm).canManage}
-                  needsPassword={resolveAffordance(comm).needsPassword}
+                  canEdit={commAffordance.canEdit}
+                  canDelete={commAffordance.canDelete}
+                  needsPassword={commAffordance.needsPassword}
                   onDeleteComment={onDeleteComment}
                   onEditComment={onEditComment}
                   // B4: 마감된 고민은 답글도 받지 않는다 — '답글 달기' 트리거 자체를 숨긴다.
@@ -4351,17 +4397,21 @@ function PollFeedbackList(
                         }
                   }
                 />
-                {replies.map((reply) => (
-                  <CommentCard
-                    key={reply.id}
-                    comm={reply}
-                    canManage={resolveAffordance(reply).canManage}
-                    needsPassword={resolveAffordance(reply).needsPassword}
-                    onDeleteComment={onDeleteComment}
-                    onEditComment={onEditComment}
-                    isReply
-                  />
-                ))}
+                {replies.map((reply) => {
+                  const replyAffordance = resolveAffordance(reply);
+                  return (
+                    <CommentCard
+                      key={reply.id}
+                      comm={reply}
+                      canEdit={replyAffordance.canEdit}
+                      canDelete={replyAffordance.canDelete}
+                      needsPassword={replyAffordance.needsPassword}
+                      onDeleteComment={onDeleteComment}
+                      onEditComment={onEditComment}
+                      isReply
+                    />
+                  );
+                })}
                 {!pollClosed && replyingTo === comm.id ? (
                   <div
                     style={{
@@ -7045,7 +7095,7 @@ export const PollDetail: React.FC = () => {
   const resolveCommentAffordance = (
     commentId: number,
     hasPassword: boolean,
-  ): { canManage: boolean; needsPassword: boolean } =>
+  ): { canEdit: boolean; canDelete: boolean; needsPassword: boolean } =>
     resolveCommentManageAffordance({
       mine: id ? isMyComment(id, commentId) : false,
       isPollOwner,
@@ -7421,14 +7471,17 @@ export const PollDetail: React.FC = () => {
       return;
     }
 
-    // 관리 비번은 "선택" — 비우면 그대로 진행. 단 1~3자(너무 짧음)면 친절히 막는다(서버 400 선제 차단).
+    // 관리 비번은 "선택" — 비우면 그대로 진행. 단 생성 최소 미만(너무 짧음)이면 친절히 막는다(서버 400 선제 차단).
     const trimmedPassword = commentPassword.trim();
-    if (trimmedPassword.length > 0 && trimmedPassword.length < 4) {
-      setVoteMessage('관리 비번은 4자 이상이어야 해요. (비우면 비번 없이 등록됩니다)');
+    if (trimmedPassword.length > 0 && trimmedPassword.length < COMMENT_PASSWORD_MIN) {
+      setVoteMessage(
+        `관리 비번은 ${COMMENT_PASSWORD_MIN}자 이상이어야 해요. (비우면 비번 없이 등록됩니다)`,
+      );
       return;
     }
     // 비번은 한마디가 있을 때만 의미가 있다(빈 한마디엔 댓글 자체가 안 생긴다).
-    const votePassword = comment.trim() && trimmedPassword.length >= 4 ? trimmedPassword : null;
+    const votePassword =
+      comment.trim() && trimmedPassword.length >= COMMENT_PASSWORD_MIN ? trimmedPassword : null;
 
     setIsSubmittingVote(true);
     clearError();
@@ -8113,6 +8166,9 @@ export const PollDetail: React.FC = () => {
         copiedId={copiedId}
         copyMessage={copyMessage}
         handleCopyLinkClick={handleCopyLinkClick}
+        // 작성자/어드민은 항상 결과를 보고, 그 외에는 공개 정책(마감/always/투표함)을 따른다.
+        // afterVote 정책 폴을 진행 중 공유한 발표 화면에서 결과가 새지 않도록 막는 게이트.
+        resultsRevealed={canManagePoll || canViewResults}
       />
     );
   }

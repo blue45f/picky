@@ -25,7 +25,7 @@ import {
   POLLS_PAGE_DEFAULT_LIMIT,
   POLLS_PAGE_MAX_LIMIT,
 } from '@picky/shared';
-import type { PollCommentWithAuthor } from '../database/database.service';
+import type { PollCommentWithAuthor, PollWithCommentAuthors } from '../database/database.service';
 
 /** GET /polls 서버측 검색/정렬/필터 파라미터(전부 선택값). */
 export interface GetPollsParams {
@@ -58,15 +58,27 @@ export class PollService {
 
   /**
    * 명백한 댓글 중복(멱등 안전망) 판정 — 연타·StrictMode·네트워크 재시도가 만든 같은 한마디를 막는다.
-   * "같은 폴 + 같은 부모(답글 위치) + 같은 작성자 + 같은 내용"이 짧은 시간 안에 이미 있으면 중복으로 본다.
+   * "같은 폴 + 같은 부모(답글 위치) + 같은 작성자 키 + 같은 내용"이 짧은 시간 안에 이미 있으면 중복으로 본다.
+   *
+   * 작성자 판정은 voterName(공개·위조 가능) 대신 안정 작성자 키(authorId=회원, authorKey=비회원)로 한다 —
+   * 이렇게 해야 ①다른 사람이 우연히 같은 닉네임으로 같은 말을 남기는 정상 케이스를 막지 않고,
+   * ②닉네임을 비워 '익명'이 된 서로 다른 두 사람의 같은 한마디를 한 건으로 잘못 합치지 않는다.
+   * 작성자 키가 전혀 없으면(레거시·키 미전송) 본인 동일성을 확신할 수 없으므로 시간창 dedup을 적용하지 않는다
+   * (이 경로의 중복 방지는 clientCommentId 멱등키가 담당한다).
+   *
    * 정상적으로 한참 뒤에 같은 말을 또 남기는 건 허용 범위 — 그래서 시간 창(window)으로 좁힌다.
    * (거부가 아니라 기존 댓글을 그대로 돌려주는 멱등 처리라 사용자 경험은 정상 단일 제출과 같다.)
    */
   private static readonly DUPLICATE_COMMENT_WINDOW_MS = 10_000;
 
   private isDuplicateComment(
-    poll: Poll,
-    input: { comment: string; voterName?: string | null; parentId?: number | null },
+    poll: PollWithCommentAuthors,
+    input: {
+      comment: string;
+      parentId?: number | null;
+      authorId?: string | null;
+      authorKey?: string | null;
+    },
   ): boolean {
     const normalize = (value: string | null | undefined): string =>
       (value ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
@@ -74,7 +86,12 @@ export class PollService {
     if (!targetText) {
       return false;
     }
-    const targetAuthor = normalize(input.voterName) || '익명';
+    const targetAuthorId = (input.authorId ?? '').trim();
+    const targetAuthorKey = (input.authorKey ?? '').trim();
+    // 작성자 키가 하나도 없으면 본인 동일성을 보장할 수 없어 시간창 dedup을 적용하지 않는다(clientCommentId가 담당).
+    if (!targetAuthorId && !targetAuthorKey) {
+      return false;
+    }
     const targetParent = input.parentId ?? null;
     const now = Date.now();
 
@@ -85,7 +102,14 @@ export class PollService {
       if (normalize(existing.comment) !== targetText) {
         return false;
       }
-      if ((normalize(existing.voterName) || '익명') !== targetAuthor) {
+      // 같은 작성자 키(회원 authorId 또는 비회원 authorKey)일 때만 같은 사람으로 본다.
+      const sameAuthorId = Boolean(
+        targetAuthorId && existing.authorId && existing.authorId === targetAuthorId,
+      );
+      const sameAuthorKey = Boolean(
+        targetAuthorKey && existing.authorKey && existing.authorKey === targetAuthorKey,
+      );
+      if (!sameAuthorId && !sameAuthorKey) {
         return false;
       }
       const createdAtMs = new Date(existing.createdAt).getTime();
@@ -295,6 +319,14 @@ export class PollService {
     return poll;
   }
 
+  /**
+   * 고민(투표)을 생성한다. 작성 모델은 댓글과 동일 — 회원은 creatorId(JWT)로, 게스트는 관리 비번으로 본인 식별.
+   * - creatorIsGuest 는 호출부 의도를 그대로 신뢰하지 않고, creatorId 존재 여부로 정확히 재계산한다
+   *   (creatorId 가 있으면 회원=false, 없으면 게스트=true). "creatorIsGuest=false 강제"가 새지 않게 한다.
+   * - 게스트(creatorId 없음)면 input.password 가 필수다(비번 없으면 컨트롤러에서 이미 거부되지만 방어적 재검증).
+   *   게스트 비번은 해시(passwordHash)로만 저장하고 원문·해시는 응답에 절대 싣지 않는다.
+   * - 회원(creatorId 있음)은 비번을 무시한다(creatorId 로 충분 — 비번을 보내도 저장하지 않음).
+   */
   async createPoll(
     input: CreatePollInput,
     creatorId: string | null = null,
@@ -322,6 +354,17 @@ export class PollService {
       throw new BadRequestException('비공개(private) 투표는 접근 코드가 필요합니다.');
     }
 
+    // creatorIsGuest 는 항상 creatorId 존재로 재계산한다(인자 신뢰 금지) — 회원=false, 게스트=true.
+    const resolvedIsGuest = !creatorId;
+    void creatorIsGuest;
+    // 게스트는 관리 비번이 필수(어느 기기서든 본인 수정/삭제용). 회원은 creatorId 로 식별하므로 비번을 저장하지 않는다.
+    const trimmedPassword = input.password?.trim() || '';
+    if (resolvedIsGuest && !trimmedPassword) {
+      throw new BadRequestException('비회원이 고민을 작성하려면 관리 비밀번호가 필요해요.');
+    }
+    const passwordHash =
+      resolvedIsGuest && trimmedPassword ? this.hashCommentPassword(trimmedPassword) : null;
+
     const newPoll: PollWithCategory = {
       id: pollId,
       question: input.question,
@@ -336,13 +379,15 @@ export class PollService {
       visibility,
       requiresCode: visibility === 'private',
       creatorId,
-      creatorIsGuest,
+      creatorIsGuest: resolvedIsGuest,
       categoryId: input.categoryId || null,
     };
 
     await this.db.createPoll({
       ...newPoll,
       accessCode: visibility === 'private' ? (input.accessCode ?? null) : null,
+      // 게스트 작성 폴만 해시 저장(회원은 null). 응답(newPoll)에는 해시를 싣지 않는다.
+      passwordHash,
     });
     return newPoll;
   }
@@ -379,13 +424,38 @@ export class PollService {
     };
   }
 
-  private assertCanManage(poll: Poll, userId: string | null, isAdmin: boolean, action: string) {
+  /**
+   * 고민(투표) 관리(수정/삭제) 권한을 강제한다 — 댓글 권한 모델과 동일한 매트릭스:
+   * - 어드민
+   * - 작성 회원 본인: userId 가 있고 poll.creatorId 와 일치
+   * - 작성 게스트 본인: 폴에 관리 비번이 설정돼 있고 입력 password 가 저장 해시와 일치(어느 기기서든 본인 인정)
+   * 비번이 없는 레거시(비번 미설정) 폴은 회원 소유자/어드민만 관리할 수 있다(하위호환 — 게스트 인증 수단 없음).
+   * 비번 검증은 verifyCommentPasswordGuarded(무차별 대입 방지 rate-limit)를 재사용한다 — commentId 슬롯은
+   * 폴 단위라 0(예약값)으로 둬 댓글 키와 충돌하지 않게 한다(`pollId:0`).
+   */
+  private async assertCanManage(
+    poll: Poll,
+    userId: string | null,
+    isAdmin: boolean,
+    action: string,
+    password?: string | null,
+  ): Promise<void> {
     if (isAdmin) {
       return;
     }
-    if (!userId || !poll.creatorId || poll.creatorId !== userId) {
-      throw new ForbiddenException(`내가 만든 고민만 ${action}할 수 있습니다.`);
+    // 작성 회원 본인.
+    if (userId && poll.creatorId && poll.creatorId === userId) {
+      return;
     }
+    // 작성 게스트 본인 — 폴에 비번이 설정돼 있고 입력 비번이 해시와 일치하면 통과(다른 기기 포함).
+    const candidate = (password ?? '').trim();
+    if (candidate) {
+      const storedHash = await this.db.getPollPasswordHash(poll.id);
+      if (storedHash && this.verifyCommentPasswordGuarded(poll.id, 0, candidate, storedHash)) {
+        return;
+      }
+    }
+    throw new ForbiddenException(`내가 만든 고민만 ${action}할 수 있습니다.`);
   }
 
   private validateEndsAt(rawEndsAt: string | null): string | null {
@@ -403,12 +473,14 @@ export class PollService {
     id: string,
     userId: string | null,
     isAdmin = false,
+    password?: string | null,
   ): Promise<{ id: string; deleted: true }> {
     const poll = await this.db.getPollById(id);
     if (!poll) {
       throw new NotFoundException(`고민(투표) ID ${id}를 찾을 수 없습니다.`);
     }
-    this.assertCanManage(poll, userId, isAdmin, '삭제');
+    // 작성 회원 본인·어드민, 또는 게스트면 폴 관리 비번 일치 시 삭제 허용.
+    await this.assertCanManage(poll, userId, isAdmin, '삭제', password);
     await this.db.deletePoll(id);
     return { id, deleted: true };
   }
@@ -423,12 +495,14 @@ export class PollService {
     input: UpdatePollInput,
     userId: string | null,
     isAdmin = false,
+    password?: string | null,
   ): Promise<Poll> {
     const poll = (await this.db.getPollById(id)) as PollWithCategory | undefined;
     if (!poll) {
       throw new NotFoundException(`고민(투표) ID ${id}를 찾을 수 없습니다.`);
     }
-    this.assertCanManage(poll, userId, isAdmin, '수정');
+    // 작성 회원 본인·어드민, 또는 게스트면 폴 관리 비번 일치 시 수정 허용.
+    await this.assertCanManage(poll, userId, isAdmin, '수정', password);
 
     const next: PollWithCategory = { ...poll };
 
@@ -569,11 +643,14 @@ export class PollService {
     voterKey: string | null,
     isAdmin = false,
     password?: string | null,
+    code?: string | null,
   ): Promise<{ id: string; commentId: number; deleted: true }> {
     const poll = await this.db.getPollWithCommentAuthors(id);
     if (!poll) {
       throw new NotFoundException(`고민(투표) ID ${id}를 찾을 수 없습니다.`);
     }
+    // 비공개(private) 투표는 DB 변조(댓글 삭제) 전에 접근 코드 게이트를 통과해야 한다(vote/addComment와 동일).
+    await this.assertWriteAccess(poll, code);
     const comment = poll.comments.find((item) => item.id === commentId);
     if (!comment) {
       throw new NotFoundException(`댓글 ID ${commentId}를 찾을 수 없습니다.`);
@@ -602,6 +679,9 @@ export class PollService {
     if (!poll) {
       throw new NotFoundException(`고민(투표) ID ${id}를 찾을 수 없습니다.`);
     }
+    // 비공개(private) 투표는 DB 변조(댓글 수정) 전에 접근 코드 게이트를 통과해야 한다(vote/addComment와 동일).
+    // 코드가 없거나 틀리면 403 — 게이트 안 데이터(댓글)를 코드 없이 바꾸지 못하게 막는다.
+    await this.assertWriteAccess(poll, code);
     const comment = poll.comments.find((item) => item.id === commentId);
     if (!comment) {
       throw new NotFoundException(`댓글 ID ${commentId}를 찾을 수 없습니다.`);
@@ -708,7 +788,9 @@ export class PollService {
     userId: string | null = null,
     code?: string | null,
   ): Promise<Poll> {
-    const poll = await this.db.getPollById(id);
+    // 작성자 식별값(authorId/authorKey)을 포함해 읽는다 — 시간창 dedup이 voterName(위조 가능)이 아니라
+    // 안정 작성자 키로 "같은 사람의 중복 제출"을 판정하기 위함이다(응답엔 author 필드를 싣지 않는다).
+    const poll = await this.db.getPollWithCommentAuthors(id);
     if (!poll) {
       throw new NotFoundException(`고민(투표) ID ${id}를 찾을 수 없습니다.`);
     }
@@ -735,8 +817,16 @@ export class PollService {
 
     // 멱등 안전망 — 같은 작성자가 같은 위치에 같은 내용을 짧은 시간 안에 또 보내면(연타·재시도)
     // 새 댓글을 만들지 않고 기존 상태를 그대로 반환한다(거부 아님 → 사용자 경험은 단일 제출과 동일).
-    // SQL/Blob/in-memory 어떤 백엔드든 getPollById가 정규화한 comments를 보므로 한 곳에서 세 경로를 덮는다.
-    if (this.isDuplicateComment(poll, { ...input, parentId })) {
+    // dedup 키는 voterName(위조 가능) 대신 작성자 키(authorId/authorKey) 기준이라, 다른 사람이 같은 닉네임으로
+    // 같은 말을 남기는 정상 케이스를 막지 않는다. clientCommentId 가 있으면 DB 부분 유니크가 우선 보장한다.
+    if (
+      this.isDuplicateComment(poll, {
+        comment: input.comment,
+        parentId,
+        authorId: userId,
+        authorKey: input.voterKey?.trim() ? input.voterKey.trim() : null,
+      })
+    ) {
       return this.getPollForViewer(id, code);
     }
 

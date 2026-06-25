@@ -72,7 +72,9 @@ export interface PollState {
   updatePoll: (id: string, patch: UpdatePollInput) => Promise<Poll | null>;
   // 비공개(private) 투표는 접근 코드를 ?code= 로 함께 보내야 서버 게이트를 통과한다(공개 폴은 생략).
   vote: (id: string, input: VoteInput, code?: string | null) => Promise<boolean>;
-  deletePoll: (id: string) => Promise<boolean>;
+  // password: 게스트(비회원)가 자신이 만든 고민을 다른 기기서 관리 비밀번호로 삭제할 때 전송(회원은 생략).
+  // GET 쿼리가 아니라 DELETE 바디로 보낸다(로그 누출 방지). 회원/어드민은 JWT 로 통과한다.
+  deletePoll: (id: string, password?: string | null) => Promise<boolean>;
   // voterKey·password 는 비회원 본인 확인용 — GET 쿼리가 아니라 요청 바디로 보낸다(로그 누출 방지).
   // password: 게스트가 다른 기기서 비번으로 본인 댓글을 삭제할 때 전송(미설정 댓글이면 생략).
   deleteComment: (
@@ -734,10 +736,10 @@ export const createPollStoreState = ({
       };
 
       try {
-        // 하이브리드 정체성 정책(폴 작성 로그인 게이트): 자동 비회원 토큰을 발급하지 않는다.
-        // 작성은 실로그인(웹 회원/소셜·토스 SSO)만 통과하므로, 진입 게이트가 보장한 기존 토큰을
-        // 그대로 싣는다. 토큰이 없으면 서버 AuthGuard 가 401 로 막아 '고아 고민'이 생기지 않는다.
-        // (투표·댓글은 이 경로를 타지 않고 voterKey 로 토큰 없이 게스트 참여를 유지한다.)
+        // 정체성 정책(댓글과 동일 모델): 회원은 JWT(creatorId)로, 게스트는 input.password(관리 비번)로 식별.
+        // 토큰이 있으면 그대로 싣고(회원), 없으면 비번 기반 게스트 작성이라 토큰 없이 보낸다.
+        // 서버는 OptionalAuthGuard 로 받아 회원=creatorId, 게스트=비번 필수(없으면 400/401)로 처리한다.
+        // (투표·댓글도 같은 저마찰 모델 — voterKey/비번으로 토큰 없이 참여한다.)
         const token = getAuthToken(useAuthStore);
         const headers: Record<string, string> = {
           'Content-Type': 'application/json',
@@ -876,7 +878,7 @@ export const createPollStoreState = ({
       }
     },
 
-    deletePoll: async (id) => {
+    deletePoll: async (id, password) => {
       const dropFromState = () => {
         removePollFromCache(id);
         set(buildPollRemovalUpdate(id));
@@ -890,12 +892,18 @@ export const createPollStoreState = ({
       set({ error: null });
       try {
         const token = getAuthToken(useAuthStore);
-        const headers: Record<string, string> = {};
+        // 게스트 비번을 보낼 땐 JSON 바디가 필요해 Content-Type 을 함께 싣는다(회원은 바디 없이 통과).
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
         if (token) {
           headers.Authorization = `Bearer ${token}`;
         }
 
-        const res = await requestApi(`/polls/${id}`, { method: 'DELETE', headers });
+        const res = await requestApi(`/polls/${id}`, {
+          method: 'DELETE',
+          headers,
+          // 비회원 본인 확인용 관리 비번을 바디로 전송(GET 쿼리 누출 방지). 회원/어드민은 null.
+          body: JSON.stringify({ password: password ?? null }),
+        });
         if (!res.ok) {
           const message = await setAuthSessionExpired(
             res,

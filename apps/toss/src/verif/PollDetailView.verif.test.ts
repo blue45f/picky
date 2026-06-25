@@ -97,4 +97,55 @@ describe('PollDetailView full render (verif)', () => {
       }
     }
   });
+
+  // Leak guard: when results are hidden (results-visibility gate not yet open),
+  // the comment bodies and the per-comment "콕 찝음" selected-option chip must NOT render,
+  // so a viewer can't infer the opinion/vote distribution before participating.
+  it('hides comment bodies + selected-option chip until results are unlocked', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(PollDetailView, {
+        poll: fixturePoll,
+        isLoading: false,
+        closed: false,
+        // results gate CLOSED (e.g. resultsVisibility=afterVote and not voted)
+        showResults: false,
+        hasVoted: false,
+        votedOptionId: null,
+        selectedOptionId: null,
+        onSelect: () => {},
+        onVote: () => {},
+        voterName: '',
+        setVoterName: () => {},
+        comment: '',
+        setComment: () => {},
+        commentPassword: '',
+        setCommentPassword: () => {},
+        leader: null,
+        displayOptions: fixturePoll.options,
+        winnerId: null,
+        isOwner: false,
+        confirmDelete: false,
+        onDelete: () => {},
+        remaining: null,
+        shareUrl: 'https://picky-olive.vercel.app/poll/' + fixturePoll.id,
+        onShare: () => {},
+        onCopy: () => {},
+        onCopyText: () => {},
+        onResultImageSaved: () => {},
+        onBack: () => {},
+        totalVotes: fixturePoll.totalVotes,
+        comments: fixturePoll.comments,
+      }),
+    );
+
+    // Comment bodies are gated behind the results lock.
+    expect(html).not.toContain('고기집이 회식 분위기 최고예요');
+    expect(html).not.toContain('파스타도 괜찮지만 고기파가 많을 듯');
+    // The "콕 찝음" chip (which option a commenter picked) must not leak.
+    expect(html).not.toContain('콕 찝음');
+    // Instead, a "open after participating" notice is shown so users know discussion exists.
+    expect(html).toContain('참여 후');
+    // The comment count itself (engagement signal, not the distribution) may still show.
+    expect(html).toContain('친구들 한마디');
+  });
 });

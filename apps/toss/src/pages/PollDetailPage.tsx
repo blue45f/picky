@@ -151,7 +151,7 @@ export function PollDetailPage() {
   // 서버가 최종 권한을 강제하므로 여기선 버튼 노출·비번 프롬프트 여부만 결정한다.
   const resolveCommentAffordance = (
     commentId: number,
-  ): { canManage: boolean; needsPassword: boolean } => {
+  ): { canEdit: boolean; canDelete: boolean; needsPassword: boolean } => {
     const target = poll ? poll.comments.find((c) => c.id === commentId) : null;
     return resolveCommentManageAffordance({
       mine: poll ? isMyComment(poll.id, commentId) : false,
@@ -160,8 +160,12 @@ export function PollDetailPage() {
       hasPassword: Boolean(target?.hasPassword),
     });
   };
-  const canManageCommentById = (commentId: number): boolean =>
-    resolveCommentAffordance(commentId).canManage;
+  // 한마디별 수정/삭제 어포던스를 분리해 넘긴다(세부 권한은 서버가 강제).
+  // 서버 매트릭스: 수정=본인/어드민/비번, 삭제=본인/폴 소유자/어드민/비번(소유자는 삭제만 가능).
+  const canEditCommentById = (commentId: number): boolean =>
+    resolveCommentAffordance(commentId).canEdit;
+  const canDeleteCommentById = (commentId: number): boolean =>
+    resolveCommentAffordance(commentId).canDelete;
   const commentNeedsPassword = (commentId: number): boolean =>
     resolveCommentAffordance(commentId).needsPassword;
 
@@ -467,7 +471,8 @@ export function PollDetailPage() {
       winnerId={winnerId}
       isOwner={isOwner}
       canManage={canManage}
-      canManageCommentById={canManageCommentById}
+      canEditCommentById={canEditCommentById}
+      canDeleteCommentById={canDeleteCommentById}
       commentNeedsPassword={commentNeedsPassword}
       confirmDelete={confirmDelete}
       onDelete={handleDelete}

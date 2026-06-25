@@ -31,6 +31,10 @@ export const polls = pgTable('polls', {
   // 공개 범위(public/unlisted/private) + 비공개 접근 코드. nullable/default라 비파괴.
   visibility: text('visibility').default('public').notNull(),
   accessCode: text('access_code'),
+  // 게스트(비회원) 고민 작성자의 선택적 관리 비밀번호 해시(salt:hash 또는 iterations:salt:hash, pbkdf2).
+  // 회원 작성 폴은 creatorId(authorId)로 본인 판정하므로 null. 게스트 작성 폴만 채운다.
+  // 비밀 — 응답에 절대 노출 금지(accessCode와 동급). 비번 일치 시 어느 기기서든 본인 수정/삭제 인정.
+  passwordHash: text('password_hash'),
 });
 
 // Poll options table

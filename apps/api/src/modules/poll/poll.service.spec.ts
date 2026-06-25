@@ -66,6 +66,10 @@ const createDbMock = () => {
   const savePollContent = vi.fn(async () => undefined);
   const deleteComment = vi.fn(async () => true);
   const updateComment = vi.fn(async () => true);
+  const createPoll = vi.fn(async (_poll: unknown): Promise<void> => undefined);
+  const deletePoll = vi.fn(async (_id: string): Promise<boolean> => true);
+  // 게스트 폴 관리 비번 해시 조회 — 기본은 null(비번 미설정 폴). 비번 분기 테스트가 mockResolvedValue 로 덮는다.
+  const getPollPasswordHash = vi.fn(async (): Promise<string | null> => null);
   const db = {
     getPolls,
     getPollById,
@@ -76,6 +80,9 @@ const createDbMock = () => {
     savePollContent,
     deleteComment,
     updateComment,
+    createPoll,
+    deletePoll,
+    getPollPasswordHash,
   } as unknown as DatabaseService;
   return {
     db,
@@ -88,6 +95,9 @@ const createDbMock = () => {
     savePollContent,
     deleteComment,
     updateComment,
+    createPoll,
+    deletePoll,
+    getPollPasswordHash,
   };
 };
 
@@ -275,7 +285,126 @@ describe('PollService.updatePoll (visibility / access-code transitions)', () => 
   });
 });
 
-describe('PollService.addComment (closed-poll guard)', () => {
+describe('PollService.createPoll (guest password — same model as comments)', () => {
+  let mocks: ReturnType<typeof createDbMock>;
+  let service: PollService;
+
+  beforeEach(() => {
+    mocks = createDbMock();
+    service = new PollService(mocks.db);
+    // generateShortId 가 충돌검사로 호출하는 getPollById 는 신규 id 라 undefined 여야 한다.
+    mocks.getPollById.mockResolvedValue(undefined);
+  });
+
+  it('rejects a guest poll without a password (creatorId=null, no password)', async () => {
+    await expect(
+      service.createPoll(
+        { question: '점심?', options: [{ text: '김밥' }, { text: '라면' }] },
+        null,
+        true,
+      ),
+    ).rejects.toThrow();
+    expect(mocks.createPoll).not.toHaveBeenCalled();
+  });
+
+  it('hashes and stores the guest password as passwordHash (never raw), creatorIsGuest=true', async () => {
+    await service.createPoll(
+      { question: '점심?', options: [{ text: '김밥' }, { text: '라면' }], password: 'pw1234' },
+      null,
+      true,
+    );
+    const arg = mocks.createPoll.mock.calls[0]?.[0] as unknown as {
+      passwordHash?: string | null;
+      creatorIsGuest?: boolean;
+      creatorId?: string | null;
+    };
+    expect(arg.creatorIsGuest).toBe(true);
+    expect(arg.creatorId).toBeNull();
+    expect(arg.passwordHash).toMatch(/^[0-9]+:[0-9a-f]+:[0-9a-f]+$/);
+    expect(arg.passwordHash).not.toContain('pw1234');
+  });
+
+  it('member poll: creatorIsGuest=false (recomputed from creatorId), no password stored', async () => {
+    await service.createPoll(
+      // 회원이 실수로 password 를 보내도 저장하지 않는다(creatorId 로 식별).
+      { question: '점심?', options: [{ text: '김밥' }, { text: '라면' }], password: 'pw1234' },
+      'u-member',
+      // 호출부가 creatorIsGuest=true 를 잘못 넘겨도 creatorId 존재로 false 로 재계산해야 한다.
+      true,
+    );
+    const arg = mocks.createPoll.mock.calls[0]?.[0] as unknown as {
+      passwordHash?: string | null;
+      creatorIsGuest?: boolean;
+      creatorId?: string | null;
+    };
+    expect(arg.creatorIsGuest).toBe(false);
+    expect(arg.creatorId).toBe('u-member');
+    expect(arg.passwordHash).toBeNull();
+  });
+});
+
+describe('PollService.updatePoll / deletePoll (guest manage via poll password)', () => {
+  let mocks: ReturnType<typeof createDbMock>;
+  let service: PollService;
+  // 게스트 작성 폴 — creatorId 없음(비번으로만 본인 식별).
+  const guestPoll = () => makePoll({ creatorId: null, creatorIsGuest: true });
+
+  beforeEach(() => {
+    mocks = createDbMock();
+    service = new PollService(mocks.db);
+  });
+
+  it('lets a guest UPDATE their poll when the correct poll password is supplied', async () => {
+    mocks.getPollById.mockResolvedValue(guestPoll());
+    mocks.getPollPasswordHash.mockResolvedValue(hashCommentPasswordForTest('pw1234'));
+    const result = await service.updatePoll(
+      'abc123',
+      { question: '바뀐 질문이에요' },
+      null,
+      false,
+      'pw1234',
+    );
+    expect(result.question).toBe('바뀐 질문이에요');
+    expect(mocks.savePollContent).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects a guest UPDATE when the poll password is WRONG (403, no save)', async () => {
+    mocks.getPollById.mockResolvedValue(guestPoll());
+    mocks.getPollPasswordHash.mockResolvedValue(hashCommentPasswordForTest('pw1234'));
+    await expect(
+      service.updatePoll('abc123', { question: '몰래 수정' }, null, false, 'wrong-pw'),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(mocks.savePollContent).not.toHaveBeenCalled();
+  });
+
+  it('lets a guest DELETE their poll with the correct password', async () => {
+    mocks.getPollById.mockResolvedValue(guestPoll());
+    mocks.getPollPasswordHash.mockResolvedValue(hashCommentPasswordForTest('pw1234'));
+    const result = await service.deletePoll('abc123', null, false, 'pw1234');
+    expect(result).toEqual({ id: 'abc123', deleted: true });
+    expect(mocks.deletePoll).toHaveBeenCalledWith('abc123');
+  });
+
+  it('rejects a legacy (no password) poll for a guest even with a password attempt', async () => {
+    // 비번 미설정 레거시 폴은 게스트 인증 수단이 없으므로 회원 소유자/어드민만 관리 가능.
+    mocks.getPollById.mockResolvedValue(guestPoll());
+    mocks.getPollPasswordHash.mockResolvedValue(null);
+    await expect(service.deletePoll('abc123', null, false, 'anything')).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+    expect(mocks.deletePoll).not.toHaveBeenCalled();
+  });
+
+  it('admin can delete any poll without a password', async () => {
+    mocks.getPollById.mockResolvedValue(guestPoll());
+    await service.deletePoll('abc123', null, true);
+    expect(mocks.deletePoll).toHaveBeenCalledWith('abc123');
+    // 어드민은 비번 분기 전에 통과하므로 해시 조회조차 하지 않는다.
+    expect(mocks.getPollPasswordHash).not.toHaveBeenCalled();
+  });
+});
+
+describe('PollService.addComment (closed-poll guard + author-key dedup)', () => {
   let mocks: ReturnType<typeof createDbMock>;
   let service: PollService;
 
@@ -284,110 +413,154 @@ describe('PollService.addComment (closed-poll guard)', () => {
     service = new PollService(mocks.db);
   });
 
+  /** addComment 는 작성자 식별값을 함께 읽으므로 getPollWithCommentAuthors 를 댓글로 채운다(author 키 포함). */
+  const seedWithComments = (
+    comments: PollCommentWithAuthor[],
+    pollOverrides: Partial<Poll> = {},
+  ) => {
+    mocks.getPollWithCommentAuthors.mockResolvedValue({
+      ...makePoll(pollOverrides),
+      comments,
+    } as PollWithCommentAuthors);
+  };
+
   it('appends a comment to an open poll', async () => {
-    mocks.getPollById.mockResolvedValue(makePoll());
+    mocks.getPollWithCommentAuthors.mockResolvedValue(makePoll() as PollWithCommentAuthors);
     await service.addComment('abc123', { comment: '나도 김밥!' });
     expect(mocks.appendComment).toHaveBeenCalledTimes(1);
   });
 
   it('blocks comments on a closed poll (no append)', async () => {
-    mocks.getPollById.mockResolvedValue(makePoll({ endsAt: '2000-01-01T00:00:00.000Z' }));
+    mocks.getPollWithCommentAuthors.mockResolvedValue(
+      makePoll({ endsAt: '2000-01-01T00:00:00.000Z' }) as PollWithCommentAuthors,
+    );
     await expect(service.addComment('abc123', { comment: '늦었지만…' })).rejects.toThrow();
     expect(mocks.appendComment).not.toHaveBeenCalled();
   });
 
-  // 멱등 안전망 — 연타·재시도가 만든 "직전과 똑같은 한마디"는 새로 만들지 않고 기존을 돌려준다.
-  it('is idempotent: a duplicate of a just-posted comment does NOT append again', async () => {
-    mocks.getPollById.mockResolvedValue(
-      makePoll({
-        comments: [
-          {
-            id: 1,
-            voterName: '익명',
-            comment: '나도 김밥!',
-            createdAt: new Date().toISOString(),
-            parentId: null,
-          },
-        ],
-      }),
-    );
-    await service.addComment('abc123', { comment: '나도 김밥!' });
+  // 멱등 안전망 — 같은 작성자 키(authorKey)가 연타·재시도로 만든 "직전과 똑같은 한마디"는 새로 만들지 않는다.
+  it('is idempotent for the SAME author key: a duplicate does NOT append again', async () => {
+    seedWithComments([
+      {
+        id: 1,
+        voterName: '익명',
+        comment: '나도 김밥!',
+        createdAt: new Date().toISOString(),
+        parentId: null,
+        authorKey: 'guest-key-1',
+      },
+    ]);
+    await service.addComment('abc123', { comment: '나도 김밥!', voterKey: 'guest-key-1' });
     // 거부가 아니라 멱등 — append 는 호출되지 않고 정상 응답을 돌려준다.
     expect(mocks.appendComment).not.toHaveBeenCalled();
   });
 
-  it('treats whitespace/case variants of the same author+text as a duplicate', async () => {
-    mocks.getPollById.mockResolvedValue(
-      makePoll({
-        comments: [
-          {
-            id: 1,
-            voterName: '민지',
-            comment: 'Hello World',
-            createdAt: new Date().toISOString(),
-            parentId: null,
-          },
-        ],
-      }),
-    );
-    await service.addComment('abc123', { comment: '  hello   world ', voterName: '민지' });
+  it('treats whitespace/case variants of the same author key + text as a duplicate', async () => {
+    seedWithComments([
+      {
+        id: 1,
+        voterName: '민지',
+        comment: 'Hello World',
+        createdAt: new Date().toISOString(),
+        parentId: null,
+        authorKey: 'guest-key-1',
+      },
+    ]);
+    await service.addComment('abc123', {
+      comment: '  hello   world ',
+      voterName: '민지',
+      voterKey: 'guest-key-1',
+    });
     expect(mocks.appendComment).not.toHaveBeenCalled();
   });
 
-  it('allows the same text from a DIFFERENT author (not a duplicate)', async () => {
-    mocks.getPollById.mockResolvedValue(
-      makePoll({
-        comments: [
-          {
-            id: 1,
-            voterName: '민지',
-            comment: '동의해요',
-            createdAt: new Date().toISOString(),
-            parentId: null,
-          },
-        ],
-      }),
-    );
-    await service.addComment('abc123', { comment: '동의해요', voterName: '현우' });
+  it('allows the same text from a DIFFERENT author key (not a duplicate)', async () => {
+    seedWithComments([
+      {
+        id: 1,
+        voterName: '민지',
+        comment: '동의해요',
+        createdAt: new Date().toISOString(),
+        parentId: null,
+        authorKey: 'guest-key-1',
+      },
+    ]);
+    await service.addComment('abc123', {
+      comment: '동의해요',
+      voterName: '현우',
+      voterKey: 'guest-key-2',
+    });
     expect(mocks.appendComment).toHaveBeenCalledTimes(1);
   });
 
+  it('does NOT dedup when no author key is present (anonymous — clientCommentId handles it)', async () => {
+    // 작성자 키가 전혀 없으면 본인 동일성을 보장할 수 없어 시간창 dedup을 적용하지 않는다.
+    seedWithComments([
+      {
+        id: 1,
+        voterName: '익명',
+        comment: '나도 김밥!',
+        createdAt: new Date().toISOString(),
+        parentId: null,
+        authorKey: null,
+        authorId: null,
+      },
+    ]);
+    await service.addComment('abc123', { comment: '나도 김밥!' });
+    expect(mocks.appendComment).toHaveBeenCalledTimes(1);
+  });
+
+  it('dedups by member author id too', async () => {
+    seedWithComments([
+      {
+        id: 1,
+        voterName: '회원',
+        comment: '같은 말',
+        createdAt: new Date().toISOString(),
+        parentId: null,
+        authorId: 'u-member',
+      },
+    ]);
+    await service.addComment('abc123', { comment: '같은 말' }, 'u-member');
+    expect(mocks.appendComment).not.toHaveBeenCalled();
+  });
+
   it('allows the same comment again after the dedupe window has passed', async () => {
-    mocks.getPollById.mockResolvedValue(
-      makePoll({
-        comments: [
-          {
-            id: 1,
-            voterName: '익명',
-            comment: '같은 말',
-            // 창(10s)을 한참 넘긴 과거 → 정상적으로 다시 남길 수 있어야 한다.
-            createdAt: new Date(Date.now() - 60_000).toISOString(),
-            parentId: null,
-          },
-        ],
-      }),
-    );
-    await service.addComment('abc123', { comment: '같은 말' });
+    seedWithComments([
+      {
+        id: 1,
+        voterName: '익명',
+        comment: '같은 말',
+        // 창(10s)을 한참 넘긴 과거 → 정상적으로 다시 남길 수 있어야 한다.
+        createdAt: new Date(Date.now() - 60_000).toISOString(),
+        parentId: null,
+        authorKey: 'guest-key-1',
+      },
+    ]);
+    await service.addComment('abc123', { comment: '같은 말', voterKey: 'guest-key-1' });
     expect(mocks.appendComment).toHaveBeenCalledTimes(1);
   });
 
   it('does not treat a top-level comment as a duplicate of a reply with the same text', async () => {
-    mocks.getPollById.mockResolvedValue(
-      makePoll({
-        comments: [
-          { id: 1, voterName: '익명', comment: '루트', createdAt: new Date().toISOString() },
-          {
-            id: 2,
-            voterName: '익명',
-            comment: '같은 텍스트',
-            createdAt: new Date().toISOString(),
-            parentId: 1,
-          },
-        ],
-      }),
-    );
+    seedWithComments([
+      {
+        id: 1,
+        voterName: '익명',
+        comment: '루트',
+        createdAt: new Date().toISOString(),
+        authorKey: 'guest-key-1',
+      },
+      {
+        id: 2,
+        voterName: '익명',
+        comment: '같은 텍스트',
+        createdAt: new Date().toISOString(),
+        parentId: 1,
+        authorKey: 'guest-key-1',
+      },
+    ]);
     // 부모가 다르면(최상위 vs 답글) 중복이 아니다 → append 된다.
-    await service.addComment('abc123', { comment: '같은 텍스트' });
+    await service.addComment('abc123', { comment: '같은 텍스트', voterKey: 'guest-key-1' });
     expect(mocks.appendComment).toHaveBeenCalledTimes(1);
   });
 });
@@ -414,7 +587,8 @@ describe('PollService private-poll write gate (vote/comment access-code enforcem
   });
 
   it('blocks commenting on a private poll when the access code is wrong (403, no append)', async () => {
-    mocks.getPollById.mockResolvedValue(privatePoll());
+    // addComment 는 작성자 키를 함께 읽으려고 getPollWithCommentAuthors 를 쓴다 — private 폴로 모킹한다.
+    mocks.getPollWithCommentAuthors.mockResolvedValue(privatePoll() as PollWithCommentAuthors);
     mocks.verifyAccessCode.mockResolvedValue(false);
 
     await expect(
@@ -542,6 +716,35 @@ describe('PollService.deleteComment (author-self + moderation permissions)', () 
     expect(mocks.deleteComment).toHaveBeenCalledWith('abc123', 1);
   });
 
+  it('enforces the private-poll access-code gate BEFORE deleting (403, no delete, even for the author)', async () => {
+    // 비공개 폴이면 댓글 작성자 본인이라도 올바른 접근 코드 없이 삭제할 수 없다(vote/comment 게이트와 동일).
+    mocks.getPollWithCommentAuthors.mockResolvedValue(
+      makePollWithComment(
+        { authorKey: 'guest-key-1' },
+        { creatorId: 'owner-x', visibility: 'private' },
+      ),
+    );
+    mocks.verifyAccessCode.mockResolvedValue(false);
+    await expect(
+      service.deleteComment('abc123', 1, null, 'guest-key-1', false, null, 'wrong-code'),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(mocks.deleteComment).not.toHaveBeenCalled();
+  });
+
+  it('deletes on a private poll once the access code passes the gate (author)', async () => {
+    mocks.getPollWithCommentAuthors.mockResolvedValue(
+      makePollWithComment(
+        { authorKey: 'guest-key-1' },
+        { creatorId: 'owner-x', visibility: 'private' },
+      ),
+    );
+    mocks.verifyAccessCode.mockResolvedValue(true);
+    await expect(
+      service.deleteComment('abc123', 1, null, 'guest-key-1', false, null, 'ok-code'),
+    ).resolves.toMatchObject({ deleted: true });
+    expect(mocks.deleteComment).toHaveBeenCalledWith('abc123', 1);
+  });
+
   it('keeps owner/admin moderation for LEGACY comments (authorId/authorKey both null)', async () => {
     mocks.getPollWithCommentAuthors.mockResolvedValue(
       makePollWithComment({ authorId: null, authorKey: null }, { creatorId: 'owner-x' }),
@@ -647,6 +850,28 @@ describe('PollService.editComment (author-self only, moderation cannot rewrite)'
     await expect(
       service.editComment('abc123', 42, { comment: '없음', voterKey: 'guest-key-1' }, null, false),
     ).rejects.toBeInstanceOf(NotFoundException);
+    expect(mocks.updateComment).not.toHaveBeenCalled();
+  });
+
+  it('enforces the private-poll access-code gate BEFORE editing (403, no update)', async () => {
+    // 비공개 폴이면 댓글 작성자 본인이라도 올바른 접근 코드 없이 수정할 수 없다(vote/comment 게이트와 동일).
+    mocks.getPollWithCommentAuthors.mockResolvedValue(
+      makePollWithComment(
+        { authorKey: 'guest-key-1' },
+        { creatorId: 'owner-x', visibility: 'private' },
+      ),
+    );
+    mocks.verifyAccessCode.mockResolvedValue(false);
+    await expect(
+      service.editComment(
+        'abc123',
+        1,
+        { comment: '코드 없이 수정', voterKey: 'guest-key-1' },
+        null,
+        false,
+        'wrong-code',
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
     expect(mocks.updateComment).not.toHaveBeenCalled();
   });
 });

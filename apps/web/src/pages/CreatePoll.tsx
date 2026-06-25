@@ -11,7 +11,6 @@ import {
   ImageIcon,
   Link2,
   Lock,
-  LogIn,
   Monitor,
   Plus,
   Search,
@@ -21,10 +20,9 @@ import {
   TimerReset,
   Trash2,
   Upload,
-  UserPlus,
   X,
 } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { usePollStore } from '../store/usePollStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
@@ -33,6 +31,8 @@ import { ParticipantPreviewPanel } from '../components/ParticipantPreviewPanel';
 import { buildShareablePollSnapshot, copyText } from '../lib/pollShare';
 import { fileToDownscaledDataUrl } from '../lib/image';
 import {
+  COMMENT_PASSWORD_MAX,
+  COMMENT_PASSWORD_MIN,
   fromDateTimeLocalValue,
   isPollVisibility,
   POLL_CATEGORIES,
@@ -3398,7 +3398,11 @@ export const CreatePoll: React.FC = () => {
   // 미로그인/게스트면 자동 게스트 토큰을 발급하지 않고 로그인/회원가입을 유도한다.
   // (투표·댓글은 voterKey 기반이라 토큰 없이도 게스트 그대로 참여 — 이 게이트와 무관.)
   const user = useAuthStore((state) => state.user);
-  const canCreate = Boolean(user) && !user?.isGuest;
+  // 하이브리드 정체성 정책(댓글과 동일 모델): 폴 작성은 누구나 가능하다.
+  // - 회원(실로그인)은 계정(creatorId)으로 식별돼 비번 없이 작성한다.
+  // - 비회원(게스트/익명)은 '관리 비밀번호'를 정하면 그 비번으로 어느 기기서든 본인 폴을 관리한다.
+  // 따라서 폼은 모두에게 열고, 비회원에게만 관리 비번 입력을 노출한다(아래 needsManagePassword).
+  const isGuestCreator = !user || Boolean(user.isGuest);
   const navigate = useNavigate();
   const [cachedDraft, setCachedDraft] = useState<PollDraft | null>(() => loadDraftFromStorage());
 
@@ -3437,6 +3441,9 @@ export const CreatePoll: React.FC = () => {
     accessCode: string;
   } | null>(null);
   const [accessCodeCopied, setAccessCodeCopied] = useState(false);
+  // 비회원(게스트) 관리 비밀번호 — 정하면 이 비번으로 어느 기기서든 본인 폴을 수정·삭제한다.
+  // 회원은 계정으로 식별되므로 입력/전송하지 않는다(draft 캐시에도 비번은 저장하지 않는다).
+  const [managePassword, setManagePassword] = useState('');
 
   const normalizedQuestion = question.trim();
   const normalizedDescription = description.trim();
@@ -3613,6 +3620,17 @@ export const CreatePoll: React.FC = () => {
   const isPrivateAccessCodeValid =
     visibility !== 'private' || (trimmedAccessCodeLength >= 4 && trimmedAccessCodeLength <= 20);
 
+  // 비회원은 관리 비밀번호(6~20자)를 정해야 본인 폴을 나중에 수정·삭제할 수 있다(백엔드 필수).
+  // 회원은 계정으로 식별되므로 이 검증을 적용하지 않는다.
+  const trimmedManagePasswordLength = managePassword.trim().length;
+  const isManagePasswordValid =
+    !isGuestCreator ||
+    (trimmedManagePasswordLength >= COMMENT_PASSWORD_MIN &&
+      trimmedManagePasswordLength <= COMMENT_PASSWORD_MAX);
+  // 미입력(0자)은 아직 오류로 표시하지 않는다 — 사용자가 입력한 값이 범위 밖일 때만 빨갛게 안내한다.
+  const showManagePasswordError =
+    isGuestCreator && trimmedManagePasswordLength > 0 && !isManagePasswordValid;
+
   const canSubmit =
     normalizedQuestion.length >= 2 &&
     normalizedQuestion.length <= 100 &&
@@ -3622,6 +3640,7 @@ export const CreatePoll: React.FC = () => {
     !isEndsAtInvalid &&
     attachments.length <= MAX_ATTACHMENTS &&
     isPrivateAccessCodeValid &&
+    isManagePasswordValid &&
     !isLoading;
 
   const qualityItems = useMemo(
@@ -4088,6 +4107,19 @@ export const CreatePoll: React.FC = () => {
       return;
     }
 
+    // 비회원은 관리 비밀번호 필수(백엔드 계약). 회원은 계정으로 식별되므로 비번을 보내지 않는다.
+    const trimmedManagePassword = managePassword.trim();
+    if (
+      isGuestCreator &&
+      (trimmedManagePassword.length < COMMENT_PASSWORD_MIN ||
+        trimmedManagePassword.length > COMMENT_PASSWORD_MAX)
+    ) {
+      setFormError(
+        `비회원은 내 고민을 관리할 비밀번호(${COMMENT_PASSWORD_MIN}~${COMMENT_PASSWORD_MAX}자)를 정해주세요.`,
+      );
+      return;
+    }
+
     const result = await createPoll({
       question: normalizedQuestion,
       description: normalizedDescription || null,
@@ -4098,6 +4130,8 @@ export const CreatePoll: React.FC = () => {
       options: nonEmptyOptions,
       attachments,
       categoryId,
+      // 비회원만 관리 비번 전송 — 회원은 토큰(creatorId)으로 식별되어 서버가 비번을 무시한다.
+      password: isGuestCreator ? trimmedManagePassword : null,
     });
 
     if (result) {
@@ -4159,89 +4193,6 @@ export const CreatePoll: React.FC = () => {
     return 'PDF/TXT/CSV/JSON 파일 업로드';
   };
   const attachmentDropzoneLabel = resolveAttachmentDropzoneLabel();
-
-  // 폴 작성 로그인 게이트 — 미로그인/게스트면 폼 대신 로그인 유도 화면을 보여준다.
-  // 투표·댓글은 게스트 그대로 가능하므로, 여기 안내는 '작성만 로그인 필요'임을 분명히 한다.
-  if (!canCreate) {
-    return (
-      <div
-        className="animate-slide-up"
-        style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', maxWidth: '560px' }}
-      >
-        <div className="content-card" style={{ display: 'grid', gap: '1.1rem', padding: '1.6rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
-            <Lock size={22} style={{ color: 'var(--brand-accent-teal)' }} />
-            <h1
-              style={{
-                margin: 0,
-                fontSize: '1.2rem',
-                fontWeight: 900,
-                color: 'var(--text-primary)',
-              }}
-            >
-              로그인하고 고민을 올려보세요 🥑
-            </h1>
-          </div>
-          <p
-            style={{
-              margin: 0,
-              fontSize: '0.9rem',
-              color: 'var(--text-secondary)',
-              lineHeight: 1.65,
-            }}
-          >
-            고민(폴) <strong>작성·수정·삭제</strong>는 로그인한 회원만 할 수 있어요. 내가 올린
-            고민을 계정에 모아두고 안전하게 관리할 수 있습니다.
-            {user?.isGuest
-              ? ' 지금은 비회원(게스트)으로 이용 중이라, 회원가입 후 작성할 수 있어요.'
-              : ''}
-          </p>
-          <p
-            style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: 1.6 }}
-          >
-            투표와 한마디(댓글)는 로그인 없이도 자유롭게 참여할 수 있어요.
-          </p>
-          <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
-            <Link
-              to="/auth/login"
-              className="btn-primary"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                textDecoration: 'none',
-              }}
-            >
-              <LogIn size={16} />
-              로그인하기
-            </Link>
-            <Link
-              to="/auth/register"
-              className="btn-secondary"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                textDecoration: 'none',
-              }}
-            >
-              <UserPlus size={16} />
-              회원가입
-            </Link>
-            <button
-              type="button"
-              onClick={() => navigate('/')}
-              className="ghost-btn"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-            >
-              <ArrowLeft size={14} />
-              목록으로
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   if (createdPrivatePoll) {
     return (
@@ -4511,6 +4462,75 @@ export const CreatePoll: React.FC = () => {
           accessCode={accessCode}
           setAccessCode={setAccessCode}
         />
+
+        {isGuestCreator ? (
+          <div
+            className="content-card"
+            style={{ display: 'grid', gap: '0.7rem', padding: '1.1rem 1.2rem' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Lock size={16} style={{ color: 'var(--brand-accent-teal)' }} />
+              <h2
+                style={{
+                  margin: 0,
+                  fontSize: '0.92rem',
+                  fontWeight: 800,
+                  color: 'var(--text-primary)',
+                }}
+              >
+                내 고민 관리 비밀번호
+              </h2>
+            </div>
+            <p
+              style={{
+                margin: 0,
+                fontSize: '0.78rem',
+                color: 'var(--text-secondary)',
+                lineHeight: 1.6,
+              }}
+            >
+              비회원은 이 비밀번호로 나중에 내 고민을 수정·삭제할 수 있어요. 잊으면 관리할 수 없으니
+              꼭 기억해 주세요. (회원으로 가입하면 비밀번호 없이 계정에서 모아 관리할 수 있어요.)
+            </p>
+            <label style={{ display: 'grid', gap: '0.35rem' }}>
+              <span
+                style={{ color: 'var(--text-secondary)', fontSize: '0.72rem', fontWeight: 700 }}
+              >
+                관리 비밀번호 ({COMMENT_PASSWORD_MIN}~{COMMENT_PASSWORD_MAX}자)
+              </span>
+              <input
+                type="password"
+                value={managePassword}
+                onChange={(event) => {
+                  clearError();
+                  setFormError('');
+                  setManagePassword(event.target.value);
+                }}
+                placeholder="수정·삭제할 때 입력할 비밀번호를 정해주세요"
+                maxLength={COMMENT_PASSWORD_MAX}
+                minLength={COMMENT_PASSWORD_MIN}
+                autoComplete="new-password"
+                className="form-input"
+                aria-label="비회원 고민 관리 비밀번호"
+                aria-invalid={showManagePasswordError}
+                style={{ fontSize: '0.82rem' }}
+              />
+              <small
+                style={{
+                  color: showManagePasswordError
+                    ? 'var(--brand-accent-coral)'
+                    : 'var(--text-muted)',
+                  fontSize: '0.66rem',
+                  lineHeight: 1.4,
+                }}
+              >
+                {showManagePasswordError
+                  ? `관리 비밀번호는 ${COMMENT_PASSWORD_MIN}~${COMMENT_PASSWORD_MAX}자로 정해주세요.`
+                  : '이 비밀번호를 아는 사람만 고민을 수정·삭제할 수 있어요.'}
+              </small>
+            </label>
+          </div>
+        ) : null}
 
         <ParticipantPreviewPanel
           question={question}

@@ -145,25 +145,30 @@ export const canManageComment = (params: {
 }): boolean => params.mine || params.isPollOwner || params.isAdmin;
 
 /**
- * 댓글에 관리(수정/삭제) 어포던스를 "노출"할지(프론트 UI 한정). 서버가 최종 권한을 강제한다.
- * - 직접 관리 가능(본인/소유자/어드민): canManageComment 가 true
- * - 비번 잠금(다른 기기): 같은 기기 본인이 아니어도, 댓글에 관리 비번이 설정돼 있으면(hasPassword)
- *   자물쇠 버튼을 띄워 "비번 입력" 흐름으로 관리할 수 있게 한다.
- * needsPassword 가 true 면 UI 가 비번 프롬프트를 거쳐야 한다(직접 관리는 false).
+ * 댓글의 수정/삭제 어포던스를 "노출"할지(프론트 UI 한정) — 서버 권한 매트릭스와 1:1로 분리한다.
+ * 서버가 최종 권한을 강제하지만, 버튼 노출/비번 프롬프트 여부는 이 판정으로 결정한다.
+ *
+ * 서버 매트릭스(poll.service):
+ * - editComment   : 본인(authorId/authorKey) || 어드민 || 비번 일치  (폴 소유자는 남의 글을 수정 못 함)
+ * - deleteComment : 본인 || 폴 소유자(모더레이션) || 어드민 || 비번 일치
+ * 즉 폴 소유자는 "삭제만" 가능하고 수정은 불가하므로, canEdit/canDelete 를 분리해야 정확하다.
+ *
+ * - canEdit   = mine || isAdmin || hasPassword
+ * - canDelete = mine || isPollOwner || isAdmin || hasPassword
+ * - needsPassword: 직접 권한(본인/소유자/어드민)이 전혀 없고 비번 잠금만 있는 경우 → UI 가 비번 프롬프트를 거쳐야 한다.
+ *   (직접 권한이 하나라도 있으면 비번 없이 바로 관리 → false)
  */
 export const resolveCommentManageAffordance = (params: {
   mine: boolean;
   isPollOwner: boolean;
   isAdmin: boolean;
   hasPassword: boolean;
-}): { canManage: boolean; needsPassword: boolean } => {
-  const direct = canManageComment(params);
-  if (direct) {
-    return { canManage: true, needsPassword: false };
-  }
-  // 직접 권한은 없지만 비번이 걸린 댓글이면 비번 입력으로 관리 시도 가능.
-  if (params.hasPassword) {
-    return { canManage: true, needsPassword: true };
-  }
-  return { canManage: false, needsPassword: false };
+}): { canEdit: boolean; canDelete: boolean; needsPassword: boolean } => {
+  const { mine, isPollOwner, isAdmin, hasPassword } = params;
+  const canEdit = mine || isAdmin || hasPassword;
+  const canDelete = mine || isPollOwner || isAdmin || hasPassword;
+  // 직접 권한(본인/소유자/어드민)이 없고 비번 잠금만 있을 때만 비번 입력 흐름이 필요하다.
+  const hasDirectGrant = mine || isPollOwner || isAdmin;
+  const needsPassword = !hasDirectGrant && hasPassword;
+  return { canEdit, canDelete, needsPassword };
 };

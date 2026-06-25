@@ -110,6 +110,7 @@ export class DatabaseService implements OnModuleInit {
             results_visibility TEXT DEFAULT 'afterVote' NOT NULL,
             visibility TEXT DEFAULT 'public' NOT NULL,
             access_code TEXT,
+            password_hash TEXT,
             creator_id TEXT,
             creator_is_guest BOOLEAN DEFAULT TRUE NOT NULL,
             attachments JSONB DEFAULT '[]'::jsonb NOT NULL
@@ -162,6 +163,7 @@ export class DatabaseService implements OnModuleInit {
           ALTER TABLE polls ADD COLUMN IF NOT EXISTS category_id TEXT;
           ALTER TABLE polls ADD COLUMN IF NOT EXISTS visibility TEXT DEFAULT 'public' NOT NULL;
           ALTER TABLE polls ADD COLUMN IF NOT EXISTS access_code TEXT;
+          ALTER TABLE polls ADD COLUMN IF NOT EXISTS password_hash TEXT;
           ALTER TABLE poll_comments ADD COLUMN IF NOT EXISTS parent_id INTEGER;
           ALTER TABLE poll_comments ADD COLUMN IF NOT EXISTS author_id TEXT;
           ALTER TABLE poll_comments ADD COLUMN IF NOT EXISTS author_key TEXT;
@@ -445,15 +447,21 @@ export class DatabaseService implements OnModuleInit {
   /**
    * Blob 경로 응답에서 비표시 메타(votedKeys 등)를 제거해 외부로 새지 않게 한다.
    * 댓글의 작성자 식별값(authorId/authorKey)도 비밀이라 함께 제거한다(stripCommentAuthors).
+   * 폴 자체의 비밀(accessCode·passwordHash)도 제거한다 — SQL 경로는 컬럼을 select하지 않아 노출되지 않지만,
+   * Blob/in-memory 는 폴 객체에 그대로 들고 있으므로 SQL과 동일하게 응답에서 지운다.
    */
   private stripPollMeta(poll: Poll | undefined): Poll | undefined {
     if (!poll) {
       return poll;
     }
-    const next: PollWithVotedKeys = { ...(poll as PollWithVotedKeys) };
+    const next = {
+      ...(poll as PollWithVotedKeys & { accessCode?: unknown; passwordHash?: unknown }),
+    };
     delete next.votedKeys;
+    delete next.accessCode;
+    delete next.passwordHash;
     next.comments = this.stripCommentAuthors(next.comments);
-    return next;
+    return next as Poll;
   }
 
   /**
@@ -970,7 +978,27 @@ export class DatabaseService implements OnModuleInit {
     return p.accessCode === code;
   }
 
-  async createPoll(poll: Poll & { accessCode?: string | null }) {
+  /**
+   * 게스트 작성 폴의 관리 비번 해시를 내부 권한 판정용으로만 읽는다(accessCode와 동급 비밀).
+   * 응답 경로(getPollById/stripPollMeta)는 이 값을 절대 싣지 않으므로, 비번 검증이 필요한
+   * updatePoll/deletePoll 에서만 이 메서드로 해시를 직접 꺼내 service 가 대조한다. 없으면 null.
+   */
+  async getPollPasswordHash(pollId: string): Promise<string | null> {
+    if (this.useSqlDb) {
+      const r = await db.query.polls.findFirst({
+        where: eq(schema.polls.id, pollId),
+        columns: { passwordHash: true },
+      });
+      return r?.passwordHash ?? null;
+    }
+    await this.refresh();
+    const p = this.data.polls.find((x) => x.id === pollId) as
+      | (Poll & { passwordHash?: string | null })
+      | undefined;
+    return p?.passwordHash ?? null;
+  }
+
+  async createPoll(poll: Poll & { accessCode?: string | null; passwordHash?: string | null }) {
     if (this.useSqlDb) {
       await db.insert(schema.polls).values({
         id: poll.id,
@@ -982,6 +1010,8 @@ export class DatabaseService implements OnModuleInit {
         resultsVisibility: poll.resultsVisibility || 'afterVote',
         visibility: poll.visibility || 'public',
         accessCode: poll.accessCode ?? null,
+        // 게스트 작성 폴의 관리 비번 해시(있으면). 회원 작성 폴은 null. 비밀 — 응답엔 절대 노출 안 함.
+        passwordHash: poll.passwordHash ?? null,
         creatorId: poll.creatorId,
         creatorIsGuest: poll.creatorIsGuest ?? true,
         categoryId: poll.categoryId ?? null,

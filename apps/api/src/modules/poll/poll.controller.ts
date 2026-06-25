@@ -19,16 +19,18 @@ import {
   CreateCommentSchema,
   CreatePollSchema,
   DeleteCommentSchema,
+  DeletePollSchema,
   EditCommentSchema,
   UpdatePollSchema,
   VoteSchema,
   canRevealResults,
 } from '@picky/shared';
 import { PollService } from './poll.service';
-import { AuthGuard, OptionalAuthGuard } from '../auth/auth.guard';
+import { OptionalAuthGuard } from '../auth/auth.guard';
 
 class CreatePollDto extends createZodDto(CreatePollSchema) {}
 class UpdatePollDto extends createZodDto(UpdatePollSchema) {}
+class DeletePollDto extends createZodDto(DeletePollSchema) {}
 class VoteDto extends createZodDto(VoteSchema) {}
 class CreateCommentDto extends createZodDto(CreateCommentSchema) {}
 class EditCommentDto extends createZodDto(EditCommentSchema) {}
@@ -48,13 +50,28 @@ export class PollController {
   constructor(private readonly pollService: PollService) {}
 
   /**
-   * 폴 작성/관리(생성·수정·삭제) 게이트 — 자동 발급된 비회원 토큰(isGuest=true)을 거부한다.
-   * AuthGuard 가 토큰 자체가 없으면 401 을 먼저 던지므로, 여기서는 "로그인은 했지만 게스트"인
-   * 경우만 403 으로 막는다. (투표·댓글은 이 게이트를 거치지 않아 게스트가 그대로 참여한다.)
+   * 실로그인 회원이면 그 userId(JWT sub)를, 게스트(isGuest=true)·익명(토큰 없음)이면 null 을 돌려준다.
+   * 게스트의 ephemeral guest-uuid 는 폴 소유자(creatorId)로 쓰지 않는다 — 게스트의 portable 본인 식별은
+   * 관리 비밀번호이기 때문이다. 이 값으로 service 가 creatorIsGuest 를 정확히 재계산한다(creatorId 유무).
    */
-  private assertNotGuest(user: any): void {
-    if (user?.isGuest === true) {
-      throw new ForbiddenException('고민(폴) 작성·관리는 로그인 후 이용할 수 있어요.');
+  private resolveCreatorId(user: any): string | null {
+    return user?.sub && user.isGuest !== true ? user.sub : null;
+  }
+
+  /**
+   * 폴 관리(수정/삭제) 게이트 — 게스트(또는 익명)는 관리 비밀번호가 있어야 통과한다(댓글과 동일 모델).
+   * 회원/어드민은 비번 없이 JWT 로 통과한다. 게스트가 비번을 안 보내면 401 로 막는다(service 의 비번 대조 전 1차 게이트).
+   * 실제 비번 일치 여부는 service.assertCanManage 가 저장 해시와 대조해 최종 강제한다.
+   */
+  private assertManageCredential(user: any, password?: string | null): void {
+    const isMember = Boolean(user?.sub && user.isGuest !== true);
+    if (isMember) {
+      return;
+    }
+    if (!password?.trim()) {
+      throw new ForbiddenException(
+        '비회원은 관리 비밀번호를 입력해야 고민을 수정/삭제할 수 있어요.',
+      );
     }
   }
 
@@ -80,15 +97,14 @@ export class PollController {
   }
 
   @Post()
-  @UseGuards(AuthGuard)
+  @UseGuards(OptionalAuthGuard)
   createPoll(@Request() req: any, @Body() dto: CreatePollDto) {
-    // 하이브리드 정체성 정책: 폴 작성은 실로그인(웹 회원/소셜·토스 SSO) 필수.
-    // AuthGuard 가 토큰 없으면 401 을 던지고, 자동 발급된 게스트 토큰(isGuest=true)은
-    // 여기서 403 으로 거부한다. (투표·댓글은 OptionalAuthGuard·voterKey 로 게스트 그대로 허용.)
-    this.assertNotGuest(req.user);
-    const creatorId = req.user?.sub || null;
-    // 작성 경로는 실로그인만 통과하므로 creatorIsGuest 는 항상 false.
-    return this.pollService.createPoll(dto, creatorId, false);
+    // 정체성 정책(댓글과 동일 모델): 회원은 JWT(creatorId)로, 게스트는 관리 비밀번호로 본인 식별.
+    // - 회원(isGuest!==true): creatorId=sub 로 작성, creatorIsGuest=false(service 가 creatorId 유무로 재계산).
+    // - 게스트/익명: creatorId=null. 비번이 있어야 작성 가능(없으면 service 가 400 으로 거부).
+    const creatorId = this.resolveCreatorId(req.user);
+    // creatorIsGuest 인자는 service 가 creatorId 유무로 무시·재계산하므로 형식상 전달만 한다.
+    return this.pollService.createPoll(dto, creatorId, creatorId === null);
   }
 
   @Get(':id/share')
@@ -307,19 +323,27 @@ export class PollController {
   }
 
   @Patch(':id')
-  @UseGuards(AuthGuard)
+  @UseGuards(OptionalAuthGuard)
   updatePoll(@Param('id') id: string, @Request() req: any, @Body() dto: UpdatePollDto) {
-    // 폴 수정도 실로그인 필수 — 자동 게스트 토큰은 거부한다(작성/관리 게이트 일관).
-    this.assertNotGuest(req.user);
-    return this.pollService.updatePoll(id, dto, req.user?.sub ?? null, Boolean(req.user?.isAdmin));
+    // 회원은 JWT 로, 게스트는 관리 비밀번호로 본인 식별(댓글과 동일 모델).
+    // 게스트가 비번을 안 보내면 여기서 401 게이트로 막고, 비번이 있으면 service 가 저장 해시와 대조해 최종 강제한다.
+    this.assertManageCredential(req.user, dto?.password);
+    const userId = this.resolveCreatorId(req.user);
+    return this.pollService.updatePoll(id, dto, userId, Boolean(req.user?.isAdmin), dto?.password);
   }
 
   @Delete(':id')
-  @UseGuards(AuthGuard)
-  deletePoll(@Param('id') id: string, @Request() req: any) {
-    // 폴 삭제도 실로그인 필수 — 자동 게스트 토큰은 거부한다(작성/관리 게이트 일관).
-    this.assertNotGuest(req.user);
-    return this.pollService.deletePoll(id, req.user?.sub ?? null, Boolean(req.user?.isAdmin));
+  @UseGuards(OptionalAuthGuard)
+  deletePoll(@Param('id') id: string, @Request() req: any, @Body() dto: DeletePollDto) {
+    // 회원/어드민은 JWT 로, 게스트는 관리 비밀번호로 본인 식별(댓글과 동일 모델). 비번 원문은 바디로만 받는다.
+    this.assertManageCredential(req.user, dto?.password);
+    const userId = this.resolveCreatorId(req.user);
+    return this.pollService.deletePoll(
+      id,
+      userId,
+      Boolean(req.user?.isAdmin),
+      dto?.password ?? null,
+    );
   }
 
   // 댓글 삭제는 작성자 본인(회원/비회원/비번 일치)·폴 소유자·어드민이 할 수 있다.
@@ -331,7 +355,9 @@ export class PollController {
     @Param('commentId', ParseIntPipe) commentId: number,
     @Request() req: any,
     @Body() dto: DeleteCommentDto,
+    @Query('code') code?: string,
   ) {
+    // 비공개(private) 투표는 ?code= 접근 코드 검증을 통과해야 댓글을 삭제할 수 있다(vote/addComment와 동일 게이트).
     return this.pollService.deleteComment(
       id,
       commentId,
@@ -339,6 +365,7 @@ export class PollController {
       dto?.voterKey ?? null,
       Boolean(req.user?.isAdmin),
       dto?.password ?? null,
+      code,
     );
   }
 

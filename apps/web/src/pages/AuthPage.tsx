@@ -583,12 +583,12 @@ export const AuthPage: React.FC = () => {
                     <h2 style={{ margin: 0, fontSize: '1.05rem' }}>회원/비회원 인증 정책 안내</h2>
                     <p style={{ margin: 0, color: 'var(--text-secondary)', lineHeight: 1.7 }}>
                       투표와 한마디(댓글)는 회원·비회원 모두 닉네임만으로 바로 참여할 수 있어요.
-                      고민(폴) 작성·수정·삭제는 내 계정에 안전하게 귀속되도록 로그인한 회원만 할 수
-                      있습니다.
+                      고민(폴) 작성·수정·삭제는 로그인한 회원이거나, 비회원은 관리 비밀번호를 설정한
+                      경우에 본인이 관리할 수 있습니다.
                     </p>
                     <p style={{ margin: 0, color: 'var(--text-secondary)', lineHeight: 1.7 }}>
-                      회원가입하면 내가 올린 고민과 투표 결과를 한곳에서 관리할 수 있어요. 추후
-                      회원가입 시 기존 닉네임으로 남긴 참여 데이터도 그대로 이어집니다.
+                      회원가입하면 내가 올린 고민과 투표 결과를 한곳에서 관리할 수 있어요.
+                      비회원으로 남긴 참여 데이터는 같은 기기에서 유지됩니다.
                     </p>
                     <Dialog.Close asChild>
                       <button
