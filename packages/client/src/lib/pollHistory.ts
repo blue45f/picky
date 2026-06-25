@@ -1,4 +1,6 @@
-import type { Poll } from '@picky/shared';
+// 토스 `.ait` 번들러(collect-package-version)가 @picky/shared 패키지명 해석을 못해
+// 번들러 무관 상대 경로(공유 소스)로 타입을 가져와요. 웹(vite)도 동일하게 해석돼요.
+import type { Poll } from '../../../shared/src/index';
 
 const RECENT_POLL_HISTORY_KEY = 'picky_recent_poll_history_v1';
 const MAX_RECENT_POLLS = 8;

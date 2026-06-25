@@ -16,7 +16,6 @@
   "dependencies": {
     "@apps-in-toss/web-framework": "^2.9.1",
     "@emotion/react": "^11.14.0",
-    "@picky/shared": "workspace:*",
     "@toss/tds-mobile": "^2.5.0",
     "@toss/tds-mobile-ait": "^2.5.0",
     "lucide-react": "^0.475.0",

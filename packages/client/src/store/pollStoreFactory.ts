@@ -1,10 +1,12 @@
+// 토스 `.ait` 번들러(collect-package-version)가 @picky/shared 패키지명 해석을 못해
+// 번들러 무관 상대 경로(공유 소스)로 타입을 가져와요. 웹(vite)도 동일하게 해석돼요.
 import type {
   Poll,
   CreatePollInput,
   UpdatePollInput,
   VoteInput,
   CreateCommentInput,
-} from '@picky/shared';
+} from '../../../shared/src/index';
 import type { AuthState } from './authStoreFactory';
 
 type StoreSet<T> = (

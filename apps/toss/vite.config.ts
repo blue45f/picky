@@ -7,6 +7,9 @@ import react from '@vitejs/plugin-react';
 // 실제 앱인토스(.ait) 빌드에는 영향이 없어요(env 미설정 시 alias 비활성).
 const previewNoTds = process.env.PREVIEW_NO_TDS === '1';
 const tdsShim = fileURLToPath(new URL('./src/tds-shim.tsx', import.meta.url));
+// @picky/shared bare specifier를 소스로 직접 해소해요 — ait 빌드의 collect-package-version 플러그인이
+// workspace 패키지(@picky/shared) 경로 추출에 실패하는 걸 우회하고, typecheck=src/runtime=dist 스테일니스도 없애요.
+const sharedSrc = fileURLToPath(new URL('../../packages/shared/src/index.ts', import.meta.url));
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -15,6 +18,9 @@ export default defineConfig({
   // 이 앱의 단일 React 인스턴스로 강제 정렬해요. (invalid hook 방지)
   resolve: {
     dedupe: ['react', 'react-dom'],
-    alias: previewNoTds ? { '@toss/tds-mobile-ait': tdsShim, '@toss/tds-mobile': tdsShim } : {},
+    alias: {
+      '@picky/shared': sharedSrc,
+      ...(previewNoTds ? { '@toss/tds-mobile-ait': tdsShim, '@toss/tds-mobile': tdsShim } : {}),
+    },
   },
 });
