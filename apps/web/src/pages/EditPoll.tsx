@@ -14,6 +14,7 @@ import {
 import { usePollStore } from '../store/usePollStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { VISIBILITY_OPTIONS } from '@picky/shared';
 import type { Poll, PollResultsVisibility, PollVisibility, UpdatePollInput } from '@picky/shared';
 
 // CreatePoll.tsx 와 동일한 datetime-local <-> ISO 변환 규약을 그대로 따른다.
@@ -57,28 +58,8 @@ const RESULT_VISIBILITY_OPTIONS: Array<{
   },
 ];
 
-// 공개 범위 — CreatePoll.tsx 와 동일한 라벨/설명을 그대로 따른다. 비공개 선택 시 접근 코드 입력을 노출한다.
-const VISIBILITY_OPTIONS: Array<{
-  value: PollVisibility;
-  label: string;
-  description: string;
-}> = [
-  {
-    value: 'public',
-    label: '공개 🌍',
-    description: '목록에 노출되고 누구나 참여할 수 있어요.',
-  },
-  {
-    value: 'unlisted',
-    label: '링크전용 🔗',
-    description: '목록엔 안 보이고, 링크를 받은 사람만 참여해요.',
-  },
-  {
-    value: 'private',
-    label: '비공개 🔒',
-    description: '접근 코드를 아는 사람만 참여할 수 있어요.',
-  },
-];
+// 공개 범위 옵션은 @picky/shared VISIBILITY_OPTIONS 단일 소스를 쓴다(라벨/설명 동일).
+// 비공개 선택 시 접근 코드 입력을 노출한다.
 
 const MIN_OPTIONS = 2;
 const MAX_OPTIONS = 10;

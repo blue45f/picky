@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Button } from '@toss/tds-mobile';
 import type { PollOption } from '../shared';
-import { MASCOT, VOICE } from '../shared';
+import { MASCOT, VOICE, canRevealResults } from '../shared';
 import { usePollStore } from '../store/usePollStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useIdentity } from '../store/useIdentity';
@@ -88,9 +88,11 @@ export function PollDetailPage() {
   const remaining = useCountdown(poll?.endsAt);
   const closed = isPollClosed(poll) || (remaining != null && remaining <= 0);
   const hasVoted = votedOptionId != null;
+  // 결과 공개 게이트는 web/toss 공통 canRevealResults(@picky/shared)로 단일화.
+  // 토스는 마감 판정에 remaining<=0(클라 카운트다운)도 합쳐야 하므로 closed를 OR로 전달한다.
   const showResults = useMemo(
-    () => hasVoted || closed || poll?.resultsVisibility === 'always',
-    [hasVoted, closed, poll?.resultsVisibility],
+    () => canRevealResults(poll, hasVoted) || closed,
+    [poll, hasVoted, closed],
   );
 
   useEffect(() => {

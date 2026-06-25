@@ -3,12 +3,13 @@ import { z } from 'zod';
 // 공유 브랜드(마스코트·카테고리·말투) — web/toss 두 앱이 같은 결을 쓰도록 재수출한다.
 export * from './brand';
 
-// web/toss 공유 순수 로직(토크나이저·시그널·준비도·카운트다운·옵션 헬퍼).
+// web/toss 공유 순수 로직(토크나이저·시그널·준비도·카운트다운·옵션 헬퍼·포맷).
 export * from './keywords';
 export * from './poll';
 export * from './pollSignal';
 export * from './pollReadiness';
 export * from './countdown';
+export * from './format';
 
 // 결과 해석/공유 순수 로직 — web/toss가 동일 점수·문구·구조를 쓰도록 단일화.
 export * from './pollConfidence';
@@ -30,6 +31,51 @@ export type PollResultsVisibility = z.infer<typeof PollResultsVisibilitySchema>;
 export const PollVisibilitySchema = z.enum(['public', 'unlisted', 'private']);
 
 export type PollVisibility = z.infer<typeof PollVisibilitySchema>;
+
+/**
+ * 공개 범위 셀렉터 옵션 — web/toss 두 앱이 같은 라벨·설명을 쓰도록 단일화한 상수.
+ * label은 칩/세그먼트용(이모지 포함), description은 한 줄 안내.
+ */
+export const VISIBILITY_OPTIONS: ReadonlyArray<{
+  value: PollVisibility;
+  label: string;
+  description: string;
+}> = [
+  { value: 'public', label: '공개 🌍', description: '목록에 노출되고 누구나 참여할 수 있어요.' },
+  {
+    value: 'unlisted',
+    label: '링크전용 🔗',
+    description: '목록엔 안 보이고, 링크를 받은 사람만 참여해요.',
+  },
+  {
+    value: 'private',
+    label: '비공개 🔒',
+    description: '접근 코드를 아는 사람만 참여할 수 있어요.',
+  },
+];
+
+/** value가 PollVisibility인지 좁히는 타입 가드(쿼리·드래프트 복원 등에서 사용). */
+export const isPollVisibility = (value: unknown): value is PollVisibility =>
+  value === 'public' || value === 'unlisted' || value === 'private';
+
+/**
+ * 작성 화면 마감 프리셋 — web/toss 공통(없음/6시간/1일/3일/1주/직접선택).
+ * ms<=0 은 마감 없음(none) 또는 직접 선택(custom)을 뜻한다.
+ */
+export type DeadlinePreset = 'none' | '6h' | '1d' | '3d' | '1w' | 'custom';
+
+export const DEADLINE_PRESETS: ReadonlyArray<{
+  value: DeadlinePreset;
+  label: string;
+  ms: number;
+}> = [
+  { value: 'none', label: '마감 없음 🌈', ms: 0 },
+  { value: '6h', label: '6시간 ⏰', ms: 6 * 3_600_000 },
+  { value: '1d', label: '1일 📅', ms: 24 * 3_600_000 },
+  { value: '3d', label: '3일 ⌛️', ms: 3 * 24 * 3_600_000 },
+  { value: '1w', label: '1주 🗓️', ms: 7 * 24 * 3_600_000 },
+  { value: 'custom', label: '직접 선택 ✏️', ms: -1 },
+];
 
 /** 비공개(private) 투표의 접근 코드. 4~20자. */
 export const PollAccessCodeSchema = z
@@ -219,6 +265,17 @@ export const POLLS_PAGE_MAX_LIMIT = 50;
  */
 export const PollListSortSchema = z.enum(['latest', 'popular', 'commented', 'closing']);
 export type PollListSort = z.infer<typeof PollListSortSchema>;
+
+/**
+ * 목록 정렬 셀렉터 옵션 — web/toss 두 앱이 같은 4종·같은 라벨을 쓰도록 단일화한 상수.
+ * 서버 PollListSort 4종과 1:1 대응한다(웹은 closing 누락, 토스는 commented 누락이던 드리프트 해소).
+ */
+export const SORT_OPTIONS: ReadonlyArray<{ value: PollListSort; label: string }> = [
+  { value: 'latest', label: '최신순' },
+  { value: 'popular', label: '투표 많은순' },
+  { value: 'commented', label: '댓글 많은순' },
+  { value: 'closing', label: '마감 임박순' },
+];
 
 /** 목록 진행 상태 필터. open=마감 전, closed=마감됨, all=전체. */
 export const PollListStatusSchema = z.enum(['all', 'open', 'closed']);

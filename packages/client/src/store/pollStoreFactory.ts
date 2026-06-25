@@ -8,6 +8,10 @@ import type {
   CreateCommentInput,
 } from '../../../shared/src/index';
 import type { AuthState } from './authStoreFactory';
+import {
+  isLocalPollFallbackAllowed as defaultIsLocalPollFallbackAllowed,
+  isRetryableLocalPollStatus,
+} from './localFallbackPolicy';
 
 type StoreSet<T> = (
   partial: Partial<T> | T | ((state: T) => Partial<T> | T),
@@ -75,18 +79,15 @@ interface PollAuthStore {
   getState: () => Pick<AuthState, 'user' | 'token' | 'invalidateSession' | 'ensureIdentity'>;
 }
 
-interface LocalVoteFallbackInput {
-  id: string;
-  status: number;
-}
-
 interface PollStoreFactoryOptions {
   parseApiPayload: (res: Response) => Promise<any>;
   requestApi: (path: string, init?: RequestInit) => Promise<Response>;
   useAuthStore: PollAuthStore;
-  canCreateLocalPollFromStatus: (status: number) => boolean;
-  canCreateLocalPollFromError: () => boolean;
-  canApplyLocalVoteFallback: (input: LocalVoteFallbackInput) => boolean;
+  /**
+   * 로컬 폴백 허용 여부 — 기본은 web/toss 공통 정책(isLocalPollFallbackAllowed: dev/localhost).
+   * 테스트에서만 주입해 환경을 흉내 낸다. 프로덕션 동작은 두 앱이 동일하다.
+   */
+  isLocalFallbackAllowed?: () => boolean;
 }
 
 const LOCAL_POLL_CACHE_KEY = 'picky_local_polls';
@@ -478,16 +479,22 @@ const buildPollRemovalUpdate =
     error: null,
   });
 
-export const createPollStoreState =
-  ({
-    parseApiPayload,
-    requestApi,
-    useAuthStore,
-    canCreateLocalPollFromStatus,
-    canCreateLocalPollFromError,
-    canApplyLocalVoteFallback,
-  }: PollStoreFactoryOptions): StoreStateCreator<PollState> =>
-  (set, get) => ({
+export const createPollStoreState = ({
+  parseApiPayload,
+  requestApi,
+  useAuthStore,
+  isLocalFallbackAllowed = defaultIsLocalPollFallbackAllowed,
+}: PollStoreFactoryOptions): StoreStateCreator<PollState> => {
+  // 폴백 정책을 web/toss 한 곳에서 동일하게 파생한다(프로덕션 가짜 성공·유령 폴 제거).
+  // - 생성 폴백: dev/localhost 환경 + 재시도 가능한 상태(404/405/5xx)일 때만 로컬 폴 생성.
+  // - 투표 폴백: dev/localhost 환경 + 재시도 가능한 상태일 때, 또는 이미 만들어진 로컬 폴(local-*).
+  const canCreateLocalPollFromStatus = (status: number) =>
+    isLocalFallbackAllowed() && isRetryableLocalPollStatus(status);
+  const canCreateLocalPollFromError = () => isLocalFallbackAllowed();
+  const canApplyLocalVoteFallback = ({ id, status }: { id: string; status: number }) =>
+    id.startsWith('local-') || (isLocalFallbackAllowed() && isRetryableLocalPollStatus(status));
+
+  return (set, get) => ({
     polls: [],
     currentPoll: null,
     isLoading: false,
@@ -943,3 +950,4 @@ export const createPollStoreState =
       }
     },
   });
+};

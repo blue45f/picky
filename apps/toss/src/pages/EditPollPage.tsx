@@ -4,7 +4,9 @@ import { Button } from '@toss/tds-mobile';
 import {
   RESULTS_VISIBILITY_LABELS,
   UpdatePollSchema,
+  VISIBILITY_OPTIONS,
   type PollResultsVisibility,
+  type PollVisibility,
   type UpdatePollInput,
 } from '../shared';
 import { usePollStore } from '../store/usePollStore';
@@ -34,7 +36,7 @@ const emptyOption = (): OptionDraft => ({
   imageUrl: null,
 });
 
-// 라벨은 web/toss 공통 상수에서 가져와 양 앱이 같은 문구를 쓰도록 한다.
+// 라벨·공개 범위 옵션은 web/toss 공통 상수(@picky/shared)에서 가져와 양 앱이 같은 문구를 쓴다.
 const RESULT_OPTIONS = [
   { value: 'afterVote', label: RESULTS_VISIBILITY_LABELS.afterVote.short },
   { value: 'always', label: RESULTS_VISIBILITY_LABELS.always.short },
@@ -420,6 +422,9 @@ export function EditPollPage() {
   const [question, setQuestion] = useState('');
   const [description, setDescription] = useState('');
   const [resultsVisibility, setResultsVisibility] = useState<PollResultsVisibility>('afterVote');
+  const [visibility, setVisibility] = useState<PollVisibility>('public');
+  // 새 접근 코드(비우면 기존 코드 유지). 서버는 코드 원문을 돌려주지 않으므로 항상 빈 값에서 시작.
+  const [accessCode, setAccessCode] = useState('');
   const [options, setOptions] = useState<OptionDraft[]>(() => [emptyOption(), emptyOption()]);
   const [openImageIndex, setOpenImageIndex] = useState<number | null>(null);
   const [linkDrafts, setLinkDrafts] = useState<Record<number, string>>({});
@@ -448,6 +453,8 @@ export function EditPollPage() {
     setQuestion(poll.question);
     setDescription(poll.description ?? '');
     setResultsVisibility(poll.resultsVisibility === 'always' ? 'always' : 'afterVote');
+    setVisibility(poll.visibility ?? 'public');
+    setAccessCode('');
     setOptions(
       poll.options.map((option) => ({
         id: `opt-${globalThis.crypto.randomUUID()}`,
@@ -566,11 +573,32 @@ export function EditPollPage() {
       return;
     }
 
+    // 접근 코드 검증 — web EditPoll과 동일 규칙.
+    // 이미 비공개였던 폴은 코드를 갖고 있으므로 빈 칸이면 서버가 기존 코드를 유지한다.
+    // 공개/링크전용 -> 비공개로 처음 전환할 때는 새 코드(4~20자)가 반드시 있어야 한다.
+    const trimmedAccessCode = accessCode.trim();
+    const wasAlreadyPrivate = poll.visibility === 'private';
+    if (visibility === 'private') {
+      const needsNewCode = !wasAlreadyPrivate || trimmedAccessCode.length > 0;
+      if (needsNewCode && (trimmedAccessCode.length < 4 || trimmedAccessCode.length > 20)) {
+        hapticFeedback('error');
+        setFormError(
+          wasAlreadyPrivate
+            ? '접근 코드는 4~20자예요. 비워두면 기존 코드가 그대로 유지돼요 🔒'
+            : '비공개로 바꾸려면 접근 코드(4~20자)를 입력해 주세요 🔒',
+        );
+        return;
+      }
+    }
+
     const candidate: UpdatePollInput = {
       question: question.trim(),
       description: description.trim() || null,
       endsAt: endsAtIso,
       resultsVisibility,
+      visibility,
+      // 비공개이면서 새 코드를 입력했을 때만 코드를 전송(빈 칸이면 서버가 기존 코드 유지).
+      ...(visibility === 'private' && trimmedAccessCode ? { accessCode: trimmedAccessCode } : {}),
       options: optionPayload,
     };
 
@@ -686,6 +714,44 @@ export function EditPollPage() {
           value={resultsVisibility}
           onChange={setResultsVisibility}
         />
+
+        <span style={{ ...labelStyle, display: 'block', margin: '24px 0 8px' }}>
+          누가 참여할 수 있나요? 🔐
+        </span>
+        <SegmentedControl
+          ariaLabel="공개 범위"
+          options={VISIBILITY_OPTIONS}
+          value={visibility}
+          onChange={(value) => {
+            setFormError(null);
+            setVisibility(value);
+          }}
+        />
+        <p style={{ fontSize: 13, color: theme.textFaint, marginTop: 8, marginLeft: 2 }}>
+          {visibility === 'public'
+            ? '목록에 노출되고 누구나 참여할 수 있어요'
+            : visibility === 'unlisted'
+              ? '목록엔 안 보이고, 링크를 받은 사람만 참여해요'
+              : '접근 코드를 아는 사람만 참여할 수 있어요'}
+        </p>
+        {visibility === 'private' ? (
+          <input
+            type="text"
+            value={accessCode}
+            onChange={(e) => {
+              setFormError(null);
+              setAccessCode(e.target.value);
+            }}
+            placeholder={
+              poll.visibility === 'private'
+                ? '바꿀 코드 입력 (비우면 기존 코드 유지)'
+                : '접근 코드 (4~20자)'
+            }
+            maxLength={20}
+            style={{ ...fieldStyle, marginTop: 10 }}
+            aria-label="비공개 투표 접근 코드"
+          />
+        ) : null}
 
         <div style={labelRowStyle}>
           <span style={labelStyle}>선택지 다듬기 🎨</span>

@@ -34,6 +34,7 @@ import { MASCOT, VOICE, categoryMeta, BETA_NOTICE } from '@picky/shared';
 // 시그널 분류(접전/신규/마감임박/피드백)·마감 판정 순수 로직은 @picky/shared 로 단일화했어요.
 import {
   canRevealResults,
+  formatPollEndAt as formatEndAtIso,
   getPollAgeDays,
   hottestActivePoll,
   isCloseRacePoll,
@@ -41,6 +42,9 @@ import {
   isFeedbackRichPoll,
   isPollClosed,
   optionPercent,
+  resolveCreatorLabel,
+  SIGNAL_CHIP_LABELS,
+  SORT_OPTIONS,
 } from '@picky/shared';
 import { usePollStore } from '../store/usePollStore';
 import { useAuthStore } from '../store/useAuthStore';
@@ -55,7 +59,7 @@ import {
 } from '../lib/pollHistory';
 import { CountdownChip, useCountdown } from '../components/Countdown';
 
-type SortMode = 'latest' | 'popular' | 'commented';
+type SortMode = 'latest' | 'popular' | 'commented' | 'closing';
 type ScopeMode = 'all' | 'mine' | 'guest';
 type SignalMode =
   | 'all'
@@ -98,7 +102,7 @@ const savePinnedPollIds = (pollIds: string[]) => {
 };
 
 const isSortMode = (value: string | null): value is SortMode => {
-  return value === 'latest' || value === 'popular' || value === 'commented';
+  return value === 'latest' || value === 'popular' || value === 'commented' || value === 'closing';
 };
 
 const isScopeMode = (value: string | null): value is ScopeMode => {
@@ -122,23 +126,8 @@ const isGuestCreator = (creatorId?: string | null, creatorIsGuest?: boolean) => 
   return creatorIsGuest || Boolean(creatorId?.startsWith('guest-'));
 };
 
-const formatPollEndAt = (poll: Poll) => {
-  if (!poll.endsAt) {
-    return '마감 없음';
-  }
-
-  const endAtTime = new Date(poll.endsAt);
-  if (!Number.isFinite(endAtTime.getTime())) {
-    return '마감 확인 필요';
-  }
-
-  return endAtTime.toLocaleString('ko-KR', {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-};
+// 마감 표기는 @picky/shared formatPollEndAt 단일 소스에 위임한다("마감 없음"/"마감 확인 필요"/"6월 25일 14:30").
+const formatPollEndAt = (poll: Poll) => formatEndAtIso(poll.endsAt);
 
 const formatRecentPollViewedAt = (value: string) => {
   const viewedAt = new Date(value).getTime();
@@ -225,7 +214,7 @@ const getPollSignalLabel = (poll: Poll) => {
   }
 
   if (isFeedbackRichPoll(poll)) {
-    return '피드백 활발';
+    return SIGNAL_CHIP_LABELS.feedbackRich;
   }
 
   if (getPollAgeDays(poll.createdAt) <= 3) {
@@ -249,7 +238,7 @@ const getPollSignalStyle = (label: string): React.CSSProperties => {
         borderColor: 'rgba(251, 113, 133, 0.3)',
         background: 'rgba(251, 113, 133, 0.08)',
       };
-    case '피드백 활발':
+    case SIGNAL_CHIP_LABELS.feedbackRich:
       return {
         color: 'var(--brand-accent-teal)',
         borderColor: 'rgba(45, 212, 191, 0.3)',
@@ -276,18 +265,6 @@ const getPollSignalStyle = (label: string): React.CSSProperties => {
   }
 };
 
-const getCreatorLabel = (creatorId?: string | null, creatorIsGuest?: boolean) => {
-  if (isGuestCreator(creatorId, creatorIsGuest)) {
-    return '비회원 작성';
-  }
-
-  if (creatorId) {
-    return '회원 작성';
-  }
-
-  return '비회원 작성';
-};
-
 const resolveEmptyStateHint = (hasActiveFilters: boolean, isGuestUser: boolean) => {
   if (hasActiveFilters) {
     return '검색어나 필터를 바꿔서 다시 찾아볼까요?';
@@ -300,11 +277,8 @@ const resolveEmptyStateHint = (hasActiveFilters: boolean, isGuestUser: boolean) 
   return '첫 고민을 올리고 친구·동료에게 링크로 빠르게 물어보세요 🥑';
 };
 
-const sortOptions: { value: SortMode; label: string }[] = [
-  { value: 'latest', label: '최신순' },
-  { value: 'popular', label: '투표 많은순' },
-  { value: 'commented', label: '댓글 많은순' },
-];
+// 정렬 옵션은 @picky/shared SORT_OPTIONS 단일 소스(latest/popular/commented/closing 4종)를 그대로 쓴다.
+const sortOptions: ReadonlyArray<{ value: SortMode; label: string }> = SORT_OPTIONS;
 
 const scopeOptions: { value: ScopeMode; label: string }[] = [
   { value: 'all', label: '전체 보기' },
@@ -312,14 +286,17 @@ const scopeOptions: { value: ScopeMode; label: string }[] = [
   { value: 'guest', label: '비회원 작성' },
 ];
 
+// 5종 캐노니컬 시그널(all/closeRace/fresh/closingSoon/feedbackRich)은 @picky/shared SIGNAL_CHIP_LABELS
+// 단일 소스를 그대로 쓴다(feedbackRich 라벨이 '피드백 활발'/'한마디 많은'으로 갈리던 드리프트 해소).
+// needsVote/withAttachment/closed 는 웹 전용 보조 모드라 자체 라벨을 유지한다.
 const signalOptions: { value: SignalMode; label: string }[] = [
-  { value: 'all', label: '전체 상태' },
+  { value: 'all', label: SIGNAL_CHIP_LABELS.all },
   { value: 'needsVote', label: '참여 대기' },
-  { value: 'closeRace', label: '접전' },
-  { value: 'fresh', label: '신규' },
-  { value: 'feedbackRich', label: '피드백 활발' },
+  { value: 'closeRace', label: SIGNAL_CHIP_LABELS.closeRace },
+  { value: 'fresh', label: SIGNAL_CHIP_LABELS.fresh },
+  { value: 'feedbackRich', label: SIGNAL_CHIP_LABELS.feedbackRich },
   { value: 'withAttachment', label: '자료 첨부' },
-  { value: 'closingSoon', label: '마감 임박' },
+  { value: 'closingSoon', label: SIGNAL_CHIP_LABELS.closingSoon },
   { value: 'closed', label: '마감' },
 ];
 type ViewMode = 'stack' | 'compact';
@@ -516,7 +493,8 @@ function PollCard(
     handleCopyPollLink,
     handleCopyPollEmbed,
   } = props;
-  const creatorLabel = getCreatorLabel(poll.creatorId, poll.creatorIsGuest);
+  // 회원/비회원 판단은 @picky/shared resolveCreatorLabel 단일 소스로(목록 카드는 닉네임 없이 회원/비회원만).
+  const creatorLabel = `${resolveCreatorLabel(null, poll.creatorId, poll.creatorIsGuest)} 작성`;
   // 부모(PollCard)가 남은 ms를 1초마다 틱하고, CountdownChip은 표시만 한다(자체 타이머 없음 = 누수 방지).
   const remaining = useCountdown(poll.endsAt);
   // Poll 타입에 categoryId 가 아직 없지만 런타임 데이터엔 실릴 수 있어 방어적으로 읽는다.
@@ -1206,7 +1184,7 @@ function OperatorToolsPanel(
               지금 참여하면 좋은 고민
             </h2>
             <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.76rem' }}>
-              참여 대기, 접전, 피드백 활발 상태를 기준으로 바로 들어갈 투표를 추천합니다.
+              참여 대기, 접전, 한마디 많은 상태를 기준으로 바로 들어갈 투표를 추천합니다.
             </p>
           </div>
           <span
@@ -2135,17 +2113,28 @@ export const PollList: React.FC = () => {
     [scopedCounts],
   );
 
-  const signalCounts = useMemo(
-    () =>
-      signalOptions.map((option) => ({
-        ...option,
-        count:
-          option.value === 'all'
-            ? polls.length
-            : polls.filter((poll) => matchesSignalMode(poll, option.value)).length,
-      })),
-    [polls],
-  );
+  const signalCounts = useMemo(() => {
+    // 결과 파생 시그널(접전·한마디많은)은 이 기기가 결과를 볼 수 있는 폴만 세서(미공개 결과 누출 방지)
+    // 칩 카운트가 실제 노출되는 목록과 어긋나지 않게 한다.
+    const voted = votedPollIds();
+    const matchesForViewer = (poll: Poll, value: SignalMode) => {
+      if (!matchesSignalMode(poll, value)) {
+        return false;
+      }
+      if (value === 'closeRace' || value === 'feedbackRich') {
+        return canRevealResults(poll, voted.has(poll.id));
+      }
+      return true;
+    };
+
+    return signalOptions.map((option) => ({
+      ...option,
+      count:
+        option.value === 'all'
+          ? polls.length
+          : polls.filter((poll) => matchesForViewer(poll, option.value)).length,
+    }));
+  }, [polls]);
 
   const visiblePolls = useMemo(() => {
     // 검색(q)·정렬(sort)·마감상태는 서버가 이미 적용한 현재 페이지(polls)다(#W2).
@@ -2162,7 +2151,13 @@ export const PollList: React.FC = () => {
 
     // 'closed'는 서버 status로 처리되므로 클라에서 중복 적용하지 않는다.
     if (signal !== 'all' && signal !== 'closed') {
-      next = next.filter((poll) => matchesSignalMode(poll, signal));
+      // 결과 파생 시그널(접전·한마디많은)은 이 기기가 결과를 볼 수 있는 폴만 매칭해(미공개 결과 누출 방지).
+      const voted = votedPollIds();
+      const gated = signal === 'closeRace' || signal === 'feedbackRich';
+      next = next.filter(
+        (poll) =>
+          matchesSignalMode(poll, signal) && (!gated || canRevealResults(poll, voted.has(poll.id))),
+      );
     }
 
     return next;

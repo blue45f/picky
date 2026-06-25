@@ -29,7 +29,9 @@ import { SnsPreviewCard } from '../components/SnsPreviewCard';
 import { ParticipantPreviewPanel } from '../components/ParticipantPreviewPanel';
 import { buildShareablePollSnapshot, copyText } from '../lib/pollShare';
 import {
+  isPollVisibility,
   POLL_CATEGORIES,
+  VISIBILITY_OPTIONS,
   type Poll,
   type PollResultsVisibility,
   type PollVisibility,
@@ -255,32 +257,8 @@ const isResultsVisibility = (value: unknown): value is PollResultsVisibility => 
   return value === 'afterVote' || value === 'always';
 };
 
-// 공개 범위 — 목록 노출/링크전용/접근코드 비공개. 비공개 선택 시 접근 코드 입력을 노출한다.
-const VISIBILITY_OPTIONS: Array<{
-  value: PollVisibility;
-  label: string;
-  description: string;
-}> = [
-  {
-    value: 'public',
-    label: '공개 🌍',
-    description: '목록에 노출되고 누구나 참여할 수 있어요.',
-  },
-  {
-    value: 'unlisted',
-    label: '링크전용 🔗',
-    description: '목록엔 안 보이고, 링크를 받은 사람만 참여해요.',
-  },
-  {
-    value: 'private',
-    label: '비공개 🔒',
-    description: '접근 코드를 아는 사람만 참여할 수 있어요.',
-  },
-];
-
-const isVisibility = (value: unknown): value is PollVisibility => {
-  return value === 'public' || value === 'unlisted' || value === 'private';
-};
+// 공개 범위 옵션(목록 노출/링크전용/접근코드 비공개)·타입 가드는 @picky/shared 단일 소스를 쓴다.
+// 비공개 선택 시 접근 코드 입력을 노출한다(렌더링 로직은 동일).
 
 const resolveIsoEndAt = (value: string): string | null => {
   if (!value.trim()) {
@@ -345,7 +323,7 @@ const loadDraftFromStorage = (): PollDraft | null => {
     const resultsVisibility = isResultsVisibility(parsed.resultsVisibility)
       ? parsed.resultsVisibility
       : 'afterVote';
-    const visibility = isVisibility(parsed.visibility) ? parsed.visibility : 'public';
+    const visibility = isPollVisibility(parsed.visibility) ? parsed.visibility : 'public';
     const accessCode = typeof parsed.accessCode === 'string' ? parsed.accessCode : '';
     const options = Array.isArray(parsed.options)
       ? parsed.options

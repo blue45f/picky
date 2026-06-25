@@ -4,14 +4,20 @@
  */
 export type { PollSignal } from '../shared';
 export {
+  SIGNAL_CHIP_LABELS,
+  SIGNAL_OPTIONS,
   countPollsBySignal,
+  countPollsBySignalForViewer,
   filterPollsBySignal,
+  filterPollsBySignalForViewer,
   getPollAgeDays,
   hottestActivePoll,
   isCloseRacePoll,
   isClosingSoonPoll,
   isFeedbackRichPoll,
   isFreshPoll,
+  isResultDerivedSignal,
   matchesPollSignal,
+  matchesPollSignalForViewer,
   pollEngagementScore,
 } from '../shared';

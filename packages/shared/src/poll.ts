@@ -57,6 +57,32 @@ export const RESULTS_VISIBILITY_LABELS: Record<
 /** afterVote 폴에서 아직 결과를 못 본 사람에게 보여줄 안내 문구. */
 export const RESULTS_LOCKED_HINT = '투표하면 결과가 보여요';
 
+/**
+ * 작성자 표시 라벨 — web/toss 두 앱이 같은 표기 정책을 쓰도록 단일화한 헬퍼.
+ * 우선순위:
+ * 1) 닉네임이 있으면 닉네임 그대로(회원 글이 '익명/비회원'으로 잘못 표기되는 모순 제거)
+ * 2) 게스트면 '비회원'
+ * 3) creatorId가 있으면 '회원', 없으면(완전 익명) '익명'
+ *
+ * 닉네임은 단건 상세 응답에만 채워지므로(목록엔 비움), 목록 카드는 닉네임 없이
+ * 회원/비회원만 구분된다(정책상 의도된 동작).
+ */
+export const resolveCreatorLabel = (
+  nickname: string | null | undefined,
+  creatorId: string | null | undefined,
+  isGuest: boolean | undefined,
+): string => {
+  const trimmedNickname = nickname?.trim();
+  if (trimmedNickname) {
+    return trimmedNickname;
+  }
+  const guest = isGuest || Boolean(creatorId?.startsWith('guest-'));
+  if (guest) {
+    return '비회원';
+  }
+  return creatorId ? '회원' : '익명';
+};
+
 /** 옵션 득표율(%) 정수 반올림. */
 export const optionPercent = (voteCount: number, totalVotes: number): number =>
   totalVotes > 0 ? Math.round((voteCount / totalVotes) * 100) : 0;

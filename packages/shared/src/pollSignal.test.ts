@@ -1,13 +1,19 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Poll } from './index';
 import {
+  SIGNAL_CHIP_LABELS,
+  SIGNAL_OPTIONS,
   countPollsBySignal,
+  countPollsBySignalForViewer,
   filterPollsBySignal,
+  filterPollsBySignalForViewer,
   hottestActivePoll,
   isCloseRacePoll,
   isFeedbackRichPoll,
   isFreshPoll,
+  isResultDerivedSignal,
   matchesPollSignal,
+  matchesPollSignalForViewer,
   pollEngagementScore,
 } from './pollSignal';
 
@@ -149,5 +155,138 @@ describe('pollEngagementScore / hottestActivePoll', () => {
     const first = makePoll({ id: 'first', totalVotes: 5 });
     const second = makePoll({ id: 'second', totalVotes: 5 });
     expect(hottestActivePoll([first, second])?.id).toBe('first');
+  });
+});
+
+describe('isResultDerivedSignal', () => {
+  it('is true only for result-derived signals (closeRace / feedbackRich)', () => {
+    expect(isResultDerivedSignal('closeRace')).toBe(true);
+    expect(isResultDerivedSignal('feedbackRich')).toBe(true);
+    expect(isResultDerivedSignal('fresh')).toBe(false);
+    expect(isResultDerivedSignal('closingSoon')).toBe(false);
+    expect(isResultDerivedSignal('all')).toBe(false);
+  });
+});
+
+describe('SIGNAL_CHIP_LABELS / SIGNAL_OPTIONS', () => {
+  it('exposes 5 options whose labels come from SIGNAL_CHIP_LABELS', () => {
+    expect(SIGNAL_OPTIONS).toHaveLength(5);
+    for (const option of SIGNAL_OPTIONS) {
+      expect(option.label).toBe(SIGNAL_CHIP_LABELS[option.value]);
+    }
+  });
+  it('uses the canonical feedbackRich label', () => {
+    expect(SIGNAL_CHIP_LABELS.feedbackRich).toBe('한마디 많은 💬');
+    expect(SIGNAL_OPTIONS.find((option) => option.value === 'feedbackRich')?.label).toBe(
+      '한마디 많은 💬',
+    );
+  });
+});
+
+describe('matchesPollSignalForViewer (result-derived gating)', () => {
+  afterEach(() => vi.useRealTimers());
+
+  const voted = () => true;
+  const notVoted = () => false;
+
+  const closeOptions = [
+    { id: 1, text: 'a', voteCount: 5 },
+    { id: 2, text: 'b', voteCount: 5 },
+  ];
+  const richComments = [
+    { id: 1, voterName: 'a', comment: 'x', createdAt: '' },
+    { id: 2, voterName: 'b', comment: 'y', createdAt: '' },
+  ];
+
+  it('gates an open afterVote close-race poll behind a vote', () => {
+    const poll = makePoll({
+      options: closeOptions,
+      totalVotes: 10,
+      resultsVisibility: 'afterVote',
+      endsAt: null,
+    });
+    expect(matchesPollSignalForViewer(poll, 'closeRace', notVoted)).toBe(false);
+    expect(matchesPollSignalForViewer(poll, 'closeRace', voted)).toBe(true);
+  });
+
+  it('matches an always-visible close-race poll even without a vote', () => {
+    const poll = makePoll({
+      options: closeOptions,
+      totalVotes: 10,
+      resultsVisibility: 'always',
+      endsAt: null,
+    });
+    expect(matchesPollSignalForViewer(poll, 'closeRace', notVoted)).toBe(true);
+  });
+
+  it('matches a closed close-race poll even without a vote (closed reveals results)', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-25T00:00:00Z'));
+    const poll = makePoll({
+      options: closeOptions,
+      totalVotes: 10,
+      resultsVisibility: 'afterVote',
+      endsAt: '2026-06-24T00:00:00Z',
+    });
+    expect(matchesPollSignalForViewer(poll, 'closeRace', notVoted)).toBe(true);
+  });
+
+  it('gates an open afterVote feedbackRich poll behind a vote', () => {
+    const poll = makePoll({
+      comments: richComments,
+      resultsVisibility: 'afterVote',
+      endsAt: null,
+    });
+    expect(matchesPollSignalForViewer(poll, 'feedbackRich', notVoted)).toBe(false);
+    expect(matchesPollSignalForViewer(poll, 'feedbackRich', voted)).toBe(true);
+  });
+
+  it('does not gate non-result signals like fresh regardless of vote state', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-25T00:00:00Z'));
+    const poll = makePoll({
+      createdAt: '2026-06-25T00:00:00Z',
+      resultsVisibility: 'afterVote',
+      endsAt: null,
+    });
+    expect(matchesPollSignalForViewer(poll, 'fresh', notVoted)).toBe(true);
+    expect(matchesPollSignalForViewer(poll, 'fresh', voted)).toBe(true);
+  });
+});
+
+describe('filterPollsBySignalForViewer / countPollsBySignalForViewer', () => {
+  const closeA = makePoll({
+    id: 'closeA',
+    options: [
+      { id: 1, text: 'a', voteCount: 5 },
+      { id: 2, text: 'b', voteCount: 5 },
+    ],
+    totalVotes: 10,
+    resultsVisibility: 'afterVote',
+    endsAt: null,
+  });
+  const closeB = makePoll({
+    id: 'closeB',
+    options: [
+      { id: 1, text: 'a', voteCount: 4 },
+      { id: 2, text: 'b', voteCount: 4 },
+    ],
+    totalVotes: 8,
+    resultsVisibility: 'afterVote',
+    endsAt: null,
+  });
+
+  const votedForA = (poll: Poll) => poll.id === 'closeA';
+
+  it('reflects per-poll gating over the array', () => {
+    expect(
+      filterPollsBySignalForViewer([closeA, closeB], 'closeRace', votedForA).map((poll) => poll.id),
+    ).toEqual(['closeA']);
+    expect(countPollsBySignalForViewer([closeA, closeB], 'closeRace', votedForA)).toBe(1);
+  });
+
+  it("returns all polls for 'all' regardless of vote state", () => {
+    expect(filterPollsBySignalForViewer([closeA, closeB], 'all', () => false)).toHaveLength(2);
+    expect(countPollsBySignalForViewer([closeA, closeB], 'all', () => false)).toBe(2);
   });
 });

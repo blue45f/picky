@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Poll } from './index';
+import { SORT_OPTIONS } from './index';
 import {
   RESULTS_VISIBILITY_LABELS,
   canRevealResults,
@@ -8,6 +9,7 @@ import {
   normalizeResultsVisibility,
   optionPercent,
   optionsByVotes,
+  resolveCreatorLabel,
 } from './poll';
 
 const makePoll = (over: Partial<Poll> = {}): Poll => ({
@@ -113,5 +115,40 @@ describe('normalizeResultsVisibility / RESULTS_VISIBILITY_LABELS', () => {
   it('exposes a label set for both visibilities', () => {
     expect(RESULTS_VISIBILITY_LABELS.always.full).toBe('실시간 결과 공개');
     expect(RESULTS_VISIBILITY_LABELS.afterVote.full).toBe('투표 후 결과 공개');
+  });
+});
+
+describe('resolveCreatorLabel', () => {
+  it('returns the trimmed nickname when present (even for a guest with no creatorId)', () => {
+    expect(resolveCreatorLabel('  하준  ', null, true)).toBe('하준');
+    expect(resolveCreatorLabel('하준', 'guest-abc', true)).toBe('하준');
+    expect(resolveCreatorLabel('하준', 'user-1', false)).toBe('하준');
+  });
+
+  it("returns '비회원' when there is no nickname and the author is a guest", () => {
+    expect(resolveCreatorLabel(null, null, true)).toBe('비회원');
+    expect(resolveCreatorLabel('   ', 'user-1', true)).toBe('비회원');
+    expect(resolveCreatorLabel(undefined, 'guest-xyz', false)).toBe('비회원');
+  });
+
+  it("returns '회원' when there is no nickname, not a guest, and a creatorId is present", () => {
+    expect(resolveCreatorLabel(null, 'user-1', false)).toBe('회원');
+    expect(resolveCreatorLabel('  ', 'user-1', undefined)).toBe('회원');
+  });
+
+  it("returns '익명' when there is no nickname, not a guest, and no creatorId", () => {
+    expect(resolveCreatorLabel(null, null, false)).toBe('익명');
+    expect(resolveCreatorLabel(undefined, undefined, undefined)).toBe('익명');
+  });
+});
+
+describe('SORT_OPTIONS', () => {
+  it('has the 4 expected sort values in order', () => {
+    expect(SORT_OPTIONS.map((option) => option.value)).toEqual([
+      'latest',
+      'popular',
+      'commented',
+      'closing',
+    ]);
   });
 });

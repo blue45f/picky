@@ -3,9 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@toss/tds-mobile';
 import {
   CreatePollSchema,
+  DEADLINE_PRESETS,
   POLL_CATEGORIES,
   RESULTS_VISIBILITY_LABELS,
+  VISIBILITY_OPTIONS,
   type CreatePollInput,
+  type DeadlinePreset,
+  type Poll,
   type PollResultsVisibility,
   type PollVisibility,
 } from '../shared';
@@ -14,6 +18,7 @@ import { theme, stickyActionBar } from '../theme';
 import { fromDateTimeLocalValue, toDateTimeLocalValue } from '../lib/format';
 import { fileToDownscaledDataUrl, isUsableImageUrl } from '../lib/image';
 import { hapticFeedback } from '../lib/toss';
+import { copyText } from '../lib/pollShare';
 import { evaluatePollReadiness } from '../lib/pollReadiness';
 import { AppBar, Chip, SegmentedControl } from '../components/ui';
 
@@ -23,8 +28,6 @@ const QUESTION_MAX = 100;
 const DESC_MAX = 500;
 const OPTION_MAX = 60;
 const DEADLINE_BUFFER_MS = 60_000;
-
-type DeadlinePreset = 'none' | '6h' | '1d' | '3d' | '1w' | 'custom';
 
 interface OptionDraft {
   id: string;
@@ -38,26 +41,12 @@ const emptyOption = (): OptionDraft => ({
   imageUrl: null,
 });
 
-const DEADLINE_PRESETS = [
-  { value: 'none', label: '마감 없음 🌈', ms: 0 },
-  { value: '6h', label: '6시간 ⏰', ms: 6 * 3_600_000 },
-  { value: '1d', label: '1일 📅', ms: 24 * 3_600_000 },
-  { value: '3d', label: '3일 ⌛️', ms: 3 * 24 * 3_600_000 },
-  { value: '1w', label: '1주 🗓️', ms: 7 * 24 * 3_600_000 },
-  { value: 'custom', label: '직접 선택 ✏️', ms: -1 },
-] as const satisfies ReadonlyArray<{ value: DeadlinePreset; label: string; ms: number }>;
-
+// 마감 프리셋·공개 범위 옵션은 web/toss 공통 상수(@picky/shared)에서 가져와 양 앱이 같은 문구를 쓴다.
 // 라벨은 web/toss 공통 상수에서 가져와 양 앱이 같은 문구를 쓰도록 한다.
 const RESULT_OPTIONS = [
   { value: 'afterVote', label: RESULTS_VISIBILITY_LABELS.afterVote.short },
   { value: 'always', label: RESULTS_VISIBILITY_LABELS.always.short },
 ] as const satisfies ReadonlyArray<{ value: PollResultsVisibility; label: string }>;
-
-const VISIBILITY_OPTIONS = [
-  { value: 'public', label: '공개 🌍' },
-  { value: 'unlisted', label: '링크전용 🔗' },
-  { value: 'private', label: '비공개 🔒' },
-] as const satisfies ReadonlyArray<{ value: PollVisibility; label: string }>;
 
 const fieldStyle: React.CSSProperties = {
   width: '100%',
@@ -933,6 +922,87 @@ function SubmitBar(
   );
 }
 
+/**
+ * 비공개 고민 생성 직후 화면 — 작성자가 방금 정한 접근 코드를 공유 전에 확인/복사하게 한다.
+ * 서버는 접근 코드를 돌려주지 않으므로 화면을 떠나기 전에 한 번 노출해야 한다(web과 동일 동선).
+ */
+function CreatedPrivateScreen(
+  props: Readonly<{
+    accessCode: string;
+    copied: boolean;
+    onCopy: () => void;
+    onGoToPoll: () => void;
+    onGoToList: () => void;
+  }>,
+) {
+  const { accessCode, copied, onCopy, onGoToPoll, onGoToList } = props;
+  return (
+    <div style={{ minHeight: '100dvh' }}>
+      <AppBar title="비공개 고민 완성! 🔒" onBack={onGoToList} />
+      <div style={{ maxWidth: 520, margin: '0 auto', padding: '8px 20px 40px' }}>
+        <div className="rise" style={{ textAlign: 'center', padding: '20px 0 8px' }}>
+          <div style={{ fontSize: 52, marginBottom: 10 }}>🔒</div>
+          <h1 style={{ fontSize: 20, fontWeight: 900, color: theme.text, margin: '0 0 8px' }}>
+            비공개 고민이 만들어졌어요
+          </h1>
+          <p style={{ fontSize: 13.5, color: theme.textMuted, lineHeight: 1.55, margin: 0 }}>
+            아래 <strong style={{ color: theme.text }}>접근 코드</strong>를 아는 사람만 참여할 수
+            있어요. 링크와 함께 코드를 꼭 전달해 주세요. 코드는 다시 표시되지 않으니 지금 복사해
+            두는 게 좋아요.
+          </p>
+        </div>
+
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+            flexWrap: 'wrap',
+            marginTop: 18,
+            padding: '14px 16px',
+            borderRadius: theme.radiusSm,
+            border: `1px solid ${theme.accent}`,
+            background: theme.accentSoft,
+          }}
+        >
+          <div style={{ display: 'grid', gap: 4, minWidth: 0 }}>
+            <span style={{ fontSize: 12, fontWeight: 800, color: theme.textMuted }}>접근 코드</span>
+            <strong
+              style={{
+                fontSize: 20,
+                fontWeight: 900,
+                letterSpacing: '0.12em',
+                color: theme.accent,
+                wordBreak: 'break-all',
+              }}
+            >
+              {accessCode}
+            </strong>
+          </div>
+          <Button variant="weak" onClick={onCopy} aria-label="접근 코드 복사">
+            {copied ? '복사됨 ✅' : '복사 📋'}
+          </Button>
+        </div>
+        {copied ? (
+          <p role="status" style={{ margin: '10px 2px 0', fontSize: 12.5, color: theme.accent }}>
+            접근 코드를 복사했어요. 참여자에게 링크와 함께 전달해 주세요.
+          </p>
+        ) : null}
+
+        <div style={{ display: 'flex', gap: 10, marginTop: 22 }}>
+          <Button variant="weak" style={{ flex: 1, borderRadius: 16 }} onClick={onGoToList}>
+            목록으로
+          </Button>
+          <Button style={{ flex: 2, borderRadius: 16 }} onClick={onGoToPoll}>
+            공유하러 가기 🚀
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function CreatePollPage() {
   const navigate = useNavigate();
   const { createPoll, isLoading } = usePollStore();
@@ -952,6 +1022,12 @@ export function CreatePollPage() {
   const [endsAtIso, setEndsAtIso] = useState<string | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // 비공개 생성 직후 접근 코드 노출용(서버는 코드를 돌려주지 않으므로 화면에서 한 번 보여준다).
+  const [createdPrivatePoll, setCreatedPrivatePoll] = useState<{
+    poll: Poll;
+    accessCode: string;
+  } | null>(null);
+  const [accessCodeCopied, setAccessCodeCopied] = useState(false);
 
   const minCustom = useMemo(() => toDateTimeLocalValue(new Date(Date.now() + 5 * 60_000)), []);
 
@@ -1045,13 +1121,15 @@ export function CreatePollPage() {
       }
     }
 
+    const trimmedAccessCode = visibility === 'private' ? accessCode.trim() : '';
+
     const candidate = {
       question: question.trim(),
       description: description.trim() || null,
       categoryId,
       resultsVisibility,
       visibility,
-      accessCode: visibility === 'private' ? accessCode.trim() : null,
+      accessCode: visibility === 'private' ? trimmedAccessCode : null,
       endsAt: endsAtIso,
       options: filledOptions.map((opt) => ({
         text: opt.text.trim(),
@@ -1069,11 +1147,35 @@ export function CreatePollPage() {
     const created = await createPoll(parsed.data as CreatePollInput);
     if (created) {
       hapticFeedback('success');
+      // 비공개 폴은 곧장 이동하지 않고 접근 코드를 한 번 노출해 작성자가 복사·전달하게 한다(web과 동일).
+      if (visibility === 'private' && trimmedAccessCode) {
+        setAccessCodeCopied(false);
+        setCreatedPrivatePoll({ poll: created, accessCode: trimmedAccessCode });
+        return;
+      }
       navigate(`/poll/${created.id}`, { replace: true });
     } else {
       hapticFeedback('error');
       setError('고민을 만들지 못했어요. 잠시 후 다시 시도해 주세요 😢');
     }
+  };
+
+  const handleCopyAccessCode = async () => {
+    if (!createdPrivatePoll) {
+      return;
+    }
+    const ok = await copyText(createdPrivatePoll.accessCode);
+    setAccessCodeCopied(ok);
+    hapticFeedback(ok ? 'success' : 'error');
+  };
+
+  const goToCreatedPoll = () => {
+    if (!createdPrivatePoll) {
+      return;
+    }
+    const pollId = createdPrivatePoll.poll.id;
+    setCreatedPrivatePoll(null);
+    navigate(`/poll/${pollId}`, { replace: true });
   };
 
   const handleBack = () => {
@@ -1116,6 +1218,21 @@ export function CreatePollPage() {
     hapticFeedback('tap');
     setStep(1);
   };
+
+  if (createdPrivatePoll) {
+    return (
+      <CreatedPrivateScreen
+        accessCode={createdPrivatePoll.accessCode}
+        copied={accessCodeCopied}
+        onCopy={() => void handleCopyAccessCode()}
+        onGoToPoll={goToCreatedPoll}
+        onGoToList={() => {
+          setCreatedPrivatePoll(null);
+          navigate('/', { replace: true });
+        }}
+      />
+    );
+  }
 
   const advancedSettings = (
     <AdvancedSettings

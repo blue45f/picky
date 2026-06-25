@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@toss/tds-mobile';
 import type { Poll, PollComment, PollOption } from '../shared';
-import { MASCOT, VOICE } from '../shared';
+import { MASCOT, VOICE, resolveCreatorLabel } from '../shared';
 import { formatNumber } from '../lib/format';
 import { optionPercent } from '../lib/poll';
 import { theme, stickyActionBar } from '../theme';
@@ -1105,27 +1105,6 @@ function DetailHeader(
   );
 }
 
-/**
- * 작성자 라벨 — web getCreatorLabel과 같은 3분기.
- * 닉네임이 있으면 닉네임을 그대로(회원 글이 '익명'으로 표기되는 모순 제거),
- * 없으면 비회원/회원 여부로만 표시한다.
- */
-function resolveAuthorLabel(
-  creatorNickname: string | null | undefined,
-  creatorId: string | null | undefined,
-  creatorIsGuest: boolean | undefined,
-): string {
-  const nickname = creatorNickname?.trim();
-  if (nickname) {
-    return nickname;
-  }
-  const isGuest = creatorIsGuest || Boolean(creatorId?.startsWith('guest-'));
-  if (isGuest) {
-    return '비회원';
-  }
-  return creatorId ? '회원' : '익명';
-}
-
 function PollHero(
   props: Readonly<{
     question: string;
@@ -1139,7 +1118,8 @@ function PollHero(
 ) {
   const { question, description, totalVotes, leader, creatorNickname, creatorId, creatorIsGuest } =
     props;
-  const authorLabel = resolveAuthorLabel(creatorNickname, creatorId, creatorIsGuest);
+  // 작성자 라벨은 web/toss 공통 resolveCreatorLabel(@picky/shared)로 단일화.
+  const authorLabel = resolveCreatorLabel(creatorNickname, creatorId, creatorIsGuest);
   return (
     <>
       {/* Hero main issue question - stands out first like NatePan main post for eye-catch on mobile */}

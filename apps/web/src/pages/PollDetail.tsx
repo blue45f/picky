@@ -49,6 +49,7 @@ import {
   MASCOT,
   VOICE,
   categoryMeta,
+  canRevealResults,
   optionPercent,
   buildConsensusNarrative as buildConsensusNarrative_shared,
   buildDecisionMemo,
@@ -5340,7 +5341,8 @@ function buildPollViewModel(
   const endAtLabel = formatEndAt(currentPoll.endsAt);
   const resultsVisibility: 'always' | 'afterVote' =
     currentPoll.resultsVisibility === 'always' ? 'always' : 'afterVote';
-  const canViewResults = hasVoted || pollClosed || resultsVisibility === 'always';
+  // 결과 공개 게이트는 @picky/shared canRevealResults 단일 소스로(투표/마감/always 판단을 web/toss/OG 동일하게).
+  const canViewResults = canRevealResults(currentPoll, hasVoted);
   const sortedOptionsByVotes = [...currentPoll.options].sort((a, b) => b.voteCount - a.voteCount);
   const leadingOption = sortedOptionsByVotes[0] || null;
   const runnerUpOption = sortedOptionsByVotes[1] || null;

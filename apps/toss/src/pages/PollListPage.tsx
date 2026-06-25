@@ -1,8 +1,15 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Top } from '@toss/tds-mobile';
-import type { Poll } from '../shared';
-import { MASCOT, BETA_NOTICE, canRevealResults, RESULTS_LOCKED_HINT } from '../shared';
+import type { Poll, PollListSort } from '../shared';
+import {
+  MASCOT,
+  BETA_NOTICE,
+  SORT_OPTIONS,
+  SIGNAL_OPTIONS,
+  canRevealResults,
+  RESULTS_LOCKED_HINT,
+} from '../shared';
 import { usePollStore } from '../store/usePollStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { theme, pageShell, stickyActionBar } from '../theme';
@@ -12,8 +19,8 @@ import { hasVotedLocally } from '../lib/votes';
 import { hapticFeedback } from '../lib/toss';
 import { getRecentPollHistory, type RecentPollHistoryItem } from '../lib/pollHistory';
 import {
-  countPollsBySignal,
-  filterPollsBySignal,
+  countPollsBySignalForViewer,
+  filterPollsBySignalForViewer,
   hottestActivePoll,
   type PollSignal,
 } from '../lib/pollSignal';
@@ -23,7 +30,6 @@ import { useCountdown } from '../components/Countdown';
 import { triggerParticleBurst } from '../lib/particles';
 
 type StatusFilter = 'all' | 'open' | 'closed';
-type SortKey = 'recent' | 'popular' | 'closing';
 
 const FILTER_OPTIONS = [
   { value: 'all', label: '전체 🥑' },
@@ -31,20 +37,8 @@ const FILTER_OPTIONS = [
   { value: 'closed', label: '마감 ⏰' },
 ] as const satisfies ReadonlyArray<{ value: StatusFilter; label: string }>;
 
-const SORT_OPTIONS = [
-  { value: 'recent', label: '최신순 ⚡️' },
-  { value: 'popular', label: '인기순 🌟' },
-  { value: 'closing', label: '마감임박 ⌛️' },
-] as const satisfies ReadonlyArray<{ value: SortKey; label: string }>;
-
-// 발견성 signal 칩 — 서버 쿼리와 무관한 클라 파생 필터(현재 페이지에 적용). 핵심 5종으로 한정.
-const SIGNAL_OPTIONS = [
-  { value: 'all', label: '전체' },
-  { value: 'closeRace', label: '접전 ⚔️' },
-  { value: 'fresh', label: '신규 ✨' },
-  { value: 'closingSoon', label: '마감임박 ⌛️' },
-  { value: 'feedbackRich', label: '한마디 많은 💬' },
-] as const satisfies ReadonlyArray<{ value: PollSignal; label: string }>;
+// 정렬은 web/toss 공통 SORT_OPTIONS(서버 4종: 최신/투표많은/댓글많은/마감임박)를 그대로 쓴다.
+// 발견성 signal 칩(SIGNAL_OPTIONS)도 공통 상수 — 라벨/순서가 web과 동일.
 
 function SignalChips(
   props: Readonly<{
@@ -68,7 +62,10 @@ function SignalChips(
       >
         {SIGNAL_OPTIONS.map((option) => {
           const active = option.value === signal;
-          const count = countPollsBySignal(polls, option.value);
+          // 결과 파생 시그널(접전·한마디많은)은 이 기기가 결과를 볼 수 있는 폴만 센다(누출 방지).
+          const count = countPollsBySignalForViewer(polls, option.value, (poll) =>
+            hasVotedLocally(poll.id),
+          );
           // 0건이라도 탭은 허용(다음 페이지에 있을 수 있음). 0건은 muted 스타일로만 구분.
           const muted = option.value !== 'all' && count === 0 && !active;
           return (
@@ -122,6 +119,9 @@ function PollCard({
   const voted = hasVotedLocally(poll.id);
   // afterVote 폴은 투표 전(미마감)엔 결과(선두 %)를 가린다 — web과 동일 게이트.
   const revealResults = canRevealResults(poll, voted);
+  // 0표/선택지 1개면 '선두'가 거짓 신호가 되므로 결과를 드러낼 수 있어도 선두 표시를 막는다(web R1과 동일).
+  const hasRealLeader =
+    poll.totalVotes > 0 && poll.options.length >= 2 && (leading?.voteCount ?? 0) > 0;
   const percent = leading ? optionPercent(leading.voteCount, poll.totalVotes) : 0;
   const repImage = poll.options.find((option) => option.imageUrl)?.imageUrl ?? null;
 
@@ -247,33 +247,42 @@ function PollCard({
             border: `1px solid rgba(255,255,255,0.02)`,
           }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, gap: 12 }}>
-            <span
-              style={{
-                color: theme.textMuted,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-                fontWeight: 600,
-              }}
-            >
-              {revealResults ? `📊 ${leading.text}` : `🗳️ ${leading.text}`}
-            </span>
-            {revealResults ? (
-              <span style={{ color: theme.accent, fontWeight: 800, flexShrink: 0 }}>
-                {percent}%
-              </span>
-            ) : (
-              <span style={{ color: theme.textFaint, fontWeight: 700, flexShrink: 0 }}>🔒</span>
-            )}
-          </div>
-          {revealResults ? (
-            <div style={{ marginTop: 8 }}>
-              <ProgressBar percent={percent} height={10} />
+          {revealResults && hasRealLeader ? (
+            <>
+              <div
+                style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, gap: 12 }}
+              >
+                <span
+                  style={{
+                    color: theme.textMuted,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    fontWeight: 600,
+                  }}
+                >
+                  📊 {leading.text}
+                </span>
+                <span style={{ color: theme.accent, fontWeight: 800, flexShrink: 0 }}>
+                  {percent}%
+                </span>
+              </div>
+              <div style={{ marginTop: 8 }}>
+                <ProgressBar percent={percent} height={10} />
+              </div>
+            </>
+          ) : revealResults ? (
+            // 결과는 열 수 있지만 0표라 '선두'가 없는 상태 — 거짓 선두 대신 첫 투표를 유도(R1).
+            <div style={{ fontSize: 13, color: theme.textMuted, fontWeight: 600 }}>
+              🗳️ 아직 표가 없어요 · 첫 투표를 기다려요
             </div>
           ) : (
-            <div style={{ marginTop: 6, fontSize: 12, color: theme.textFaint, fontWeight: 600 }}>
-              {RESULTS_LOCKED_HINT}
+            // 미투표·미공개 — 선두를 가리고 투표를 유도(자물쇠).
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ color: theme.textFaint, fontWeight: 700 }}>🔒</span>
+              <span style={{ fontSize: 13, color: theme.textFaint, fontWeight: 600 }}>
+                {RESULTS_LOCKED_HINT}
+              </span>
             </div>
           )}
         </div>
@@ -382,6 +391,8 @@ function HotPollLeading(props: Readonly<{ poll: Poll }>) {
   const pct = optionPercent(leadingOpt.voteCount, poll.totalVotes);
   // afterVote 폴은 투표 전(미마감)엔 1위 %·진행바를 가리고 잠금 안내만 — web과 동일 게이트.
   const revealResults = canRevealResults(poll, hasVotedLocally(poll.id));
+  // 0표/선택지 1개면 '선두'가 거짓이 되므로 결과를 드러낼 수 있어도 1위 표시를 막는다(R1).
+  const hasRealLeader = poll.totalVotes > 0 && poll.options.length >= 2 && leadingOpt.voteCount > 0;
   return (
     <div
       style={{
@@ -392,7 +403,7 @@ function HotPollLeading(props: Readonly<{ poll: Poll }>) {
         border: `1px solid rgba(255,255,255,0.02)`,
       }}
     >
-      {revealResults ? (
+      {revealResults && hasRealLeader ? (
         <>
           <div
             style={{
@@ -411,6 +422,11 @@ function HotPollLeading(props: Readonly<{ poll: Poll }>) {
             <ProgressBar percent={pct} height={10} />
           </div>
         </>
+      ) : revealResults ? (
+        // 결과는 열렸지만 0표라 1위가 없는 상태 — 거짓 선두 대신 첫 투표 유도(R1).
+        <div style={{ fontSize: 13, color: theme.textMuted, fontWeight: 600 }}>
+          🗳️ 아직 표가 없어요 · 첫 투표를 기다려요
+        </div>
       ) : (
         <div style={{ fontSize: 13, color: theme.textMuted, fontWeight: 600 }}>
           🔒 {RESULTS_LOCKED_HINT}
@@ -784,11 +800,11 @@ function ListStats(props: Readonly<{ pollCount: number; totalVotes: number }>) {
 function ListFilters(
   props: Readonly<{
     statusFilter: StatusFilter;
-    sortKey: SortKey;
+    sortKey: PollListSort;
     myOnly: boolean;
     myPollCount: number;
     onStatusChange: (value: StatusFilter) => void;
-    onSortChange: (value: SortKey) => void;
+    onSortChange: (value: PollListSort) => void;
     onToggleMyOnly: () => void;
   }>,
 ) {
@@ -1002,7 +1018,7 @@ export function PollListPage() {
 
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-  const [sortKey, setSortKey] = useState<SortKey>('recent');
+  const [sortKey, setSortKey] = useState<PollListSort>('latest');
   const [myOnly, setMyOnly] = useState(false);
   // 발견성 signal — 서버 쿼리와 무관한 클라 파생 필터(현재 페이지에만 적용).
   const [signal, setSignal] = useState<PollSignal>('all');
@@ -1017,12 +1033,12 @@ export function PollListPage() {
     setRecent(getRecentPollHistory());
   }, []);
 
-  // 검색(q)·상태(status)·정렬(sort)을 서버측으로 보낸다(#W2). recent→latest 매핑.
+  // 검색(q)·상태(status)·정렬(sort)을 서버측으로 보낸다(#W2). 정렬키는 서버 PollListSort 4종 그대로.
   // myOnly(내 글만)는 식별 기반이라 결과에 대한 클라 보조필터로 남긴다.
   const serverFilters = useMemo(
     () => ({
       q: query.trim(),
-      sort: sortKey === 'recent' ? ('latest' as const) : sortKey,
+      sort: sortKey,
       status: statusFilter,
       category: null,
     }),
@@ -1049,7 +1065,8 @@ export function PollListPage() {
 
   const visiblePolls = useMemo(
     // signal은 서버에 없는 클라 파생 필터라 마지막에 현재 페이지(scopedPolls)에 적용한다(#W2).
-    () => filterPollsBySignal(scopedPolls, signal),
+    // 결과 파생 시그널은 결과를 볼 수 있는 폴만 남겨 미투표자에게 접전/한마디 신호가 새지 않게 한다.
+    () => filterPollsBySignalForViewer(scopedPolls, signal, (poll) => hasVotedLocally(poll.id)),
     [scopedPolls, signal],
   );
 
