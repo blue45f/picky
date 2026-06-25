@@ -238,6 +238,101 @@ describe('PollService.addComment (closed-poll guard)', () => {
     await expect(service.addComment('abc123', { comment: '늦었지만…' })).rejects.toThrow();
     expect(mocks.appendComment).not.toHaveBeenCalled();
   });
+
+  // 멱등 안전망 — 연타·재시도가 만든 "직전과 똑같은 한마디"는 새로 만들지 않고 기존을 돌려준다.
+  it('is idempotent: a duplicate of a just-posted comment does NOT append again', async () => {
+    mocks.getPollById.mockResolvedValue(
+      makePoll({
+        comments: [
+          {
+            id: 1,
+            voterName: '익명',
+            comment: '나도 김밥!',
+            createdAt: new Date().toISOString(),
+            parentId: null,
+          },
+        ],
+      }),
+    );
+    await service.addComment('abc123', { comment: '나도 김밥!' });
+    // 거부가 아니라 멱등 — append 는 호출되지 않고 정상 응답을 돌려준다.
+    expect(mocks.appendComment).not.toHaveBeenCalled();
+  });
+
+  it('treats whitespace/case variants of the same author+text as a duplicate', async () => {
+    mocks.getPollById.mockResolvedValue(
+      makePoll({
+        comments: [
+          {
+            id: 1,
+            voterName: '민지',
+            comment: 'Hello World',
+            createdAt: new Date().toISOString(),
+            parentId: null,
+          },
+        ],
+      }),
+    );
+    await service.addComment('abc123', { comment: '  hello   world ', voterName: '민지' });
+    expect(mocks.appendComment).not.toHaveBeenCalled();
+  });
+
+  it('allows the same text from a DIFFERENT author (not a duplicate)', async () => {
+    mocks.getPollById.mockResolvedValue(
+      makePoll({
+        comments: [
+          {
+            id: 1,
+            voterName: '민지',
+            comment: '동의해요',
+            createdAt: new Date().toISOString(),
+            parentId: null,
+          },
+        ],
+      }),
+    );
+    await service.addComment('abc123', { comment: '동의해요', voterName: '현우' });
+    expect(mocks.appendComment).toHaveBeenCalledTimes(1);
+  });
+
+  it('allows the same comment again after the dedupe window has passed', async () => {
+    mocks.getPollById.mockResolvedValue(
+      makePoll({
+        comments: [
+          {
+            id: 1,
+            voterName: '익명',
+            comment: '같은 말',
+            // 창(10s)을 한참 넘긴 과거 → 정상적으로 다시 남길 수 있어야 한다.
+            createdAt: new Date(Date.now() - 60_000).toISOString(),
+            parentId: null,
+          },
+        ],
+      }),
+    );
+    await service.addComment('abc123', { comment: '같은 말' });
+    expect(mocks.appendComment).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not treat a top-level comment as a duplicate of a reply with the same text', async () => {
+    mocks.getPollById.mockResolvedValue(
+      makePoll({
+        comments: [
+          { id: 1, voterName: '익명', comment: '루트', createdAt: new Date().toISOString() },
+          {
+            id: 2,
+            voterName: '익명',
+            comment: '같은 텍스트',
+            createdAt: new Date().toISOString(),
+            parentId: 1,
+          },
+        ],
+      }),
+    );
+    // 부모가 다르면(최상위 vs 답글) 중복이 아니다 → append 된다.
+    await service.addComment('abc123', { comment: '같은 텍스트' });
+    expect(mocks.appendComment).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('PollService private-poll write gate (vote/comment access-code enforcement)', () => {

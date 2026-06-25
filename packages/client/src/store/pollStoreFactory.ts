@@ -479,12 +479,23 @@ const buildPollRemovalUpdate =
     error: null,
   });
 
+/**
+ * 동시 중복 호출 차단용 키 정규화 — 공백 접기 + 소문자화로 사소한 차이를 같은 키로 본다.
+ * (연타·StrictMode 이중 호출·네트워크 재시도가 만드는 "사실상 같은 요청"을 한 곳에서 막는다.)
+ */
+const normalizeGuardText = (value: string | null | undefined): string =>
+  (value ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
+
 export const createPollStoreState = ({
   parseApiPayload,
   requestApi,
   useAuthStore,
   isLocalFallbackAllowed = defaultIsLocalPollFallbackAllowed,
 }: PollStoreFactoryOptions): StoreStateCreator<PollState> => {
+  // in-flight 중복 가드 — 같은 키의 쓰기(투표/한마디)가 아직 진행 중이면 즉시 무시한다.
+  // web/toss 양 앱이 이 단일 스토어 팩토리를 공유하므로 한 곳만 고치면 양쪽이 보호된다.
+  // (연타, React StrictMode 개발 이중 호출, 네트워크 재시도가 만드는 중복 POST를 차단.)
+  const inFlightWrites = new Set<string>();
   // 폴백 정책을 web/toss 한 곳에서 동일하게 파생한다(프로덕션 가짜 성공·유령 폴 제거).
   // - 생성 폴백: dev/localhost 환경 + 재시도 가능한 상태(404/405/5xx)일 때만 로컬 폴 생성.
   // - 투표 폴백: dev/localhost 환경 + 재시도 가능한 상태일 때, 또는 이미 만들어진 로컬 폴(local-*).
@@ -662,6 +673,15 @@ export const createPollStoreState = ({
     },
 
     createPoll: async (input) => {
+      // 동시 중복 차단 — 같은 질문+첫 선택지의 생성 요청이 진행 중이면 무시한다(폼 더블 제출 방지).
+      const createGuardKey = `create:${normalizeGuardText(input.question)}:${normalizeGuardText(
+        input.options?.[0]?.text,
+      )}`;
+      if (inFlightWrites.has(createGuardKey)) {
+        return null;
+      }
+      inFlightWrites.add(createGuardKey);
+
       set({ isLoading: true, error: null });
       const commitCreatedPoll = (data: Poll) => {
         const nextPolls = [data, ...excludePollById(get().polls, data.id)];
@@ -716,10 +736,19 @@ export const createPollStoreState = ({
           isLoading: false,
         });
         return null;
+      } finally {
+        inFlightWrites.delete(createGuardKey);
       }
     },
 
     vote: async (id, input, code) => {
+      // 동시 중복 차단 — 같은 폴에 대한 투표가 이미 날아가는 중이면 무시한다(연타/StrictMode/재시도).
+      const voteGuardKey = `vote:${id}`;
+      if (inFlightWrites.has(voteGuardKey)) {
+        return false;
+      }
+      inFlightWrites.add(voteGuardKey);
+
       set({ isLoading: true, error: null });
       const knownPoll =
         get().currentPoll ||
@@ -727,6 +756,7 @@ export const createPollStoreState = ({
         findPollFromLocalCache(id);
 
       if (isPollClosed(knownPoll)) {
+        inFlightWrites.delete(voteGuardKey);
         set({ error: '마감된 투표에는 더 이상 참여할 수 없습니다.', isLoading: false });
         return false;
       }
@@ -788,6 +818,8 @@ export const createPollStoreState = ({
       } catch (err: any) {
         set({ error: err.message || '에러가 발생했습니다.', isLoading: false });
         return false;
+      } finally {
+        inFlightWrites.delete(voteGuardKey);
       }
     },
 
@@ -916,6 +948,17 @@ export const createPollStoreState = ({
     },
 
     addComment: async (id, input, code) => {
+      // 동시 중복 차단(한마디·답글) — 같은 폴·같은 부모·같은 내용·같은 작성자의 제출이 아직
+      // 진행 중이면 즉시 무시한다. 연타·StrictMode 이중 호출·네트워크 재시도로 생기는 중복 POST 방지.
+      // 키에 내용·작성자를 포함해 "정상적인 다른 한마디"는 막지 않는다(명백한 중복만 차단).
+      const commentGuardKey = `comment:${id}:${input.parentId ?? 'root'}:${normalizeGuardText(
+        input.voterName,
+      )}:${normalizeGuardText(input.comment)}`;
+      if (inFlightWrites.has(commentGuardKey)) {
+        return null;
+      }
+      inFlightWrites.add(commentGuardKey);
+
       set({ error: null });
       try {
         const token = getAuthToken(useAuthStore);
@@ -947,6 +990,8 @@ export const createPollStoreState = ({
       } catch (err: any) {
         set({ error: err.message || '에러가 발생했습니다.' });
         return null;
+      } finally {
+        inFlightWrites.delete(commentGuardKey);
       }
     },
   });

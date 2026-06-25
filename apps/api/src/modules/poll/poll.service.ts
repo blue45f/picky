@@ -51,6 +51,47 @@ export class PollService {
     return Number.isFinite(endsAtTime) && Date.now() >= endsAtTime;
   }
 
+  /**
+   * 명백한 댓글 중복(멱등 안전망) 판정 — 연타·StrictMode·네트워크 재시도가 만든 같은 한마디를 막는다.
+   * "같은 폴 + 같은 부모(답글 위치) + 같은 작성자 + 같은 내용"이 짧은 시간 안에 이미 있으면 중복으로 본다.
+   * 정상적으로 한참 뒤에 같은 말을 또 남기는 건 허용 범위 — 그래서 시간 창(window)으로 좁힌다.
+   * (거부가 아니라 기존 댓글을 그대로 돌려주는 멱등 처리라 사용자 경험은 정상 단일 제출과 같다.)
+   */
+  private static readonly DUPLICATE_COMMENT_WINDOW_MS = 10_000;
+
+  private isDuplicateComment(
+    poll: Poll,
+    input: { comment: string; voterName?: string | null; parentId?: number | null },
+  ): boolean {
+    const normalize = (value: string | null | undefined): string =>
+      (value ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
+    const targetText = normalize(input.comment);
+    if (!targetText) {
+      return false;
+    }
+    const targetAuthor = normalize(input.voterName) || '익명';
+    const targetParent = input.parentId ?? null;
+    const now = Date.now();
+
+    return poll.comments.some((existing) => {
+      if ((existing.parentId ?? null) !== targetParent) {
+        return false;
+      }
+      if (normalize(existing.comment) !== targetText) {
+        return false;
+      }
+      if ((normalize(existing.voterName) || '익명') !== targetAuthor) {
+        return false;
+      }
+      const createdAtMs = new Date(existing.createdAt).getTime();
+      if (!Number.isFinite(createdAtMs)) {
+        // 시각을 못 읽으면(드문 경우) 안전하게 중복으로 간주하지 않는다 — 정상 제출을 막지 않기 위함.
+        return false;
+      }
+      return now - createdAtMs <= PollService.DUPLICATE_COMMENT_WINDOW_MS;
+    });
+  }
+
   // Generate 6 character unique short ID
   private async generateShortId(): Promise<string> {
     const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -427,6 +468,13 @@ export class PollService {
       if (parent.parentId != null) {
         parentId = parent.parentId;
       }
+    }
+
+    // 멱등 안전망 — 같은 작성자가 같은 위치에 같은 내용을 짧은 시간 안에 또 보내면(연타·재시도)
+    // 새 댓글을 만들지 않고 기존 상태를 그대로 반환한다(거부 아님 → 사용자 경험은 단일 제출과 동일).
+    // SQL/Blob/in-memory 어떤 백엔드든 getPollById가 정규화한 comments를 보므로 한 곳에서 세 경로를 덮는다.
+    if (this.isDuplicateComment(poll, { ...input, parentId })) {
+      return this.getPollForViewer(id, code);
     }
 
     await this.db.appendComment(id, {

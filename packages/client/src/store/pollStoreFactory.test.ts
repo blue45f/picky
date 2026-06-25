@@ -156,3 +156,113 @@ describe('createPollStoreState — local fallback policy (production safety)', (
     expect(store.get().currentPoll?.options.find((o) => o.id === 1)?.voteCount).toBe(1);
   });
 });
+
+/**
+ * ok:true 응답을 돌려주는 가짜 Response. 주어진 poll JSON 을 본문으로 싣는다.
+ * 응답 해석 시점을 제어하려고 resolve 를 외부에서 당기는 deferred 패턴을 쓴다.
+ */
+const okPollResponse = (poll: Poll): any => ({
+  ok: true,
+  status: 200,
+  url: '',
+  headers: { get: () => 'application/json' },
+  json: async () => poll,
+});
+
+/**
+ * in-flight 동시 호출을 흉내내려고 requestApi 가 수동으로 풀리는 약속을 돌려주게 만든다.
+ * release() 를 호출해야 비로소 응답이 해석된다 → 두 번째 호출이 첫 호출 진행 중에 끼어든다.
+ */
+const buildDeferredState = (poll: Poll) => {
+  let release: (() => void) | null = null;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const requestApi = vi.fn(async () => {
+    await gate;
+    return okPollResponse(poll);
+  });
+  const auth = makeAuthStore();
+  const creator = createPollStoreState({
+    parseApiPayload,
+    requestApi: requestApi as any,
+    useAuthStore: auth as any,
+    isLocalFallbackAllowed: () => false,
+  });
+  const store = makeStore(creator as any);
+  return { store, requestApi, release: () => release?.() };
+};
+
+describe('createPollStoreState — duplicate-submit in-flight guard (#dup)', () => {
+  it('addComment: 같은 폴·같은 내용 동시 2회면 POST 는 한 번만 나간다', async () => {
+    const poll = makeOpenPoll({ id: 'p1', comments: [] });
+    const { store, requestApi, release } = buildDeferredState(poll);
+
+    // 첫 호출이 응답 대기(in-flight)인 동안 같은 내용으로 두 번째 호출을 겹친다.
+    const first = store.get().addComment('p1', { comment: '같은 한마디' } as any);
+    const second = store.get().addComment('p1', { comment: '같은 한마디' } as any);
+
+    release();
+    const [r1, r2] = await Promise.all([first, second]);
+
+    // 한 번만 서버로 나가고(중복 차단), 두 번째는 즉시 무시되어 null.
+    expect(requestApi).toHaveBeenCalledTimes(1);
+    expect(r1).not.toBeNull();
+    expect(r2).toBeNull();
+  });
+
+  it('addComment: 가드 해제 후 같은 내용을 다시 보내면 정상 동작한다(차단은 in-flight 한정)', async () => {
+    const poll = makeOpenPoll({ id: 'p1', comments: [] });
+    const { store, requestApi, release } = buildDeferredState(poll);
+
+    const first = store.get().addComment('p1', { comment: '한마디' } as any);
+    release();
+    await first;
+
+    const again = await store.get().addComment('p1', { comment: '한마디' } as any);
+    expect(again).not.toBeNull();
+    // 첫 호출 + 두 번째(직렬) 호출 = 2회. 정상 단일 제출은 막지 않는다.
+    expect(requestApi).toHaveBeenCalledTimes(2);
+  });
+
+  it('addComment: 서로 다른 내용은 동시여도 둘 다 나간다(정상 제출 불변)', async () => {
+    const poll = makeOpenPoll({ id: 'p1', comments: [] });
+    const { store, requestApi, release } = buildDeferredState(poll);
+
+    const a = store.get().addComment('p1', { comment: '하나' } as any);
+    const b = store.get().addComment('p1', { comment: '둘' } as any);
+    release();
+    await Promise.all([a, b]);
+
+    expect(requestApi).toHaveBeenCalledTimes(2);
+  });
+
+  it('vote: 같은 폴 동시 2회면 투표 POST 는 한 번만 나간다', async () => {
+    const poll = makeOpenPoll({ id: 'p1' });
+    const { store, requestApi, release } = buildDeferredState(poll);
+    store.get().setCurrentPoll(poll);
+
+    const first = store.get().vote('p1', voteInput);
+    const second = store.get().vote('p1', voteInput);
+    release();
+    const [r1, r2] = await Promise.all([first, second]);
+
+    expect(requestApi).toHaveBeenCalledTimes(1);
+    expect(r1).toBe(true);
+    expect(r2).toBe(false);
+  });
+
+  it('createPoll: 같은 질문 동시 2회면 생성 POST 는 한 번만 나간다', async () => {
+    const created = makeOpenPoll({ id: 'p-created' });
+    const { store, requestApi, release } = buildDeferredState(created);
+
+    const first = store.get().createPoll(createInput);
+    const second = store.get().createPoll(createInput);
+    release();
+    const [r1, r2] = await Promise.all([first, second]);
+
+    expect(requestApi).toHaveBeenCalledTimes(1);
+    expect(r1).not.toBeNull();
+    expect(r2).toBeNull();
+  });
+});

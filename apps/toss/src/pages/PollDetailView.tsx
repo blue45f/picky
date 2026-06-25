@@ -592,6 +592,8 @@ function CommentsSection(
   const { comments, canManage, closed, onDeleteComment, onAddReply } = props;
   const [replyingTo, setReplyingTo] = useState<number | null>(null);
   const [replyText, setReplyText] = useState('');
+  // 답글 제출 중 재진입 차단(연타/Enter 중복) — 투표 제출 가드와 동일한 패턴.
+  const [isSubmittingReply, setIsSubmittingReply] = useState(false);
   if (comments.length === 0) {
     return null;
   }
@@ -610,10 +612,15 @@ function CommentsSection(
 
   const submitReply = async (parentId: number) => {
     const text = replyText.trim();
-    if (!text || !onAddReply) return;
-    await onAddReply(parentId, text);
-    setReplyText('');
-    setReplyingTo(null);
+    if (!text || !onAddReply || isSubmittingReply) return;
+    setIsSubmittingReply(true);
+    try {
+      await onAddReply(parentId, text);
+      setReplyText('');
+      setReplyingTo(null);
+    } finally {
+      setIsSubmittingReply(false);
+    }
   };
   return (
     <section style={{ marginTop: 16 }}>
@@ -679,11 +686,12 @@ function CommentsSection(
                   value={replyText}
                   onChange={(e) => setReplyText(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') void submitReply(c.id);
+                    if (e.key === 'Enter' && !isSubmittingReply) void submitReply(c.id);
                   }}
                   placeholder="따뜻한 답글을 남겨요 💬"
                   maxLength={100}
                   aria-label="답글 입력"
+                  disabled={isSubmittingReply}
                   style={{
                     flex: 1,
                     minWidth: 0,
@@ -701,6 +709,7 @@ function CommentsSection(
                   type="button"
                   className="pressable"
                   onClick={() => void submitReply(c.id)}
+                  disabled={isSubmittingReply || !replyText.trim()}
                   style={{
                     flexShrink: 0,
                     minHeight: 44,
@@ -711,10 +720,11 @@ function CommentsSection(
                     color: theme.accentInk,
                     fontSize: FONT.body,
                     fontWeight: 800,
-                    cursor: 'pointer',
+                    cursor: isSubmittingReply ? 'default' : 'pointer',
+                    opacity: isSubmittingReply ? 0.6 : 1,
                   }}
                 >
-                  등록
+                  {isSubmittingReply ? '등록 중…' : '등록'}
                 </button>
               </div>
             ) : null}
@@ -997,7 +1007,7 @@ function VoteActionBar(
             boxShadow: '0 8px 24px rgba(19, 194, 163, 0.25)',
           }}
           loading={isLoading}
-          disabled={selectedOptionId == null}
+          disabled={selectedOptionId == null || isLoading}
           onClick={onVote}
         >
           {selectedOptionId == null ? '마음 가는 거 골라보세요 👇' : '투표 완료하기! 🗳️'}

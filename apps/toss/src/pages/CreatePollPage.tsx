@@ -920,7 +920,7 @@ function SubmitBar(
                 boxShadow: '0 8px 24px rgba(19, 194, 163, 0.25)',
               }}
               loading={isLoading}
-              disabled={!canSubmit}
+              disabled={!canSubmit || isLoading}
               onClick={onSubmit}
             >
               친구들에게 물어보기! 🚀
@@ -1119,6 +1119,8 @@ export function CreatePollPage() {
   };
 
   const handleSubmit = async () => {
+    // 진행 중이면 재진입 차단(폼 더블 제출 방지). 스토어에도 중복 가드가 있어 이중 안전망.
+    if (isLoading) return;
     setError(null);
 
     if (deadlinePreset !== 'none') {

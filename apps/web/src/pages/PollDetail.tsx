@@ -3879,6 +3879,8 @@ function PollFeedbackList(
   } = props;
   const [replyingTo, setReplyingTo] = React.useState<number | null>(null);
   const [replyText, setReplyText] = React.useState('');
+  // 답글 제출 중 재진입 차단(연타/Enter 중복) — 투표의 isSubmittingVote 패턴과 동일.
+  const [isSubmittingReply, setIsSubmittingReply] = React.useState(false);
 
   // 대댓글 트리 — 최상위 댓글(parentId 없음)만 목록에 두고, 각 댓글의 답글을 아래로 들여쓴다.
   const repliesByParent = new Map<number, Poll['comments']>();
@@ -3893,12 +3895,17 @@ function PollFeedbackList(
 
   const submitReply = async (parentId: number) => {
     const text = replyText.trim();
-    if (!text) {
+    if (!text || isSubmittingReply) {
       return;
     }
-    await onAddReply(parentId, text);
-    setReplyText('');
-    setReplyingTo(null);
+    setIsSubmittingReply(true);
+    try {
+      await onAddReply(parentId, text);
+      setReplyText('');
+      setReplyingTo(null);
+    } finally {
+      setIsSubmittingReply(false);
+    }
   };
   return (
     <div style={{ marginTop: '0.5rem' }}>
@@ -4081,23 +4088,25 @@ function PollFeedbackList(
                       value={replyText}
                       onChange={(event) => setReplyText(event.target.value)}
                       onKeyDown={(event) => {
-                        if (event.key === 'Enter') {
+                        if (event.key === 'Enter' && !isSubmittingReply) {
                           void submitReply(comm.id);
                         }
                       }}
                       placeholder="따뜻한 답글을 남겨요 💬"
                       maxLength={100}
                       aria-label="답글 입력"
+                      disabled={isSubmittingReply}
                       className="form-input"
                       style={{ flex: 1, minWidth: 0, fontSize: '0.8rem' }}
                     />
                     <button
                       type="button"
                       onClick={() => void submitReply(comm.id)}
+                      disabled={isSubmittingReply || !replyText.trim()}
                       className="btn-primary"
                       style={{ flexShrink: 0, padding: '8px 14px', fontSize: '0.8rem' }}
                     >
-                      등록
+                      {isSubmittingReply ? '등록 중…' : '등록'}
                     </button>
                   </div>
                 ) : null}
