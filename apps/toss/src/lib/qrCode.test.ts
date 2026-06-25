@@ -39,11 +39,18 @@ describe('buildQrSvgDataUri', () => {
     expect(dataUri).toContain('%3Cpath');
   });
 
-  it('returns null if text length exceeds version capacity', () => {
-    // QR_VERSION = 10 capacity is ~271 bytes for Byte Mode ECC L
+  it('handles long URLs by auto-selecting a higher QR version', () => {
+    // 표준 qrcode 라이브러리는 데이터 길이에 맞춰 버전을 자동 선택 → 긴 URL도 디코드 가능한 QR로 처리.
     const longUrl = 'https://picky-olive.vercel.app/poll/nkCjnH?' + 'a'.repeat(300);
     const dataUri = buildQrSvgDataUri(longUrl);
-    expect(dataUri).toBeNull();
+    expect(dataUri).not.toBeNull();
+    expect(dataUri).toContain('data:image/svg+xml;charset=utf-8,');
+  });
+
+  it('returns null for empty or capacity-exceeding input', () => {
+    expect(buildQrSvgDataUri('')).toBeNull();
+    // v40-M 용량(~2331 bytes)을 넘는 비현실적 입력은 생성 불가 → null.
+    expect(buildQrSvgDataUri('a'.repeat(5000))).toBeNull();
   });
 });
 
