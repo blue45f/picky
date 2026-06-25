@@ -31,6 +31,14 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import type { Poll } from '@picky/shared';
 import { MASCOT, VOICE, categoryMeta, BETA_NOTICE } from '@picky/shared';
+// 시그널 분류(접전/신규/마감임박/피드백)·마감 판정 순수 로직은 @picky/shared 로 단일화했어요.
+import {
+  getPollAgeDays,
+  isCloseRacePoll,
+  isClosingSoonPoll,
+  isFeedbackRichPoll,
+  isPollClosed,
+} from '@picky/shared';
 import { usePollStore } from '../store/usePollStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
@@ -56,8 +64,6 @@ type SignalMode =
   | 'closingSoon'
   | 'closed';
 
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
-const CLOSING_SOON_MS = 24 * 60 * 60 * 1000;
 const PINNED_POLLS_STORAGE_KEY = 'picky_pinned_poll_ids_v1'; // gitleaks:allow — localStorage 키(비밀 아님)
 const MAX_PINNED_POLLS = 6;
 
@@ -113,38 +119,6 @@ const isGuestCreator = (creatorId?: string | null, creatorIsGuest?: boolean) => 
   return creatorIsGuest || Boolean(creatorId?.startsWith('guest-'));
 };
 
-const getPollAgeDays = (createdAt: string) => {
-  const createdTime = new Date(createdAt).getTime();
-  if (Number.isNaN(createdTime)) {
-    return Number.POSITIVE_INFINITY;
-  }
-
-  return (Date.now() - createdTime) / MS_PER_DAY;
-};
-
-const isPollClosed = (poll: Poll) => {
-  if (!poll.endsAt) {
-    return false;
-  }
-
-  const endsAtTime = new Date(poll.endsAt).getTime();
-  return Number.isFinite(endsAtTime) && Date.now() >= endsAtTime;
-};
-
-const isClosingSoonPoll = (poll: Poll) => {
-  if (!poll.endsAt || isPollClosed(poll)) {
-    return false;
-  }
-
-  const endsAtTime = new Date(poll.endsAt).getTime();
-  if (!Number.isFinite(endsAtTime)) {
-    return false;
-  }
-
-  const remainingMs = endsAtTime - Date.now();
-  return remainingMs > 0 && remainingMs <= CLOSING_SOON_MS;
-};
-
 const formatPollEndAt = (poll: Poll) => {
   if (!poll.endsAt) {
     return '마감 없음';
@@ -192,28 +166,6 @@ const formatRecentPollViewedAt = (value: string) => {
 
 const getPollResultsVisibilityLabel = (poll: Poll) => {
   return poll.resultsVisibility === 'always' ? '실시간 결과 공개' : '투표 후 결과 공개';
-};
-
-const getSortedOptionsByVotes = (poll: Poll) => {
-  return [...poll.options].sort((a, b) => b.voteCount - a.voteCount);
-};
-
-const isCloseRacePoll = (poll: Poll) => {
-  if (poll.totalVotes < 2 || poll.options.length < 2) {
-    return false;
-  }
-
-  const [leader, runnerUp] = getSortedOptionsByVotes(poll);
-  const voteGap = (leader?.voteCount || 0) - (runnerUp?.voteCount || 0);
-  return voteGap <= Math.max(1, Math.floor(poll.totalVotes * 0.12));
-};
-
-const isFeedbackRichPoll = (poll: Poll) => {
-  if (poll.comments.length >= 2) {
-    return true;
-  }
-
-  return poll.totalVotes > 0 && poll.comments.length / poll.totalVotes >= 0.5;
 };
 
 const hasAttachmentPoll = (poll: Poll) => {

@@ -1,35 +1,10 @@
-import { useEffect, useState } from 'react';
-import { formatCountdown, getRemainingMs } from '../lib/format';
+import { formatCountdown } from '../lib/format';
 import { Chip } from './ui';
 
+// useCountdown 훅은 packages/client 로 단일화했어요(웹과 동일 구현).
+export { useCountdown } from '../../../../packages/client/src/hooks/useCountdown';
+
 const DAY_MS = 24 * 60 * 60 * 1000;
-
-/**
- * 마감까지 남은 ms를 1초마다 갱신. 마감 없음 → null.
- * 부모가 이 값으로 `closed` 등 게이팅을 함께 파생하면 카운트다운과 상태가 lockstep으로 전환돼요.
- */
-export function useCountdown(endsAt: string | null | undefined): number | null {
-  const [remaining, setRemaining] = useState<number | null>(() => getRemainingMs(endsAt));
-
-  useEffect(() => {
-    setRemaining(getRemainingMs(endsAt));
-    if (!endsAt) {
-      return;
-    }
-
-    const timer = globalThis.setInterval(() => {
-      const next = getRemainingMs(endsAt);
-      setRemaining(next);
-      if (next != null && next <= 0) {
-        globalThis.clearInterval(timer);
-      }
-    }, 1000);
-
-    return () => globalThis.clearInterval(timer);
-  }, [endsAt]);
-
-  return remaining;
-}
 
 /**
  * 마감 카운트다운 배지. 부모가 틱하는 `remaining`을 받아 표시만 해요(자체 타이머 없음).

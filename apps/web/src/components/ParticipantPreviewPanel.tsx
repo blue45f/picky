@@ -9,6 +9,21 @@ import {
   Smartphone,
   TimerReset,
 } from 'lucide-react';
+// 준비도 채점(질문/선택지/맥락 통과 판정·점수)은 @picky/shared 로 단일화했어요.
+// 안내 문구만 웹 결(있습니다체/참가자)로 주입하고, 미리보기용 파생값은 아래에서 따로 계산해요.
+import { evaluatePollReadiness, type ReadinessCopy } from '@picky/shared';
+
+const WEB_READINESS_COPY: ReadinessCopy = {
+  questionShort: '참가자가 맥락을 이해하기엔 질문이 짧습니다.',
+  questionLong: '모바일에서 질문이 길게 느껴질 수 있습니다.',
+  questionOk: '모바일 첫 화면에서 바로 이해할 수 있습니다.',
+  optionDuplicate: '중복 선택지가 있어 참가자가 헷갈릴 수 있습니다.',
+  optionTooMany: '선택지가 많아 단톡방 즉시 응답에는 부담이 있습니다.',
+  optionTooFew: '선택지를 빠르게 비교할 수 있습니다.',
+  optionOk: '선택지를 빠르게 비교할 수 있습니다.',
+  contextOk: '배경 설명이나 참고 파일이 있어 판단 근거가 있습니다.',
+  contextMissing: '왜 투표하는지 한 줄 배경을 추가하면 응답 품질이 좋아집니다.',
+};
 
 type PreviewOption = {
   text: string;
@@ -60,7 +75,6 @@ export function ParticipantPreviewPanel({
   resultsVisibility,
 }: ParticipantPreviewPanelProps) {
   const preview = useMemo(() => {
-    const normalizedQuestion = question.trim();
     const normalizedDescription = description.trim();
     const filledOptions = options
       .map((option, index) => ({
@@ -69,8 +83,6 @@ export function ParticipantPreviewPanel({
         text: option.text.trim(),
       }))
       .filter((option) => option.text.length > 0);
-    const uniqueOptions = new Set(filledOptions.map((option) => option.text.toLowerCase()));
-    const hasDuplicateOptions = uniqueOptions.size !== filledOptions.length;
     const hasImages = filledOptions.some((option) => Boolean(option.imageUrl));
     const estimatedSeconds = clamp(
       18 +
@@ -89,46 +101,15 @@ export function ParticipantPreviewPanel({
       effortLabel = '높음';
     }
 
-    let questionHelp: string;
-    if (normalizedQuestion.length < 8) {
-      questionHelp = '참가자가 맥락을 이해하기엔 질문이 짧습니다.';
-    } else if (normalizedQuestion.length > 90) {
-      questionHelp = '모바일에서 질문이 길게 느껴질 수 있습니다.';
-    } else {
-      questionHelp = '모바일 첫 화면에서 바로 이해할 수 있습니다.';
-    }
-
-    let optionScanHelp: string;
-    if (hasDuplicateOptions) {
-      optionScanHelp = '중복 선택지가 있어 참가자가 헷갈릴 수 있습니다.';
-    } else if (filledOptions.length > 6) {
-      optionScanHelp = '선택지가 많아 단톡방 즉시 응답에는 부담이 있습니다.';
-    } else {
-      optionScanHelp = '선택지를 빠르게 비교할 수 있습니다.';
-    }
-
-    const readinessItems = [
+    // 통과 판정·점수는 공유 채점기로, 안내 문구는 웹 결로 주입.
+    const { items: readinessItems, score: readinessScore } = evaluatePollReadiness(
       {
-        label: '질문 명확성',
-        passed: normalizedQuestion.length >= 8 && normalizedQuestion.length <= 90,
-        help: questionHelp,
+        question,
+        description,
+        optionTexts: options.map((option) => option.text),
+        attachmentCount: attachments.length,
       },
-      {
-        label: '선택지 스캔',
-        passed: filledOptions.length >= 2 && filledOptions.length <= 6 && !hasDuplicateOptions,
-        help: optionScanHelp,
-      },
-      {
-        label: '결정 맥락',
-        passed: normalizedDescription.length >= 20 || attachments.length > 0,
-        help:
-          normalizedDescription.length >= 20 || attachments.length > 0
-            ? '배경 설명이나 참고 파일이 있어 판단 근거가 있습니다.'
-            : '왜 투표하는지 한 줄 배경을 추가하면 응답 품질이 좋아집니다.',
-      },
-    ];
-    const readinessScore = Math.round(
-      (readinessItems.filter((item) => item.passed).length / readinessItems.length) * 100,
+      WEB_READINESS_COPY,
     );
 
     return {

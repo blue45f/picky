@@ -1,63 +1,9 @@
-import { useEffect, useState } from 'react';
+import { formatCountdown } from '@picky/shared';
+
+// 카운트다운 순수 헬퍼(getRemainingMs/formatCountdown)와 useCountdown 훅은 공유 패키지로 단일화했어요.
+export { useCountdown } from '../../../../packages/client/src/hooks/useCountdown';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-
-/** 마감까지 남은 밀리초. 마감 없음/무효 → null, 이미 지남 → 0. */
-function getRemainingMs(endsAt: string | null | undefined): number | null {
-  if (!endsAt) {
-    return null;
-  }
-  const target = new Date(endsAt).getTime();
-  if (!Number.isFinite(target)) {
-    return null;
-  }
-  return Math.max(0, target - Date.now());
-}
-
-/** 남은 시간(ms) → "2일 3시간" · "5시간 12분" · "12분 30초" · "마감". */
-function formatCountdown(ms: number): string {
-  if (ms <= 0) {
-    return '마감';
-  }
-
-  const totalSec = Math.floor(ms / 1000);
-  const day = Math.floor(totalSec / 86400);
-  const hour = Math.floor((totalSec % 86400) / 3600);
-  const min = Math.floor((totalSec % 3600) / 60);
-  const sec = totalSec % 60;
-
-  if (day > 0) return `${day}일 ${hour}시간`;
-  if (hour > 0) return `${hour}시간 ${min}분`;
-  if (min > 0) return `${min}분 ${sec}초`;
-  return `${sec}초`;
-}
-
-/**
- * 마감까지 남은 ms를 1초마다 갱신. 마감 없음 → null.
- * 부모가 이 값으로 `closed` 등 게이팅을 함께 파생하면 카운트다운과 상태가 lockstep으로 전환돼요.
- */
-export function useCountdown(endsAt: string | null | undefined): number | null {
-  const [remaining, setRemaining] = useState<number | null>(() => getRemainingMs(endsAt));
-
-  useEffect(() => {
-    setRemaining(getRemainingMs(endsAt));
-    if (!endsAt) {
-      return;
-    }
-
-    const timer = globalThis.setInterval(() => {
-      const next = getRemainingMs(endsAt);
-      setRemaining(next);
-      if (next != null && next <= 0) {
-        globalThis.clearInterval(timer);
-      }
-    }, 1000);
-
-    return () => globalThis.clearInterval(timer);
-  }, [endsAt]);
-
-  return remaining;
-}
 
 const chipBaseStyle: React.CSSProperties = {
   display: 'inline-flex',

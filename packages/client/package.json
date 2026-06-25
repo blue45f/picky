@@ -1,0 +1,17 @@
+{
+  "name": "@picky/client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Source-only shared client (store/api/lib/hooks/components). Apps import via relative paths.",
+  "peerDependencies": {
+    "react": ">=18",
+    "react-dom": ">=18"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6"
+  }
+}
