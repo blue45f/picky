@@ -266,6 +266,19 @@ export function PollDetailPage() {
     showToast(ok ? '투표 결과를 복사했어요 📊' : '복사에 실패했어요 😢');
   };
 
+  // 결정 도구(신뢰도/메모/토픽/공유 템플릿) 공통 텍스트 복사 — 토스트·햅틱을 한 곳에서 처리.
+  const handleCopyText = async (text: string) => {
+    const ok = await copyText(text);
+    hapticFeedback(ok ? 'tap' : 'error');
+    showToast(ok ? '클립보드에 복사했어요 📋' : '복사에 실패했어요 😢');
+  };
+
+  // 결과 이미지 저장 알림 — a[download] 앵커 트리거 성공/실패만 받아 안내.
+  const handleResultImageSaved = (ok: boolean) => {
+    hapticFeedback(ok ? 'success' : 'error');
+    showToast(ok ? '결과 이미지를 저장했어요 🖼️' : '이미지 저장에 실패했어요 😢');
+  };
+
   const handleEdit = () => {
     if (!poll) return;
     hapticFeedback('tap');
@@ -453,6 +466,8 @@ export function PollDetailPage() {
       onShare={handleShare}
       onCopy={handleCopy}
       onCopyResult={showResults ? handleCopyResult : undefined}
+      onCopyText={handleCopyText}
+      onResultImageSaved={handleResultImageSaved}
       onBack={() => navigate('/')}
       totalVotes={poll ? poll.totalVotes : 0}
       comments={poll ? poll.comments : []}

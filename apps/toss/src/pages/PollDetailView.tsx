@@ -9,6 +9,11 @@ import { AppBar, Chip, ProgressBar } from '../components/ui';
 import { CountdownChip } from '../components/Countdown';
 import { PollShareQrSection } from '../components/PollShareQrSection';
 import { OPTION_COLORS, VoteDonutChart } from '../components/VoteDonutChart';
+import { DecisionConfidencePanel } from '../components/DecisionConfidencePanel';
+import { DecisionMemoSheet } from '../components/DecisionMemoSheet';
+import { ResultImageExport } from '../components/ResultImageExport';
+import { OpinionTopicCloud } from '../components/OpinionTopicCloud';
+import { ShareTemplates } from '../components/ShareTemplates';
 
 interface PollDetailViewProps {
   poll: Poll | null;
@@ -68,6 +73,13 @@ interface PollDetailViewProps {
   onShare: () => void;
   onCopy: () => void;
   onCopyResult?: () => void;
+  /**
+   * 결정 도구(신뢰도/메모/토픽/공유 템플릿)의 텍스트 복사 — 토스트·햅틱은 상위가 처리.
+   * 미전달 시 각 도구의 복사 어포던스는 숨겨지고 표시 전용으로 동작한다(기존 회귀 0).
+   */
+  onCopyText?: (text: string) => void;
+  /** 결과 이미지 저장 결과 알림(성공/실패) — 토스트·햅틱은 상위가 처리. */
+  onResultImageSaved?: (ok: boolean) => void;
   onBack: () => void;
   totalVotes: number;
   comments: PollComment[];
@@ -1314,9 +1326,11 @@ function ShareSection(
     onShare: () => void;
     onCopy: () => void;
     onCopyResult?: () => void;
+    /** 공유 카드 하단에 덧붙일 추가 영역(공유 템플릿 등). 미전달 시 기존 레이아웃 그대로. */
+    children?: React.ReactNode;
   }>,
 ) {
-  const { shareUrl, showResults, onShare, onCopy, onCopyResult } = props;
+  const { shareUrl, showResults, onShare, onCopy, onCopyResult, children } = props;
   return (
     <div
       style={{
@@ -1422,6 +1436,7 @@ function ShareSection(
         </div>
         {shareUrl ? <PollShareQrSection shareUrl={shareUrl} onCopyLink={onCopy} /> : null}
       </div>
+      {children}
     </div>
   );
 }
@@ -1674,6 +1689,8 @@ export function PollDetailView(props: Readonly<PollDetailViewProps>) {
     onShare,
     onCopy,
     onCopyResult,
+    onCopyText,
+    onResultImageSaved,
     onBack,
     totalVotes,
     comments,
@@ -1685,6 +1702,12 @@ export function PollDetailView(props: Readonly<PollDetailViewProps>) {
   if (!poll) {
     return <PollEmptyState />;
   }
+
+  // 결정 도구(신뢰도·메모·결과이미지·토픽클라우드)는 결과를 열 수 있고(showResults) 표가 모였고
+  // 선택지가 2개 이상일 때만 의미가 있어요(0표/단일 선택지면 지표가 거짓 → R1 가드와 동일 기준).
+  const decisionToolsVisible = showResults && totalVotes > 0 && displayOptions.length >= 2;
+  // 의견 토픽 클라우드는 한마디가 한 줄이라도 있어야 보여줘요(키워드 0이면 헛 카드).
+  const hasOpinions = comments.some((c) => Boolean(c.comment));
 
   // 하단 고정 액션바가 떠 있을 때(미투표·진행중)만 그 높이만큼 바닥 여백을 확보해
   // QR·링크복사·결과복사 같은 마지막 콘텐츠가 바에 가려지지 않게 해요.
@@ -1745,6 +1768,26 @@ export function PollDetailView(props: Readonly<PollDetailViewProps>) {
           />
         ) : null}
 
+        {/* 결정 신뢰도 — 결과 공개 + 표 모임(R1) 시에만. 점수/상태/리스크는 @picky/shared 소비. */}
+        {decisionToolsVisible ? (
+          <DecisionConfidencePanel
+            poll={poll}
+            shareUrl={shareUrl}
+            pollClosed={closed}
+            onCopyText={onCopyText}
+          />
+        ) : null}
+
+        {/* 결정 메모·액션 플랜 — buildDecisionMemo/buildActionPlan/buildConsensusNarrative 소비. */}
+        {decisionToolsVisible ? (
+          <DecisionMemoSheet
+            poll={poll}
+            shareUrl={shareUrl}
+            pollClosed={closed}
+            onCopyText={onCopyText}
+          />
+        ) : null}
+
         {!hasVoted && !closed && (
           <CommentDraftFields
             selectedOptionId={selectedOptionId}
@@ -1760,6 +1803,11 @@ export function PollDetailView(props: Readonly<PollDetailViewProps>) {
           />
         )}
 
+        {/* 의견 토픽 클라우드 — 결과 하단. extractKeywords 소비. 한마디가 있을 때만. */}
+        {decisionToolsVisible && hasOpinions ? (
+          <OpinionTopicCloud poll={poll} onCopyText={onCopyText} />
+        ) : null}
+
         <CommentsSection
           comments={comments}
           canManage={canManage}
@@ -1771,13 +1819,23 @@ export function PollDetailView(props: Readonly<PollDetailViewProps>) {
           onAddReply={onAddReply}
         />
 
+        {/* 결과 이미지 내보내기 — buildPollResultImageDataUrl(순수 Canvas) 소비. */}
+        {decisionToolsVisible ? (
+          <ResultImageExport poll={poll} shareUrl={shareUrl} onNotify={onResultImageSaved} />
+        ) : null}
+
         <ShareSection
           shareUrl={shareUrl}
           showResults={showResults}
           onShare={onShare}
           onCopy={onCopy}
           onCopyResult={onCopyResult}
-        />
+        >
+          {/* 공유 템플릿(카카오/회의/리마인더) — buildSnsPreviewContent 소비. 복사 콜백 있을 때만. */}
+          {onCopyText ? (
+            <ShareTemplates poll={poll} shareUrl={shareUrl} onCopyText={onCopyText} />
+          ) : null}
+        </ShareSection>
       </div>
 
       {!hasVoted && !closed && (

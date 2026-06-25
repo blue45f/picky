@@ -51,6 +51,8 @@ describe('PollDetailView full render (verif)', () => {
         onShare: () => {},
         onCopy: () => {},
         onCopyResult: () => {},
+        onCopyText: () => {},
+        onResultImageSaved: () => {},
         onBack: () => {},
         totalVotes: fixturePoll.totalVotes,
         comments: fixturePoll.comments,
@@ -61,6 +63,14 @@ describe('PollDetailView full render (verif)', () => {
     expect(html).toContain('QR 태그');
     expect(html).toMatch(/data:image\/svg\+xml/);
     expect(html).toContain(fixturePoll.question); // full context from the view
+
+    // Stage 2 feature parity: rich decision tools (consumed from @picky/shared) are wired into the view.
+    // The fixture is showResults+>0 votes+3 options → decision tools gate is open.
+    expect(html).toContain('결정 신뢰도'); // DecisionConfidencePanel
+    expect(html).toContain('결정 메모'); // DecisionMemoSheet
+    expect(html).toContain('의견 토픽 클라우드'); // OpinionTopicCloud
+    expect(html).toContain('결과 이미지로 저장'); // ResultImageExport
+    expect(html).toContain('상황별 공유 문구'); // ShareTemplates
 
     // AC1: question prominent hero (large size/weight first)
     expect(html).toMatch(/font-size:26|fontSize:\s*26|font-weight:900|fontWeight:\s*900/);
