@@ -5,7 +5,8 @@
   "type": "module",
   "description": "Source-only shared client (store/api/lib/hooks/components). Apps import via relative paths.",
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "peerDependencies": {
     "react": ">=18",

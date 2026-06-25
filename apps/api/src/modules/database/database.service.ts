@@ -1097,12 +1097,21 @@ export class DatabaseService implements OnModuleInit {
     await this.commit({ ...this.data, polls: nextPolls });
   }
 
+  /**
+   * 댓글 1건을 삭제하되, 그 댓글이 부모면 자식 답글(parentId === commentId)도 함께 삭제한다(cascade).
+   * 부모만 지우고 자식을 남기면 답글이 고아가 되어 화면에 떠돌게 되므로, 대상 + 직속 답글을 한 번에 제거한다.
+   * (대댓글은 한 단계 깊이만 허용하므로 손주는 없다 — appendComment가 parentId를 부모로 정규화함.)
+   */
   async deleteComment(pollId: string, commentId: number): Promise<boolean> {
     if (this.useSqlDb) {
+      // 대상 댓글 + 그 댓글을 부모로 둔 답글을 한 DELETE로 제거(고아 답글 방지).
       await db
         .delete(schema.pollComments)
         .where(
-          sql`${schema.pollComments.pollId} = ${pollId} AND ${schema.pollComments.id} = ${commentId}`,
+          and(
+            eq(schema.pollComments.pollId, pollId),
+            or(eq(schema.pollComments.id, commentId), eq(schema.pollComments.parentId, commentId)),
+          ),
         );
       return true;
     }
@@ -1110,7 +1119,15 @@ export class DatabaseService implements OnModuleInit {
     await this.refresh();
     const nextPolls = this.data.polls.map((p) =>
       p.id === pollId
-        ? { ...p, comments: p.comments.filter((comment) => comment.id !== commentId) }
+        ? {
+            ...p,
+            // 대상 댓글과 그 답글(parentId === commentId)을 함께 걸러낸다(고아 답글 방지).
+            comments: p.comments.filter(
+              (comment) =>
+                comment.id !== commentId &&
+                (comment as PollComment & { parentId?: number | null }).parentId !== commentId,
+            ),
+          }
         : p,
     );
     await this.commit({ ...this.data, polls: nextPolls });

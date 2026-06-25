@@ -17,6 +17,7 @@ import { IntroSplashScreen } from './components/IntroSplashScreen';
 import { GlobalParticleCanvas } from './components/GlobalParticleCanvas';
 import { useAuthStore } from './store/useAuthStore';
 import { pingVisit } from './lib/deskPlatform';
+import { installGlobalClickSounds } from '../../../packages/client/src/lib/audio';
 
 // 라우트 단위 코드 스플리팅 — 초기 번들에서 무거운 페이지(작성/디자인 등)를 분리해요.
 const PollList = lazy(() => import('./pages/PollList').then((m) => ({ default: m.PollList })));
@@ -95,6 +96,10 @@ export const App: React.FC = () => {
     // desk-platform 방문 집계(공개·키 불필요). 실패는 조용히 무시.
     void pingVisit();
   }, [fetchMe]);
+
+  // 전역 클릭 사운드 설치 — 캡처 클릭 리스너 1개로 버튼/링크에 미묘한 틱을 입혀요.
+  // SFX 토글이 OFF(기본 reduce-motion 등)면 엔진이 내부에서 no-op. cleanup 으로 언마운트 시 제거.
+  useEffect(() => installGlobalClickSounds(), []);
 
   return (
     <BrowserRouter>

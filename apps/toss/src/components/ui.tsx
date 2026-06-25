@@ -167,6 +167,58 @@ export function Skeleton({
   );
 }
 
+/**
+ * 역동적 아보카도 로더 — 페이지 로딩 상태에 쓰는 브랜드 모션 블록.
+ * 궤도 회전 그라데이션 링 + 둥실 떠오르는 마스코트 + 통통 튀는 점.
+ * `role="status"`/`aria-live="polite"` 로 스크린리더에 진행 상황을 알리고,
+ * 모션은 `prefers-reduced-motion` 을 존중해요(index.css 에서 정지 처리).
+ */
+export function PageLoader({
+  emoji = '🥑',
+  message,
+  style,
+}: Readonly<{
+  emoji?: string;
+  /** 화면에 보이는 안내 문구(스크린리더에도 그대로 읽혀요). */
+  message: string;
+  style?: CSSProperties;
+}>) {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 14,
+        ...style,
+      }}
+    >
+      <div className="pf-loader">
+        <span className="pf-loader-mascot" aria-hidden>
+          {emoji}
+        </span>
+      </div>
+      <p
+        className="pf-loader-dots"
+        style={{
+          margin: 0,
+          fontSize: FONT.body,
+          fontWeight: 700,
+          color: theme.textMuted,
+          letterSpacing: '-0.2px',
+        }}
+      >
+        {message}
+        <span aria-hidden>·</span>
+        <span aria-hidden>·</span>
+        <span aria-hidden>·</span>
+      </p>
+    </div>
+  );
+}
+
 /** 상단 앱바 (뒤로가기 + 제목 + 우측 액션). */
 export function AppBar({
   title,

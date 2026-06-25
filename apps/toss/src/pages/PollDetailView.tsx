@@ -708,7 +708,7 @@ function CommentCard(
               ↳
             </span>
           ) : null}
-          {c.voterName}
+          {c.voterName?.trim() || '익명'}
         </strong>
         <div
           style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, maxWidth: '60%' }}

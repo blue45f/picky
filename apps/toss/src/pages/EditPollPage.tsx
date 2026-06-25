@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Button } from '@toss/tds-mobile';
 import {
   RESULTS_VISIBILITY_LABELS,
@@ -15,7 +15,7 @@ import { theme, stickyActionBar, FONT } from '../theme';
 import { fromDateTimeLocalValue, toDateTimeLocalValue } from '../lib/format';
 import { fileToDownscaledDataUrl, isUsableImageUrl } from '../lib/image';
 import { hapticFeedback } from '../lib/toss';
-import { AppBar, Chip, SegmentedControl } from '../components/ui';
+import { AppBar, Chip, PageLoader, SegmentedControl } from '../components/ui';
 
 const MAX_OPTIONS = 10;
 const MIN_OPTIONS = 2;
@@ -424,6 +424,7 @@ function toCustomDeadline(iso: string | null | undefined): string {
 export function EditPollPage() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { currentPoll, isLoading, error, fetchPoll, updatePoll } = usePollStore();
   const myId = useAuthStore((state) => state.user?.id ?? null);
 
@@ -443,20 +444,50 @@ export function EditPollPage() {
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
+  // 비공개 폴은 코드 없이 받으면 선택지/설명이 비어 온다(서버 redaction, 소유자 우회 없음).
+  // 상세에서 잠금 해제 후 넘어오면 ?code= 로 코드가 실려 있고, 없으면 게이트로 코드를 받아 전체 폴을 로드한다.
+  const urlCode = searchParams.get('code') ?? undefined;
+  // 폼 전송(updatePoll) 때도 게이트를 통과하려면 활성 코드를 함께 보내야 하므로 별도 상태로 보관한다.
+  const [activeCode, setActiveCode] = useState<string | undefined>(urlCode);
+  const [codeInput, setCodeInput] = useState('');
+  const [codeError, setCodeError] = useState<string | null>(null);
+
   const minCustom = useMemo(() => toDateTimeLocalValue(new Date(Date.now() + 5 * 60_000)), []);
 
+  // 활성 코드(activeCode)를 함께 보내 전체 폴을 로드한다. 코드가 바뀌면(게이트 통과) 다시 로드한다.
   useEffect(() => {
-    fetchPoll(id).catch(() => {});
-  }, [id, fetchPoll]);
+    if (!id) return;
+    fetchPoll(id, activeCode).catch(() => {});
+  }, [id, activeCode, fetchPoll]);
 
   const poll = currentPoll && currentPoll.id === id ? currentPoll : null;
   const isAdmin = Boolean(useAuthStore.getState().user?.isAdmin);
   const isOwner = Boolean(poll && myId && poll.creatorId === myId);
   const canManage = isOwner || isAdmin;
 
+  // 비공개 폴 코드 게이트 — 코드로 재조회해 통과하면 activeCode 를 갱신해 위 effect 가 전체 폴을 다시 로드한다.
+  const handleUnlockCode = async () => {
+    const trimmed = codeInput.trim();
+    if (trimmed.length < 4) {
+      setCodeError('코드는 4자 이상이에요');
+      hapticFeedback('error');
+      return;
+    }
+    setCodeError(null);
+    const result = await fetchPoll(id, trimmed);
+    if (!result || result.requiresCode) {
+      setCodeError('코드가 맞지 않아요 🔒');
+      hapticFeedback('error');
+      return;
+    }
+    hapticFeedback('success');
+    setActiveCode(trimmed);
+  };
+
   // 폴이 처음 로드됐을 때 한 번만 폼을 채운다(편집 중 사용자 입력을 덮어쓰지 않게).
+  // 단, 코드 게이트에 막혀(requiresCode) 선택지가 비어 오면 폼을 채우지 않고 코드 입력을 기다린다.
   useEffect(() => {
-    if (!poll || loaded) {
+    if (!poll || loaded || poll.requiresCode) {
       return;
     }
     setQuestion(poll.question);
@@ -623,7 +654,10 @@ export function EditPollPage() {
     setSubmitting(false);
     if (updated) {
       hapticFeedback('success');
-      navigate(`/poll/${id}`, { replace: true });
+      // 비공개로 남는 폴은 상세에서 다시 코드 게이트에 막히지 않게, 새/활성 코드를 ?code= 로 넘긴다.
+      const codeForReturn = visibility === 'private' ? trimmedAccessCode || activeCode : undefined;
+      const codeQuery = codeForReturn ? `?code=${encodeURIComponent(codeForReturn)}` : '';
+      navigate(`/poll/${id}${codeQuery}`, { replace: true });
     } else {
       hapticFeedback('error');
       setFormError(
@@ -635,8 +669,7 @@ export function EditPollPage() {
   if (isLoading && !poll) {
     return (
       <CenterMessage>
-        <span style={{ fontSize: 48 }}>🥑</span>
-        <span style={{ fontSize: 15 }}>고민을 불러오는 중이에요…</span>
+        <PageLoader message="고민을 불러오는 중이에요" />
       </CenterMessage>
     );
   }
@@ -659,6 +692,63 @@ export function EditPollPage() {
         <span style={{ fontSize: 48 }}>🔒</span>
         <span style={{ fontSize: 15 }}>이 고민을 수정할 권한이 없어요</span>
         <Button style={{ marginTop: 16 }} variant="weak" onClick={() => navigate(`/poll/${id}`)}>
+          고민으로 돌아가기 🔙
+        </Button>
+      </CenterMessage>
+    );
+  }
+
+  // 비공개 폴인데 코드가 없어 선택지가 가려진 상태(requiresCode) — 권한자(소유자/운영자)에게 코드 입력을 받는다.
+  // 코드가 맞으면 위 effect 가 전체 폴(선택지 포함)을 다시 로드해 정상 편집 화면으로 전환된다.
+  if (poll.requiresCode) {
+    return (
+      <CenterMessage>
+        <span style={{ fontSize: 48 }}>🔒</span>
+        <span style={{ fontSize: 17, fontWeight: 800, color: theme.text, marginTop: 12 }}>
+          비공개 고민을 수정하려면 코드가 필요해요
+        </span>
+        <span style={{ fontSize: 13, color: theme.textFaint, marginTop: 6, maxWidth: 280 }}>
+          내가 만든 비공개 고민이라도, 선택지를 안전하게 불러오려면 접근 코드를 한 번 입력해 주세요.
+        </span>
+        <input
+          type="text"
+          value={codeInput}
+          onChange={(e) => {
+            setCodeError(null);
+            setCodeInput(e.target.value);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') void handleUnlockCode();
+          }}
+          placeholder="접근 코드"
+          maxLength={20}
+          aria-label="비공개 투표 접근 코드"
+          style={{
+            marginTop: 18,
+            width: '100%',
+            maxWidth: 280,
+            padding: '14px 16px',
+            borderRadius: theme.radiusSm,
+            border: `1px solid ${theme.borderStrong}`,
+            background: theme.surface,
+            color: theme.text,
+            fontSize: 16,
+            textAlign: 'center',
+          }}
+        />
+        {codeError ? (
+          <span role="alert" style={{ fontSize: 13, color: theme.danger, marginTop: 8 }}>
+            {codeError}
+          </span>
+        ) : null}
+        <Button
+          style={{ marginTop: 16 }}
+          disabled={isLoading}
+          onClick={() => void handleUnlockCode()}
+        >
+          코드 확인하고 수정하기 🔓
+        </Button>
+        <Button style={{ marginTop: 8 }} variant="weak" onClick={() => navigate(`/poll/${id}`)}>
           고민으로 돌아가기 🔙
         </Button>
       </CenterMessage>

@@ -1912,6 +1912,12 @@ body.present-mode .page-shell {
     transition: none !important;
   }
 
+  /* 모션 최소화: 시머를 멈추되 빈 블록이 아니라 하이라이트가 중앙에 머문 정적 패널로 보이게 한다. */
+  .skeleton {
+    background-position: 50% 0 !important;
+    opacity: 0.85 !important;
+  }
+
   /* Reveal content must stay visible without the IO ever firing */
   .reveal {
     opacity: 1 !important;
@@ -1952,41 +1958,62 @@ body.present-mode .page-shell {
   animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-@keyframes skeletonPulse {
+/* 시머 스윕 — 그라데이션을 왼→오른쪽으로 흘려보내 '살아있는' 로딩감을 준다.
+   background-position만 움직이므로 레이아웃/페인트 비용 없이 컴포지터에서 처리된다. */
+@keyframes skeletonSweep {
   0% {
-    opacity: 0.7;
-  }
-  50% {
-    opacity: 0.4;
+    background-position: 180% 0;
   }
   100% {
-    opacity: 0.7;
+    background-position: -80% 0;
+  }
+}
+
+/* 스윕과 위상이 어긋난 은은한 펄스 — 단순 깜빡임이 아니라 숨 쉬는 듯한 질감을 더한다. */
+@keyframes skeletonBreathe {
+  0%,
+  100% {
+    opacity: 0.92;
+  }
+  50% {
+    opacity: 0.66;
   }
 }
 
 .skeleton {
   height: 16px;
   border-radius: 8px;
-  background: linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0.06) 25%,
-    rgba(255, 255, 255, 0.14) 50%,
-    rgba(255, 255, 255, 0.06) 75%
+  /* 베이스 면(은은한 표면) + 브랜드 틸 하이라이트가 지나가는 2겹 구성.
+     하이라이트 띠는 좁고 또렷해서 빛이 훑고 지나가는 느낌을 만든다. */
+  background-color: rgba(255, 255, 255, 0.07);
+  background-image: linear-gradient(
+    100deg,
+    transparent 28%,
+    rgba(255, 255, 255, 0.1) 42%,
+    color-mix(in oklab, var(--brand-accent-teal) 38%, rgba(255, 255, 255, 0.16)) 50%,
+    rgba(255, 255, 255, 0.1) 58%,
+    transparent 72%
   );
+  background-repeat: no-repeat;
   background-size: 220% 100%;
-  animation: skeletonPulse 1.25s ease-in-out infinite;
+  background-position: 180% 0;
+  animation:
+    skeletonSweep 1.45s cubic-bezier(0.4, 0, 0.2, 1) infinite,
+    skeletonBreathe 2.6s ease-in-out infinite;
 }
 
-/* 라이트 모드에선 흰 시머가 흰 배경에 묻혀 안 보인다 — 어두운(반투명 검정) 시머로 뒤집는다.
+/* 라이트 모드에선 흰 시머가 흰 배경에 묻혀 안 보인다 — 어두운 베이스 + 브랜드 틸 하이라이트로 뒤집는다.
    PollList/Admin/EditPoll/Support 등 스켈레톤이 뜨는 모든 화면에 일괄 적용된다. */
 :root[data-theme='light'] .skeleton {
-  background: linear-gradient(
-    90deg,
-    rgba(0, 0, 0, 0.05) 25%,
-    rgba(0, 0, 0, 0.11) 50%,
-    rgba(0, 0, 0, 0.05) 75%
+  background-color: rgba(0, 0, 0, 0.055);
+  background-image: linear-gradient(
+    100deg,
+    transparent 28%,
+    rgba(0, 0, 0, 0.05) 42%,
+    color-mix(in oklab, var(--brand-accent-teal) 30%, rgba(0, 0, 0, 0.06)) 50%,
+    rgba(0, 0, 0, 0.05) 58%,
+    transparent 72%
   );
-  background-size: 220% 100%;
 }
 
 /* Form Styling */

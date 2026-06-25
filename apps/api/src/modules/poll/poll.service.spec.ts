@@ -6,8 +6,9 @@ import { POLLS_PAGE_MAX_LIMIT } from '@picky/shared';
 import { PollService } from './poll.service';
 
 /**
- * 게스트 댓글 관리 비번 해시 픽스처 — 서비스의 hashCommentPassword 와 동일한 형식(salt:hash, pbkdf2-sha512).
- * 권한 판정(verifyCommentPassword) 경로를 흉내 내려고 테스트에서 직접 해시를 만든다(원문은 절대 저장 안 됨).
+ * 게스트 댓글 관리 비번 해시 픽스처 — 의도적으로 레거시 형식(salt:hash, 반복 1000)을 만든다.
+ * 서비스 verifyCommentPassword 가 신규(iterations:salt:hash)뿐 아니라 옛 2-파트 해시도
+ * 그대로 검증함을 함께 검증하기 위함이다(하위 호환). 원문은 절대 저장하지 않는다.
  */
 const hashCommentPasswordForTest = (password: string): string => {
   const salt = crypto.randomBytes(16).toString('hex');
@@ -699,8 +700,8 @@ describe('PollService.addComment (optional guest password — set + hash-only st
       { passwordHash?: string },
     ];
     const arg = call[1];
-    // 해시는 salt:hash 형식이고, 원문(pw1234)은 어디에도 담기지 않는다.
-    expect(arg.passwordHash).toMatch(/^[0-9a-f]+:[0-9a-f]+$/);
+    // 해시는 iterations:salt:hash 형식(반복 횟수를 함께 저장)이고, 원문(pw1234)은 어디에도 담기지 않는다.
+    expect(arg.passwordHash).toMatch(/^[0-9]+:[0-9a-f]+:[0-9a-f]+$/);
     expect(arg.passwordHash).not.toContain('pw1234');
   });
 
@@ -816,5 +817,51 @@ describe('PollService comment management via optional password (any device)', ()
       service.deleteComment('abc123', 1, null, 'guest-key-1', false),
     ).resolves.toMatchObject({ deleted: true });
     expect(mocks.deleteComment).toHaveBeenCalledWith('abc123', 1);
+  });
+
+  it('locks out brute-force password guessing after repeated failures (429)', async () => {
+    mocks.getPollWithCommentAuthors.mockResolvedValue(
+      makePollWithComment(
+        { authorKey: 'guest-key-1', passwordHash: hashCommentPasswordForTest('correct-pw') },
+        { creatorId: 'owner-x' },
+      ),
+    );
+    // 임계치(5회)까지는 틀린 비번이 권한 거부(Forbidden)로 떨어진다.
+    for (let i = 0; i < 5; i++) {
+      await expect(
+        service.deleteComment('abc123', 1, null, 'stranger-key', false, `guess-${i}`),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    }
+    // 임계 초과 시도는 검증 전에 429(TooManyRequests)로 막힌다 — 더 이상 추측을 못 한다.
+    await expect(
+      service.deleteComment('abc123', 1, null, 'stranger-key', false, 'guess-6'),
+    ).rejects.toMatchObject({ status: 429 });
+    expect(mocks.deleteComment).not.toHaveBeenCalled();
+  });
+
+  it('verifies a LEGACY salt:hash (2-part) password and a NEW iterations:salt:hash both', async () => {
+    // 레거시 2-파트 해시
+    mocks.getPollWithCommentAuthors.mockResolvedValueOnce(
+      makePollWithComment(
+        { authorKey: 'k1', passwordHash: hashCommentPasswordForTest('legacypw') },
+        { creatorId: 'owner-x' },
+      ),
+    );
+    await expect(
+      service.deleteComment('abc123', 1, null, 'other-device', false, 'legacypw'),
+    ).resolves.toMatchObject({ deleted: true });
+
+    // 신규 3-파트 해시(서비스가 직접 만든 포맷)도 동일하게 검증된다.
+    const freshService = new PollService(mocks.db);
+    const newHash = (
+      freshService as unknown as { hashCommentPassword: (p: string) => string }
+    ).hashCommentPassword('newpw123');
+    expect(newHash).toMatch(/^[0-9]+:[0-9a-f]+:[0-9a-f]+$/);
+    mocks.getPollWithCommentAuthors.mockResolvedValueOnce(
+      makePollWithComment({ authorKey: 'k2', passwordHash: newHash }, { creatorId: 'owner-x' }),
+    );
+    await expect(
+      freshService.deleteComment('abc123', 1, null, 'other-device', false, 'newpw123'),
+    ).resolves.toMatchObject({ deleted: true });
   });
 });

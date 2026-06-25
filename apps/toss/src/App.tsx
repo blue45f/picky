@@ -9,6 +9,7 @@ import { PollDetailView } from './pages/PollDetailView';
 import { useIdentity } from './store/useIdentity';
 import { parseEntryRoute } from './lib/toss';
 import { trackAppOpen } from './lib/analytics';
+import { installGlobalClickSounds } from './lib/sound';
 import { globalParticles } from './lib/particles';
 import { WelcomeSplash } from './components/WelcomeSplash';
 import { fixturePoll } from './verif/fixturePoll';
@@ -128,6 +129,9 @@ export function App() {
     // 토스 Analytics: 미니앱 진입 1회(토스 밖/미지원이면 no-op).
     trackAppOpen();
   }, [init]);
+
+  // 전역 클릭 효과음 — document 캡처 리스너 1개(비활성/미지원이면 no-op). cleanup 으로 해제.
+  useEffect(() => installGlobalClickSounds(), []);
 
   // 라우터 규칙을 일반 웹(BrowserRouter)과 통일해 클린 경로(/poll/:id) 사용.
   // 앱인토스 WebView는 "프로젝트에 설정한 웹 라우터 규칙을 그대로 따른다"(공식 문서),

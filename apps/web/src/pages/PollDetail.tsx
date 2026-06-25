@@ -3914,7 +3914,7 @@ function CommentCard(
             ) : (
               <User size={12} style={{ color: 'var(--text-muted)' }} />
             )}
-            <span>{comm.voterName}</span>
+            <span>{comm.voterName?.trim() || '익명'}</span>
           </span>
           {comm.selectedOptionText && (
             <span
@@ -6459,7 +6459,8 @@ function ResultSummaryActions(
         <blockquote className="featured-comment">
           <p>{featuredComment.comment}</p>
           <footer>
-            {featuredComment.voterName} · {featuredComment.selectedOptionText || '선택지 정보 없음'}
+            {featuredComment.voterName?.trim() || '익명'} ·{' '}
+            {featuredComment.selectedOptionText || '선택지 정보 없음'}
           </footer>
         </blockquote>
       ) : (

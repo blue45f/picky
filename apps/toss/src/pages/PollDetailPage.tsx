@@ -31,6 +31,7 @@ import { useCountdown } from '../components/Countdown';
 import { useToast } from '../components/Toast';
 import { triggerParticleBurst } from '../lib/particles';
 import { PollDetailView } from './PollDetailView';
+import { PageLoader } from '../components/ui';
 
 const REVIEW_ASKED_KEY = 'picky_review_asked';
 
@@ -179,7 +180,7 @@ export function PollDetailPage() {
     if (trimmedName) {
       setDisplayName(trimmedName);
     }
-    // 선택적 관리 비번: 입력했는데 너무 짧으면(1~3자) 제출을 막고 안내만 — 빈 값은 그대로 통과(프릭션 0).
+    // 선택적 관리 비번: 입력했는데 최소 길이 미만이면 제출을 막고 안내만 — 빈 값은 그대로 통과(프릭션 0).
     const trimmedPassword = commentPassword.trim();
     if (trimmedPassword.length > 0 && trimmedPassword.length < COMMENT_PASSWORD_MIN) {
       hapticFeedback('error');
@@ -194,7 +195,7 @@ export function PollDetailPage() {
         comment: comment.trim() || null,
         // 서버측 1인1표(#12): 안정 식별키(getAnonymousKey 해시). null이면 미전송 → 레거시 허용.
         voterKey: userKey ?? null,
-        // 선택적 관리 비번 — 4자 이상일 때만 전송(빈 값/짧은 값은 위에서 처리됨).
+        // 선택적 관리 비번 — 최소 길이 이상일 때만 전송(빈 값/짧은 값은 위에서 처리됨).
         password: trimmedPassword.length >= COMMENT_PASSWORD_MIN ? trimmedPassword : null,
       },
       // 비공개 투표면 활성 접근 코드를 함께 보내 서버 게이트를 통과한다(공개 폴은 undefined).
@@ -290,7 +291,11 @@ export function PollDetailPage() {
   const handleEdit = () => {
     if (!poll) return;
     hapticFeedback('tap');
-    navigate(`/poll/${poll.id}/edit`);
+    // 비공개 폴은 편집 페이지에서도 코드 게이트를 통과해야 선택지를 불러올 수 있으므로,
+    // 상세에서 잠금 해제한 활성 코드(activeCode)를 ?code= 로 함께 넘긴다(없으면 편집 페이지가 코드를 받음).
+    const codeQuery =
+      poll.visibility === 'private' && activeCode ? `?code=${encodeURIComponent(activeCode)}` : '';
+    navigate(`/poll/${poll.id}/edit${codeQuery}`);
   };
 
   const handleDeleteComment = async (commentId: number, password?: string) => {
@@ -329,7 +334,7 @@ export function PollDetailPage() {
 
   const handleAddReply = async (parentId: number, text: string, password?: string) => {
     if (!poll) return;
-    // 선택적 관리 비번: 입력했는데 너무 짧으면(1~3자) 막고 안내만 — 빈 값은 그대로 통과(프릭션 0).
+    // 선택적 관리 비번: 입력했는데 최소 길이 미만이면 막고 안내만 — 빈 값은 그대로 통과(프릭션 0).
     const trimmedPassword = (password ?? '').trim();
     if (trimmedPassword.length > 0 && trimmedPassword.length < COMMENT_PASSWORD_MIN) {
       hapticFeedback('error');
@@ -344,7 +349,7 @@ export function PollDetailPage() {
         voterName: voterName.trim() || null,
         // 답글 작성자 식별키 — 비회원이라도 본인 답글을 나중에 관리할 수 있게 한다.
         voterKey: userKey ?? null,
-        // 선택적 관리 비번 — 4자 이상일 때만 전송(다른 기기서 관리용).
+        // 선택적 관리 비번 — 최소 길이 이상일 때만 전송(다른 기기서 관리용).
         password: trimmedPassword.length >= COMMENT_PASSWORD_MIN ? trimmedPassword : null,
       },
       // 비공개 투표면 활성 접근 코드를 함께 보내 서버 게이트를 통과한다(공개 폴은 undefined).
@@ -402,8 +407,7 @@ export function PollDetailPage() {
   if (isLoading && !poll) {
     return (
       <CenterMessage>
-        <span style={{ fontSize: 48 }}>{MASCOT.thinking.emoji}</span>
-        <span style={{ fontSize: 15, marginTop: 10 }}>{VOICE.loading}</span>
+        <PageLoader message={VOICE.loading.replace(/[…\s🥑]+$/u, '')} />
       </CenterMessage>
     );
   }

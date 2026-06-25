@@ -17,6 +17,7 @@ import { formatNumber, formatRelativeTime } from '../lib/format';
 import { isPollClosed, leadingOption, optionPercent } from '../lib/poll';
 import { hasVotedLocally } from '../lib/votes';
 import { hapticFeedback } from '../lib/toss';
+import { playClick } from '../lib/sound';
 import { getRecentPollHistory, type RecentPollHistoryItem } from '../lib/pollHistory';
 import {
   countPollsBySignalForViewer,
@@ -25,6 +26,7 @@ import {
   type PollSignal,
 } from '../lib/pollSignal';
 import { Chip, ProgressBar, SegmentedControl, Skeleton } from '../components/ui';
+import { SoundControls } from '../components/SoundControls';
 import { BannerAd } from '../components/BannerAd';
 import { useCountdown } from '../components/Countdown';
 import { triggerParticleBurst } from '../lib/particles';
@@ -591,6 +593,8 @@ function LoadingState() {
   return (
     <>
       <div
+        role="status"
+        aria-live="polite"
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -601,10 +605,15 @@ function LoadingState() {
           fontWeight: 600,
         }}
       >
-        <span aria-hidden style={{ fontSize: 20 }}>
+        <span className="pf-mascot-bob" aria-hidden style={{ fontSize: 20 }}>
           {MASCOT.thinking.emoji}
         </span>
-        <span>{MASCOT.thinking.line}</span>
+        <span className="pf-loader-dots">
+          {MASCOT.thinking.line}
+          <span aria-hidden>·</span>
+          <span aria-hidden>·</span>
+          <span aria-hidden>·</span>
+        </span>
       </div>
       <ListSkeleton />
     </>
@@ -1116,7 +1125,9 @@ export function PollListPage() {
     navigate('/create');
   };
   const onTitleTap = (x: number, y: number) => {
+    // 강조 인터랙션: 햅틱 진동(토스 밖/미지원이면 no-op) + sparkle 효과음 + 파티클 버스트.
     hapticFeedback('success');
+    playClick('title');
     triggerParticleBurst(x, y, { count: 20 });
   };
   const toggleMyOnly = () => setMyOnly((prev) => !prev);
@@ -1127,6 +1138,11 @@ export function PollListPage() {
       <ListHeader onTitleTap={onTitleTap} />
 
       <div style={pageShell}>
+        {/* 사운드 설정(효과음·배경음악·다음 곡) — 헤더 바로 아래, 우측 정렬. */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+          <SoundControls />
+        </div>
+
         <ListStats pollCount={polls.length} totalVotes={totalVotes} />
 
         {featuredHotPoll ? (

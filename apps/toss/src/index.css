@@ -174,6 +174,111 @@ a {
   }
 }
 
+/* ───────────────────────────────────────────────
+   역동적 아보카도 로더 — 페이지 로딩 상태에 쓰는 브랜드 모션.
+   웹의 brandBounce/emptyFloat 결을 토스에도 이식: 둥실 떠오르며
+   궤도를 도는 그라데이션 링 + 상시 스파클. 다크 베이스 정합.
+   ─────────────────────────────────────────────── */
+.pf-loader {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  display: grid;
+  place-items: center;
+}
+/* 궤도 회전 그라데이션 링(conic) — 끊김 없이 도는 에메랄드→골드 광택 */
+.pf-loader::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: conic-gradient(
+    from 0deg,
+    rgba(19, 194, 163, 0) 0deg,
+    rgba(19, 194, 163, 0.85) 120deg,
+    rgba(244, 197, 96, 0.9) 230deg,
+    rgba(46, 224, 191, 0) 360deg
+  );
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 6px), #000 calc(100% - 5px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 6px), #000 calc(100% - 5px));
+  animation: pf-loader-spin 1.05s linear infinite;
+}
+/* 은은한 글로우 코어 — 링 안쪽에서 숨 쉬듯 펄스 */
+.pf-loader::after {
+  content: '';
+  position: absolute;
+  inset: 14px;
+  border-radius: 999px;
+  background: radial-gradient(
+    circle,
+    rgba(19, 194, 163, 0.22) 0%,
+    rgba(244, 197, 96, 0.08) 55%,
+    transparent 72%
+  );
+  animation: pf-loader-glow 1.5s ease-in-out infinite alternate;
+}
+.pf-loader-mascot {
+  position: relative;
+  z-index: 1;
+  font-size: 40px;
+  line-height: 1;
+  filter: drop-shadow(0 8px 16px rgba(19, 194, 163, 0.4));
+  animation: pf-loader-bob 1.6s cubic-bezier(0.45, 0, 0.55, 1) infinite alternate;
+}
+@keyframes pf-loader-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes pf-loader-glow {
+  0% {
+    transform: scale(0.86);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+}
+@keyframes pf-loader-bob {
+  0% {
+    transform: translateY(2px) rotate(-5deg) scale(0.98);
+  }
+  100% {
+    transform: translateY(-7px) rotate(5deg) scale(1.04);
+  }
+}
+/* 인라인 마스코트 미세 보브 — 스켈레톤 헤더 등 작은 자리에서 살짝 둥실. */
+.pf-mascot-bob {
+  display: inline-block;
+  transform-origin: center bottom;
+  animation: pf-loader-bob 1.6s cubic-bezier(0.45, 0, 0.55, 1) infinite alternate;
+}
+
+/* 로더 텍스트 — 점 세 개가 차례로 통통 튀는 미세 모션 */
+.pf-loader-dots span {
+  display: inline-block;
+  animation: pf-loader-dot 1.2s ease-in-out infinite;
+}
+.pf-loader-dots span:nth-child(2) {
+  animation-delay: 0.16s;
+}
+.pf-loader-dots span:nth-child(3) {
+  animation-delay: 0.32s;
+}
+@keyframes pf-loader-dot {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.5;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
 /* 토스트 등장 */
 @keyframes pf-toast-in {
   from {
@@ -208,6 +313,17 @@ a {
     transition: none;
   }
   .pf-skeleton {
+    animation: none;
+  }
+  /* 역동적 로더 — 모션 민감 사용자에겐 회전/둥실거림을 멈추고 정적 마스코트로 표시. */
+  .pf-loader::before {
+    animation: none;
+    opacity: 0.5;
+  }
+  .pf-loader::after,
+  .pf-loader-mascot,
+  .pf-loader-dots span,
+  .pf-mascot-bob {
     animation: none;
   }
   /* 상시 스파클은 모션 민감 사용자에게 멈추고 숨김(정지 시 scale(0)이라 보이지 않음 — opacity:0로 명시). */

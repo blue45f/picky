@@ -26,9 +26,15 @@ const secureRandom = () => {
   return 0.5;
 };
 
+/** 사용자가 모션 최소화를 요청했는지(접근성) — SSR/미지원 환경에선 false. */
+const prefersReducedMotion = (): boolean =>
+  'matchMedia' in globalThis && globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 export function WelcomeSplash({ forceVisible = false }: { forceVisible?: boolean } = {}) {
   const [visible, setVisible] = useState(forceVisible);
   const [fadeOut, setFadeOut] = useState(false);
+  // 모션 민감 사용자에겐 화려한 파티클 폭우·무한 모션을 끄고 차분한 스플래시만 보여줘요.
+  const reducedMotion = useRef(prefersReducedMotion());
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number | null>(null);
   const particlesRef = useRef<Particle[]>([]);
@@ -69,7 +75,8 @@ export function WelcomeSplash({ forceVisible = false }: { forceVisible?: boolean
   }, [forceVisible]);
 
   useEffect(() => {
-    if (!visible || !canvasRef.current) return;
+    // 모션 최소화 요청 시 파티클 폭우 자체를 그리지 않아요(차분한 정적 스플래시 유지).
+    if (!visible || reducedMotion.current || !canvasRef.current) return;
 
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
@@ -237,6 +244,10 @@ export function WelcomeSplash({ forceVisible = false }: { forceVisible?: boolean
 
   if (!visible) return null;
 
+  // 모션 최소화 요청 시 무한 글로우/플로트/그라데이션/스파클을 정지(브랜드 외형은 유지).
+  const rm = reducedMotion.current;
+  const anim = (value: string) => (rm ? 'none' : value);
+
   return (
     <div
       style={{
@@ -268,7 +279,7 @@ export function WelcomeSplash({ forceVisible = false }: { forceVisible?: boolean
           background:
             'radial-gradient(circle, rgba(19,194,163,0.22) 0%, rgba(244,197,96,0.09) 38%, rgba(0,0,0,0) 70%)',
           zIndex: 0,
-          animation: 'pf-glow-pulse 1.65s ease-in-out infinite alternate',
+          animation: anim('pf-glow-pulse 1.65s ease-in-out infinite alternate'),
           pointerEvents: 'none',
         }}
       />
@@ -291,7 +302,7 @@ export function WelcomeSplash({ forceVisible = false }: { forceVisible?: boolean
           gap: 12,
           zIndex: 2,
           textAlign: 'center',
-          animation: 'pf-splash-pop 1.05s cubic-bezier(0.175, 0.885, 0.32, 1.275) both',
+          animation: anim('pf-splash-pop 1.05s cubic-bezier(0.175, 0.885, 0.32, 1.275) both'),
         }}
       >
         {/* 메인 아바타: 더 크고 강한 그림자 + 펄스 + 링 */}
@@ -303,17 +314,36 @@ export function WelcomeSplash({ forceVisible = false }: { forceVisible?: boolean
               borderRadius: '999px',
               background:
                 'radial-gradient(circle, rgba(19,194,163,0.25) 10%, rgba(244,197,96,0.12) 42%, transparent 70%)',
-              animation: 'pf-glow-pulse 1.6s ease-in-out infinite alternate',
+              animation: anim('pf-glow-pulse 1.6s ease-in-out infinite alternate'),
               pointerEvents: 'none',
             }}
           />
+          {/* 궤도 광택 링 — 아보카도 둘레를 천천히 도는 에메랄드→골드 띠(로더와 동일 언어). */}
+          {rm ? null : (
+            <div
+              aria-hidden
+              style={{
+                position: 'absolute',
+                inset: -14,
+                borderRadius: '999px',
+                background:
+                  'conic-gradient(from 0deg, rgba(19,194,163,0) 0deg, rgba(19,194,163,0.7) 110deg, rgba(244,197,96,0.85) 220deg, rgba(46,224,191,0) 360deg)',
+                WebkitMask:
+                  'radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px))',
+                mask: 'radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px))',
+                animation: 'pf-splash-orbit 2.6s linear infinite',
+                pointerEvents: 'none',
+              }}
+            />
+          )}
           <div
             style={{
               fontSize: 92,
               filter:
                 'drop-shadow(0 20px 40px rgba(19, 194, 163, 0.42)) drop-shadow(0 6px 14px rgba(244,197,96,0.3))',
-              animation:
+              animation: anim(
                 'pf-avatar-float 1.9s ease-in-out infinite alternate, pf-logo-pop 1.05s cubic-bezier(0.175,0.885,0.32,1.275) both',
+              ),
               lineHeight: 1,
             }}
           >
@@ -334,7 +364,7 @@ export function WelcomeSplash({ forceVisible = false }: { forceVisible?: boolean
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
               filter: 'drop-shadow(0 8px 22px rgba(19, 194, 163, 0.32))',
-              animation: 'pf-gradient-shift 2.1s linear infinite',
+              animation: anim('pf-gradient-shift 2.1s linear infinite'),
             }}
           >
             피키
@@ -411,6 +441,9 @@ export function WelcomeSplash({ forceVisible = false }: { forceVisible?: boolean
           0% { transform: translate(-50%, -50%) scale(0.92); opacity: 0.65; }
           100% { transform: translate(-50%, -50%) scale(1.12); opacity: 0.95; }
         }
+        @keyframes pf-splash-orbit {
+          to { transform: rotate(360deg); }
+        }
         .splash-sparkle {
           position: absolute;
           color: #f4c560;
@@ -423,6 +456,13 @@ export function WelcomeSplash({ forceVisible = false }: { forceVisible?: boolean
           0%, 100% { transform: scale(0.3) rotate(0deg); opacity: 0; }
           45% { transform: scale(1.35) rotate(22deg); opacity: 1; }
           70% { transform: scale(0.9) rotate(-12deg); opacity: 0.7; }
+        }
+        /* 모션 최소화 요청 시: 무한 모션을 모두 멈추고 스파클은 숨겨 차분한 스플래시 유지. */
+        @media (prefers-reduced-motion: reduce) {
+          .splash-sparkle {
+            animation: none;
+            opacity: 0;
+          }
         }
       `}</style>
     </div>

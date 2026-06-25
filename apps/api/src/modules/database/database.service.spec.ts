@@ -256,6 +256,28 @@ describe('DatabaseService in-memory comment author path (secret-strip + persist 
     const poll = await service.getPollById('p1');
     expect(poll?.comments.map((c) => c.id)).toEqual([2]);
   });
+
+  it('deleteComment cascades to child replies (no orphaned replies)', async () => {
+    const createdAt = new Date().toISOString();
+    const service = await newService({
+      polls: [
+        seedPoll({
+          comments: [
+            { id: 1, voterName: 'parent', comment: '부모', createdAt, parentId: null },
+            { id: 2, voterName: 'reply-a', comment: '답글1', createdAt, parentId: 1 },
+            { id: 3, voterName: 'reply-b', comment: '답글2', createdAt, parentId: 1 },
+            { id: 4, voterName: 'other', comment: '무관 댓글', createdAt, parentId: null },
+          ],
+        }),
+      ],
+      users: [],
+    });
+
+    // 부모(1)를 지우면 그 답글(2,3)도 함께 사라지고, 무관한 최상위 댓글(4)만 남는다.
+    await service.deleteComment('p1', 1);
+    const poll = await service.getPollById('p1');
+    expect(poll?.comments.map((c) => c.id)).toEqual([4]);
+  });
 });
 
 describe('DatabaseService getPolls sort=commented (댓글 많은순 — no crash, correct order)', () => {

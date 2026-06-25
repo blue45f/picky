@@ -217,18 +217,37 @@ export const UpdatePollSchema = z
 
 export type UpdatePollInput = z.infer<typeof UpdatePollSchema>;
 
-/** 게스트 댓글 선택적 비밀번호 길이 한도(설정/검증 공통). 4~20자. */
-export const COMMENT_PASSWORD_MIN = 4;
+/**
+ * 게스트 댓글 선택적 비밀번호 길이 한도.
+ * - COMMENT_PASSWORD_MIN: 신규 비번 설정(생성) 최소 길이. 보안 강화를 위해 6자로 올렸다.
+ * - COMMENT_PASSWORD_VERIFY_MIN: 기존 비번 검증(수정/삭제) 최소 길이. 4자로 만든 레거시 비번도
+ *   계속 본인 확인이 되도록 옛 하한(4)을 유지한다(상향은 신규 입력에만 적용).
+ */
+export const COMMENT_PASSWORD_MIN = 6;
+export const COMMENT_PASSWORD_VERIFY_MIN = 4;
 export const COMMENT_PASSWORD_MAX = 20;
 
 /**
- * 게스트 댓글 선택적 비밀번호 스키마(4~20자).
+ * 신규 게스트 댓글 비밀번호 스키마(설정용, 6~20자).
  * 비번을 설정해 두면 voterKey(기기 고정)와 무관하게 어느 기기서든 본인 수정/삭제가 가능하다.
  * 비번 원문은 POST/PATCH/DELETE 바디로만 보내고(GET 쿼리 금지), 응답에는 hash·원문 모두 절대 노출하지 않는다.
  */
 export const CommentPasswordSchema = z
   .string()
   .min(COMMENT_PASSWORD_MIN, `비밀번호는 최소 ${COMMENT_PASSWORD_MIN}자 이상이어야 해요.`)
+  .max(COMMENT_PASSWORD_MAX, `비밀번호는 최대 ${COMMENT_PASSWORD_MAX}자 이하여야 해요.`);
+
+/**
+ * 기존 비밀번호 검증용 스키마(수정/삭제, 4~20자).
+ * 신규 하한(6)을 그대로 쓰면 4~5자 레거시 비번 소유자가 본인 댓글을 관리할 수 없게 되므로,
+ * 검증 경로는 옛 하한(4)을 유지한다 — 길이 강화는 신규 설정에만 적용하고 기존 검증엔 영향이 없다.
+ */
+export const CommentPasswordVerifySchema = z
+  .string()
+  .min(
+    COMMENT_PASSWORD_VERIFY_MIN,
+    `비밀번호는 최소 ${COMMENT_PASSWORD_VERIFY_MIN}자 이상이어야 해요.`,
+  )
   .max(COMMENT_PASSWORD_MAX, `비밀번호는 최대 ${COMMENT_PASSWORD_MAX}자 이하여야 해요.`);
 
 export const VoteSchema = z.object({
@@ -291,10 +310,10 @@ export const EditCommentSchema = z.object({
   /** 비회원 본인 확인용 식별키. 회원이면 JWT userId로 판정하므로 생략 가능. 응답 비노출. */
   voterKey: z.string().max(256, '식별키가 너무 깁니다.').optional().nullable(),
   /**
-   * 게스트가 비번을 설정한 댓글을 다른 기기서 수정할 때 보내는 비밀번호 원문(4~20자).
-   * 서버가 저장된 해시와 대조해 일치하면 본인으로 인정한다. 응답 비노출.
+   * 게스트가 비번을 설정한 댓글을 다른 기기서 수정할 때 보내는 비밀번호 원문(검증용 4~20자).
+   * 서버가 저장된 해시와 대조해 일치하면 본인으로 인정한다. 레거시 4자 비번 호환을 위해 검증 하한은 4. 응답 비노출.
    */
-  password: CommentPasswordSchema.optional().nullable(),
+  password: CommentPasswordVerifySchema.optional().nullable(),
 });
 
 export type EditCommentInput = z.infer<typeof EditCommentSchema>;
@@ -304,10 +323,10 @@ export const DeleteCommentSchema = z.object({
   /** 비회원 본인 확인용 식별키. 회원이면 JWT userId로 판정하므로 생략 가능. 폴 소유자/어드민은 불필요. */
   voterKey: z.string().max(256, '식별키가 너무 깁니다.').optional().nullable(),
   /**
-   * 게스트가 비번을 설정한 댓글을 다른 기기서 삭제할 때 보내는 비밀번호 원문(4~20자).
-   * 서버가 저장된 해시와 대조해 일치하면 본인으로 인정한다. 응답 비노출.
+   * 게스트가 비번을 설정한 댓글을 다른 기기서 삭제할 때 보내는 비밀번호 원문(검증용 4~20자).
+   * 서버가 저장된 해시와 대조해 일치하면 본인으로 인정한다. 레거시 4자 비번 호환을 위해 검증 하한은 4. 응답 비노출.
    */
-  password: CommentPasswordSchema.optional().nullable(),
+  password: CommentPasswordVerifySchema.optional().nullable(),
 });
 
 export type DeleteCommentInput = z.infer<typeof DeleteCommentSchema>;

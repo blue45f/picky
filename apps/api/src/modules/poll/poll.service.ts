@@ -3,6 +3,8 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  HttpException,
+  HttpStatus,
   NotFoundException,
 } from '@nestjs/common';
 import * as crypto from 'node:crypto';
@@ -111,18 +113,33 @@ export class PollService {
   }
 
   /**
+   * 신규 댓글 비번 해시의 pbkdf2 반복 횟수. OWASP 권고에 맞춰 레거시(1000)에서 대폭 상향한다.
+   * 저장 포맷에 반복 횟수를 함께 적어 두므로(`iterations:salt:hash`), 이 값을 올려도 기존 해시 검증은 깨지지 않는다.
+   */
+  private static readonly PBKDF2_ITERATIONS = 100_000;
+  private static readonly LEGACY_PBKDF2_ITERATIONS = 1000;
+  private static readonly PBKDF2_KEYLEN = 64;
+  private static readonly PBKDF2_DIGEST = 'sha512';
+
+  /**
    * 게스트 댓글 관리 비밀번호 해시 — auth.service 의 회원 비번 패턴(pbkdf2-sha512)을 재사용한다.
-   * salt 를 매번 새로 만들어 `salt:hash` 형태로 한 컬럼(password_hash)에 보관한다(bcrypt 의존성 불필요).
+   * salt 를 매번 새로 만들고 반복 횟수를 함께 적어 `iterations:salt:hash` 형태로 한 컬럼(password_hash)에 보관한다
+   * (bcrypt 의존성 불필요). 반복 횟수를 저장해 두므로 나중에 PBKDF2_ITERATIONS 를 올려도 기존 해시는 그대로 검증된다.
    * 비번 원문은 절대 저장/응답하지 않는다 — 이 해시만 DB 에 남는다.
    */
   private hashCommentPassword(password: string): string {
+    const iterations = PollService.PBKDF2_ITERATIONS;
     const salt = crypto.randomBytes(16).toString('hex');
-    const hash = crypto.pbkdf2Sync(password, salt, 1000, 64, 'sha512').toString('hex');
-    return `${salt}:${hash}`;
+    const hash = crypto
+      .pbkdf2Sync(password, salt, iterations, PollService.PBKDF2_KEYLEN, PollService.PBKDF2_DIGEST)
+      .toString('hex');
+    return `${iterations}:${salt}:${hash}`;
   }
 
   /**
-   * 입력 비번이 저장된 해시(`salt:hash`)와 일치하는지 상수 시간 비교로 검증한다.
+   * 입력 비번이 저장된 해시와 일치하는지 상수 시간 비교로 검증한다.
+   * 저장 포맷은 신규 `iterations:salt:hash` 와 레거시 `salt:hash`(반복 1000) 둘 다 지원한다 —
+   * 저장된 반복 횟수로 재계산하므로 반복 상향 후에도 옛 해시가 그대로 검증된다(하위 호환).
    * 형식이 깨졌거나 입력이 비면 false. 타이밍 사이드채널을 막기 위해 timingSafeEqual 을 쓴다.
    */
   private verifyCommentPassword(
@@ -134,19 +151,112 @@ export class PollService {
     if (!candidate || !stored) {
       return false;
     }
-    const separator = stored.indexOf(':');
-    if (separator <= 0) {
+    const parts = stored.split(':');
+    let iterations: number;
+    let salt: string | undefined;
+    let expectedHex: string | undefined;
+    if (parts.length === 3) {
+      // 신규 포맷 `iterations:salt:hash` — 저장된 반복 횟수를 그대로 쓴다.
+      const parsed = Number.parseInt(parts[0] ?? '', 10);
+      if (!Number.isInteger(parsed) || parsed <= 0) {
+        return false;
+      }
+      iterations = parsed;
+      salt = parts[1];
+      expectedHex = parts[2];
+    } else if (parts.length === 2) {
+      // 레거시 포맷 `salt:hash` — 반복 횟수가 없으므로 옛 기본값(1000)으로 검증한다.
+      iterations = PollService.LEGACY_PBKDF2_ITERATIONS;
+      salt = parts[0];
+      expectedHex = parts[1];
+    } else {
       return false;
     }
-    const salt = stored.slice(0, separator);
-    const expectedHex = stored.slice(separator + 1);
     if (!salt || !expectedHex) {
       return false;
     }
-    const actualHex = crypto.pbkdf2Sync(candidate, salt, 1000, 64, 'sha512').toString('hex');
+    const actualHex = crypto
+      .pbkdf2Sync(candidate, salt, iterations, PollService.PBKDF2_KEYLEN, PollService.PBKDF2_DIGEST)
+      .toString('hex');
     const expected = Buffer.from(expectedHex, 'hex');
     const actual = Buffer.from(actualHex, 'hex');
     return expected.length === actual.length && crypto.timingSafeEqual(expected, actual);
+  }
+
+  /**
+   * 댓글 비번 무차별 대입(brute-force) 가드 — 댓글별 실패 시도를 인메모리로 세고 지수 백오프로 잠근다.
+   * 외부 의존성 없이 단일 프로세스 기준 경량 방어(@nestjs/throttler 미도입). 성공/권한 통과 시 카운터를 비운다.
+   * - 임계치(FAIL_THRESHOLD)까지는 자유 시도, 초과하면 lockUntil 까지 429 로 막고 백오프를 2배씩 늘린다.
+   * - 키는 `pollId:commentId` — 댓글 한 건 단위로 격리해 다른 댓글/폴 시도에 영향 주지 않는다.
+   */
+  private static readonly PW_FAIL_THRESHOLD = 5;
+  private static readonly PW_BASE_BACKOFF_MS = 30_000; // 30s
+  private static readonly PW_MAX_BACKOFF_MS = 15 * 60_000; // 15분 상한
+  private static readonly PW_ATTEMPT_TTL_MS = 30 * 60_000; // 30분 무활동 시 기록 폐기
+  private readonly passwordAttempts = new Map<
+    string,
+    { fails: number; lockUntil: number; updatedAt: number }
+  >();
+
+  private pruneStalePasswordAttempts(now: number): void {
+    for (const [key, entry] of this.passwordAttempts) {
+      if (now - entry.updatedAt > PollService.PW_ATTEMPT_TTL_MS) {
+        this.passwordAttempts.delete(key);
+      }
+    }
+  }
+
+  /**
+   * 비번 검증 시도를 rate-limit 으로 감싼다. 잠금 중이면 429(TOO_MANY_REQUESTS)를 던지고,
+   * 그렇지 않으면 검증을 1회 수행해 성공이면 카운터를 비우고 실패면 실패수를 올린다(임계 초과 시 백오프 잠금).
+   * 비번이 비었거나 댓글에 비번이 없으면(추측 자체가 불가) 시도로 세지 않고 단순 false 를 돌려준다 — 오탐 방지.
+   */
+  private verifyCommentPasswordGuarded(
+    pollId: string,
+    commentId: number,
+    password: string | null | undefined,
+    storedHash: string | null | undefined,
+  ): boolean {
+    const candidate = (password ?? '').trim();
+    const stored = (storedHash ?? '').trim();
+    // 추측 자체가 성립하지 않는 경우(입력 없음·비번 미설정 댓글)는 카운터를 건드리지 않는다.
+    if (!candidate || !stored) {
+      return false;
+    }
+
+    const now = Date.now();
+    this.pruneStalePasswordAttempts(now);
+    const key = `${pollId}:${commentId}`;
+    const entry = this.passwordAttempts.get(key);
+
+    if (entry && entry.lockUntil > now) {
+      const retryAfterSec = Math.ceil((entry.lockUntil - now) / 1000);
+      throw new HttpException(
+        `비밀번호 시도가 너무 많아요. ${retryAfterSec}초 후 다시 시도해 주세요.`,
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
+    const ok = this.verifyCommentPassword(candidate, stored);
+    if (ok) {
+      // 성공하면 기록을 비워 정상 사용자에게 잠금이 남지 않게 한다.
+      this.passwordAttempts.delete(key);
+      return true;
+    }
+
+    const fails = (entry?.fails ?? 0) + 1;
+    let lockUntil = 0;
+    if (fails >= PollService.PW_FAIL_THRESHOLD) {
+      // 임계 초과분에 비례해 백오프를 2배씩 늘린다(상한 PW_MAX_BACKOFF_MS).
+      const overflow = fails - PollService.PW_FAIL_THRESHOLD;
+      const backoff = Math.min(
+        PollService.PW_BASE_BACKOFF_MS * 2 ** overflow,
+        PollService.PW_MAX_BACKOFF_MS,
+      );
+      lockUntil = now + backoff;
+    }
+    this.passwordAttempts.set(key, { fails, lockUntil, updatedAt: now });
+    return false;
   }
 
   /**
@@ -441,7 +551,8 @@ export class PollService {
       return;
     }
     // 비번 일치도 본인으로 인정(다른 기기) — 댓글에 비번이 설정돼 있고 입력 비번이 해시와 맞을 때만.
-    if (this.verifyCommentPassword(password, comment.passwordHash)) {
+    // 무차별 대입 방지를 위해 rate-limit 가드를 통과(잠금 중이면 429)한다.
+    if (this.verifyCommentPasswordGuarded(poll.id, comment.id, password, comment.passwordHash)) {
       return;
     }
     throw new ForbiddenException(`내가 쓴 한마디만 ${action}할 수 있어요.`);
@@ -503,7 +614,12 @@ export class PollService {
       const authorKeyMatch = Boolean(
         trimmedKey && comment.authorKey && comment.authorKey === trimmedKey,
       );
-      const passwordMatch = this.verifyCommentPassword(input.password, comment.passwordHash);
+      // 작성자 식별이 안 되면 비번 검증으로 본인 인정 — 무차별 대입 방지 rate-limit 가드 경유(잠금 중이면 429).
+      // 본인 식별(authorId/authorKey)이 이미 맞으면 비번 추측이 아니므로 가드를 호출하지 않는다.
+      const passwordMatch =
+        !authorIdMatch &&
+        !authorKeyMatch &&
+        this.verifyCommentPasswordGuarded(id, commentId, input.password, comment.passwordHash);
       if (!authorIdMatch && !authorKeyMatch && !passwordMatch) {
         throw new ForbiddenException('내가 쓴 한마디만 수정할 수 있어요.');
       }
