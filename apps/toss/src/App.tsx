@@ -8,6 +8,7 @@ import { SupportPage } from './pages/SupportPage';
 import { PollDetailView } from './pages/PollDetailView';
 import { useIdentity } from './store/useIdentity';
 import { parseEntryRoute } from './lib/toss';
+import { trackAppOpen } from './lib/analytics';
 import { globalParticles } from './lib/particles';
 import { WelcomeSplash } from './components/WelcomeSplash';
 import { fixturePoll } from './verif/fixturePoll';
@@ -124,6 +125,8 @@ export function App() {
 
   useEffect(() => {
     init().catch(() => {});
+    // 토스 Analytics: 미니앱 진입 1회(토스 밖/미지원이면 no-op).
+    trackAppOpen();
   }, [init]);
 
   // 라우터 규칙을 일반 웹(BrowserRouter)과 통일해 클린 경로(/poll/:id) 사용.

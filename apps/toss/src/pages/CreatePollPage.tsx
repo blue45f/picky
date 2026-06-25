@@ -20,6 +20,7 @@ import { theme, stickyActionBar, FONT } from '../theme';
 import { fromDateTimeLocalValue, toDateTimeLocalValue } from '../lib/format';
 import { fileToDownscaledDataUrl, isUsableImageUrl } from '../lib/image';
 import { hapticFeedback } from '../lib/toss';
+import { trackCreatePoll } from '../lib/analytics';
 import { copyText } from '../lib/pollShare';
 import { evaluatePollReadiness } from '../lib/pollReadiness';
 import { AppBar, Chip, SegmentedControl } from '../components/ui';
@@ -1169,6 +1170,8 @@ export function CreatePollPage() {
 
     const created = await createPoll(parsed.data as CreatePollInput);
     if (created) {
+      // 토스 Analytics: 고민 작성 완료. 식별값 없이 공개 범위만(public/unlisted/private).
+      trackCreatePoll(visibility);
       hapticFeedback('success');
       // 비공개 폴은 곧장 이동하지 않고 접근 코드를 한 번 노출해 작성자가 복사·전달하게 한다(web과 동일).
       if (visibility === 'private' && trimmedAccessCode) {

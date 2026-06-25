@@ -25,6 +25,7 @@ import {
   isInToss,
   requestAppReview,
 } from '../lib/toss';
+import { trackComment, trackShare, trackVote } from '../lib/analytics';
 import { theme } from '../theme';
 import { useCountdown } from '../components/Countdown';
 import { useToast } from '../components/Toast';
@@ -202,6 +203,11 @@ export function PollDetailPage() {
     if (ok) {
       rememberVote(poll.id, selectedOptionId);
       setVotedOptionId(selectedOptionId);
+      // 토스 Analytics: 투표(+ 함께 남긴 한마디가 있으면 comment도). 식별값 없이 카운트만.
+      trackVote(poll.options.length);
+      if (comment.trim()) {
+        trackComment(false);
+      }
       setComment('');
       setCommentPassword('');
       hapticFeedback('success');
@@ -248,6 +254,8 @@ export function PollDetailPage() {
     if (!poll) return;
     hapticFeedback('tap');
     const result = await sharePoll(poll, shareUrl);
+    // 토스 Analytics: 공유. 식별값 없이 공유 방식만(취소=null은 미로깅).
+    if (result) trackShare(result);
     if (result === 'clipboard') showToast('링크를 클립보드에 담았어요 📋');
     else if (result == null) showToast('공유를 취소했어요 🥺');
   };
@@ -343,6 +351,8 @@ export function PollDetailPage() {
       activeCode,
     );
     if (result) {
+      // 토스 Analytics: 한마디(답글). 식별값 없이 reply 여부만.
+      trackComment(true);
       hapticFeedback('success');
       showToast('답글을 남겼어요 💬');
     } else {

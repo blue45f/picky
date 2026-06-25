@@ -5,22 +5,36 @@ import { useCallback, useEffect, useState } from 'react';
  * 앱인토스 인앱 배너 광고 헬퍼.
  * 정책: 개발 단계는 테스트 광고 ID만 사용, 운영은 콘솔에서 발급한 광고 그룹 ID를 주입해요.
  * 외부 광고 네트워크는 금지(앱인토스 광고만 허용). 토스 밖/미지원 환경에서는 안전하게 no-op.
+ *
+ * 용어: 여기서 다루는 건 전부 '배너 광고'예요. SDK에는 광고 타입 구분이 없고,
+ * 슬롯 종류(일반 배너 / 피드형 배너 등)는 콘솔 광고 그룹(adGroupId)이 결정해요.
  */
 
 // WebView 배너 테스트 ID(공식 문서). 실제 광고 ID로 테스트하면 정책 위반이라 dev 전용.
-// - 리스트형: 가로로 긴 표준 배너(목록/상세 본문 사이에 자연스러움)
-// - 피드형(네이티브 이미지): 카드 사이에 끼우기 좋은 이미지형
+//
+// 중요: SDK(attachBanner)에는 'feed'/'native' 같은 광고 타입 구분이 없어요.
+// 슬롯 종류는 전적으로 콘솔의 광고 그룹(adGroupId)이 결정해요. 아래 'feed'는
+// 별도 광고 타입이 아니라, 콘솔에서 만든 '배너(피드형)' 그룹을 가리키는
+// 우리 코드의 배치/렌더 위치 라벨일 뿐이에요(둘 다 '배너 광고').
+// - banner: 목록/본문 사이에 두는 일반 배너 그룹
+// - feed:   카드 목록 사이에 끼우려고 콘솔에서 '배너(피드형)'로 만든 그룹
+//           (전용 그룹이 없으면 일반 배너 그룹으로 폴백 → 동일하게 동작)
 const TEST_BANNER_AD_GROUP_ID = 'ait-ad-test-banner-id';
 const TEST_FEED_AD_GROUP_ID = 'ait-ad-test-native-image-id';
 
-/** 배너 광고 형태(슬롯 종류). 운영 광고 그룹 ID를 형태별로 분리 주입할 수 있어요. */
+/**
+ * 배너 광고 배치 위치 라벨(슬롯 종류 X, 광고 타입 X).
+ * 어느 콘솔 광고 그룹 ID를 쓸지 고르는 키일 뿐 — 둘 다 '배너 광고'예요.
+ * 운영 광고 그룹 ID를 배치별로 분리 주입할 수 있어요.
+ */
 export type AdFormat = 'banner' | 'feed';
 
 /**
  * 노출할 배너 광고 그룹 ID.
- * - 운영: 형태별 콘솔 발급값(`VITE_TOSS_AD_GROUP_ID` / `VITE_TOSS_FEED_AD_GROUP_ID`)
- *   - 피드형 전용 값이 없으면 일반 배너 값으로 폴백(둘 다 없으면 미노출)
- * - 개발: 형태별 테스트 ID
+ * - 운영: 배치별 콘솔 발급값(`VITE_TOSS_AD_GROUP_ID` / `VITE_TOSS_FEED_AD_GROUP_ID`)
+ *   - `feed`는 콘솔에서 '배너(피드형)'로 만든 그룹 ID를 넣어야 해요(별도 광고 타입 아님).
+ *   - 'feed' 전용 값이 없으면 일반 배너 값으로 폴백(둘 다 없으면 미노출).
+ * - 개발: 배치별 테스트 ID
  * - 그 외(운영인데 미설정): null → 광고 미노출(빈 슬롯 방지)
  */
 export function getBannerAdGroupId(format: AdFormat = 'banner'): string | null {
