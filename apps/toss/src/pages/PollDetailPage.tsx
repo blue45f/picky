@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Button } from '@toss/tds-mobile';
 import type { PollOption } from '../shared';
-import { MASCOT, VOICE, canRevealResults } from '../shared';
+import { MASCOT, VOICE, canRevealResults, COMMENT_PASSWORD_MIN } from '../shared';
 import { usePollStore } from '../store/usePollStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useIdentity } from '../store/useIdentity';
@@ -16,7 +16,7 @@ import {
 } from '../lib/pollShare';
 import { isPollClosed, leadingOption, optionsByVotes } from '../lib/poll';
 import { getVotedOptionId, rememberVote } from '../lib/votes';
-import { canManageComment, isMyComment } from '../lib/myComments';
+import { isMyComment, resolveCommentManageAffordance } from '../lib/myComments';
 import {
   buildTossShareLink,
   fetchConsentedProfile,
@@ -65,6 +65,8 @@ export function PollDetailPage() {
 
   const [selectedOptionId, setSelectedOptionId] = useState<number | null>(null);
   const [comment, setComment] = useState('');
+  // 한마디에 붙일 선택적 관리 비번(빈 값=프릭션 0, 기존 동작 그대로). 다른 기기서 수정/삭제용.
+  const [commentPassword, setCommentPassword] = useState('');
   const [voterName, setVoterName] = useState(displayName);
   const [votedOptionId, setVotedOptionId] = useState<number | null>(() => getVotedOptionId(id));
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -91,6 +93,7 @@ export function PollDetailPage() {
     setVotedOptionId(getVotedOptionId(id));
     setSelectedOptionId(null);
     setComment('');
+    setCommentPassword('');
     setConfirmDelete(false);
   }, [id]);
 
@@ -141,14 +144,24 @@ export function PollDetailPage() {
   const isOwner = Boolean(poll && myId && poll.creatorId === myId);
   const isAdmin = Boolean(useAuthStore.getState().user?.isAdmin);
   const canManage = isOwner || isAdmin;
-  // 댓글별 관리(수정/삭제) 노출 여부 — 본인(이 기기에서 내가 단 댓글) 또는 폴 소유자/어드민.
-  // 서버가 최종 권한을 강제하므로 여기선 버튼 노출만 결정한다.
-  const canManageCommentById = (commentId: number): boolean =>
-    canManageComment({
+  // 댓글별 관리(수정/삭제) 어포던스 — 본인(이 기기에서 내가 단 댓글)·폴 소유자/어드민이면 직접 관리,
+  // 그 외라도 댓글에 관리 비번(hasPassword)이 걸려 있으면 비번 입력 흐름으로 관리할 수 있게 한다.
+  // 서버가 최종 권한을 강제하므로 여기선 버튼 노출·비번 프롬프트 여부만 결정한다.
+  const resolveCommentAffordance = (
+    commentId: number,
+  ): { canManage: boolean; needsPassword: boolean } => {
+    const target = poll ? poll.comments.find((c) => c.id === commentId) : null;
+    return resolveCommentManageAffordance({
       mine: poll ? isMyComment(poll.id, commentId) : false,
       isPollOwner: isOwner,
       isAdmin,
+      hasPassword: Boolean(target?.hasPassword),
     });
+  };
+  const canManageCommentById = (commentId: number): boolean =>
+    resolveCommentAffordance(commentId).canManage;
+  const commentNeedsPassword = (commentId: number): boolean =>
+    resolveCommentAffordance(commentId).needsPassword;
 
   // 토스 안: 토스 공유 링크 우선. 밖: 공개 웹 URL. (QR·공유·링크복사 모두 이 값을 사용)
   const shareUrl = tossShareLink ?? (poll ? resolvePollShareUrl(poll) : '');
@@ -165,6 +178,13 @@ export function PollDetailPage() {
     if (trimmedName) {
       setDisplayName(trimmedName);
     }
+    // 선택적 관리 비번: 입력했는데 너무 짧으면(1~3자) 제출을 막고 안내만 — 빈 값은 그대로 통과(프릭션 0).
+    const trimmedPassword = commentPassword.trim();
+    if (trimmedPassword.length > 0 && trimmedPassword.length < COMMENT_PASSWORD_MIN) {
+      hapticFeedback('error');
+      showToast(`🔒 비번은 ${COMMENT_PASSWORD_MIN}자 이상으로 정해 주세요`);
+      return;
+    }
     const ok = await vote(
       poll.id,
       {
@@ -173,6 +193,8 @@ export function PollDetailPage() {
         comment: comment.trim() || null,
         // 서버측 1인1표(#12): 안정 식별키(getAnonymousKey 해시). null이면 미전송 → 레거시 허용.
         voterKey: userKey ?? null,
+        // 선택적 관리 비번 — 4자 이상일 때만 전송(빈 값/짧은 값은 위에서 처리됨).
+        password: trimmedPassword.length >= COMMENT_PASSWORD_MIN ? trimmedPassword : null,
       },
       // 비공개 투표면 활성 접근 코드를 함께 보내 서버 게이트를 통과한다(공개 폴은 undefined).
       activeCode,
@@ -181,6 +203,7 @@ export function PollDetailPage() {
       rememberVote(poll.id, selectedOptionId);
       setVotedOptionId(selectedOptionId);
       setComment('');
+      setCommentPassword('');
       hapticFeedback('success');
       globalThis.setTimeout(() => hapticFeedback('confetti'), 90);
 
@@ -249,10 +272,11 @@ export function PollDetailPage() {
     navigate(`/poll/${poll.id}/edit`);
   };
 
-  const handleDeleteComment = async (commentId: number) => {
+  const handleDeleteComment = async (commentId: number, password?: string) => {
     if (!poll) return;
     // 비회원 본인 확인용 voterKey(getAnonymousKey 해시)를 바디로 보내 서버가 authorKey 와 대조한다.
-    const ok = await deleteComment(poll.id, commentId, userKey ?? null);
+    // 다른 기기서 관리하는 경우엔 작성 시 정한 관리 비번(password)도 함께 보내 서버가 대조한다.
+    const ok = await deleteComment(poll.id, commentId, userKey ?? null, password ?? null);
     if (ok) {
       hapticFeedback('success');
       showToast('한마디를 지웠어요 🧹');
@@ -262,13 +286,14 @@ export function PollDetailPage() {
     }
   };
 
-  const handleEditComment = async (commentId: number, text: string) => {
+  const handleEditComment = async (commentId: number, text: string, password?: string) => {
     if (!poll) return false;
     const result = await editComment(
       poll.id,
       commentId,
       // voterKey 를 바디로 함께 보내 서버가 작성자 본인(authorId/authorKey)인지 강제 검증한다.
-      { comment: text, voterKey: userKey ?? null },
+      // 다른 기기서 수정하는 경우엔 작성 시 정한 관리 비번(password)도 함께 보낸다.
+      { comment: text, voterKey: userKey ?? null, password: password ?? null },
       activeCode,
     );
     if (result) {
@@ -281,8 +306,15 @@ export function PollDetailPage() {
     return false;
   };
 
-  const handleAddReply = async (parentId: number, text: string) => {
+  const handleAddReply = async (parentId: number, text: string, password?: string) => {
     if (!poll) return;
+    // 선택적 관리 비번: 입력했는데 너무 짧으면(1~3자) 막고 안내만 — 빈 값은 그대로 통과(프릭션 0).
+    const trimmedPassword = (password ?? '').trim();
+    if (trimmedPassword.length > 0 && trimmedPassword.length < COMMENT_PASSWORD_MIN) {
+      hapticFeedback('error');
+      showToast(`🔒 비번은 ${COMMENT_PASSWORD_MIN}자 이상으로 정해 주세요`);
+      return;
+    }
     const result = await addComment(
       poll.id,
       {
@@ -291,6 +323,8 @@ export function PollDetailPage() {
         voterName: voterName.trim() || null,
         // 답글 작성자 식별키 — 비회원이라도 본인 답글을 나중에 관리할 수 있게 한다.
         voterKey: userKey ?? null,
+        // 선택적 관리 비번 — 4자 이상일 때만 전송(다른 기기서 관리용).
+        password: trimmedPassword.length >= COMMENT_PASSWORD_MIN ? trimmedPassword : null,
       },
       // 비공개 투표면 활성 접근 코드를 함께 보내 서버 게이트를 통과한다(공개 폴은 undefined).
       activeCode,
@@ -396,6 +430,8 @@ export function PollDetailPage() {
       setVoterName={setVoterName}
       comment={comment}
       setComment={setComment}
+      commentPassword={commentPassword}
+      setCommentPassword={setCommentPassword}
       onLoadProfile={isConsentedProfileEnabled() ? handleLoadProfile : undefined}
       profileLoading={profileLoading}
       profileNotice={profileNotice}
@@ -405,6 +441,7 @@ export function PollDetailPage() {
       isOwner={isOwner}
       canManage={canManage}
       canManageCommentById={canManageCommentById}
+      commentNeedsPassword={commentNeedsPassword}
       confirmDelete={confirmDelete}
       onDelete={handleDelete}
       onEdit={handleEdit}

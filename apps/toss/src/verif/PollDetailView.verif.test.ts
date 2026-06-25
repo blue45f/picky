@@ -38,6 +38,8 @@ describe('PollDetailView full render (verif)', () => {
         setVoterName: () => {},
         comment: '',
         setComment: () => {},
+        commentPassword: '',
+        setCommentPassword: () => {},
         leader: null,
         displayOptions: fixturePoll.options,
         winnerId: null,

@@ -6,6 +6,7 @@ import {
   isMyComment,
   rememberMyComment,
   rememberNewCommentsFromSnapshot,
+  resolveCommentManageAffordance,
 } from './myComments';
 
 /** 초소형 localStorage 목 — node 환경에 주입해 "내 댓글" 추적을 검증한다. */
@@ -78,5 +79,52 @@ describe('canManageComment policy (정책차이는 인자)', () => {
   });
   it('hides manage UI for a stranger', () => {
     expect(canManageComment({ mine: false, isPollOwner: false, isAdmin: false })).toBe(false);
+  });
+});
+
+describe('resolveCommentManageAffordance (직접 관리 vs 비번 잠금)', () => {
+  it('direct manage (no password prompt) for my own comment', () => {
+    expect(
+      resolveCommentManageAffordance({
+        mine: true,
+        isPollOwner: false,
+        isAdmin: false,
+        hasPassword: false,
+      }),
+    ).toEqual({ canManage: true, needsPassword: false });
+  });
+
+  it('direct manage for owner/admin even if the comment has a password', () => {
+    expect(
+      resolveCommentManageAffordance({
+        mine: false,
+        isPollOwner: true,
+        isAdmin: false,
+        hasPassword: true,
+      }),
+    ).toEqual({ canManage: true, needsPassword: false });
+  });
+
+  it('password-gated manage for a different device when the comment has a password', () => {
+    // 같은 기기 본인이 아니어도 비번이 걸린 댓글이면 자물쇠 흐름으로 관리 가능.
+    expect(
+      resolveCommentManageAffordance({
+        mine: false,
+        isPollOwner: false,
+        isAdmin: false,
+        hasPassword: true,
+      }),
+    ).toEqual({ canManage: true, needsPassword: true });
+  });
+
+  it('no affordance for a stranger on a comment without a password', () => {
+    expect(
+      resolveCommentManageAffordance({
+        mine: false,
+        isPollOwner: false,
+        isAdmin: false,
+        hasPassword: false,
+      }),
+    ).toEqual({ canManage: false, needsPassword: false });
   });
 });

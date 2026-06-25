@@ -7,4 +7,5 @@ export {
   forgetMyComment,
   rememberNewCommentsFromSnapshot,
   canManageComment,
+  resolveCommentManageAffordance,
 } from '../../../../packages/client/src/lib/myComments';

@@ -177,6 +177,8 @@ export function App() {
                     setVoterName={() => {}}
                     comment=""
                     setComment={() => {}}
+                    commentPassword=""
+                    setCommentPassword={() => {}}
                     leader={null}
                     displayOptions={fixturePoll.options}
                     winnerId={null}

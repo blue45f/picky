@@ -322,8 +322,8 @@ export class PollController {
     return this.pollService.deletePoll(id, req.user?.sub ?? null, Boolean(req.user?.isAdmin));
   }
 
-  // 댓글 삭제는 작성자 본인(회원/비회원)·폴 소유자·어드민이 할 수 있다.
-  // 비회원 본인 확인용 voterKey 는 GET 쿼리가 아니라 요청 바디로 받는다(로그 누출 방지).
+  // 댓글 삭제는 작성자 본인(회원/비회원/비번 일치)·폴 소유자·어드민이 할 수 있다.
+  // 비회원 본인 확인용 voterKey·관리 비번(password)은 GET 쿼리가 아니라 요청 바디로 받는다(로그 누출 방지).
   @Delete(':id/comments/:commentId')
   @UseGuards(OptionalAuthGuard)
   deleteComment(
@@ -338,10 +338,12 @@ export class PollController {
       req.user?.sub ?? null,
       dto?.voterKey ?? null,
       Boolean(req.user?.isAdmin),
+      dto?.password ?? null,
     );
   }
 
-  // 댓글 수정은 작성자 본인(회원 authorId / 비회원 바디 voterKey→authorKey) 또는 어드민만 가능.
+  // 댓글 수정은 작성자 본인(회원 authorId / 비회원 바디 voterKey→authorKey / 바디 password 일치) 또는 어드민만 가능.
+  // voterKey·password 원문은 바디(EditCommentDto)로만 받는다(GET 쿼리 누출 방지).
   @Patch(':id/comments/:commentId')
   @UseGuards(OptionalAuthGuard)
   editComment(

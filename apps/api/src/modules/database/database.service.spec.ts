@@ -183,6 +183,42 @@ describe('DatabaseService in-memory comment author path (secret-strip + persist 
     expect(comment?.authorKey).toBeNull();
   });
 
+  it('persists passwordHash internally but exposes only hasPassword (never the hash) in responses', async () => {
+    const service = await newService({ polls: [seedPoll()], users: [] });
+    await service.appendComment('p1', {
+      voterName: '익명',
+      comment: '비번 단 한마디',
+      createdAt: new Date().toISOString(),
+      authorKey: 'guest-key-1',
+      passwordHash: 'somesalt:somehash',
+    });
+
+    // 공개 응답: 해시는 절대 노출 안 되고, 존재 여부만 hasPassword=true 로 파생된다.
+    const poll = await service.getPollById('p1');
+    const comment = poll?.comments[0] as Record<string, unknown> | undefined;
+    expect(comment).not.toHaveProperty('passwordHash');
+    expect(comment?.hasPassword).toBe(true);
+
+    // 내부 권한 판정 경로에서만 해시를 읽을 수 있다.
+    const internal = await service.getPollWithCommentAuthors('p1');
+    expect(internal?.comments[0]?.passwordHash).toBe('somesalt:somehash');
+  });
+
+  it('derives hasPassword=false for comments with no password set', async () => {
+    const service = await newService({ polls: [seedPoll()], users: [] });
+    await service.appendComment('p1', {
+      voterName: '익명',
+      comment: '비번 없는 한마디',
+      createdAt: new Date().toISOString(),
+      authorKey: 'guest-key-2',
+    });
+
+    const poll = await service.getPollById('p1');
+    const comment = poll?.comments[0] as Record<string, unknown> | undefined;
+    expect(comment?.hasPassword).toBe(false);
+    expect(comment).not.toHaveProperty('passwordHash');
+  });
+
   it('updateComment changes text and sets editedAt (author/createdAt unchanged)', async () => {
     const createdAt = new Date(Date.now() - 60_000).toISOString();
     const service = await newService({

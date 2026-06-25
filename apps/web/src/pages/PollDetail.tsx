@@ -36,7 +36,10 @@ import {
 import { usePollStore } from '../store/usePollStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { getVoterKey } from '../lib/voterKey';
-import { canManageComment, isMyComment } from '../../../../packages/client/src/lib/myComments';
+import {
+  isMyComment,
+  resolveCommentManageAffordance,
+} from '../../../../packages/client/src/lib/myComments';
 import { VoteDonutChart, OPTION_COLORS } from '../components/VoteDonutChart';
 import { SnsPreviewCard } from '../components/SnsPreviewCard';
 import { AudienceLaunchKit } from '../components/AudienceLaunchKit';
@@ -56,6 +59,7 @@ import {
   optionsByVotes,
   buildConsensusNarrative as buildConsensusNarrative_shared,
   buildDecisionMemo,
+  COMMENT_PASSWORD_MAX,
   RESULTS_VISIBILITY_LABELS as SHARED_RESULTS_VISIBILITY_LABELS,
 } from '@picky/shared';
 // 결과 카드 이미지(순수 Canvas) 드로잉은 packages/client 로 단일화했어요.
@@ -1854,6 +1858,74 @@ function VoteReadinessStatus(
   );
 }
 
+// 게스트가 한마디/답글에 "선택" 관리 비밀번호를 설정하는 접기형 디스클로저.
+// 비번을 설정하면 다른 기기·브라우저에서도 본인 댓글을 수정/삭제할 수 있다(완전 선택).
+function CommentPasswordDisclosure(
+  props: Readonly<{
+    value: string;
+    onChange: (next: string) => void;
+    disabled?: boolean;
+    idPrefix: string;
+  }>,
+) {
+  const { value, onChange, disabled = false, idPrefix } = props;
+  const [open, setOpen] = React.useState(false);
+  const trimmedLength = value.trim().length;
+  // 1~3자(너무 짧음)면 친절하게 안내만 — 제출 자체는 상위에서 막는다(비번은 보내지 않음).
+  const tooShort = trimmedLength > 0 && trimmedLength < 4;
+  const inputId = `${idPrefix}-comment-password`;
+
+  return (
+    <div style={{ display: 'grid', gap: '0.4rem' }}>
+      <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        aria-expanded={open}
+        aria-controls={inputId}
+        className="ghost-inline"
+        disabled={disabled}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '5px',
+          alignSelf: 'flex-start',
+          fontSize: '0.7rem',
+          fontWeight: 800,
+          color: trimmedLength >= 4 ? 'var(--brand-accent-teal)' : 'var(--text-secondary)',
+        }}
+      >
+        <Lock size={12} />
+        {trimmedLength >= 4 ? '관리 비번 설정됨 (선택)' : '다른 기기서 관리하려면 비번 설정 (선택)'}
+      </button>
+      {open ? (
+        <div style={{ display: 'grid', gap: '0.3rem' }}>
+          <input
+            id={inputId}
+            type="password"
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+            maxLength={COMMENT_PASSWORD_MAX}
+            disabled={disabled}
+            placeholder="관리 비밀번호 (4~20자, 선택)"
+            aria-label="댓글 관리 비밀번호 (선택)"
+            autoComplete="new-password"
+            className="form-input"
+            style={{ fontSize: '0.8rem' }}
+          />
+          <small style={{ color: 'var(--text-muted)', fontSize: '0.66rem', lineHeight: 1.45 }}>
+            비번을 설정하면 다른 기기·브라우저에서도 이 한마디를 수정/삭제할 수 있어요. (4~20자)
+          </small>
+          {tooShort ? (
+            <small style={{ color: 'var(--brand-accent-coral)', fontSize: '0.66rem' }}>
+              비번은 4자 이상이어야 해요. (비우면 설정 없이 등록됩니다)
+            </small>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function PollVotingScreen(
   props: Readonly<{
     currentPoll: Poll;
@@ -1872,6 +1944,8 @@ function PollVotingScreen(
     setVoterName: React.Dispatch<React.SetStateAction<string>>;
     comment: string;
     setComment: React.Dispatch<React.SetStateAction<string>>;
+    commentPassword: string;
+    setCommentPassword: React.Dispatch<React.SetStateAction<string>>;
     quickReasonChips: QuickReasonChip[];
     voteDraftSavedAt: string | null;
     pollClosed: boolean;
@@ -1895,6 +1969,8 @@ function PollVotingScreen(
     setVoterName,
     comment,
     setComment,
+    commentPassword,
+    setCommentPassword,
     quickReasonChips,
     voteDraftSavedAt,
     pollClosed,
@@ -2142,6 +2218,14 @@ function PollVotingScreen(
               className="form-input"
             />
           </div>
+          {comment.trim() ? (
+            <CommentPasswordDisclosure
+              idPrefix="vote"
+              value={commentPassword}
+              onChange={setCommentPassword}
+              disabled={voteSubmitBusy}
+            />
+          ) : null}
           <section
             aria-label="빠른 선택 이유"
             style={{
@@ -3706,19 +3790,54 @@ function CommentCard(
   props: Readonly<{
     comm: Poll['comments'][number];
     canManage: boolean;
-    onDeleteComment: (commentId: number) => void;
-    onEditComment?: (commentId: number, text: string) => Promise<boolean> | boolean;
+    /** 비번 잠금 댓글(다른 기기)이라 수정/삭제 전 비밀번호 입력이 필요한지. 본인/소유자/어드민이면 false. */
+    needsPassword?: boolean;
+    onDeleteComment: (commentId: number, password?: string) => void;
+    onEditComment?: (
+      commentId: number,
+      text: string,
+      password?: string,
+    ) => Promise<boolean> | boolean;
     onReplyToggle?: () => void;
     isReply?: boolean;
   }>,
 ) {
-  const { comm, canManage, onDeleteComment, onEditComment, onReplyToggle, isReply = false } = props;
+  const {
+    comm,
+    canManage,
+    needsPassword = false,
+    onDeleteComment,
+    onEditComment,
+    onReplyToggle,
+    isReply = false,
+  } = props;
   const [editing, setEditing] = React.useState(false);
   const [draft, setDraft] = React.useState(comm.comment);
   const [isSaving, setIsSaving] = React.useState(false);
+  // 비번 잠금 수정 흐름: 수정 진입 시 입력받은 비번을 저장 → 저장 시 함께 전송한다.
+  const [unlockPassword, setUnlockPassword] = React.useState<string | null>(null);
   const canEdit = canManage && Boolean(onEditComment);
 
+  // 비번 잠금 댓글이면 관리(수정/삭제) 전에 비밀번호를 받는다. 취소(null)·빈값이면 중단.
+  const promptPassword = (): string | null => {
+    const entered = globalThis.prompt('이 한마디를 수정/삭제하려면 설정한 비밀번호를 입력하세요');
+    if (entered == null) {
+      return null;
+    }
+    const trimmed = entered.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  };
+
   const startEdit = () => {
+    if (needsPassword) {
+      const password = promptPassword();
+      if (!password) {
+        return;
+      }
+      setUnlockPassword(password);
+    } else {
+      setUnlockPassword(null);
+    }
     setDraft(comm.comment);
     setEditing(true);
   };
@@ -3729,13 +3848,25 @@ function CommentCard(
     }
     setIsSaving(true);
     try {
-      const ok = await onEditComment(comm.id, text);
+      const ok = await onEditComment(comm.id, text, unlockPassword ?? undefined);
       if (ok) {
         setEditing(false);
+        setUnlockPassword(null);
       }
     } finally {
       setIsSaving(false);
     }
+  };
+  const requestDelete = () => {
+    if (needsPassword) {
+      const password = promptPassword();
+      if (!password) {
+        return;
+      }
+      onDeleteComment(comm.id, password);
+      return;
+    }
+    onDeleteComment(comm.id);
   };
 
   return (
@@ -3820,6 +3951,7 @@ function CommentCard(
               }
               if (event.key === 'Escape') {
                 setEditing(false);
+                setUnlockPassword(null);
               }
             }}
             maxLength={100}
@@ -3840,7 +3972,10 @@ function CommentCard(
           </button>
           <button
             type="button"
-            onClick={() => setEditing(false)}
+            onClick={() => {
+              setEditing(false);
+              setUnlockPassword(null);
+            }}
             disabled={isSaving}
             className="ghost-btn"
             style={{ flexShrink: 0, padding: '6px 10px', fontSize: '0.72rem' }}
@@ -3899,7 +4034,11 @@ function CommentCard(
                 type="button"
                 onClick={startEdit}
                 className="ghost-btn"
-                aria-label={`${comm.voterName} 님의 댓글 수정`}
+                aria-label={
+                  needsPassword
+                    ? `${comm.voterName} 님의 댓글 수정 (비밀번호 필요)`
+                    : `${comm.voterName} 님의 댓글 수정`
+                }
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -3910,15 +4049,19 @@ function CommentCard(
                   borderColor: 'rgba(45, 212, 191, 0.28)',
                 }}
               >
-                <Pencil size={12} />
+                {needsPassword ? <Lock size={12} /> : <Pencil size={12} />}
                 수정
               </button>
             ) : null}
             <button
               type="button"
-              onClick={() => onDeleteComment(comm.id)}
+              onClick={requestDelete}
               className="ghost-btn"
-              aria-label={`${comm.voterName} 님의 댓글 삭제`}
+              aria-label={
+                needsPassword
+                  ? `${comm.voterName} 님의 댓글 삭제 (비밀번호 필요)`
+                  : `${comm.voterName} 님의 댓글 삭제`
+              }
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -3929,7 +4072,7 @@ function CommentCard(
                 borderColor: 'rgba(239, 68, 68, 0.28)',
               }}
             >
-              <Trash2 size={12} />
+              {needsPassword ? <Lock size={12} /> : <Trash2 size={12} />}
               삭제
             </button>
           </div>
@@ -3951,12 +4094,22 @@ function PollFeedbackList(
     emptyCommentMessage: string;
     /** 폴 권한(소유자/어드민) — 댓글별 콜백이 없을 때의 폴백. */
     canManage: boolean;
-    /** 댓글별 관리(수정/삭제) 노출 판정 — 본인(내가 단 댓글) 또는 소유자/어드민. */
-    canManageCommentById?: (commentId: number) => boolean;
+    /**
+     * 댓글별 관리(수정/삭제) 어포던스 판정 — 본인/소유자/어드민은 직접(needsPassword=false),
+     * 비번 잠금 댓글(다른 기기)은 비번 입력(needsPassword=true)으로. hasPassword 로 자물쇠 여부 판단.
+     */
+    resolveCommentAffordance?: (
+      commentId: number,
+      hasPassword: boolean,
+    ) => { canManage: boolean; needsPassword: boolean };
     pollClosed: boolean;
-    onDeleteComment: (commentId: number) => void;
-    onEditComment?: (commentId: number, text: string) => Promise<boolean> | boolean;
-    onAddReply: (parentId: number, text: string) => Promise<void> | void;
+    onDeleteComment: (commentId: number, password?: string) => void;
+    onEditComment?: (
+      commentId: number,
+      text: string,
+      password?: string,
+    ) => Promise<boolean> | boolean;
+    onAddReply: (parentId: number, text: string, password?: string) => Promise<void> | void;
   }>,
 ) {
   const {
@@ -3969,17 +4122,24 @@ function PollFeedbackList(
     visibleComments,
     emptyCommentMessage,
     canManage,
-    canManageCommentById,
+    resolveCommentAffordance,
     pollClosed,
     onDeleteComment,
     onEditComment,
     onAddReply,
   } = props;
-  // 댓글별 권한 — 콜백이 있으면 그걸(본인/소유자/어드민), 없으면 폴 권한(canManage)으로 폴백.
-  const resolveCanManage = (commentId: number): boolean =>
-    canManageCommentById ? canManageCommentById(commentId) : canManage;
+  // 댓글별 어포던스 — 콜백이 있으면 그걸(본인/소유자/어드민/비번잠금), 없으면 폴 권한(canManage)으로 폴백.
+  const resolveAffordance = (
+    comm: Poll['comments'][number],
+  ): { canManage: boolean; needsPassword: boolean } =>
+    resolveCommentAffordance
+      ? resolveCommentAffordance(comm.id, Boolean(comm.hasPassword))
+      : { canManage, needsPassword: false };
   const [replyingTo, setReplyingTo] = React.useState<number | null>(null);
   const [replyText, setReplyText] = React.useState('');
+  // 답글에 "선택" 관리 비밀번호(다른 기기서 본인 답글 관리용). 비우면 비번 없이 등록.
+  const [replyPassword, setReplyPassword] = React.useState('');
+  const [replyPasswordError, setReplyPasswordError] = React.useState('');
   // 답글 제출 중 재진입 차단(연타/Enter 중복) — 투표의 isSubmittingVote 패턴과 동일.
   const [isSubmittingReply, setIsSubmittingReply] = React.useState(false);
 
@@ -3999,10 +4159,18 @@ function PollFeedbackList(
     if (!text || isSubmittingReply) {
       return;
     }
+    // 관리 비번은 "선택" — 비우면 그대로. 단 1~3자(너무 짧음)면 친절히 막는다(서버 400 선제 차단).
+    const trimmedPassword = replyPassword.trim();
+    if (trimmedPassword.length > 0 && trimmedPassword.length < 4) {
+      setReplyPasswordError('관리 비번은 4자 이상이어야 해요. (비우면 비번 없이 등록됩니다)');
+      return;
+    }
+    setReplyPasswordError('');
     setIsSubmittingReply(true);
     try {
-      await onAddReply(parentId, text);
+      await onAddReply(parentId, text, trimmedPassword.length >= 4 ? trimmedPassword : undefined);
       setReplyText('');
+      setReplyPassword('');
       setReplyingTo(null);
     } finally {
       setIsSubmittingReply(false);
@@ -4161,7 +4329,8 @@ function PollFeedbackList(
               >
                 <CommentCard
                   comm={comm}
-                  canManage={resolveCanManage(comm.id)}
+                  canManage={resolveAffordance(comm).canManage}
+                  needsPassword={resolveAffordance(comm).needsPassword}
                   onDeleteComment={onDeleteComment}
                   onEditComment={onEditComment}
                   // B4: 마감된 고민은 답글도 받지 않는다 — '답글 달기' 트리거 자체를 숨긴다.
@@ -4171,6 +4340,8 @@ function PollFeedbackList(
                       : () => {
                           setReplyingTo((prev) => (prev === comm.id ? null : comm.id));
                           setReplyText('');
+                          setReplyPassword('');
+                          setReplyPasswordError('');
                         }
                   }
                 />
@@ -4178,39 +4349,69 @@ function PollFeedbackList(
                   <CommentCard
                     key={reply.id}
                     comm={reply}
-                    canManage={resolveCanManage(reply.id)}
+                    canManage={resolveAffordance(reply).canManage}
+                    needsPassword={resolveAffordance(reply).needsPassword}
                     onDeleteComment={onDeleteComment}
                     onEditComment={onEditComment}
                     isReply
                   />
                 ))}
                 {!pollClosed && replyingTo === comm.id ? (
-                  <div style={{ display: 'flex', gap: '0.5rem', marginLeft: '1.5rem' }}>
-                    <input
-                      type="text"
-                      value={replyText}
-                      onChange={(event) => setReplyText(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter' && !isSubmittingReply) {
-                          void submitReply(comm.id);
-                        }
-                      }}
-                      placeholder="따뜻한 답글을 남겨요 💬"
-                      maxLength={100}
-                      aria-label="답글 입력"
-                      disabled={isSubmittingReply}
-                      className="form-input"
-                      style={{ flex: 1, minWidth: 0, fontSize: '0.8rem' }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => void submitReply(comm.id)}
-                      disabled={isSubmittingReply || !replyText.trim()}
-                      className="btn-primary"
-                      style={{ flexShrink: 0, padding: '8px 14px', fontSize: '0.8rem' }}
-                    >
-                      {isSubmittingReply ? '등록 중…' : '등록'}
-                    </button>
+                  <div
+                    style={{
+                      display: 'grid',
+                      gap: '0.4rem',
+                      marginLeft: '1.5rem',
+                    }}
+                  >
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <input
+                        type="text"
+                        value={replyText}
+                        onChange={(event) => setReplyText(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' && !isSubmittingReply) {
+                            void submitReply(comm.id);
+                          }
+                        }}
+                        placeholder="따뜻한 답글을 남겨요 💬"
+                        maxLength={100}
+                        aria-label="답글 입력"
+                        disabled={isSubmittingReply}
+                        className="form-input"
+                        style={{ flex: 1, minWidth: 0, fontSize: '0.8rem' }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void submitReply(comm.id)}
+                        disabled={isSubmittingReply || !replyText.trim()}
+                        className="btn-primary"
+                        style={{ flexShrink: 0, padding: '8px 14px', fontSize: '0.8rem' }}
+                      >
+                        {isSubmittingReply ? '등록 중…' : '등록'}
+                      </button>
+                    </div>
+                    {replyText.trim() ? (
+                      <CommentPasswordDisclosure
+                        idPrefix={`reply-${comm.id}`}
+                        value={replyPassword}
+                        onChange={(next) => {
+                          setReplyPassword(next);
+                          if (replyPasswordError) {
+                            setReplyPasswordError('');
+                          }
+                        }}
+                        disabled={isSubmittingReply}
+                      />
+                    ) : null}
+                    {replyPasswordError ? (
+                      <small
+                        role="alert"
+                        style={{ color: 'var(--brand-accent-coral)', fontSize: '0.66rem' }}
+                      >
+                        {replyPasswordError}
+                      </small>
+                    ) : null}
                   </div>
                 ) : null}
               </div>
@@ -6285,6 +6486,7 @@ function PollMainCard(
     vm: PollViewModel;
     activeToolTab: string;
     comment: string;
+    commentPassword: string;
     copiedId: string | null;
     copyMessage: string;
     currentPoll: Poll;
@@ -6308,6 +6510,7 @@ function PollMainCard(
     resultSummaryMode: ResultSummaryMode;
     setActiveToolTab: (key: string) => void;
     setComment: React.Dispatch<React.SetStateAction<string>>;
+    setCommentPassword: React.Dispatch<React.SetStateAction<string>>;
     setCopiedId: React.Dispatch<React.SetStateAction<string | null>>;
     setCopyMessage: React.Dispatch<React.SetStateAction<string>>;
     setResultSummaryMode: React.Dispatch<React.SetStateAction<ResultSummaryMode>>;
@@ -6328,6 +6531,7 @@ function PollMainCard(
     vm,
     activeToolTab,
     comment,
+    commentPassword,
     copiedId,
     copyMessage,
     currentPoll,
@@ -6351,6 +6555,7 @@ function PollMainCard(
     resultSummaryMode,
     setActiveToolTab,
     setComment,
+    setCommentPassword,
     setCopiedId,
     setCopyMessage,
     setResultSummaryMode,
@@ -6501,6 +6706,8 @@ function PollMainCard(
           setVoterName={setVoterName}
           comment={comment}
           setComment={setComment}
+          commentPassword={commentPassword}
+          setCommentPassword={setCommentPassword}
           quickReasonChips={quickReasonChips}
           voteDraftSavedAt={voteDraftSavedAt}
           pollClosed={pollClosed}
@@ -6790,43 +6997,55 @@ export const PollDetail: React.FC = () => {
     }
   };
 
-  const handleDeleteComment = (commentId: number) => {
+  // password: 다른 기기서 비번 잠금 댓글을 관리할 때 전송(본인/소유자/어드민 직접 삭제는 undefined).
+  const handleDeleteComment = (commentId: number, password?: string) => {
     if (!id) {
       return;
     }
-    if (!globalThis.confirm('이 댓글을 삭제할까요?')) {
+    // 잠금(비번) 경로는 비번 프롬프트가 이미 확인 역할을 한다 — 직접 삭제 경로만 confirm.
+    if (!password && !globalThis.confirm('이 댓글을 삭제할까요?')) {
       return;
     }
     // 비회원 본인 확인용 voterKey 를 바디로 보낸다(서버가 authorKey 와 대조). 회원은 JWT userId로도 판정됨.
-    deleteComment(id, commentId, getVoterKey());
+    deleteComment(id, commentId, getVoterKey(), password ?? null);
   };
 
   // 댓글 텍스트 수정(작성자 본인) — voterKey 를 바디로 보내 서버가 authorId/authorKey 와 대조해 강제한다.
-  const handleEditComment = async (commentId: number, text: string): Promise<boolean> => {
+  // password: 다른 기기서 비번 잠금 댓글을 수정할 때 전송(직접 수정은 undefined).
+  const handleEditComment = async (
+    commentId: number,
+    text: string,
+    password?: string,
+  ): Promise<boolean> => {
     if (!id) {
       return false;
     }
     const result = await editComment(
       id,
       commentId,
-      { comment: text, voterKey: getVoterKey() },
+      { comment: text, voterKey: getVoterKey(), password: password ?? null },
       // 비공개 투표면 활성 접근 코드를 함께 보내 응답 redaction 게이트를 통과한다(공개 폴은 undefined).
       activeCode,
     );
     return Boolean(result);
   };
 
-  // 댓글별 관리(수정/삭제) 노출 — 본인(이 기기에서 내가 단 댓글) 또는 폴 소유자/어드민.
-  // 서버가 최종 권한을 강제하므로 여기선 버튼 노출만 결정한다.
-  const canManageCommentById = (commentId: number): boolean =>
-    canManageComment({
+  // 댓글별 관리(수정/삭제) 어포던스 — 본인/소유자/어드민은 직접, 비번 잠금 댓글(다른 기기)은 비번 입력으로.
+  // 서버가 최종 권한을 강제하므로 여기선 버튼 노출(+비번 프롬프트 여부)만 결정한다.
+  const resolveCommentAffordance = (
+    commentId: number,
+    hasPassword: boolean,
+  ): { canManage: boolean; needsPassword: boolean } =>
+    resolveCommentManageAffordance({
       mine: id ? isMyComment(id, commentId) : false,
       isPollOwner,
       isAdmin: isPollAdmin,
+      hasPassword,
     });
 
   // 대댓글(답글) 작성 — 부모 댓글 id 를 함께 보내 공유 스토어가 트리를 갱신한다.
-  const handleAddReply = async (parentId: number, text: string) => {
+  // password: 답글에도 "선택" 관리 비번을 걸 수 있다(다른 기기서 본인 답글 관리용).
+  const handleAddReply = async (parentId: number, text: string, password?: string) => {
     if (!id) {
       return;
     }
@@ -6840,6 +7059,7 @@ export const PollDetail: React.FC = () => {
         comment: text,
         parentId,
         voterName: (user?.nickname || guestName || '').trim() || null,
+        password: password ?? null,
       },
       // 비공개 투표면 활성 접근 코드를 함께 보내 서버 게이트를 통과한다(공개 폴은 undefined).
       activeCode,
@@ -6882,6 +7102,8 @@ export const PollDetail: React.FC = () => {
   const [votedOptionId, setVotedOptionId] = useState<number | null>(null);
   const [voterName, setVoterName] = useState('');
   const [comment, setComment] = useState('');
+  // 게스트가 한마디에 "선택" 관리 비밀번호를 설정하면, 다른 기기서도 수정/삭제할 수 있다(완전 선택).
+  const [commentPassword, setCommentPassword] = useState('');
   const [voteDraftSavedAt, setVoteDraftSavedAt] = useState<string | null>(null);
   const [voteDraftLoadedPollId, setVoteDraftLoadedPollId] = useState<string | null>(null);
 
@@ -7187,6 +7409,15 @@ export const PollDetail: React.FC = () => {
       return;
     }
 
+    // 관리 비번은 "선택" — 비우면 그대로 진행. 단 1~3자(너무 짧음)면 친절히 막는다(서버 400 선제 차단).
+    const trimmedPassword = commentPassword.trim();
+    if (trimmedPassword.length > 0 && trimmedPassword.length < 4) {
+      setVoteMessage('관리 비번은 4자 이상이어야 해요. (비우면 비번 없이 등록됩니다)');
+      return;
+    }
+    // 비번은 한마디가 있을 때만 의미가 있다(빈 한마디엔 댓글 자체가 안 생긴다).
+    const votePassword = comment.trim() && trimmedPassword.length >= 4 ? trimmedPassword : null;
+
     setIsSubmittingVote(true);
     clearError();
     setVoteMessage('');
@@ -7199,6 +7430,7 @@ export const PollDetail: React.FC = () => {
           voterName: voterName.trim() || null,
           comment: comment.trim() || null,
           voterKey: getVoterKey(),
+          password: votePassword,
         },
         // 비공개 투표면 활성 접근 코드를 함께 보내 서버 게이트를 통과한다(공개 폴은 undefined).
         activeCode,
@@ -7216,6 +7448,7 @@ export const PollDetail: React.FC = () => {
         // Reset inputs
         setVoterName('');
         setComment('');
+        setCommentPassword('');
         setVotedOptionId(null);
         setVoteDraftSavedAt(null);
         setVoteMessage('');
@@ -7954,6 +8187,7 @@ export const PollDetail: React.FC = () => {
         vm={vm}
         activeToolTab={activeToolTab}
         comment={comment}
+        commentPassword={commentPassword}
         copiedId={copiedId}
         copyMessage={copyMessage}
         currentPoll={currentPoll}
@@ -7977,6 +8211,7 @@ export const PollDetail: React.FC = () => {
         resultSummaryMode={resultSummaryMode}
         setActiveToolTab={setActiveToolTab}
         setComment={setComment}
+        setCommentPassword={setCommentPassword}
         setCopiedId={setCopiedId}
         setCopyMessage={setCopyMessage}
         setResultSummaryMode={setResultSummaryMode}
@@ -8006,7 +8241,7 @@ export const PollDetail: React.FC = () => {
             visibleComments={visibleComments}
             emptyCommentMessage={emptyCommentMessage}
             canManage={canManagePoll}
-            canManageCommentById={canManageCommentById}
+            resolveCommentAffordance={resolveCommentAffordance}
             pollClosed={pollClosed}
             onDeleteComment={handleDeleteComment}
             onEditComment={handleEditComment}

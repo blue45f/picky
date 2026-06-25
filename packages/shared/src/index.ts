@@ -217,6 +217,20 @@ export const UpdatePollSchema = z
 
 export type UpdatePollInput = z.infer<typeof UpdatePollSchema>;
 
+/** 게스트 댓글 선택적 비밀번호 길이 한도(설정/검증 공통). 4~20자. */
+export const COMMENT_PASSWORD_MIN = 4;
+export const COMMENT_PASSWORD_MAX = 20;
+
+/**
+ * 게스트 댓글 선택적 비밀번호 스키마(4~20자).
+ * 비번을 설정해 두면 voterKey(기기 고정)와 무관하게 어느 기기서든 본인 수정/삭제가 가능하다.
+ * 비번 원문은 POST/PATCH/DELETE 바디로만 보내고(GET 쿼리 금지), 응답에는 hash·원문 모두 절대 노출하지 않는다.
+ */
+export const CommentPasswordSchema = z
+  .string()
+  .min(COMMENT_PASSWORD_MIN, `비밀번호는 최소 ${COMMENT_PASSWORD_MIN}자 이상이어야 해요.`)
+  .max(COMMENT_PASSWORD_MAX, `비밀번호는 최대 ${COMMENT_PASSWORD_MAX}자 이하여야 해요.`);
+
 export const VoteSchema = z.object({
   optionId: z.number({ required_error: '선택할 옵션 ID가 필요합니다.' }),
   voterName: z
@@ -230,6 +244,12 @@ export const VoteSchema = z.object({
    * (pollId, voterKey) 단위로 재투표를 막는다. 없으면(레거시·키 미지원) 기존처럼 허용한다.
    */
   voterKey: z.string().max(256, '식별키가 너무 깁니다.').optional().nullable(),
+  /**
+   * 투표 시 남긴 한마디(comment)에 설정할 선택적 관리 비밀번호(4~20자). comment 가 있을 때만 의미가 있다.
+   * 설정하면 voterKey(기기 고정)와 무관하게 어느 기기서든 본인 수정/삭제가 가능해진다(서버는 해시로만 저장).
+   * 미설정 시 기존 voterKey 경로 그대로라 마찰이 없다. 비번 원문은 응답에 절대 노출하지 않는다.
+   */
+  password: CommentPasswordSchema.optional().nullable(),
 });
 
 export type VoteInput = z.infer<typeof VoteSchema>;
@@ -246,18 +266,29 @@ export const CreateCommentSchema = z.object({
    * authorKey 원문은 응답에 절대 노출하지 않는다(voterKey처럼 비밀).
    */
   voterKey: z.string().max(256, '식별키가 너무 깁니다.').optional().nullable(),
+  /**
+   * 게스트가 다른 기기서도 본인 댓글을 관리하려고 설정하는 선택적 비밀번호(4~20자).
+   * 설정하지 않으면(미전송) 기존 voterKey 경로 그대로라 마찰이 없다. 서버는 해시로만 저장한다.
+   * 비번 원문은 응답에 절대 노출하지 않는다(hash·존재여부(hasPassword)만 다룬다).
+   */
+  password: CommentPasswordSchema.optional().nullable(),
 });
 
 export type CreateCommentInput = z.infer<typeof CreateCommentSchema>;
 
 /**
- * 댓글 수정 입력 — 작성자 본인만(authorId===userId OR authorKey===voterKey) 텍스트를 고칠 수 있다.
+ * 댓글 수정 입력 — 작성자 본인만(authorId===userId OR authorKey===voterKey OR 비번 일치) 텍스트를 고칠 수 있다.
  * 작성자/원시각은 불변, 텍스트만 교체하고 editedAt이 갱신된다.
  */
 export const EditCommentSchema = z.object({
   comment: z.string().trim().min(1, '한마디를 입력해 주세요.').max(100, '한마디는 최대 100자예요.'),
   /** 비회원 본인 확인용 식별키. 회원이면 JWT userId로 판정하므로 생략 가능. 응답 비노출. */
   voterKey: z.string().max(256, '식별키가 너무 깁니다.').optional().nullable(),
+  /**
+   * 게스트가 비번을 설정한 댓글을 다른 기기서 수정할 때 보내는 비밀번호 원문(4~20자).
+   * 서버가 저장된 해시와 대조해 일치하면 본인으로 인정한다. 응답 비노출.
+   */
+  password: CommentPasswordSchema.optional().nullable(),
 });
 
 export type EditCommentInput = z.infer<typeof EditCommentSchema>;
@@ -266,6 +297,11 @@ export type EditCommentInput = z.infer<typeof EditCommentSchema>;
 export const DeleteCommentSchema = z.object({
   /** 비회원 본인 확인용 식별키. 회원이면 JWT userId로 판정하므로 생략 가능. 폴 소유자/어드민은 불필요. */
   voterKey: z.string().max(256, '식별키가 너무 깁니다.').optional().nullable(),
+  /**
+   * 게스트가 비번을 설정한 댓글을 다른 기기서 삭제할 때 보내는 비밀번호 원문(4~20자).
+   * 서버가 저장된 해시와 대조해 일치하면 본인으로 인정한다. 응답 비노출.
+   */
+  password: CommentPasswordSchema.optional().nullable(),
 });
 
 export type DeleteCommentInput = z.infer<typeof DeleteCommentSchema>;
@@ -288,6 +324,11 @@ export interface PollComment {
   parentId?: number | null;
   /** 본인이 댓글을 수정한 시각(ISO). 한 번도 수정 안 했으면 null/미설정. 공개 표시값. */
   editedAt?: string | null;
+  /**
+   * 게스트가 이 댓글에 관리 비밀번호를 설정했는지(불리언만 — 해시·원문은 절대 노출 금지).
+   * 프론트는 이 값으로 voterKey 불일치(다른 기기)일 때 자물쇠 어포던스(비번 입력)를 띄운다.
+   */
+  hasPassword?: boolean;
 }
 
 export type PollAttachment = z.infer<typeof PollAttachmentSchema>;

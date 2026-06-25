@@ -20,6 +20,8 @@ type PollWithVotedKeys = Poll & { votedKeys?: string[] };
 export type PollCommentWithAuthor = PollComment & {
   authorId?: string | null;
   authorKey?: string | null;
+  // 게스트 댓글 관리 비번 해시(salt:hash). 비밀 — 권한 판정 전용, 응답엔 절대 싣지 않는다.
+  passwordHash?: string | null;
 };
 export type PollWithCommentAuthors = Omit<Poll, 'comments'> & {
   comments: PollCommentWithAuthor[];
@@ -133,7 +135,8 @@ export class DatabaseService implements OnModuleInit {
             parent_id INTEGER,
             author_id TEXT,
             author_key TEXT,
-            edited_at TIMESTAMP
+            edited_at TIMESTAMP,
+            password_hash TEXT
           );
         `);
         // 서버측 1인1표(#12). (poll_id, voter_key) 유니크로 재투표를 막는다. 비파괴·멱등.
@@ -160,6 +163,7 @@ export class DatabaseService implements OnModuleInit {
           ALTER TABLE poll_comments ADD COLUMN IF NOT EXISTS author_id TEXT;
           ALTER TABLE poll_comments ADD COLUMN IF NOT EXISTS author_key TEXT;
           ALTER TABLE poll_comments ADD COLUMN IF NOT EXISTS edited_at TIMESTAMP;
+          ALTER TABLE poll_comments ADD COLUMN IF NOT EXISTS password_hash TEXT;
         `);
         // users.email UNIQUE 제약 마이그레이션:
         // 익명/게스트/토스 로그인은 email='' 로 사용자를 만들기 때문에, 기존 `email TEXT NOT NULL UNIQUE`는
@@ -442,13 +446,18 @@ export class DatabaseService implements OnModuleInit {
     return next;
   }
 
-  /** 댓글 배열에서 비밀 작성자 식별값(authorId/authorKey)을 제거해 응답 노출을 막는다. */
+  /**
+   * 댓글 배열에서 비밀 작성자 식별값(authorId/authorKey)·비번 해시(passwordHash)를 제거해 응답 노출을 막는다.
+   * 비번 해시는 절대 노출하지 않고, 존재 여부만 hasPassword 불리언으로 파생해 프론트의 자물쇠 어포던스에 쓴다.
+   */
   private stripCommentAuthors(comments: PollComment[]): PollComment[] {
     return comments.map((comment) => {
       const next = { ...(comment as PollCommentWithAuthor) };
+      const hasPassword = Boolean(next.passwordHash);
       delete next.authorId;
       delete next.authorKey;
-      return next as PollComment;
+      delete next.passwordHash;
+      return { ...next, hasPassword } as PollComment;
     });
   }
 
@@ -800,6 +809,7 @@ export class DatabaseService implements OnModuleInit {
         authorId?: string | null;
         authorKey?: string | null;
         editedAt?: Date | null;
+        passwordHash?: string | null;
       }>;
     },
     includeAuthors = false,
@@ -833,8 +843,16 @@ export class DatabaseService implements OnModuleInit {
         selectedOptionText: c.selectedOptionText || undefined,
         parentId: c.parentId ?? undefined,
         editedAt: c.editedAt ? c.editedAt.toISOString() : undefined,
-        // authorId/authorKey 는 비밀 — includeAuthors(내부 권한 판정)일 때만 싣는다.
-        ...(includeAuthors ? { authorId: c.authorId ?? null, authorKey: c.authorKey ?? null } : {}),
+        // 비번 존재 여부(hasPassword)는 공개 표시값 — 항상 싣는다(해시·원문은 절대 노출 안 함).
+        hasPassword: Boolean(c.passwordHash),
+        // authorId/authorKey/passwordHash 는 비밀 — includeAuthors(내부 권한 판정)일 때만 싣는다.
+        ...(includeAuthors
+          ? {
+              authorId: c.authorId ?? null,
+              authorKey: c.authorKey ?? null,
+              passwordHash: c.passwordHash ?? null,
+            }
+          : {}),
       })),
     } as Poll;
   }
@@ -1194,6 +1212,8 @@ export class DatabaseService implements OnModuleInit {
       // 작성자 식별값(비밀) — 본인 수정/삭제 권한 판정용. 회원=authorId, 비회원=authorKey.
       authorId?: string | null;
       authorKey?: string | null;
+      // 게스트 댓글 관리 비번 해시(비밀, salt:hash). 미설정이면 null. 다른 기기서 본인 인정용.
+      passwordHash?: string | null;
     },
   ): Promise<void> {
     if (this.useSqlDb) {
@@ -1207,6 +1227,7 @@ export class DatabaseService implements OnModuleInit {
         parentId: comment.parentId ?? null,
         authorId: comment.authorId ?? null,
         authorKey: comment.authorKey ?? null,
+        passwordHash: comment.passwordHash ?? null,
       });
       return;
     }
@@ -1229,6 +1250,7 @@ export class DatabaseService implements OnModuleInit {
       parentId: comment.parentId ?? null,
       authorId: comment.authorId ?? null,
       authorKey: comment.authorKey ?? null,
+      passwordHash: comment.passwordHash ?? null,
     };
     nextPolls[idx] = {
       ...target,

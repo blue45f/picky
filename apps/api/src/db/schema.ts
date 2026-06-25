@@ -64,6 +64,9 @@ export const pollComments = pgTable('poll_comments', {
   authorKey: text('author_key'),
   // 본인이 댓글을 수정한 시각. 한 번도 수정 안 했으면 null. 공개 표시값.
   editedAt: timestamp('edited_at'),
+  // 게스트 댓글 선택적 관리 비밀번호 해시(salt:hash, pbkdf2). 미설정이면 null.
+  // 비밀 — 응답에 절대 노출 금지(hasPassword 불리언만 파생). 비번 일치 시 다른 기기서도 본인 인정.
+  passwordHash: text('password_hash'),
 });
 
 // Poll votes table — 서버측 1인1표. (poll_id, voter_key) 유니크로 재투표를 막는다.

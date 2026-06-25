@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@toss/tds-mobile';
 import type { Poll, PollComment, PollOption } from '../shared';
-import { MASCOT, VOICE, resolveCreatorLabel } from '../shared';
+import { MASCOT, VOICE, resolveCreatorLabel, COMMENT_PASSWORD_MAX } from '../shared';
 import { formatNumber } from '../lib/format';
 import { optionPercent } from '../lib/poll';
 import { theme, stickyActionBar, FONT } from '../theme';
@@ -24,6 +24,9 @@ interface PollDetailViewProps {
   setVoterName: (name: string) => void;
   comment: string;
   setComment: (comment: string) => void;
+  /** 한마디에 붙일 선택적 관리 비번(빈 값=프릭션 0). 다른 기기서 수정/삭제용. */
+  commentPassword: string;
+  setCommentPassword: (value: string) => void;
   /** 옵트인 '토스 프로필 불러오기'. 미전달(키 없음/토스 밖)이면 버튼 미노출. */
   onLoadProfile?: () => void;
   /** 프로필 불러오는 중 로딩 표시. */
@@ -41,16 +44,25 @@ interface PollDetailViewProps {
    * 미전달 시 canManage(폴 권한)로 폴백한다.
    */
   canManageCommentById?: (commentId: number) => boolean;
+  /**
+   * 댓글 관리에 비번 입력이 필요한지(다른 기기 + hasPassword) 판정. true 면 카드가 자물쇠 버튼 →
+   * 인라인 비번 입력 흐름을 거쳐 수정/삭제 핸들러에 비번을 넘긴다. 미전달 시 false(직접 관리).
+   */
+  commentNeedsPassword?: (commentId: number) => boolean;
   confirmDelete: boolean;
   onDelete: () => void;
   /** 수정 화면 진입(소유자/어드민). 미전달 시 수정 버튼 미노출. */
   onEdit?: () => void;
-  /** 댓글 삭제(작성자 본인/소유자/어드민). 미전달 시 댓글 삭제 버튼 미노출. */
-  onDeleteComment?: (commentId: number) => void;
-  /** 댓글 수정(작성자 본인). 미전달 시 수정 버튼 미노출. */
-  onEditComment?: (commentId: number, text: string) => Promise<boolean> | boolean;
-  /** 답글(대댓글) 작성. 미전달 시 답글 UI 미노출. */
-  onAddReply?: (parentId: number, text: string) => Promise<void> | void;
+  /** 댓글 삭제(작성자 본인/소유자/어드민). password=다른 기기 관리용 선택 비번. 미전달 시 삭제 버튼 미노출. */
+  onDeleteComment?: (commentId: number, password?: string) => void;
+  /** 댓글 수정(작성자 본인). password=다른 기기 관리용 선택 비번. 미전달 시 수정 버튼 미노출. */
+  onEditComment?: (
+    commentId: number,
+    text: string,
+    password?: string,
+  ) => Promise<boolean> | boolean;
+  /** 답글(대댓글) 작성. password=다른 기기 관리용 선택 비번. 미전달 시 답글 UI 미노출. */
+  onAddReply?: (parentId: number, text: string, password?: string) => Promise<void> | void;
   remaining: number | null;
   shareUrl: string;
   onShare: () => void;
@@ -461,13 +473,13 @@ function SocialComparisonBadge(
   );
 }
 
-function CommentDeleteButton(props: Readonly<{ onClick: () => void }>) {
-  const { onClick } = props;
+function CommentDeleteButton(props: Readonly<{ onClick: () => void; locked?: boolean }>) {
+  const { onClick, locked = false } = props;
   return (
     <button
       type="button"
       className="pressable"
-      aria-label="이 한마디 삭제하기"
+      aria-label={locked ? '비번 입력 후 이 한마디 삭제하기' : '이 한마디 삭제하기'}
       onClick={onClick}
       style={{
         flexShrink: 0,
@@ -484,8 +496,101 @@ function CommentDeleteButton(props: Readonly<{ onClick: () => void }>) {
         borderRadius: theme.radiusSm,
       }}
     >
-      🗑
+      {locked ? '🔒🗑' : '🗑'}
     </button>
+  );
+}
+
+/**
+ * 잠긴(다른 기기) 댓글 관리용 인라인 비번 확인 행 — 삭제 확정/취소.
+ * 토스 웹뷰에서 globalThis.prompt 가 불안정해 카드 안에서 직접 비번을 받는다.
+ */
+function InlinePasswordConfirm(
+  props: Readonly<{
+    label: string;
+    confirmLabel: string;
+    onConfirm: (password: string) => void;
+    onCancel: () => void;
+    busy?: boolean;
+  }>,
+) {
+  const { label, confirmLabel, onConfirm, onCancel, busy = false } = props;
+  const [pw, setPw] = useState('');
+  const submit = () => {
+    const trimmed = pw.trim();
+    if (!trimmed || busy) return;
+    onConfirm(trimmed);
+  };
+  return (
+    <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+      <input
+        type="password"
+        value={pw}
+        onChange={(e) => setPw(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') submit();
+          if (e.key === 'Escape') onCancel();
+        }}
+        maxLength={COMMENT_PASSWORD_MAX}
+        placeholder="작성 시 정한 관리 비번"
+        aria-label={label}
+        autoComplete="off"
+        disabled={busy}
+        autoFocus
+        style={{
+          flex: 1,
+          minWidth: 0,
+          minHeight: 44,
+          padding: '10px 14px',
+          borderRadius: theme.radiusSm,
+          border: `1px solid ${theme.borderStrong}`,
+          background: theme.surface,
+          color: theme.text,
+          fontSize: 16,
+        }}
+      />
+      <button
+        type="button"
+        className="pressable"
+        onClick={submit}
+        disabled={busy || !pw.trim()}
+        style={{
+          flexShrink: 0,
+          minHeight: 44,
+          padding: '0 14px',
+          borderRadius: theme.radiusSm,
+          border: 'none',
+          background: theme.accent,
+          color: theme.accentInk,
+          fontSize: FONT.body,
+          fontWeight: 800,
+          cursor: busy ? 'default' : 'pointer',
+          opacity: busy ? 0.6 : 1,
+        }}
+      >
+        {confirmLabel}
+      </button>
+      <button
+        type="button"
+        className="pressable"
+        onClick={onCancel}
+        disabled={busy}
+        style={{
+          flexShrink: 0,
+          minHeight: 44,
+          padding: '0 12px',
+          borderRadius: theme.radiusSm,
+          border: `1px solid ${theme.border}`,
+          background: 'none',
+          color: theme.textMuted,
+          fontSize: FONT.small,
+          fontWeight: 700,
+          cursor: 'pointer',
+        }}
+      >
+        취소
+      </button>
+    </div>
   );
 }
 
@@ -493,35 +598,62 @@ function CommentCard(
   props: Readonly<{
     comment: PollComment;
     canManage: boolean;
-    onDelete?: (commentId: number) => void;
-    onEdit?: (commentId: number, text: string) => Promise<boolean> | boolean;
+    /** 다른 기기 + hasPassword → 수정/삭제 전에 비번 입력이 필요(자물쇠 어포던스). */
+    needsPassword?: boolean;
+    onDelete?: (commentId: number, password?: string) => void;
+    onEdit?: (commentId: number, text: string, password?: string) => Promise<boolean> | boolean;
     onReply?: () => void;
     isReply?: boolean;
   }>,
 ) {
-  const { comment: c, canManage, onDelete, onEdit, onReply, isReply = false } = props;
+  const {
+    comment: c,
+    canManage,
+    needsPassword = false,
+    onDelete,
+    onEdit,
+    onReply,
+    isReply = false,
+  } = props;
   const showDelete = canManage && Boolean(onDelete);
   const showEdit = canManage && Boolean(onEdit);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(c.comment);
   const [isSaving, setIsSaving] = useState(false);
+  // 잠긴 댓글 전용: 수정/삭제 시 인라인 비번 입력을 거친다(웹뷰서 prompt 불안정 → 카드 내 입력).
+  // 수정 비번은 편집 입력 행과 함께 받고, 삭제는 별도 비번 확인 행을 띄운다.
+  const [editPassword, setEditPassword] = useState('');
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const startEdit = () => {
     setDraft(c.comment);
+    setEditPassword('');
+    setConfirmingDelete(false);
     setEditing(true);
   };
   const saveEdit = async () => {
     const text = draft.trim();
     if (!text || !onEdit || isSaving) return;
+    // 잠긴 댓글이면 비번이 채워져야 저장(서버가 최종 대조). 직접 관리면 비번 불필요.
+    const pw = editPassword.trim();
+    if (needsPassword && !pw) return;
     setIsSaving(true);
     try {
-      const ok = await onEdit(c.id, text);
+      const ok = await onEdit(c.id, text, needsPassword ? pw : undefined);
       if (ok) {
         setEditing(false);
+        setEditPassword('');
       }
     } finally {
       setIsSaving(false);
     }
+  };
+  const handleDeleteClick = () => {
+    if (needsPassword) {
+      setConfirmingDelete(true);
+      return;
+    }
+    onDelete?.(c.id);
   };
 
   return (
@@ -582,77 +714,121 @@ function CommentCard(
               <span>콕 찝음 👈</span>
             </Chip>
           ) : null}
-          {showEdit && !editing ? <CommentEditButton onClick={startEdit} /> : null}
-          {showDelete ? <CommentDeleteButton onClick={() => onDelete?.(c.id)} /> : null}
+          {showEdit && !editing ? (
+            <CommentEditButton onClick={startEdit} locked={needsPassword} />
+          ) : null}
+          {showDelete && !confirmingDelete ? (
+            <CommentDeleteButton onClick={handleDeleteClick} locked={needsPassword} />
+          ) : null}
         </div>
       </div>
+      {/* 잠긴 댓글 삭제: 인라인 비번 확인 행으로 받아 onDelete(비번)로 넘긴다. */}
+      {showDelete && confirmingDelete ? (
+        <InlinePasswordConfirm
+          label="삭제 확인 비밀번호"
+          confirmLabel="삭제"
+          onConfirm={(password) => {
+            setConfirmingDelete(false);
+            onDelete?.(c.id, password);
+          }}
+          onCancel={() => setConfirmingDelete(false)}
+        />
+      ) : null}
       {editing ? (
-        <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-          <input
-            type="text"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !isSaving) void saveEdit();
-              if (e.key === 'Escape') setEditing(false);
-            }}
-            maxLength={100}
-            aria-label="한마디 수정"
-            disabled={isSaving}
-            autoFocus
-            style={{
-              flex: 1,
-              minWidth: 0,
-              minHeight: 44,
-              padding: '10px 14px',
-              borderRadius: theme.radiusSm,
-              border: `1px solid ${theme.borderStrong}`,
-              background: theme.surface,
-              color: theme.text,
-              fontSize: 16,
-            }}
-          />
-          <button
-            type="button"
-            className="pressable"
-            onClick={() => void saveEdit()}
-            disabled={isSaving || !draft.trim()}
-            style={{
-              flexShrink: 0,
-              minHeight: 44,
-              padding: '0 16px',
-              borderRadius: theme.radiusSm,
-              border: 'none',
-              background: theme.accent,
-              color: theme.accentInk,
-              fontSize: FONT.body,
-              fontWeight: 800,
-              cursor: isSaving ? 'default' : 'pointer',
-              opacity: isSaving ? 0.6 : 1,
-            }}
-          >
-            {isSaving ? '저장 중…' : '저장'}
-          </button>
-          <button
-            type="button"
-            className="pressable"
-            onClick={() => setEditing(false)}
-            disabled={isSaving}
-            style={{
-              flexShrink: 0,
-              minHeight: 44,
-              padding: '0 12px',
-              borderRadius: theme.radiusSm,
-              border: `1px solid ${theme.border}`,
-              background: 'none',
-              color: theme.textMuted,
-              fontSize: FONT.small,
-              fontWeight: 700,
-              cursor: 'pointer',
-            }}
-          >
-            취소
-          </button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input
+              type="text"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !isSaving) void saveEdit();
+                if (e.key === 'Escape') setEditing(false);
+              }}
+              maxLength={100}
+              aria-label="한마디 수정"
+              disabled={isSaving}
+              autoFocus
+              style={{
+                flex: 1,
+                minWidth: 0,
+                minHeight: 44,
+                padding: '10px 14px',
+                borderRadius: theme.radiusSm,
+                border: `1px solid ${theme.borderStrong}`,
+                background: theme.surface,
+                color: theme.text,
+                fontSize: 16,
+              }}
+            />
+            <button
+              type="button"
+              className="pressable"
+              onClick={() => void saveEdit()}
+              disabled={isSaving || !draft.trim() || (needsPassword && !editPassword.trim())}
+              style={{
+                flexShrink: 0,
+                minHeight: 44,
+                padding: '0 16px',
+                borderRadius: theme.radiusSm,
+                border: 'none',
+                background: theme.accent,
+                color: theme.accentInk,
+                fontSize: FONT.body,
+                fontWeight: 800,
+                cursor: isSaving ? 'default' : 'pointer',
+                opacity: isSaving ? 0.6 : 1,
+              }}
+            >
+              {isSaving ? '저장 중…' : '저장'}
+            </button>
+            <button
+              type="button"
+              className="pressable"
+              onClick={() => setEditing(false)}
+              disabled={isSaving}
+              style={{
+                flexShrink: 0,
+                minHeight: 44,
+                padding: '0 12px',
+                borderRadius: theme.radiusSm,
+                border: `1px solid ${theme.border}`,
+                background: 'none',
+                color: theme.textMuted,
+                fontSize: FONT.small,
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              취소
+            </button>
+          </div>
+          {/* 잠긴 댓글(다른 기기)이면 작성 시 정한 관리 비번을 함께 입력해야 저장된다. */}
+          {needsPassword ? (
+            <input
+              type="password"
+              value={editPassword}
+              onChange={(e) => setEditPassword(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !isSaving) void saveEdit();
+                if (e.key === 'Escape') setEditing(false);
+              }}
+              maxLength={COMMENT_PASSWORD_MAX}
+              placeholder="작성 시 정한 관리 비번"
+              aria-label="수정 확인 비밀번호"
+              autoComplete="off"
+              disabled={isSaving}
+              style={{
+                minHeight: 44,
+                padding: '10px 14px',
+                borderRadius: theme.radiusSm,
+                border: `1px solid ${theme.borderStrong}`,
+                background: theme.surface,
+                color: theme.text,
+                fontSize: 16,
+              }}
+            />
+          ) : null}
         </div>
       ) : (
         <p style={{ margin: '6px 0 0', fontSize: 14, lineHeight: 1.5, color: theme.text }}>
@@ -685,13 +861,13 @@ function CommentCard(
   );
 }
 
-function CommentEditButton(props: Readonly<{ onClick: () => void }>) {
-  const { onClick } = props;
+function CommentEditButton(props: Readonly<{ onClick: () => void; locked?: boolean }>) {
+  const { onClick, locked = false } = props;
   return (
     <button
       type="button"
       className="pressable"
-      aria-label="이 한마디 수정하기"
+      aria-label={locked ? '비번 입력 후 이 한마디 수정하기' : '이 한마디 수정하기'}
       onClick={onClick}
       style={{
         flexShrink: 0,
@@ -708,7 +884,7 @@ function CommentEditButton(props: Readonly<{ onClick: () => void }>) {
         borderRadius: theme.radiusSm,
       }}
     >
-      ✏️
+      {locked ? '🔒✏️' : '✏️'}
     </button>
   );
 }
@@ -718,16 +894,22 @@ function CommentsSection(
     comments: PollComment[];
     canManage: boolean;
     canManageCommentById?: (commentId: number) => boolean;
+    commentNeedsPassword?: (commentId: number) => boolean;
     closed: boolean;
-    onDeleteComment?: (commentId: number) => void;
-    onEditComment?: (commentId: number, text: string) => Promise<boolean> | boolean;
-    onAddReply?: (parentId: number, text: string) => Promise<void> | void;
+    onDeleteComment?: (commentId: number, password?: string) => void;
+    onEditComment?: (
+      commentId: number,
+      text: string,
+      password?: string,
+    ) => Promise<boolean> | boolean;
+    onAddReply?: (parentId: number, text: string, password?: string) => Promise<void> | void;
   }>,
 ) {
   const {
     comments,
     canManage,
     canManageCommentById,
+    commentNeedsPassword,
     closed,
     onDeleteComment,
     onEditComment,
@@ -736,8 +918,13 @@ function CommentsSection(
   // 댓글별 권한 — 콜백이 있으면 그걸 쓰고(본인/소유자/어드민), 없으면 폴 권한(canManage)으로 폴백한다.
   const resolveCanManage = (commentId: number): boolean =>
     canManageCommentById ? canManageCommentById(commentId) : canManage;
+  // 댓글별 비번 필요 여부 — 다른 기기 + hasPassword 인 댓글만 true(미전달이면 false=직접 관리).
+  const resolveNeedsPassword = (commentId: number): boolean =>
+    commentNeedsPassword ? commentNeedsPassword(commentId) : false;
   const [replyingTo, setReplyingTo] = useState<number | null>(null);
   const [replyText, setReplyText] = useState('');
+  // 답글에 붙일 선택적 관리 비번(빈 값=프릭션 0). 다른 기기서 답글 관리용.
+  const [replyPassword, setReplyPassword] = useState('');
   // 답글 제출 중 재진입 차단(연타/Enter 중복) — 투표 제출 가드와 동일한 패턴.
   const [isSubmittingReply, setIsSubmittingReply] = useState(false);
   if (comments.length === 0) {
@@ -761,8 +948,10 @@ function CommentsSection(
     if (!text || !onAddReply || isSubmittingReply) return;
     setIsSubmittingReply(true);
     try {
-      await onAddReply(parentId, text);
+      // 선택 비번은 비어 있으면 undefined로 보내 기존 동작 유지(짧은 값 검증은 상위 핸들러가 처리).
+      await onAddReply(parentId, text, replyPassword.trim() || undefined);
       setReplyText('');
+      setReplyPassword('');
       setReplyingTo(null);
     } finally {
       setIsSubmittingReply(false);
@@ -806,6 +995,7 @@ function CommentsSection(
             <CommentCard
               comment={c}
               canManage={resolveCanManage(c.id)}
+              needsPassword={resolveNeedsPassword(c.id)}
               onDelete={onDeleteComment}
               onEdit={onEditComment}
               onReply={
@@ -813,6 +1003,7 @@ function CommentsSection(
                   ? () => {
                       setReplyingTo((prev) => (prev === c.id ? null : c.id));
                       setReplyText('');
+                      setReplyPassword('');
                     }
                   : undefined
               }
@@ -822,58 +1013,76 @@ function CommentsSection(
                 key={r.id}
                 comment={r}
                 canManage={resolveCanManage(r.id)}
+                needsPassword={resolveNeedsPassword(r.id)}
                 onDelete={onDeleteComment}
                 onEdit={onEditComment}
                 isReply
               />
             ))}
             {replyEnabled && replyingTo === c.id ? (
-              <div style={{ display: 'flex', gap: 8, marginLeft: 22 }}>
-                <input
-                  type="text"
-                  value={replyText}
-                  onChange={(e) => setReplyText(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !isSubmittingReply) void submitReply(c.id);
-                  }}
-                  placeholder="따뜻한 답글을 남겨요 💬"
-                  maxLength={100}
-                  aria-label="답글 입력"
-                  disabled={isSubmittingReply}
-                  style={{
-                    flex: 1,
-                    minWidth: 0,
-                    minHeight: 44,
-                    padding: '10px 14px',
-                    borderRadius: theme.radiusSm,
-                    border: `1px solid ${theme.borderStrong}`,
-                    background: theme.surface,
-                    color: theme.text,
-                    // iOS 16px 미만 입력은 포커스 시 화면 확대 → 줌 방지 플로어.
-                    fontSize: 16,
-                  }}
-                />
-                <button
-                  type="button"
-                  className="pressable"
-                  onClick={() => void submitReply(c.id)}
-                  disabled={isSubmittingReply || !replyText.trim()}
-                  style={{
-                    flexShrink: 0,
-                    minHeight: 44,
-                    padding: '0 18px',
-                    borderRadius: theme.radiusSm,
-                    border: 'none',
-                    background: theme.accent,
-                    color: theme.accentInk,
-                    fontSize: FONT.body,
-                    fontWeight: 800,
-                    cursor: isSubmittingReply ? 'default' : 'pointer',
-                    opacity: isSubmittingReply ? 0.6 : 1,
-                  }}
-                >
-                  {isSubmittingReply ? '등록 중…' : '등록'}
-                </button>
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 8,
+                  marginLeft: 22,
+                }}
+              >
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input
+                    type="text"
+                    value={replyText}
+                    onChange={(e) => setReplyText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !isSubmittingReply) void submitReply(c.id);
+                    }}
+                    placeholder="따뜻한 답글을 남겨요 💬"
+                    maxLength={100}
+                    aria-label="답글 입력"
+                    disabled={isSubmittingReply}
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      minHeight: 44,
+                      padding: '10px 14px',
+                      borderRadius: theme.radiusSm,
+                      border: `1px solid ${theme.borderStrong}`,
+                      background: theme.surface,
+                      color: theme.text,
+                      // iOS 16px 미만 입력은 포커스 시 화면 확대 → 줌 방지 플로어.
+                      fontSize: 16,
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="pressable"
+                    onClick={() => void submitReply(c.id)}
+                    disabled={isSubmittingReply || !replyText.trim()}
+                    style={{
+                      flexShrink: 0,
+                      minHeight: 44,
+                      padding: '0 18px',
+                      borderRadius: theme.radiusSm,
+                      border: 'none',
+                      background: theme.accent,
+                      color: theme.accentInk,
+                      fontSize: FONT.body,
+                      fontWeight: 800,
+                      cursor: isSubmittingReply ? 'default' : 'pointer',
+                      opacity: isSubmittingReply ? 0.6 : 1,
+                    }}
+                  >
+                    {isSubmittingReply ? '등록 중…' : '등록'}
+                  </button>
+                </div>
+                {/* 답글을 적었을 때만 선택적 관리 비번 디스클로저 노출(빈 답글엔 의미 없어요). */}
+                {replyText.trim().length > 0 ? (
+                  <PasswordDisclosure
+                    value={replyPassword}
+                    setValue={setReplyPassword}
+                    idPrefix={`reply-${c.id}`}
+                  />
+                ) : null}
               </div>
             ) : null}
           </div>
@@ -953,6 +1162,74 @@ function ConsentedProfileButton(
   );
 }
 
+/**
+ * 선택적 관리 비번 입력 — 디스클로저(토글)로 접혀 있다가 펼치면 비번 칸이 나온다.
+ * 빈 값은 프릭션 0(기존 동작 그대로). 입력하면 다른 기기서도 이 한마디를 수정/삭제할 수 있다.
+ */
+function PasswordDisclosure(
+  props: Readonly<{
+    value: string;
+    setValue: (value: string) => void;
+    /** 접근성용 고유 id 접두(여러 컴포저가 한 화면에 있을 수 있어요). */
+    idPrefix: string;
+  }>,
+) {
+  const { value, setValue, idPrefix } = props;
+  // 값이 이미 있으면(예: 답글 재오픈) 펼친 상태로 시작해 입력값이 숨지 않게 한다.
+  const [open, setOpen] = useState(value.length > 0);
+  const fieldId = `${idPrefix}-password`;
+  const helpId = `${idPrefix}-password-help`;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <button
+        type="button"
+        className="pressable"
+        onClick={() => setOpen((prev) => !prev)}
+        aria-expanded={open}
+        aria-controls={fieldId}
+        style={{
+          alignSelf: 'flex-start',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 4,
+          minHeight: 36,
+          padding: '6px 4px',
+          background: 'none',
+          border: 'none',
+          color: theme.textMuted,
+          fontSize: 13,
+          fontWeight: 700,
+          cursor: 'pointer',
+        }}
+      >
+        🔒 다른 기기서 관리하려면 비번 설정 (선택)
+        <span aria-hidden style={{ fontSize: 11 }}>
+          {open ? '▲' : '▼'}
+        </span>
+      </button>
+      {open ? (
+        <>
+          <input
+            id={fieldId}
+            type="password"
+            style={inputStyle}
+            value={value}
+            maxLength={COMMENT_PASSWORD_MAX}
+            placeholder="관리 비번 (4~20자)"
+            aria-label="한마디 관리 비밀번호 (선택)"
+            aria-describedby={helpId}
+            autoComplete="new-password"
+            onChange={(e) => setValue(e.target.value)}
+          />
+          <span id={helpId} style={{ fontSize: 12, color: theme.textFaint, lineHeight: 1.4 }}>
+            비번을 설정하면 다른 기기에서도 이 한마디를 수정/삭제할 수 있어요. (4~20자)
+          </span>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 function CommentDraftFields(
   props: Readonly<{
     selectedOptionId: number | null;
@@ -960,6 +1237,8 @@ function CommentDraftFields(
     setVoterName: (name: string) => void;
     comment: string;
     setComment: (comment: string) => void;
+    commentPassword: string;
+    setCommentPassword: (value: string) => void;
     onLoadProfile?: () => void;
     profileLoading?: boolean;
     profileNotice?: string | null;
@@ -971,6 +1250,8 @@ function CommentDraftFields(
     setVoterName,
     comment,
     setComment,
+    commentPassword,
+    setCommentPassword,
     onLoadProfile,
     profileLoading = false,
     profileNotice,
@@ -979,7 +1260,7 @@ function CommentDraftFields(
     <div
       className="disclosure-enter"
       style={{
-        maxHeight: selectedOptionId === null ? 0 : 340,
+        maxHeight: selectedOptionId === null ? 0 : 460,
         opacity: selectedOptionId === null ? 0 : 1,
         overflow: 'hidden',
         marginTop: selectedOptionId === null ? 0 : 24,
@@ -1014,6 +1295,14 @@ function CommentDraftFields(
         aria-label="의견"
         onChange={(e) => setComment(e.target.value)}
       />
+      {/* 한마디를 적었을 때만 관리 비번 디스클로저를 노출(빈 한마디엔 비번이 의미 없어요). */}
+      {comment.trim().length > 0 ? (
+        <PasswordDisclosure
+          value={commentPassword}
+          setValue={setCommentPassword}
+          idPrefix="vote-comment"
+        />
+      ) : null}
     </div>
   );
 }
@@ -1362,6 +1651,8 @@ export function PollDetailView(props: Readonly<PollDetailViewProps>) {
     setVoterName,
     comment,
     setComment,
+    commentPassword,
+    setCommentPassword,
     onLoadProfile,
     profileLoading,
     profileNotice,
@@ -1371,6 +1662,7 @@ export function PollDetailView(props: Readonly<PollDetailViewProps>) {
     isOwner,
     canManage: canManageProp,
     canManageCommentById,
+    commentNeedsPassword,
     confirmDelete,
     onDelete,
     onEdit,
@@ -1460,6 +1752,8 @@ export function PollDetailView(props: Readonly<PollDetailViewProps>) {
             setVoterName={setVoterName}
             comment={comment}
             setComment={setComment}
+            commentPassword={commentPassword}
+            setCommentPassword={setCommentPassword}
             onLoadProfile={onLoadProfile}
             profileLoading={profileLoading}
             profileNotice={profileNotice}
@@ -1470,6 +1764,7 @@ export function PollDetailView(props: Readonly<PollDetailViewProps>) {
           comments={comments}
           canManage={canManage}
           canManageCommentById={canManageCommentById}
+          commentNeedsPassword={commentNeedsPassword}
           closed={closed}
           onDeleteComment={onDeleteComment}
           onEditComment={onEditComment}

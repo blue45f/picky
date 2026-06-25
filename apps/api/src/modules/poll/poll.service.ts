@@ -5,6 +5,7 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
+import * as crypto from 'node:crypto';
 import { DatabaseService } from '../database/database.service';
 import {
   CreatePollInput,
@@ -107,6 +108,45 @@ export class PollService {
       return this.generateShortId();
     }
     return id;
+  }
+
+  /**
+   * 게스트 댓글 관리 비밀번호 해시 — auth.service 의 회원 비번 패턴(pbkdf2-sha512)을 재사용한다.
+   * salt 를 매번 새로 만들어 `salt:hash` 형태로 한 컬럼(password_hash)에 보관한다(bcrypt 의존성 불필요).
+   * 비번 원문은 절대 저장/응답하지 않는다 — 이 해시만 DB 에 남는다.
+   */
+  private hashCommentPassword(password: string): string {
+    const salt = crypto.randomBytes(16).toString('hex');
+    const hash = crypto.pbkdf2Sync(password, salt, 1000, 64, 'sha512').toString('hex');
+    return `${salt}:${hash}`;
+  }
+
+  /**
+   * 입력 비번이 저장된 해시(`salt:hash`)와 일치하는지 상수 시간 비교로 검증한다.
+   * 형식이 깨졌거나 입력이 비면 false. 타이밍 사이드채널을 막기 위해 timingSafeEqual 을 쓴다.
+   */
+  private verifyCommentPassword(
+    password: string | null | undefined,
+    storedHash: string | null | undefined,
+  ): boolean {
+    const candidate = (password ?? '').trim();
+    const stored = (storedHash ?? '').trim();
+    if (!candidate || !stored) {
+      return false;
+    }
+    const separator = stored.indexOf(':');
+    if (separator <= 0) {
+      return false;
+    }
+    const salt = stored.slice(0, separator);
+    const expectedHex = stored.slice(separator + 1);
+    if (!salt || !expectedHex) {
+      return false;
+    }
+    const actualHex = crypto.pbkdf2Sync(candidate, salt, 1000, 64, 'sha512').toString('hex');
+    const expected = Buffer.from(expectedHex, 'hex');
+    const actual = Buffer.from(actualHex, 'hex');
+    return expected.length === actual.length && crypto.timingSafeEqual(expected, actual);
   }
 
   /**
@@ -368,10 +408,11 @@ export class PollService {
   /**
    * 댓글 관리(수정/삭제) 권한을 강제한다 — 다음 중 하나면 허용:
    * - 작성자 본인: 회원(authorId===userId) 또는 비회원(authorKey===요청 voterKey)
+   * - 비번 일치: 댓글에 관리 비번이 설정돼 있고 입력 password 가 저장 해시와 일치(어느 기기서든 본인 인정)
    * - 폴 소유자(모더레이션): poll.creatorId===userId
    * - 어드민
    * 레거시 댓글(authorId/authorKey 둘 다 null)은 본인 판정이 불가하지만 폴 소유자/어드민은 여전히 관리할 수 있다.
-   * 권한 검사용으로 댓글 작성자 식별값을 들고 있는 comment(PollCommentWithAuthor)를 받지만,
+   * 권한 검사용으로 댓글 작성자 식별값·비번 해시를 들고 있는 comment(PollCommentWithAuthor)를 받지만,
    * 이 값들은 응답으로 절대 나가지 않는다(비밀).
    */
   private assertCanManageComment(
@@ -381,6 +422,7 @@ export class PollService {
     voterKey: string | null,
     isAdmin: boolean,
     action: string,
+    password?: string | null,
   ): void {
     if (isAdmin) {
       return;
@@ -398,12 +440,16 @@ export class PollService {
     if (authorIdMatch || authorKeyMatch) {
       return;
     }
+    // 비번 일치도 본인으로 인정(다른 기기) — 댓글에 비번이 설정돼 있고 입력 비번이 해시와 맞을 때만.
+    if (this.verifyCommentPassword(password, comment.passwordHash)) {
+      return;
+    }
     throw new ForbiddenException(`내가 쓴 한마디만 ${action}할 수 있어요.`);
   }
 
   /**
-   * 댓글(의견)을 삭제한다. 작성자 본인(회원 authorId / 비회원 authorKey)·폴 소유자·어드민이 삭제할 수 있다.
-   * 비회원 본인 확인용 voterKey 는 GET 쿼리가 아니라 요청 바디로 받는다(로그 누출 방지).
+   * 댓글(의견)을 삭제한다. 작성자 본인(회원 authorId / 비회원 authorKey / 비번 일치)·폴 소유자·어드민이 삭제할 수 있다.
+   * 비회원 본인 확인용 voterKey·관리 비번 password 는 GET 쿼리가 아니라 요청 바디로 받는다(로그 누출 방지).
    */
   async deleteComment(
     id: string,
@@ -411,6 +457,7 @@ export class PollService {
     userId: string | null,
     voterKey: string | null,
     isAdmin = false,
+    password?: string | null,
   ): Promise<{ id: string; commentId: number; deleted: true }> {
     const poll = await this.db.getPollWithCommentAuthors(id);
     if (!poll) {
@@ -420,16 +467,17 @@ export class PollService {
     if (!comment) {
       throw new NotFoundException(`댓글 ID ${commentId}를 찾을 수 없습니다.`);
     }
-    this.assertCanManageComment(poll, comment, userId, voterKey, isAdmin, '삭제');
+    // 비번 일치도 본인으로 인정한다(다른 기기서 관리). voterKey/userId 미일치여도 비번이 맞으면 통과.
+    this.assertCanManageComment(poll, comment, userId, voterKey, isAdmin, '삭제', password);
 
     await this.db.deleteComment(id, commentId);
     return { id, commentId, deleted: true };
   }
 
   /**
-   * 댓글 텍스트를 수정한다 — 작성자 본인만(회원 authorId / 비회원 authorKey). 폴 소유자/어드민은 모더레이션 삭제만 하고
-   * 남의 글 내용 변조는 어드민만 허용한다(작성자 신뢰 보존). 작성자/원시각은 불변, editedAt 만 갱신된다.
-   * 응답은 작성자 식별값을 제거한 최신 폴(getPollForViewer)로 돌려준다.
+   * 댓글 텍스트를 수정한다 — 작성자 본인만(회원 authorId / 비회원 authorKey / 비번 일치). 폴 소유자/어드민은
+   * 모더레이션 삭제만 하고 남의 글 내용 변조는 어드민만 허용한다(작성자 신뢰 보존). 작성자/원시각은 불변, editedAt 만 갱신된다.
+   * 비번(input.password) 원문은 바디로만 받고 응답엔 작성자 식별값·해시를 모두 제거한 최신 폴(getPollForViewer)로 돌려준다.
    */
   async editComment(
     id: string,
@@ -448,13 +496,15 @@ export class PollService {
       throw new NotFoundException(`댓글 ID ${commentId}를 찾을 수 없습니다.`);
     }
     // 수정은 작성자 본인(또는 어드민)만 — 폴 소유자라도 남의 한마디 내용은 바꿀 수 없다.
+    // 본인 판정: 회원(authorId) OR 비회원(authorKey) OR 비번 일치(다른 기기서도 본인 인정).
     if (!isAdmin) {
       const trimmedKey = (input.voterKey ?? '').trim();
       const authorIdMatch = Boolean(userId && comment.authorId && comment.authorId === userId);
       const authorKeyMatch = Boolean(
         trimmedKey && comment.authorKey && comment.authorKey === trimmedKey,
       );
-      if (!authorIdMatch && !authorKeyMatch) {
+      const passwordMatch = this.verifyCommentPassword(input.password, comment.passwordHash);
+      if (!authorIdMatch && !authorKeyMatch && !passwordMatch) {
         throw new ForbiddenException('내가 쓴 한마디만 수정할 수 있어요.');
       }
     }
@@ -511,6 +561,7 @@ export class PollService {
 
     // 한마디(댓글)는 카운트와 분리해 추가한다(카운트는 castVote가 이미 원자적으로 반영).
     // 투표 시 남긴 한마디도 작성자 식별값(회원 userId / 비회원 voterKey)을 저장해 본인 관리가 가능하게 한다.
+    // 선택적 관리 비번을 함께 보냈으면 해시로만 저장해 어느 기기서든 본인 수정/삭제가 가능하게 한다.
     if (input.comment?.trim()) {
       await this.db.appendComment(id, {
         voterName: input.voterName?.trim() ? input.voterName.trim() : '익명',
@@ -520,6 +571,9 @@ export class PollService {
         selectedOptionText: option.text,
         authorId: userId,
         authorKey: input.voterKey?.trim() ? input.voterKey.trim() : null,
+        passwordHash: input.password?.trim()
+          ? this.hashCommentPassword(input.password.trim())
+          : null,
       });
     }
 
@@ -570,6 +624,12 @@ export class PollService {
       return this.getPollForViewer(id, code);
     }
 
+    // 선택적 게스트 비번 — 설정했으면 해시로만 저장한다(원문 미저장). 회원/토스는 굳이 안 보내도 된다.
+    // 비번을 설정하면 voterKey(기기 고정)와 무관하게 어느 기기서든 본인 수정/삭제가 가능해진다.
+    const passwordHash = input.password?.trim()
+      ? this.hashCommentPassword(input.password.trim())
+      : null;
+
     await this.db.appendComment(id, {
       voterName: input.voterName?.trim() ? input.voterName.trim() : '익명',
       comment: input.comment.trim(),
@@ -578,6 +638,7 @@ export class PollService {
       // 회원=authorId 우선, 비회원=요청 voterKey→authorKey(vote와 동일한 안정 키).
       authorId: userId,
       authorKey: input.voterKey?.trim() ? input.voterKey.trim() : null,
+      passwordHash,
     });
     // 응답은 열람용 redaction을 거쳐 비공개 폴의 게이트 데이터가 새지 않게 한다(코드 통과 시 전체 반환).
     return this.getPollForViewer(id, code);

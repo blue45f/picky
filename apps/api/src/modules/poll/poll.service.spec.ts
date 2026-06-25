@@ -1,8 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import * as crypto from 'node:crypto';
 import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import type { Poll, PaginatedPolls } from '@picky/shared';
 import { POLLS_PAGE_MAX_LIMIT } from '@picky/shared';
 import { PollService } from './poll.service';
+
+/**
+ * 게스트 댓글 관리 비번 해시 픽스처 — 서비스의 hashCommentPassword 와 동일한 형식(salt:hash, pbkdf2-sha512).
+ * 권한 판정(verifyCommentPassword) 경로를 흉내 내려고 테스트에서 직접 해시를 만든다(원문은 절대 저장 안 됨).
+ */
+const hashCommentPasswordForTest = (password: string): string => {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.pbkdf2Sync(password, salt, 1000, 64, 'sha512').toString('hex');
+  return `${salt}:${hash}`;
+};
 import type {
   DatabaseService,
   PollWithCommentAuthors,
@@ -664,5 +675,146 @@ describe('PollService.addComment (author identity persistence)', () => {
       'abc123',
       expect.objectContaining({ authorId: null, authorKey: 'guest-key-9' }),
     );
+  });
+});
+
+describe('PollService.addComment (optional guest password — set + hash-only storage)', () => {
+  let mocks: ReturnType<typeof createDbMock>;
+  let service: PollService;
+
+  beforeEach(() => {
+    mocks = createDbMock();
+    service = new PollService(mocks.db);
+  });
+
+  it('hashes and stores the optional password as passwordHash (never the raw value)', async () => {
+    mocks.getPollById.mockResolvedValue(makePoll());
+    await service.addComment(
+      'abc123',
+      { comment: '비번 단 한마디', voterKey: 'guest-key-1', password: 'pw1234' },
+      null,
+    );
+    const call = mocks.appendComment.mock.calls[0] as unknown as [
+      string,
+      { passwordHash?: string },
+    ];
+    const arg = call[1];
+    // 해시는 salt:hash 형식이고, 원문(pw1234)은 어디에도 담기지 않는다.
+    expect(arg.passwordHash).toMatch(/^[0-9a-f]+:[0-9a-f]+$/);
+    expect(arg.passwordHash).not.toContain('pw1234');
+  });
+
+  it('keeps the legacy path (passwordHash=null) when no password is supplied — zero friction', async () => {
+    mocks.getPollById.mockResolvedValue(makePoll());
+    await service.addComment(
+      'abc123',
+      { comment: '비번 없는 한마디', voterKey: 'guest-key-2' },
+      null,
+    );
+    expect(mocks.appendComment).toHaveBeenCalledWith(
+      'abc123',
+      expect.objectContaining({ passwordHash: null }),
+    );
+  });
+});
+
+describe('PollService comment management via optional password (any device)', () => {
+  let mocks: ReturnType<typeof createDbMock>;
+  let service: PollService;
+
+  beforeEach(() => {
+    mocks = createDbMock();
+    service = new PollService(mocks.db);
+  });
+
+  it('lets a DIFFERENT device delete a comment when the correct password is supplied', async () => {
+    mocks.getPollWithCommentAuthors.mockResolvedValue(
+      makePollWithComment(
+        { authorKey: 'guest-key-1', passwordHash: hashCommentPasswordForTest('pw1234') },
+        { creatorId: 'owner-x' },
+      ),
+    );
+    // voterKey 불일치(다른 기기)지만 비번이 맞으면 본인으로 인정해 삭제 통과.
+    await expect(
+      service.deleteComment('abc123', 1, null, 'a-different-device-key', false, 'pw1234'),
+    ).resolves.toMatchObject({ deleted: true });
+    expect(mocks.deleteComment).toHaveBeenCalledWith('abc123', 1);
+  });
+
+  it('lets a DIFFERENT device edit a comment when the correct password is supplied', async () => {
+    mocks.getPollWithCommentAuthors.mockResolvedValue(
+      makePollWithComment(
+        { authorKey: 'guest-key-1', passwordHash: hashCommentPasswordForTest('pw1234') },
+        { creatorId: 'owner-x' },
+      ),
+    );
+    await service.editComment(
+      'abc123',
+      1,
+      { comment: '다른 기기서 고침', voterKey: 'a-different-device-key', password: 'pw1234' },
+      null,
+      false,
+    );
+    expect(mocks.updateComment).toHaveBeenCalledWith('abc123', 1, '다른 기기서 고침');
+  });
+
+  it('rejects deletion when the password is WRONG (no voterKey/userId match either)', async () => {
+    mocks.getPollWithCommentAuthors.mockResolvedValue(
+      makePollWithComment(
+        { authorKey: 'guest-key-1', passwordHash: hashCommentPasswordForTest('pw1234') },
+        { creatorId: 'owner-x' },
+      ),
+    );
+    await expect(
+      service.deleteComment('abc123', 1, null, 'stranger-key', false, 'wrong-pw'),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(mocks.deleteComment).not.toHaveBeenCalled();
+  });
+
+  it('rejects edit when the password is WRONG', async () => {
+    mocks.getPollWithCommentAuthors.mockResolvedValue(
+      makePollWithComment(
+        { authorKey: 'guest-key-1', passwordHash: hashCommentPasswordForTest('pw1234') },
+        { creatorId: 'owner-x' },
+      ),
+    );
+    await expect(
+      service.editComment(
+        'abc123',
+        1,
+        { comment: '몰래 수정', voterKey: 'stranger-key', password: 'wrong-pw' },
+        null,
+        false,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(mocks.updateComment).not.toHaveBeenCalled();
+  });
+
+  it('rejects a password attempt on a comment that has NO password set (passwordHash null)', async () => {
+    mocks.getPollWithCommentAuthors.mockResolvedValue(
+      makePollWithComment(
+        { authorKey: 'guest-key-1', passwordHash: null },
+        { creatorId: 'owner-x' },
+      ),
+    );
+    // 비번 미설정 댓글엔 어떤 비번을 보내도 본인으로 인정하지 않는다(voterKey/userId 경로만 유효).
+    await expect(
+      service.deleteComment('abc123', 1, null, 'stranger-key', false, 'any-pw'),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(mocks.deleteComment).not.toHaveBeenCalled();
+  });
+
+  it('keeps the voterKey path working unchanged when no password is involved', async () => {
+    mocks.getPollWithCommentAuthors.mockResolvedValue(
+      makePollWithComment(
+        { authorKey: 'guest-key-1', passwordHash: hashCommentPasswordForTest('pw1234') },
+        { creatorId: 'owner-x' },
+      ),
+    );
+    // 같은 기기(voterKey 일치)면 비번을 안 보내도 기존 경로 그대로 통과한다.
+    await expect(
+      service.deleteComment('abc123', 1, null, 'guest-key-1', false),
+    ).resolves.toMatchObject({ deleted: true });
+    expect(mocks.deleteComment).toHaveBeenCalledWith('abc123', 1);
   });
 });

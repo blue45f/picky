@@ -73,8 +73,14 @@ export interface PollState {
   // 비공개(private) 투표는 접근 코드를 ?code= 로 함께 보내야 서버 게이트를 통과한다(공개 폴은 생략).
   vote: (id: string, input: VoteInput, code?: string | null) => Promise<boolean>;
   deletePoll: (id: string) => Promise<boolean>;
-  // voterKey 는 비회원 본인 확인용 — GET 쿼리가 아니라 요청 바디로 보낸다(로그 누출 방지).
-  deleteComment: (id: string, commentId: number, voterKey?: string | null) => Promise<boolean>;
+  // voterKey·password 는 비회원 본인 확인용 — GET 쿼리가 아니라 요청 바디로 보낸다(로그 누출 방지).
+  // password: 게스트가 다른 기기서 비번으로 본인 댓글을 삭제할 때 전송(미설정 댓글이면 생략).
+  deleteComment: (
+    id: string,
+    commentId: number,
+    voterKey?: string | null,
+    password?: string | null,
+  ) => Promise<boolean>;
   addComment: (id: string, input: CreateCommentInput, code?: string | null) => Promise<Poll | null>;
   // 댓글 텍스트 수정(작성자 본인) — voterKey 는 바디로 전송, 서버가 authorId/authorKey 와 대조해 강제.
   editComment: (
@@ -923,7 +929,7 @@ export const createPollStoreState = ({
       }
     },
 
-    deleteComment: async (id, commentId, voterKey) => {
+    deleteComment: async (id, commentId, voterKey, password) => {
       set({ error: null });
       const removeComment = (poll: Poll): Poll => ({
         ...poll,
@@ -937,11 +943,12 @@ export const createPollStoreState = ({
           headers.Authorization = `Bearer ${token}`;
         }
 
-        // 비회원 본인 확인용 voterKey 는 바디로 보낸다(GET 쿼리 누출 방지). 서버가 authorKey 와 대조해 강제.
+        // 비회원 본인 확인용 voterKey·관리 비번(password)은 바디로 보낸다(GET 쿼리 누출 방지).
+        // 서버가 authorKey/authorId/비번 해시와 대조해 (본인 OR 폴 소유자 OR 어드민)일 때만 통과시킨다.
         const res = await requestApi(`/polls/${id}/comments/${commentId}`, {
           method: 'DELETE',
           headers,
-          body: JSON.stringify({ voterKey: voterKey ?? null }),
+          body: JSON.stringify({ voterKey: voterKey ?? null, password: password ?? null }),
         });
         if (!res.ok) {
           const message = await setAuthSessionExpired(
