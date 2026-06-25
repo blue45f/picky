@@ -10,11 +10,14 @@ import {
   TimerReset,
   Users,
 } from 'lucide-react';
-import type { Poll } from '@picky/shared';
-import { optionPercent } from '@picky/shared';
+import type { DecisionStats, Poll } from '@picky/shared';
+import {
+  computeConfidenceScore,
+  computeDecisionStats,
+  resolveDecisionState,
+  type DecisionState,
+} from '@picky/shared';
 import { copyText } from '../lib/pollShare';
-
-type DecisionState = 'collect' | 'runoff' | 'discussion' | 'ready';
 
 type FollowUpAction = {
   id: string;
@@ -63,74 +66,8 @@ const getDecisionIcon = (icon: FollowUpAction['icon']) => {
   return <Target size={14} />;
 };
 
-type DecisionStats = {
-  comments: NonNullable<Poll['comments']>;
-  leader: Poll['options'][number] | null;
-  runnerUp: Poll['options'][number] | null;
-  totalVotes: number;
-  minimumVotes: number;
-  leaderShare: number;
-  voteGap: number;
-  voteGapShare: number;
-  feedbackRate: number;
-  lowSample: boolean;
-  closeRace: boolean;
-  lowDiscussion: boolean;
-  closingSoon: boolean;
-};
-
-const computeDecisionStats = (poll: Poll, pollClosed: boolean): DecisionStats => {
-  const comments = poll.comments || [];
-  const sortedOptions = [...poll.options].sort((a, b) => b.voteCount - a.voteCount);
-  const leader = sortedOptions[0] || null;
-  const runnerUp = sortedOptions[1] || null;
-  const totalVotes = poll.totalVotes || 0;
-  const minimumVotes = Math.max(7, poll.options.length * 3);
-  const leaderShare = totalVotes > 0 && leader ? optionPercent(leader.voteCount, totalVotes) : 0;
-  const voteGap = leader ? leader.voteCount - (runnerUp?.voteCount || 0) : 0;
-  const voteGapShare = totalVotes > 0 ? Math.round((voteGap / totalVotes) * 100) : 0;
-  const feedbackRate = totalVotes > 0 ? Math.round((comments.length / totalVotes) * 100) : 0;
-  const lowSample = totalVotes < minimumVotes;
-  const closeRace = totalVotes > 0 && Boolean(runnerUp) && (voteGap <= 1 || voteGapShare <= 12);
-  const lowDiscussion = totalVotes >= 3 && feedbackRate < 25;
-  const deadlineTime = poll.endsAt ? new Date(poll.endsAt).getTime() : null;
-  const hasValidDeadline = typeof deadlineTime === 'number' && Number.isFinite(deadlineTime);
-  const timeUntilDeadline = hasValidDeadline ? deadlineTime - Date.now() : null;
-  const closingSoon =
-    !pollClosed &&
-    typeof timeUntilDeadline === 'number' &&
-    timeUntilDeadline > 0 &&
-    timeUntilDeadline <= 6 * 60 * 60 * 1000;
-
-  return {
-    comments,
-    leader,
-    runnerUp,
-    totalVotes,
-    minimumVotes,
-    leaderShare,
-    voteGap,
-    voteGapShare,
-    feedbackRate,
-    lowSample,
-    closeRace,
-    lowDiscussion,
-    closingSoon,
-  };
-};
-
-const resolveDecisionState = (stats: DecisionStats): DecisionState => {
-  if (!stats.leader || stats.totalVotes === 0 || stats.lowSample) {
-    return 'collect';
-  }
-  if (stats.closeRace) {
-    return 'runoff';
-  }
-  if (stats.lowDiscussion) {
-    return 'discussion';
-  }
-  return 'ready';
-};
+// 신뢰도 점수·4상태·통계·리스크 active 판정은 @picky/shared(pollConfidence)로 단일화했어요.
+// 이 컴포넌트는 그 순수 결과를 받아 웹 UI 라벨/문구/색으로만 매핑해요(동작 불변).
 
 const resolveDeadlineCopy = (
   poll: Poll,
@@ -197,9 +134,8 @@ const buildRiskItems = (
 export function DecisionFollowUpPanel({ poll, shareUrl, pollClosed }: DecisionFollowUpPanelProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const decision = useMemo(() => {
-    const stats = computeDecisionStats(poll, pollClosed);
+    const stats: DecisionStats = computeDecisionStats(poll, { pollClosed });
     const {
-      comments,
       leader,
       runnerUp,
       totalVotes,
@@ -210,17 +146,10 @@ export function DecisionFollowUpPanel({ poll, shareUrl, pollClosed }: DecisionFo
       feedbackRate,
       closingSoon,
     } = stats;
+    const comments = poll.comments || [];
 
     const state = resolveDecisionState(stats);
-
-    const sampleScore = Math.min(35, Math.round((totalVotes / minimumVotes) * 35));
-    const marginScore = runnerUp ? Math.min(30, Math.round((voteGapShare / 30) * 30)) : 30;
-    const discussionScore = Math.min(25, Math.round((feedbackRate / 35) * 25));
-    const closureScore = pollClosed ? 10 : 5;
-    const confidenceScore = Math.min(
-      100,
-      sampleScore + marginScore + discussionScore + closureScore,
-    );
+    const confidenceScore = computeConfidenceScore(stats, { pollClosed });
 
     const stateMeta: Record<
       DecisionState,

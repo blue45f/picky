@@ -1,4 +1,7 @@
 import React from 'react';
+// 공유 카드 콘텐츠(제목/요약/노출 선택지/메타/예상시간) 생성은 @picky/shared(snsPreview)로
+// 단일화했어요. 이 컴포넌트는 그 콘텐츠로 X/카카오 카드 UI만 렌더해요(동작 불변).
+import { buildSnsPreviewContent } from '@picky/shared';
 
 interface SnsPreviewCardProps {
   platform: 'x' | 'kakao';
@@ -441,40 +444,16 @@ export const SnsPreviewCard: React.FC<SnsPreviewCardProps> = ({
   options,
   imageUrl,
 }) => {
-  const trimmedQuestion = question.trim();
-  const title = trimmedQuestion || '공유될 투표 질문';
-  const summary =
-    description?.trim() ||
-    (options.length > 0
-      ? `${options
-          .slice(0, 3)
-          .map((option, index) => `${index + 1}. ${option}`)
-          .join(' · ')}`
-      : '링크를 받은 사람이 바로 선택할 수 있는 투표 카드가 표시됩니다.');
-  const visibleOptions = options.filter(Boolean).slice(0, 3);
-  const hiddenOptionCount = Math.max(options.length - visibleOptions.length, 0);
-  const previewReady = trimmedQuestion.length > 0 && options.length >= 2;
-  const readableCharacterCount =
-    title.length +
-    summary.length +
-    visibleOptions.reduce((total, option) => total + option.length, 0);
-  const estimatedSeconds = Math.max(5, Math.ceil(readableCharacterCount / 16));
-  const hasImagePreview = Boolean(imageUrl);
-  const metaItems = [
-    previewReady ? '참여 가능' : '작성 중',
-    `${options.length}개 선택지`,
-    hasImagePreview ? '이미지 반영' : '기본 이미지',
-    `${estimatedSeconds}초 예상`,
-  ];
+  const content = buildSnsPreviewContent({ question, description, options, imageUrl });
 
   const model: PreviewModel = {
-    title,
-    summary,
-    visibleOptions,
-    hiddenOptionCount,
-    previewReady,
-    hasImagePreview,
-    metaItems,
+    title: content.title,
+    summary: content.summary,
+    visibleOptions: content.visibleOptions,
+    hiddenOptionCount: content.hiddenOptionCount,
+    previewReady: content.previewReady,
+    hasImagePreview: content.hasImagePreview,
+    metaItems: content.metaItems,
     imageUrl,
   };
 

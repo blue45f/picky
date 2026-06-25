@@ -10,165 +10,18 @@ import {
   ShieldCheck,
   Users,
 } from 'lucide-react';
-import type { Poll } from '@picky/shared';
-import { optionPercent } from '@picky/shared';
+import type { Poll, ReportAudience } from '@picky/shared';
+import { REPORT_AUDIENCES, buildPollReport } from '@picky/shared';
 import { copyText } from '../lib/pollShare';
 
-type ReportAudience = 'decision' | 'participants' | 'retrospective';
+// 청중별 리포트 텍스트·정서·신뢰도 산출은 @picky/shared(pollReport)로 단일화했어요.
+// 이 컴포넌트는 그 결과를 받아 웹 UI로만 렌더해요(동작 불변).
 
 type StakeholderReportBuilderProps = Readonly<{
   poll: Poll;
   shareUrl: string;
   pollClosed: boolean;
 }>;
-
-type ReportAudienceConfig = {
-  id: ReportAudience;
-  label: string;
-  description: string;
-};
-
-const REPORT_AUDIENCES: [ReportAudienceConfig, ...ReportAudienceConfig[]] = [
-  {
-    id: 'decision',
-    label: '의사결정권자',
-    description: '결론, 표본, 격차, 리스크를 압축해 보고합니다.',
-  },
-  {
-    id: 'participants',
-    label: '참여자 공지',
-    description: '참여해준 사람들에게 결과와 다음 단계를 공유합니다.',
-  },
-  {
-    id: 'retrospective',
-    label: '운영 회고',
-    description: '참여율, 의견률, 개선 포인트를 다음 투표에 남깁니다.',
-  },
-];
-
-const POSITIVE_WORDS = ['좋', '추천', '찬성', '효율', '빠르', '쉬', '만족', '필요', '선호'];
-const NEGATIVE_WORDS = ['걱정', '문제', '리스크', '어렵', '불안', '비싸', '부담', '반대', '복잡'];
-
-const countMatches = (text: string, keywords: string[]): number => {
-  const normalized = text.toLowerCase();
-  return keywords.reduce(
-    (count, keyword) => count + (normalized.includes(keyword.toLowerCase()) ? 1 : 0),
-    0,
-  );
-};
-
-const getSentimentLabel = (comments: Poll['comments']): { label: string; help: string } => {
-  const score = comments.reduce((total, commentItem) => {
-    const positive = countMatches(commentItem.comment, POSITIVE_WORDS);
-    const negative = countMatches(commentItem.comment, NEGATIVE_WORDS);
-    return total + positive - negative;
-  }, 0);
-
-  if (score > 1) {
-    return {
-      label: '긍정 우세',
-      help: '찬성/선호 근거가 상대적으로 많습니다.',
-    };
-  }
-
-  if (score < -1) {
-    return {
-      label: '리스크 우세',
-      help: '우려나 반대 신호를 먼저 정리해야 합니다.',
-    };
-  }
-
-  return {
-    label: '중립',
-    help: '찬반 신호가 혼재되어 있습니다.',
-  };
-};
-
-const buildReportText = ({
-  audience,
-  confidenceScore,
-  feedbackRate,
-  leaderLine,
-  poll,
-  pollClosed,
-  sentimentLabel,
-  shareUrl,
-  voteGap,
-  voteGapShare,
-}: {
-  audience: ReportAudience;
-  confidenceScore: number;
-  feedbackRate: number;
-  leaderLine: string;
-  poll: Poll;
-  pollClosed: boolean;
-  sentimentLabel: string;
-  shareUrl: string;
-  voteGap: number;
-  voteGapShare: number;
-}): string => {
-  const topComments = poll.comments
-    .slice(0, 3)
-    .map(
-      (commentItem, index) =>
-        `${index + 1}. ${commentItem.comment} - ${commentItem.voterName || '익명'}`,
-    )
-    .join('\n');
-
-  if (audience === 'participants') {
-    return [
-      `[picky 결과 공유]`,
-      `질문: ${poll.question}`,
-      `결과: ${leaderLine}`,
-      `참여: ${poll.totalVotes}명 · 의견 ${poll.comments.length}개`,
-      `상태: ${pollClosed ? '마감' : '진행 중'}`,
-      '',
-      '참여해주셔서 감사합니다. 남겨주신 선택과 의견은 다음 결정/실행에 반영하겠습니다.',
-      `결과 확인: ${shareUrl}`,
-    ].join('\n');
-  }
-
-  if (audience === 'retrospective') {
-    return [
-      `[picky 운영 회고]`,
-      `질문: ${poll.question}`,
-      `참여: ${poll.totalVotes}명`,
-      `의견: ${poll.comments.length}개`,
-      `의견률: ${feedbackRate}%`,
-      `정서: ${sentimentLabel}`,
-      `결정 신뢰도: ${confidenceScore}%`,
-      '',
-      '[개선 포인트]',
-      poll.totalVotes < 8
-        ? '- 표본이 작습니다. 다음에는 공유 채널과 리마인더를 늘리세요.'
-        : '- 표본은 기본 기준을 충족했습니다.',
-      feedbackRate < 25
-        ? '- 의견률이 낮습니다. 선택 이유 입력을 더 강하게 유도하세요.'
-        : '- 의견 근거가 충분히 쌓였습니다.',
-      voteGapShare < 12
-        ? '- 표 차이가 작습니다. 결선이나 짧은 토론을 고려하세요.'
-        : '- 선두 흐름이 비교적 명확합니다.',
-      '',
-      `결과 링크: ${shareUrl}`,
-    ].join('\n');
-  }
-
-  return [
-    `[picky 의사결정 리포트]`,
-    `질문: ${poll.question}`,
-    `권고안: ${leaderLine}`,
-    `참여: ${poll.totalVotes}명 · 의견 ${poll.comments.length}개`,
-    `격차: ${voteGap}표 (${voteGapShare}%)`,
-    `정서: ${sentimentLabel}`,
-    `결정 신뢰도: ${confidenceScore}%`,
-    `상태: ${pollClosed ? '마감' : '진행 중'}`,
-    '',
-    '[대표 의견]',
-    topComments || '아직 대표 의견이 없습니다.',
-    '',
-    `근거 링크: ${shareUrl}`,
-  ].join('\n');
-};
 
 export function StakeholderReportBuilder({
   poll,
@@ -178,51 +31,10 @@ export function StakeholderReportBuilder({
   const [audience, setAudience] = useState<ReportAudience>('decision');
   const [copied, setCopied] = useState(false);
 
-  const report = useMemo(() => {
-    const sortedOptions = [...poll.options].sort((a, b) => b.voteCount - a.voteCount);
-    const leader = sortedOptions[0] || null;
-    const runnerUp = sortedOptions[1] || null;
-    const leaderShare =
-      poll.totalVotes > 0 && leader ? optionPercent(leader.voteCount, poll.totalVotes) : 0;
-    const voteGap = leader ? leader.voteCount - (runnerUp?.voteCount || 0) : 0;
-    const voteGapShare = poll.totalVotes > 0 ? Math.round((voteGap / poll.totalVotes) * 100) : 0;
-    const feedbackRate =
-      poll.totalVotes > 0 ? Math.round((poll.comments.length / poll.totalVotes) * 100) : 0;
-    const sampleScore = Math.min(40, Math.round((poll.totalVotes / 12) * 40));
-    const marginScore = Math.min(30, Math.round((voteGapShare / 30) * 30));
-    const feedbackScore = Math.min(20, Math.round((feedbackRate / 35) * 20));
-    const closureScore = pollClosed ? 10 : 4;
-    const confidenceScore = Math.min(100, sampleScore + marginScore + feedbackScore + closureScore);
-    const sentiment = getSentimentLabel(poll.comments || []);
-    const leaderLine = leader
-      ? `${leader.text} (${leader.voteCount}표, ${leaderShare}%)`
-      : '아직 선두 선택지 없음';
-    const activeAudience =
-      REPORT_AUDIENCES.find((item) => item.id === audience) || REPORT_AUDIENCES[0];
-    const reportText = buildReportText({
-      audience,
-      confidenceScore,
-      feedbackRate,
-      leaderLine,
-      poll,
-      pollClosed,
-      sentimentLabel: sentiment.label,
-      shareUrl,
-      voteGap,
-      voteGapShare,
-    });
-
-    return {
-      activeAudience,
-      confidenceScore,
-      feedbackRate,
-      leaderLine,
-      reportText,
-      sentiment,
-      voteGap,
-      voteGapShare,
-    };
-  }, [audience, poll, pollClosed, shareUrl]);
+  const report = useMemo(
+    () => buildPollReport({ poll, shareUrl, pollClosed, audience }),
+    [audience, poll, pollClosed, shareUrl],
+  );
 
   const handleCopyReport = async () => {
     try {

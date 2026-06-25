@@ -10,6 +10,13 @@ export * from './pollSignal';
 export * from './pollReadiness';
 export * from './countdown';
 
+// 결과 해석/공유 순수 로직 — web/toss가 동일 점수·문구·구조를 쓰도록 단일화.
+export * from './pollConfidence';
+export * from './decisionMemo';
+export * from './pollReport';
+export * from './snsPreview';
+export * from './pollNarrative';
+
 export const PollResultsVisibilitySchema = z.enum(['afterVote', 'always']);
 
 export type PollResultsVisibility = z.infer<typeof PollResultsVisibilitySchema>;
