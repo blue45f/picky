@@ -36,6 +36,7 @@ import {
 import { usePollStore } from '../store/usePollStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { getVoterKey } from '../lib/voterKey';
+import { canManageComment, isMyComment } from '../../../../packages/client/src/lib/myComments';
 import { VoteDonutChart, OPTION_COLORS } from '../components/VoteDonutChart';
 import { SnsPreviewCard } from '../components/SnsPreviewCard';
 import { AudienceLaunchKit } from '../components/AudienceLaunchKit';
@@ -3710,11 +3711,37 @@ function CommentCard(
     comm: Poll['comments'][number];
     canManage: boolean;
     onDeleteComment: (commentId: number) => void;
+    onEditComment?: (commentId: number, text: string) => Promise<boolean> | boolean;
     onReplyToggle?: () => void;
     isReply?: boolean;
   }>,
 ) {
-  const { comm, canManage, onDeleteComment, onReplyToggle, isReply = false } = props;
+  const { comm, canManage, onDeleteComment, onEditComment, onReplyToggle, isReply = false } = props;
+  const [editing, setEditing] = React.useState(false);
+  const [draft, setDraft] = React.useState(comm.comment);
+  const [isSaving, setIsSaving] = React.useState(false);
+  const canEdit = canManage && Boolean(onEditComment);
+
+  const startEdit = () => {
+    setDraft(comm.comment);
+    setEditing(true);
+  };
+  const saveEdit = async () => {
+    const text = draft.trim();
+    if (!text || !onEditComment || isSaving) {
+      return;
+    }
+    setIsSaving(true);
+    try {
+      const ok = await onEditComment(comm.id, text);
+      if (ok) {
+        setEditing(false);
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <div
       className="content-card"
@@ -3785,15 +3812,62 @@ function CommentCard(
           })}
         </span>
       </div>
-      <p
-        style={{
-          fontSize: '0.825rem',
-          color: 'var(--text-secondary)',
-          lineHeight: 1.5,
-        }}
-      >
-        {comm.comment}
-      </p>
+      {editing ? (
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <input
+            type="text"
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !isSaving) {
+                void saveEdit();
+              }
+              if (event.key === 'Escape') {
+                setEditing(false);
+              }
+            }}
+            maxLength={100}
+            aria-label="한마디 수정"
+            disabled={isSaving}
+            autoFocus
+            className="form-input"
+            style={{ flex: 1, minWidth: 0, fontSize: '0.8rem' }}
+          />
+          <button
+            type="button"
+            onClick={() => void saveEdit()}
+            disabled={isSaving || !draft.trim()}
+            className="btn-primary"
+            style={{ flexShrink: 0, padding: '8px 14px', fontSize: '0.78rem' }}
+          >
+            {isSaving ? '저장 중…' : '저장'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setEditing(false)}
+            disabled={isSaving}
+            className="ghost-btn"
+            style={{ flexShrink: 0, padding: '6px 10px', fontSize: '0.72rem' }}
+          >
+            취소
+          </button>
+        </div>
+      ) : (
+        <p
+          style={{
+            fontSize: '0.825rem',
+            color: 'var(--text-secondary)',
+            lineHeight: 1.5,
+          }}
+        >
+          {comm.comment}
+          {comm.editedAt ? (
+            <span style={{ marginLeft: '6px', fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+              (수정됨)
+            </span>
+          ) : null}
+        </p>
+      )}
       <div
         style={{
           display: 'flex',
@@ -3802,7 +3876,7 @@ function CommentCard(
           gap: '0.5rem',
         }}
       >
-        {onReplyToggle && !isReply ? (
+        {onReplyToggle && !isReply && !editing ? (
           <button
             type="button"
             onClick={onReplyToggle}
@@ -3822,25 +3896,47 @@ function CommentCard(
         ) : (
           <span />
         )}
-        {canManage ? (
-          <button
-            type="button"
-            onClick={() => onDeleteComment(comm.id)}
-            className="ghost-btn"
-            aria-label={`${comm.voterName} 님의 댓글 삭제`}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '4px',
-              padding: '4px 9px',
-              fontSize: '0.7rem',
-              color: 'var(--brand-accent-coral)',
-              borderColor: 'rgba(239, 68, 68, 0.28)',
-            }}
-          >
-            <Trash2 size={12} />
-            삭제
-          </button>
+        {canManage && !editing ? (
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+            {canEdit ? (
+              <button
+                type="button"
+                onClick={startEdit}
+                className="ghost-btn"
+                aria-label={`${comm.voterName} 님의 댓글 수정`}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '4px 9px',
+                  fontSize: '0.7rem',
+                  color: 'var(--brand-accent-teal)',
+                  borderColor: 'rgba(45, 212, 191, 0.28)',
+                }}
+              >
+                <Pencil size={12} />
+                수정
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => onDeleteComment(comm.id)}
+              className="ghost-btn"
+              aria-label={`${comm.voterName} 님의 댓글 삭제`}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '4px 9px',
+                fontSize: '0.7rem',
+                color: 'var(--brand-accent-coral)',
+                borderColor: 'rgba(239, 68, 68, 0.28)',
+              }}
+            >
+              <Trash2 size={12} />
+              삭제
+            </button>
+          </div>
         ) : null}
       </div>
     </div>
@@ -3857,9 +3953,13 @@ function PollFeedbackList(
     commentFilterOptions: Array<{ id: number; label: string; count: number }>;
     visibleComments: Poll['comments'];
     emptyCommentMessage: string;
+    /** 폴 권한(소유자/어드민) — 댓글별 콜백이 없을 때의 폴백. */
     canManage: boolean;
+    /** 댓글별 관리(수정/삭제) 노출 판정 — 본인(내가 단 댓글) 또는 소유자/어드민. */
+    canManageCommentById?: (commentId: number) => boolean;
     pollClosed: boolean;
     onDeleteComment: (commentId: number) => void;
+    onEditComment?: (commentId: number, text: string) => Promise<boolean> | boolean;
     onAddReply: (parentId: number, text: string) => Promise<void> | void;
   }>,
 ) {
@@ -3873,10 +3973,15 @@ function PollFeedbackList(
     visibleComments,
     emptyCommentMessage,
     canManage,
+    canManageCommentById,
     pollClosed,
     onDeleteComment,
+    onEditComment,
     onAddReply,
   } = props;
+  // 댓글별 권한 — 콜백이 있으면 그걸(본인/소유자/어드민), 없으면 폴 권한(canManage)으로 폴백.
+  const resolveCanManage = (commentId: number): boolean =>
+    canManageCommentById ? canManageCommentById(commentId) : canManage;
   const [replyingTo, setReplyingTo] = React.useState<number | null>(null);
   const [replyText, setReplyText] = React.useState('');
   // 답글 제출 중 재진입 차단(연타/Enter 중복) — 투표의 isSubmittingVote 패턴과 동일.
@@ -4060,8 +4165,9 @@ function PollFeedbackList(
               >
                 <CommentCard
                   comm={comm}
-                  canManage={canManage}
+                  canManage={resolveCanManage(comm.id)}
                   onDeleteComment={onDeleteComment}
+                  onEditComment={onEditComment}
                   // B4: 마감된 고민은 답글도 받지 않는다 — '답글 달기' 트리거 자체를 숨긴다.
                   onReplyToggle={
                     pollClosed
@@ -4076,8 +4182,9 @@ function PollFeedbackList(
                   <CommentCard
                     key={reply.id}
                     comm={reply}
-                    canManage={canManage}
+                    canManage={resolveCanManage(reply.id)}
                     onDeleteComment={onDeleteComment}
+                    onEditComment={onEditComment}
                     isReply
                   />
                 ))}
@@ -6618,6 +6725,7 @@ export const PollDetail: React.FC = () => {
   const setCurrentPoll = usePollStore((state) => state.setCurrentPoll);
   const deletePoll = usePollStore((state) => state.deletePoll);
   const deleteComment = usePollStore((state) => state.deleteComment);
+  const editComment = usePollStore((state) => state.editComment);
   const addComment = usePollStore((state) => state.addComment);
   const user = useAuthStore((state) => state.user);
   const guestName = useAuthStore((state) => state.guestName);
@@ -6693,8 +6801,33 @@ export const PollDetail: React.FC = () => {
     if (!globalThis.confirm('이 댓글을 삭제할까요?')) {
       return;
     }
-    deleteComment(id, commentId);
+    // 비회원 본인 확인용 voterKey 를 바디로 보낸다(서버가 authorKey 와 대조). 회원은 JWT userId로도 판정됨.
+    deleteComment(id, commentId, getVoterKey());
   };
+
+  // 댓글 텍스트 수정(작성자 본인) — voterKey 를 바디로 보내 서버가 authorId/authorKey 와 대조해 강제한다.
+  const handleEditComment = async (commentId: number, text: string): Promise<boolean> => {
+    if (!id) {
+      return false;
+    }
+    const result = await editComment(
+      id,
+      commentId,
+      { comment: text, voterKey: getVoterKey() },
+      // 비공개 투표면 활성 접근 코드를 함께 보내 응답 redaction 게이트를 통과한다(공개 폴은 undefined).
+      activeCode,
+    );
+    return Boolean(result);
+  };
+
+  // 댓글별 관리(수정/삭제) 노출 — 본인(이 기기에서 내가 단 댓글) 또는 폴 소유자/어드민.
+  // 서버가 최종 권한을 강제하므로 여기선 버튼 노출만 결정한다.
+  const canManageCommentById = (commentId: number): boolean =>
+    canManageComment({
+      mine: id ? isMyComment(id, commentId) : false,
+      isPollOwner,
+      isAdmin: isPollAdmin,
+    });
 
   // 대댓글(답글) 작성 — 부모 댓글 id 를 함께 보내 공유 스토어가 트리를 갱신한다.
   const handleAddReply = async (parentId: number, text: string) => {
@@ -7877,8 +8010,10 @@ export const PollDetail: React.FC = () => {
             visibleComments={visibleComments}
             emptyCommentMessage={emptyCommentMessage}
             canManage={canManagePoll}
+            canManageCommentById={canManageCommentById}
             pollClosed={pollClosed}
             onDeleteComment={handleDeleteComment}
+            onEditComment={handleEditComment}
             onAddReply={handleAddReply}
           />
 

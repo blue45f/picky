@@ -17,6 +17,8 @@ import { ZodValidationPipe, createZodDto } from 'nestjs-zod';
 import {
   CreateCommentSchema,
   CreatePollSchema,
+  DeleteCommentSchema,
+  EditCommentSchema,
   UpdatePollSchema,
   VoteSchema,
   canRevealResults,
@@ -28,6 +30,8 @@ class CreatePollDto extends createZodDto(CreatePollSchema) {}
 class UpdatePollDto extends createZodDto(UpdatePollSchema) {}
 class VoteDto extends createZodDto(VoteSchema) {}
 class CreateCommentDto extends createZodDto(CreateCommentSchema) {}
+class EditCommentDto extends createZodDto(EditCommentSchema) {}
+class DeleteCommentDto extends createZodDto(DeleteCommentSchema) {}
 
 const trimTrailingSlashes = (value: string): string => {
   let end = value.length;
@@ -262,15 +266,29 @@ export class PollController {
   }
 
   @Post(':id/vote')
-  vote(@Param('id') id: string, @Body() dto: VoteDto, @Query('code') code?: string) {
+  @UseGuards(OptionalAuthGuard)
+  vote(
+    @Param('id') id: string,
+    @Request() req: any,
+    @Body() dto: VoteDto,
+    @Query('code') code?: string,
+  ) {
     // 비공개(private) 투표는 GET 상세와 동일하게 ?code= 로 접근 코드를 검증한 뒤에만 표를 받는다.
-    return this.pollService.vote(id, dto, code);
+    // 로그인 상태면 userId 를 함께 넘겨, 투표 시 남긴 한마디를 작성자 본인이 관리할 수 있게 한다.
+    return this.pollService.vote(id, dto, code, req.user?.sub ?? null);
   }
 
   @Post(':id/comments')
-  addComment(@Param('id') id: string, @Body() dto: CreateCommentDto, @Query('code') code?: string) {
+  @UseGuards(OptionalAuthGuard)
+  addComment(
+    @Param('id') id: string,
+    @Request() req: any,
+    @Body() dto: CreateCommentDto,
+    @Query('code') code?: string,
+  ) {
     // 비공개(private) 투표는 ?code= 접근 코드 검증을 통과해야 한마디를 남길 수 있다.
-    return this.pollService.addComment(id, dto, code);
+    // 회원이면 JWT userId→authorId, 비회원이면 바디 voterKey→authorKey 로 작성자를 식별·저장한다.
+    return this.pollService.addComment(id, dto, req.user?.sub ?? null, code);
   }
 
   @Patch(':id')
@@ -285,18 +303,42 @@ export class PollController {
     return this.pollService.deletePoll(id, req.user?.sub ?? null, Boolean(req.user?.isAdmin));
   }
 
+  // 댓글 삭제는 작성자 본인(회원/비회원)·폴 소유자·어드민이 할 수 있다.
+  // 비회원 본인 확인용 voterKey 는 GET 쿼리가 아니라 요청 바디로 받는다(로그 누출 방지).
   @Delete(':id/comments/:commentId')
-  @UseGuards(AuthGuard)
+  @UseGuards(OptionalAuthGuard)
   deleteComment(
     @Param('id') id: string,
     @Param('commentId', ParseIntPipe) commentId: number,
     @Request() req: any,
+    @Body() dto: DeleteCommentDto,
   ) {
     return this.pollService.deleteComment(
       id,
       commentId,
       req.user?.sub ?? null,
+      dto?.voterKey ?? null,
       Boolean(req.user?.isAdmin),
+    );
+  }
+
+  // 댓글 수정은 작성자 본인(회원 authorId / 비회원 바디 voterKey→authorKey) 또는 어드민만 가능.
+  @Patch(':id/comments/:commentId')
+  @UseGuards(OptionalAuthGuard)
+  editComment(
+    @Param('id') id: string,
+    @Param('commentId', ParseIntPipe) commentId: number,
+    @Request() req: any,
+    @Body() dto: EditCommentDto,
+    @Query('code') code?: string,
+  ) {
+    return this.pollService.editComment(
+      id,
+      commentId,
+      dto,
+      req.user?.sub ?? null,
+      Boolean(req.user?.isAdmin),
+      code,
     );
   }
 

@@ -34,14 +34,21 @@ interface PollDetailViewProps {
   displayOptions: PollOption[];
   winnerId: number | null;
   isOwner: boolean;
-  /** 본인 글이거나 어드민이면 수정/삭제/댓글관리 가능. 미전달 시 isOwner로 폴백. */
+  /** 폴 자체(질문/선택지) 수정·삭제 권한 — 본인 글이거나 어드민. 미전달 시 isOwner로 폴백. */
   canManage?: boolean;
+  /**
+   * 댓글별 관리(수정/삭제) 노출 판정 — 본인(내가 단 댓글) 또는 폴 소유자/어드민이면 true.
+   * 미전달 시 canManage(폴 권한)로 폴백한다.
+   */
+  canManageCommentById?: (commentId: number) => boolean;
   confirmDelete: boolean;
   onDelete: () => void;
   /** 수정 화면 진입(소유자/어드민). 미전달 시 수정 버튼 미노출. */
   onEdit?: () => void;
-  /** 댓글 삭제(소유자/어드민). 미전달 시 댓글 삭제 버튼 미노출. */
+  /** 댓글 삭제(작성자 본인/소유자/어드민). 미전달 시 댓글 삭제 버튼 미노출. */
   onDeleteComment?: (commentId: number) => void;
+  /** 댓글 수정(작성자 본인). 미전달 시 수정 버튼 미노출. */
+  onEditComment?: (commentId: number, text: string) => Promise<boolean> | boolean;
   /** 답글(대댓글) 작성. 미전달 시 답글 UI 미노출. */
   onAddReply?: (parentId: number, text: string) => Promise<void> | void;
   remaining: number | null;
@@ -487,12 +494,36 @@ function CommentCard(
     comment: PollComment;
     canManage: boolean;
     onDelete?: (commentId: number) => void;
+    onEdit?: (commentId: number, text: string) => Promise<boolean> | boolean;
     onReply?: () => void;
     isReply?: boolean;
   }>,
 ) {
-  const { comment: c, canManage, onDelete, onReply, isReply = false } = props;
+  const { comment: c, canManage, onDelete, onEdit, onReply, isReply = false } = props;
   const showDelete = canManage && Boolean(onDelete);
+  const showEdit = canManage && Boolean(onEdit);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(c.comment);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const startEdit = () => {
+    setDraft(c.comment);
+    setEditing(true);
+  };
+  const saveEdit = async () => {
+    const text = draft.trim();
+    if (!text || !onEdit || isSaving) return;
+    setIsSaving(true);
+    try {
+      const ok = await onEdit(c.id, text);
+      if (ok) {
+        setEditing(false);
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <div
       style={{
@@ -551,13 +582,87 @@ function CommentCard(
               <span>콕 찝음 👈</span>
             </Chip>
           ) : null}
+          {showEdit && !editing ? <CommentEditButton onClick={startEdit} /> : null}
           {showDelete ? <CommentDeleteButton onClick={() => onDelete?.(c.id)} /> : null}
         </div>
       </div>
-      <p style={{ margin: '6px 0 0', fontSize: 14, lineHeight: 1.5, color: theme.text }}>
-        {c.comment}
-      </p>
-      {onReply && !isReply ? (
+      {editing ? (
+        <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+          <input
+            type="text"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !isSaving) void saveEdit();
+              if (e.key === 'Escape') setEditing(false);
+            }}
+            maxLength={100}
+            aria-label="한마디 수정"
+            disabled={isSaving}
+            autoFocus
+            style={{
+              flex: 1,
+              minWidth: 0,
+              minHeight: 44,
+              padding: '10px 14px',
+              borderRadius: theme.radiusSm,
+              border: `1px solid ${theme.borderStrong}`,
+              background: theme.surface,
+              color: theme.text,
+              fontSize: 16,
+            }}
+          />
+          <button
+            type="button"
+            className="pressable"
+            onClick={() => void saveEdit()}
+            disabled={isSaving || !draft.trim()}
+            style={{
+              flexShrink: 0,
+              minHeight: 44,
+              padding: '0 16px',
+              borderRadius: theme.radiusSm,
+              border: 'none',
+              background: theme.accent,
+              color: theme.accentInk,
+              fontSize: FONT.body,
+              fontWeight: 800,
+              cursor: isSaving ? 'default' : 'pointer',
+              opacity: isSaving ? 0.6 : 1,
+            }}
+          >
+            {isSaving ? '저장 중…' : '저장'}
+          </button>
+          <button
+            type="button"
+            className="pressable"
+            onClick={() => setEditing(false)}
+            disabled={isSaving}
+            style={{
+              flexShrink: 0,
+              minHeight: 44,
+              padding: '0 12px',
+              borderRadius: theme.radiusSm,
+              border: `1px solid ${theme.border}`,
+              background: 'none',
+              color: theme.textMuted,
+              fontSize: FONT.small,
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            취소
+          </button>
+        </div>
+      ) : (
+        <p style={{ margin: '6px 0 0', fontSize: 14, lineHeight: 1.5, color: theme.text }}>
+          {c.comment}
+          {c.editedAt ? (
+            <span style={{ marginLeft: 6, fontSize: 12, color: theme.textFaint }}>(수정됨)</span>
+          ) : null}
+        </p>
+      )}
+      {onReply && !isReply && !editing ? (
         <button
           type="button"
           className="pressable"
@@ -580,16 +685,57 @@ function CommentCard(
   );
 }
 
+function CommentEditButton(props: Readonly<{ onClick: () => void }>) {
+  const { onClick } = props;
+  return (
+    <button
+      type="button"
+      className="pressable"
+      aria-label="이 한마디 수정하기"
+      onClick={onClick}
+      style={{
+        flexShrink: 0,
+        minWidth: 44,
+        minHeight: 44,
+        display: 'grid',
+        placeItems: 'center',
+        background: 'none',
+        border: 'none',
+        color: theme.textFaint ?? theme.textMuted,
+        fontSize: FONT.small,
+        fontWeight: 700,
+        cursor: 'pointer',
+        borderRadius: theme.radiusSm,
+      }}
+    >
+      ✏️
+    </button>
+  );
+}
+
 function CommentsSection(
   props: Readonly<{
     comments: PollComment[];
     canManage: boolean;
+    canManageCommentById?: (commentId: number) => boolean;
     closed: boolean;
     onDeleteComment?: (commentId: number) => void;
+    onEditComment?: (commentId: number, text: string) => Promise<boolean> | boolean;
     onAddReply?: (parentId: number, text: string) => Promise<void> | void;
   }>,
 ) {
-  const { comments, canManage, closed, onDeleteComment, onAddReply } = props;
+  const {
+    comments,
+    canManage,
+    canManageCommentById,
+    closed,
+    onDeleteComment,
+    onEditComment,
+    onAddReply,
+  } = props;
+  // 댓글별 권한 — 콜백이 있으면 그걸 쓰고(본인/소유자/어드민), 없으면 폴 권한(canManage)으로 폴백한다.
+  const resolveCanManage = (commentId: number): boolean =>
+    canManageCommentById ? canManageCommentById(commentId) : canManage;
   const [replyingTo, setReplyingTo] = useState<number | null>(null);
   const [replyText, setReplyText] = useState('');
   // 답글 제출 중 재진입 차단(연타/Enter 중복) — 투표 제출 가드와 동일한 패턴.
@@ -659,8 +805,9 @@ function CommentsSection(
           <div key={c.id} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <CommentCard
               comment={c}
-              canManage={canManage}
+              canManage={resolveCanManage(c.id)}
               onDelete={onDeleteComment}
+              onEdit={onEditComment}
               onReply={
                 replyEnabled
                   ? () => {
@@ -674,8 +821,9 @@ function CommentsSection(
               <CommentCard
                 key={r.id}
                 comment={r}
-                canManage={canManage}
+                canManage={resolveCanManage(r.id)}
                 onDelete={onDeleteComment}
+                onEdit={onEditComment}
                 isReply
               />
             ))}
@@ -1219,10 +1367,12 @@ export function PollDetailView(props: Readonly<PollDetailViewProps>) {
     winnerId,
     isOwner,
     canManage: canManageProp,
+    canManageCommentById,
     confirmDelete,
     onDelete,
     onEdit,
     onDeleteComment,
+    onEditComment,
     onAddReply,
     remaining,
     shareUrl,
@@ -1317,8 +1467,10 @@ export function PollDetailView(props: Readonly<PollDetailViewProps>) {
         <CommentsSection
           comments={comments}
           canManage={canManage}
+          canManageCommentById={canManageCommentById}
           closed={closed}
           onDeleteComment={onDeleteComment}
+          onEditComment={onEditComment}
           onAddReply={onAddReply}
         />
 

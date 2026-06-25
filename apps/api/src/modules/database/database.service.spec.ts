@@ -129,6 +129,99 @@ describe('DatabaseService in-memory vote path (#B1 atomic relative increment)', 
   });
 });
 
+describe('DatabaseService in-memory comment author path (secret-strip + persist + edit/delete)', () => {
+  let tmpFile: string;
+
+  const newService = (state: ServiceState) => {
+    fs.writeFileSync(tmpFile, JSON.stringify(state), 'utf-8');
+    process.env.PICKY_DB_PATH = tmpFile;
+    return new DatabaseService();
+  };
+
+  beforeEach(() => {
+    tmpFile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'picky-db-')), 'db.json');
+  });
+
+  afterEach(() => {
+    try {
+      fs.rmSync(path.dirname(tmpFile), { recursive: true, force: true });
+    } catch {
+      // ignore
+    }
+    delete process.env.PICKY_DB_PATH;
+  });
+
+  it('persists authorId/authorKey but NEVER leaks them in getPollById responses', async () => {
+    const service = await newService({ polls: [seedPoll()], users: [] });
+    await service.appendComment('p1', {
+      voterName: '익명',
+      comment: '비회원 한마디',
+      createdAt: new Date().toISOString(),
+      authorKey: 'guest-key-1',
+    });
+
+    const poll = await service.getPollById('p1');
+    const comment = poll?.comments[0] as Record<string, unknown> | undefined;
+    expect(comment?.comment).toBe('비회원 한마디');
+    // 응답에는 비밀 식별값이 절대 실리지 않는다.
+    expect(comment).not.toHaveProperty('authorId');
+    expect(comment).not.toHaveProperty('authorKey');
+  });
+
+  it('exposes authorId/authorKey only via the internal getPollWithCommentAuthors path', async () => {
+    const service = await newService({ polls: [seedPoll()], users: [] });
+    await service.appendComment('p1', {
+      voterName: '익명',
+      comment: '회원 한마디',
+      createdAt: new Date().toISOString(),
+      authorId: 'u-author',
+    });
+
+    const internal = await service.getPollWithCommentAuthors('p1');
+    const comment = internal?.comments[0];
+    expect(comment?.authorId).toBe('u-author');
+    expect(comment?.authorKey).toBeNull();
+  });
+
+  it('updateComment changes text and sets editedAt (author/createdAt unchanged)', async () => {
+    const createdAt = new Date(Date.now() - 60_000).toISOString();
+    const service = await newService({
+      polls: [
+        seedPoll({
+          comments: [{ id: 1, voterName: '민지', comment: '원래', createdAt, parentId: null }],
+        }),
+      ],
+      users: [],
+    });
+
+    await service.updateComment('p1', 1, '고친 한마디');
+    const poll = await service.getPollById('p1');
+    const comment = poll?.comments[0];
+    expect(comment?.comment).toBe('고친 한마디');
+    expect(comment?.voterName).toBe('민지');
+    expect(comment?.createdAt).toBe(createdAt);
+    expect(comment?.editedAt).toBeTruthy();
+  });
+
+  it('deleteComment removes only the targeted comment', async () => {
+    const service = await newService({
+      polls: [
+        seedPoll({
+          comments: [
+            { id: 1, voterName: 'a', comment: '하나', createdAt: new Date().toISOString() },
+            { id: 2, voterName: 'b', comment: '둘', createdAt: new Date().toISOString() },
+          ],
+        }),
+      ],
+      users: [],
+    });
+
+    await service.deleteComment('p1', 1);
+    const poll = await service.getPollById('p1');
+    expect(poll?.comments.map((c) => c.id)).toEqual([2]);
+  });
+});
+
 describe('DatabaseService getPolls sort=commented (댓글 많은순 — no crash, correct order)', () => {
   let tmpFile: string;
 

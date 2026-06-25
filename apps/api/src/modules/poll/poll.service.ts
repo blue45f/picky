@@ -11,6 +11,7 @@ import {
   UpdatePollInput,
   VoteInput,
   CreateCommentInput,
+  EditCommentInput,
   PaginatedPolls,
   Poll,
   PollOption,
@@ -21,6 +22,7 @@ import {
   POLLS_PAGE_DEFAULT_LIMIT,
   POLLS_PAGE_MAX_LIMIT,
 } from '@picky/shared';
+import type { PollCommentWithAuthor } from '../database/database.service';
 
 /** GET /polls 서버측 검색/정렬/필터 파라미터(전부 선택값). */
 export interface GetPollsParams {
@@ -364,28 +366,102 @@ export class PollService {
   }
 
   /**
-   * 댓글(의견)을 삭제한다. 댓글 작성자는 비회원/익명일 수 있어 식별이 어려우므로,
-   * 고민(투표) 작성자 또는 운영자만 모더레이션 차원에서 삭제할 수 있다.
+   * 댓글 관리(수정/삭제) 권한을 강제한다 — 다음 중 하나면 허용:
+   * - 작성자 본인: 회원(authorId===userId) 또는 비회원(authorKey===요청 voterKey)
+   * - 폴 소유자(모더레이션): poll.creatorId===userId
+   * - 어드민
+   * 레거시 댓글(authorId/authorKey 둘 다 null)은 본인 판정이 불가하지만 폴 소유자/어드민은 여전히 관리할 수 있다.
+   * 권한 검사용으로 댓글 작성자 식별값을 들고 있는 comment(PollCommentWithAuthor)를 받지만,
+   * 이 값들은 응답으로 절대 나가지 않는다(비밀).
+   */
+  private assertCanManageComment(
+    poll: Poll,
+    comment: PollCommentWithAuthor,
+    userId: string | null,
+    voterKey: string | null,
+    isAdmin: boolean,
+    action: string,
+  ): void {
+    if (isAdmin) {
+      return;
+    }
+    // 폴 소유자(모더레이션)
+    if (userId && poll.creatorId && poll.creatorId === userId) {
+      return;
+    }
+    // 작성자 본인 — 회원(authorId) 또는 비회원(authorKey)
+    const trimmedKey = (voterKey ?? '').trim();
+    const authorIdMatch = Boolean(userId && comment.authorId && comment.authorId === userId);
+    const authorKeyMatch = Boolean(
+      trimmedKey && comment.authorKey && comment.authorKey === trimmedKey,
+    );
+    if (authorIdMatch || authorKeyMatch) {
+      return;
+    }
+    throw new ForbiddenException(`내가 쓴 한마디만 ${action}할 수 있어요.`);
+  }
+
+  /**
+   * 댓글(의견)을 삭제한다. 작성자 본인(회원 authorId / 비회원 authorKey)·폴 소유자·어드민이 삭제할 수 있다.
+   * 비회원 본인 확인용 voterKey 는 GET 쿼리가 아니라 요청 바디로 받는다(로그 누출 방지).
    */
   async deleteComment(
     id: string,
     commentId: number,
     userId: string | null,
+    voterKey: string | null,
     isAdmin = false,
   ): Promise<{ id: string; commentId: number; deleted: true }> {
-    const poll = await this.db.getPollById(id);
+    const poll = await this.db.getPollWithCommentAuthors(id);
     if (!poll) {
       throw new NotFoundException(`고민(투표) ID ${id}를 찾을 수 없습니다.`);
     }
-    this.assertCanManage(poll, userId, isAdmin, '관리');
-
-    const exists = poll.comments.some((comment) => comment.id === commentId);
-    if (!exists) {
+    const comment = poll.comments.find((item) => item.id === commentId);
+    if (!comment) {
       throw new NotFoundException(`댓글 ID ${commentId}를 찾을 수 없습니다.`);
     }
+    this.assertCanManageComment(poll, comment, userId, voterKey, isAdmin, '삭제');
 
     await this.db.deleteComment(id, commentId);
     return { id, commentId, deleted: true };
+  }
+
+  /**
+   * 댓글 텍스트를 수정한다 — 작성자 본인만(회원 authorId / 비회원 authorKey). 폴 소유자/어드민은 모더레이션 삭제만 하고
+   * 남의 글 내용 변조는 어드민만 허용한다(작성자 신뢰 보존). 작성자/원시각은 불변, editedAt 만 갱신된다.
+   * 응답은 작성자 식별값을 제거한 최신 폴(getPollForViewer)로 돌려준다.
+   */
+  async editComment(
+    id: string,
+    commentId: number,
+    input: EditCommentInput,
+    userId: string | null,
+    isAdmin = false,
+    code?: string | null,
+  ): Promise<Poll> {
+    const poll = await this.db.getPollWithCommentAuthors(id);
+    if (!poll) {
+      throw new NotFoundException(`고민(투표) ID ${id}를 찾을 수 없습니다.`);
+    }
+    const comment = poll.comments.find((item) => item.id === commentId);
+    if (!comment) {
+      throw new NotFoundException(`댓글 ID ${commentId}를 찾을 수 없습니다.`);
+    }
+    // 수정은 작성자 본인(또는 어드민)만 — 폴 소유자라도 남의 한마디 내용은 바꿀 수 없다.
+    if (!isAdmin) {
+      const trimmedKey = (input.voterKey ?? '').trim();
+      const authorIdMatch = Boolean(userId && comment.authorId && comment.authorId === userId);
+      const authorKeyMatch = Boolean(
+        trimmedKey && comment.authorKey && comment.authorKey === trimmedKey,
+      );
+      if (!authorIdMatch && !authorKeyMatch) {
+        throw new ForbiddenException('내가 쓴 한마디만 수정할 수 있어요.');
+      }
+    }
+
+    await this.db.updateComment(id, commentId, input.comment.trim());
+    // 비공개 폴이면 응답 redaction을 위해 코드를 함께 넘긴다(작성자 식별값은 어차피 strip됨).
+    return this.getPollForViewer(id, code);
   }
 
   /**
@@ -403,7 +479,12 @@ export class PollService {
     }
   }
 
-  async vote(id: string, input: VoteInput, code?: string | null): Promise<Poll> {
+  async vote(
+    id: string,
+    input: VoteInput,
+    code?: string | null,
+    userId: string | null = null,
+  ): Promise<Poll> {
     const poll = await this.db.getPollById(id);
     if (!poll) {
       throw new NotFoundException(`고민(투표) ID ${id}를 찾을 수 없습니다.`);
@@ -429,6 +510,7 @@ export class PollService {
     }
 
     // 한마디(댓글)는 카운트와 분리해 추가한다(카운트는 castVote가 이미 원자적으로 반영).
+    // 투표 시 남긴 한마디도 작성자 식별값(회원 userId / 비회원 voterKey)을 저장해 본인 관리가 가능하게 한다.
     if (input.comment?.trim()) {
       await this.db.appendComment(id, {
         voterName: input.voterName?.trim() ? input.voterName.trim() : '익명',
@@ -436,6 +518,8 @@ export class PollService {
         createdAt: new Date().toISOString(),
         selectedOptionId: input.optionId,
         selectedOptionText: option.text,
+        authorId: userId,
+        authorKey: input.voterKey?.trim() ? input.voterKey.trim() : null,
       });
     }
 
@@ -443,8 +527,17 @@ export class PollService {
     return this.getPollForViewer(id, code);
   }
 
-  /** 한마디(댓글)·답글 작성 — 투표와 무관. parentId가 있으면 해당 댓글의 답글. */
-  async addComment(id: string, input: CreateCommentInput, code?: string | null): Promise<Poll> {
+  /**
+   * 한마디(댓글)·답글 작성 — 투표와 무관. parentId가 있으면 해당 댓글의 답글.
+   * 작성자 식별값을 저장한다: 회원=JWT userId→authorId, 비회원=요청 voterKey→authorKey.
+   * 이 식별값으로 나중에 작성자 본인의 수정/삭제를 허용한다(응답엔 노출하지 않음).
+   */
+  async addComment(
+    id: string,
+    input: CreateCommentInput,
+    userId: string | null = null,
+    code?: string | null,
+  ): Promise<Poll> {
     const poll = await this.db.getPollById(id);
     if (!poll) {
       throw new NotFoundException(`고민(투표) ID ${id}를 찾을 수 없습니다.`);
@@ -482,6 +575,9 @@ export class PollService {
       comment: input.comment.trim(),
       createdAt: new Date().toISOString(),
       parentId,
+      // 회원=authorId 우선, 비회원=요청 voterKey→authorKey(vote와 동일한 안정 키).
+      authorId: userId,
+      authorKey: input.voterKey?.trim() ? input.voterKey.trim() : null,
     });
     // 응답은 열람용 redaction을 거쳐 비공개 폴의 게이트 데이터가 새지 않게 한다(코드 통과 시 전체 반환).
     return this.getPollForViewer(id, code);

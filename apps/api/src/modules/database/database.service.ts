@@ -1,7 +1,7 @@
 import { Injectable, OnModuleInit, ServiceUnavailableException } from '@nestjs/common';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { Poll, PaginatedPolls, PollListSort, PollListStatus } from '@picky/shared';
+import { Poll, PollComment, PaginatedPolls, PollListSort, PollListStatus } from '@picky/shared';
 import { get as getBlob, put as putBlob } from '@vercel/blob';
 import { createClient, type VercelKV } from '@vercel/kv';
 import { Pool } from 'pg';
@@ -11,6 +11,19 @@ import { eq, and, desc, asc, sql, count, ilike, or, isNull, inArray, type SQL } 
 
 /** Blob 경로에서 비표시 1인1표 메타를 폴 객체에 덧붙이기 위한 내부 확장 타입. */
 type PollWithVotedKeys = Poll & { votedKeys?: string[] };
+
+/**
+ * 댓글 작성자 식별값(authorId/authorKey)을 내부에서만 들고 다니기 위한 확장 타입.
+ * 이 값들은 비밀(voterKey 동급)이라 응답에는 절대 싣지 않는다 — stripCommentAuthors로 제거.
+ * 서버의 본인 수정/삭제 권한 판정(getPollWithCommentAuthors)에서만 쓴다.
+ */
+export type PollCommentWithAuthor = PollComment & {
+  authorId?: string | null;
+  authorKey?: string | null;
+};
+export type PollWithCommentAuthors = Omit<Poll, 'comments'> & {
+  comments: PollCommentWithAuthor[];
+};
 
 /**
  * 목록 질의 옵션(서버 1-base page + limit + 검색/정렬/필터).
@@ -117,7 +130,10 @@ export class DatabaseService implements OnModuleInit {
             created_at TIMESTAMP DEFAULT NOW() NOT NULL,
             selected_option_id INTEGER,
             selected_option_text TEXT,
-            parent_id INTEGER
+            parent_id INTEGER,
+            author_id TEXT,
+            author_key TEXT,
+            edited_at TIMESTAMP
           );
         `);
         // 서버측 1인1표(#12). (poll_id, voter_key) 유니크로 재투표를 막는다. 비파괴·멱등.
@@ -141,6 +157,9 @@ export class DatabaseService implements OnModuleInit {
           ALTER TABLE polls ADD COLUMN IF NOT EXISTS visibility TEXT DEFAULT 'public' NOT NULL;
           ALTER TABLE polls ADD COLUMN IF NOT EXISTS access_code TEXT;
           ALTER TABLE poll_comments ADD COLUMN IF NOT EXISTS parent_id INTEGER;
+          ALTER TABLE poll_comments ADD COLUMN IF NOT EXISTS author_id TEXT;
+          ALTER TABLE poll_comments ADD COLUMN IF NOT EXISTS author_key TEXT;
+          ALTER TABLE poll_comments ADD COLUMN IF NOT EXISTS edited_at TIMESTAMP;
         `);
         // users.email UNIQUE 제약 마이그레이션:
         // 익명/게스트/토스 로그인은 email='' 로 사용자를 만들기 때문에, 기존 `email TEXT NOT NULL UNIQUE`는
@@ -409,14 +428,28 @@ export class DatabaseService implements OnModuleInit {
     };
   }
 
-  /** Blob 경로 응답에서 비표시 메타(votedKeys 등)를 제거해 외부로 새지 않게 한다. */
+  /**
+   * Blob 경로 응답에서 비표시 메타(votedKeys 등)를 제거해 외부로 새지 않게 한다.
+   * 댓글의 작성자 식별값(authorId/authorKey)도 비밀이라 함께 제거한다(stripCommentAuthors).
+   */
   private stripPollMeta(poll: Poll | undefined): Poll | undefined {
     if (!poll) {
       return poll;
     }
     const next: PollWithVotedKeys = { ...(poll as PollWithVotedKeys) };
     delete next.votedKeys;
+    next.comments = this.stripCommentAuthors(next.comments);
     return next;
+  }
+
+  /** 댓글 배열에서 비밀 작성자 식별값(authorId/authorKey)을 제거해 응답 노출을 막는다. */
+  private stripCommentAuthors(comments: PollComment[]): PollComment[] {
+    return comments.map((comment) => {
+      const next = { ...(comment as PollCommentWithAuthor) };
+      delete next.authorId;
+      delete next.authorKey;
+      return next as PollComment;
+    });
   }
 
   private async loadFromKv(): Promise<DatabaseState | null> {
@@ -731,36 +764,46 @@ export class DatabaseService implements OnModuleInit {
     }
   }
 
-  /** Drizzle polls 행(options/comments 포함)을 공유 Poll 응답 형태로 변환한다. */
-  private mapPollRow(r: {
-    id: string;
-    question: string;
-    description: string | null;
-    createdAt: Date;
-    endsAt: Date | null;
-    totalVotes: number;
-    resultsVisibility: string;
-    visibility: string;
-    creatorId: string | null;
-    creatorIsGuest: boolean;
-    categoryId: string | null;
-    attachments: unknown;
-    options: Array<{
-      optionIndex: number;
-      text: string;
-      voteCount: number;
-      imageUrl: string | null;
-    }>;
-    comments: Array<{
-      id: number;
-      voterName: string;
-      comment: string;
+  /**
+   * Drizzle polls 행(options/comments 포함)을 공유 Poll 응답 형태로 변환한다.
+   * includeAuthors=true 면 댓글에 authorId/authorKey(비밀)를 내부용으로 포함한다(권한 판정 전용).
+   * 기본은 false — 응답 경로는 절대 작성자 식별값을 노출하지 않는다.
+   */
+  private mapPollRow(
+    r: {
+      id: string;
+      question: string;
+      description: string | null;
       createdAt: Date;
-      selectedOptionId: number | null;
-      selectedOptionText: string | null;
-      parentId: number | null;
-    }>;
-  }): Poll {
+      endsAt: Date | null;
+      totalVotes: number;
+      resultsVisibility: string;
+      visibility: string;
+      creatorId: string | null;
+      creatorIsGuest: boolean;
+      categoryId: string | null;
+      attachments: unknown;
+      options: Array<{
+        optionIndex: number;
+        text: string;
+        voteCount: number;
+        imageUrl: string | null;
+      }>;
+      comments: Array<{
+        id: number;
+        voterName: string;
+        comment: string;
+        createdAt: Date;
+        selectedOptionId: number | null;
+        selectedOptionText: string | null;
+        parentId: number | null;
+        authorId?: string | null;
+        authorKey?: string | null;
+        editedAt?: Date | null;
+      }>;
+    },
+    includeAuthors = false,
+  ): Poll {
     return {
       id: r.id,
       question: r.question,
@@ -789,8 +832,11 @@ export class DatabaseService implements OnModuleInit {
         selectedOptionId: c.selectedOptionId || undefined,
         selectedOptionText: c.selectedOptionText || undefined,
         parentId: c.parentId ?? undefined,
+        editedAt: c.editedAt ? c.editedAt.toISOString() : undefined,
+        // authorId/authorKey 는 비밀 — includeAuthors(내부 권한 판정)일 때만 싣는다.
+        ...(includeAuthors ? { authorId: c.authorId ?? null, authorKey: c.authorKey ?? null } : {}),
       })),
-    };
+    } as Poll;
   }
 
   async getPollById(id: string): Promise<Poll | undefined> {
@@ -817,6 +863,37 @@ export class DatabaseService implements OnModuleInit {
     const found = this.stripPollMeta(this.data.polls.find((p) => p.id === id));
     if (!found) return found;
     return { ...found, creatorNickname: this.resolveCreatorNicknameFromMemory(found.creatorId) };
+  }
+
+  /**
+   * 내부 전용 — 댓글 작성자 식별값(authorId/authorKey)을 포함해 폴을 읽는다(본인 권한 판정용).
+   * 이 결과는 응답에 그대로 내보내면 안 된다(비밀 노출). 서버 권한 검사 후 버린다.
+   */
+  async getPollWithCommentAuthors(id: string): Promise<PollWithCommentAuthors | undefined> {
+    if (this.useSqlDb) {
+      const r = await db.query.polls.findFirst({
+        where: eq(schema.polls.id, id),
+        with: {
+          options: {
+            orderBy: (opt, { asc: ascFn }) => [ascFn(opt.optionIndex)],
+          },
+          comments: {
+            orderBy: (cmt, { asc: ascFn }) => [ascFn(cmt.createdAt)],
+          },
+        },
+      });
+      if (!r) return undefined;
+      // includeAuthors=true 로 댓글에 authorId/authorKey 를 실어 권한 판정에 쓴다.
+      return this.mapPollRow(r, true) as PollWithCommentAuthors;
+    }
+
+    await this.refresh();
+    // in-memory 는 votedKeys 만 떼고 댓글 author 필드는 보존한 사본을 돌려준다(권한 판정용).
+    const raw = this.data.polls.find((p) => p.id === id);
+    if (!raw) return undefined;
+    const next = { ...(raw as PollWithVotedKeys) };
+    delete next.votedKeys;
+    return next as PollWithCommentAuthors;
   }
 
   /** creatorId → users.nickname 해석(SQL). 없거나 유저를 못 찾으면 null. */
@@ -1114,6 +1191,9 @@ export class DatabaseService implements OnModuleInit {
       selectedOptionId?: number | null;
       selectedOptionText?: string | null;
       parentId?: number | null;
+      // 작성자 식별값(비밀) — 본인 수정/삭제 권한 판정용. 회원=authorId, 비회원=authorKey.
+      authorId?: string | null;
+      authorKey?: string | null;
     },
   ): Promise<void> {
     if (this.useSqlDb) {
@@ -1125,6 +1205,8 @@ export class DatabaseService implements OnModuleInit {
         selectedOptionId: comment.selectedOptionId ?? null,
         selectedOptionText: comment.selectedOptionText ?? null,
         parentId: comment.parentId ?? null,
+        authorId: comment.authorId ?? null,
+        authorKey: comment.authorKey ?? null,
       });
       return;
     }
@@ -1137,22 +1219,51 @@ export class DatabaseService implements OnModuleInit {
     }
     const target = nextPolls[idx] as PollWithVotedKeys;
     const nextId = target.comments.reduce((max, c) => Math.max(max, c.id), 0) + 1;
+    const nextComment: PollCommentWithAuthor = {
+      id: nextId,
+      voterName: comment.voterName,
+      comment: comment.comment,
+      createdAt: comment.createdAt,
+      selectedOptionId: comment.selectedOptionId ?? undefined,
+      selectedOptionText: comment.selectedOptionText ?? undefined,
+      parentId: comment.parentId ?? null,
+      authorId: comment.authorId ?? null,
+      authorKey: comment.authorKey ?? null,
+    };
     nextPolls[idx] = {
       ...target,
-      comments: [
-        ...target.comments,
-        {
-          id: nextId,
-          voterName: comment.voterName,
-          comment: comment.comment,
-          createdAt: comment.createdAt,
-          selectedOptionId: comment.selectedOptionId ?? undefined,
-          selectedOptionText: comment.selectedOptionText ?? undefined,
-          parentId: comment.parentId ?? null,
-        },
-      ],
+      comments: [...target.comments, nextComment],
     } as PollWithVotedKeys;
     await this.commit({ ...this.data, polls: nextPolls });
+  }
+
+  /** 댓글 텍스트 수정 — 작성자/원시각은 불변, comment 와 edited_at 만 갱신한다(권한 검사는 서비스). */
+  async updateComment(pollId: string, commentId: number, comment: string): Promise<boolean> {
+    const editedAt = new Date();
+    if (this.useSqlDb) {
+      await db
+        .update(schema.pollComments)
+        .set({ comment, editedAt })
+        .where(
+          sql`${schema.pollComments.pollId} = ${pollId} AND ${schema.pollComments.id} = ${commentId}`,
+        );
+      return true;
+    }
+
+    await this.refresh();
+    const editedAtIso = editedAt.toISOString();
+    const nextPolls = this.data.polls.map((p) =>
+      p.id === pollId
+        ? {
+            ...p,
+            comments: p.comments.map((c) =>
+              c.id === commentId ? { ...c, comment, editedAt: editedAtIso } : c,
+            ),
+          }
+        : p,
+    );
+    await this.commit({ ...this.data, polls: nextPolls });
+    return true;
   }
 
   async getUsers(): Promise<DatabaseUser[]> {

@@ -83,7 +83,9 @@ export class OptionalAuthGuard implements CanActivate {
         const payload = await this.jwtService.verifyAsync(token, {
           secret: JWT_SECRET,
         });
-        request['user'] = payload;
+        // isAdmin 은 토큰 클레임을 믿지 않고 요청 시점 ADMIN_EMAILS 로 재검증한다(AuthGuard와 동일).
+        // OptionalAuthGuard 경로(댓글 수정/삭제 등)에서도 어드민 모더레이션이 유지되게 한다.
+        request['user'] = { ...payload, isAdmin: isAdminEmail(payload?.email) };
       } catch {
         // Optional 이므로 에러를 던지지 않고 그냥 넘어감
       }

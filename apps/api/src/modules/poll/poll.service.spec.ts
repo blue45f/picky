@@ -1,9 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ConflictException, ForbiddenException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import type { Poll, PaginatedPolls } from '@picky/shared';
 import { POLLS_PAGE_MAX_LIMIT } from '@picky/shared';
 import { PollService } from './poll.service';
-import type { DatabaseService } from '../database/database.service';
+import type {
+  DatabaseService,
+  PollWithCommentAuthors,
+  PollCommentWithAuthor,
+} from '../database/database.service';
 
 /** 최소 폴 픽스처 — 옵션 2개, 마감 없음, 공개. */
 const makePoll = (overrides: Partial<Poll> = {}): Poll => ({
@@ -40,20 +44,61 @@ const createDbMock = () => {
     }),
   );
   const getPollById = vi.fn(async (_id: string): Promise<Poll | undefined> => makePoll());
+  const getPollWithCommentAuthors = vi.fn(
+    async (_id: string): Promise<PollWithCommentAuthors | undefined> =>
+      makePoll() as PollWithCommentAuthors,
+  );
   const castVote = vi.fn(async () => ({ recorded: true }));
   const appendComment = vi.fn(async () => undefined);
   const verifyAccessCode = vi.fn(async () => true);
   const savePollContent = vi.fn(async () => undefined);
+  const deleteComment = vi.fn(async () => true);
+  const updateComment = vi.fn(async () => true);
   const db = {
     getPolls,
     getPollById,
+    getPollWithCommentAuthors,
     castVote,
     appendComment,
     verifyAccessCode,
     savePollContent,
+    deleteComment,
+    updateComment,
   } as unknown as DatabaseService;
-  return { db, getPolls, getPollById, castVote, appendComment, verifyAccessCode, savePollContent };
+  return {
+    db,
+    getPolls,
+    getPollById,
+    getPollWithCommentAuthors,
+    castVote,
+    appendComment,
+    verifyAccessCode,
+    savePollContent,
+    deleteComment,
+    updateComment,
+  };
 };
+
+/** authorId/authorKey 를 들고 있는 댓글이 달린 폴 픽스처(권한 판정 경로용). */
+const makePollWithComment = (
+  comment: Partial<PollCommentWithAuthor>,
+  pollOverrides: Partial<Poll> = {},
+): PollWithCommentAuthors =>
+  ({
+    ...makePoll(pollOverrides),
+    comments: [
+      {
+        id: 1,
+        voterName: '익명',
+        comment: '원래 한마디',
+        createdAt: new Date().toISOString(),
+        parentId: null,
+        authorId: null,
+        authorKey: null,
+        ...comment,
+      },
+    ],
+  }) as PollWithCommentAuthors;
 
 describe('PollService.getPolls (pagination clamp + server filters)', () => {
   it('clamps page/limit and defaults sort/status', async () => {
@@ -411,5 +456,213 @@ describe('PollService.getPoll (creatorNickname passthrough)', () => {
 
     const poll = await service.getPoll('abc123');
     expect(poll.creatorNickname).toBe('희준');
+  });
+});
+
+describe('PollService.deleteComment (author-self + moderation permissions)', () => {
+  let mocks: ReturnType<typeof createDbMock>;
+  let service: PollService;
+
+  beforeEach(() => {
+    mocks = createDbMock();
+    service = new PollService(mocks.db);
+  });
+
+  it('lets the GUEST author delete their own comment via matching voterKey→authorKey', async () => {
+    mocks.getPollWithCommentAuthors.mockResolvedValue(
+      makePollWithComment({ authorKey: 'guest-key-1' }, { creatorId: 'owner-x' }),
+    );
+    await expect(
+      // 비회원 본인: userId 없음, voterKey 일치
+      service.deleteComment('abc123', 1, null, 'guest-key-1', false),
+    ).resolves.toEqual({ id: 'abc123', commentId: 1, deleted: true });
+    expect(mocks.deleteComment).toHaveBeenCalledWith('abc123', 1);
+  });
+
+  it('lets the MEMBER author delete their own comment via matching userId→authorId', async () => {
+    mocks.getPollWithCommentAuthors.mockResolvedValue(
+      makePollWithComment({ authorId: 'u-author' }, { creatorId: 'owner-x' }),
+    );
+    await expect(
+      service.deleteComment('abc123', 1, 'u-author', null, false),
+    ).resolves.toMatchObject({ deleted: true });
+    expect(mocks.deleteComment).toHaveBeenCalledWith('abc123', 1);
+  });
+
+  it('rejects a different guest (voterKey mismatch) who is neither owner nor admin', async () => {
+    mocks.getPollWithCommentAuthors.mockResolvedValue(
+      makePollWithComment({ authorKey: 'guest-key-1' }, { creatorId: 'owner-x' }),
+    );
+    await expect(
+      service.deleteComment('abc123', 1, null, 'someone-else-key', false),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(mocks.deleteComment).not.toHaveBeenCalled();
+  });
+
+  it('rejects a different member (userId mismatch) who is neither owner nor admin', async () => {
+    mocks.getPollWithCommentAuthors.mockResolvedValue(
+      makePollWithComment({ authorId: 'u-author' }, { creatorId: 'owner-x' }),
+    );
+    await expect(
+      service.deleteComment('abc123', 1, 'u-stranger', null, false),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(mocks.deleteComment).not.toHaveBeenCalled();
+  });
+
+  it('lets the POLL OWNER moderate (delete) someone else’s comment', async () => {
+    mocks.getPollWithCommentAuthors.mockResolvedValue(
+      makePollWithComment({ authorKey: 'guest-key-1' }, { creatorId: 'owner-x' }),
+    );
+    // 폴 소유자(owner-x)는 남의 댓글도 모더레이션 삭제 가능.
+    await expect(service.deleteComment('abc123', 1, 'owner-x', null, false)).resolves.toMatchObject(
+      { deleted: true },
+    );
+    expect(mocks.deleteComment).toHaveBeenCalledWith('abc123', 1);
+  });
+
+  it('lets an ADMIN moderate (delete) any comment', async () => {
+    mocks.getPollWithCommentAuthors.mockResolvedValue(
+      makePollWithComment({ authorKey: 'guest-key-1' }, { creatorId: 'owner-x' }),
+    );
+    await expect(
+      service.deleteComment('abc123', 1, 'rando-admin', null, true),
+    ).resolves.toMatchObject({ deleted: true });
+    expect(mocks.deleteComment).toHaveBeenCalledWith('abc123', 1);
+  });
+
+  it('keeps owner/admin moderation for LEGACY comments (authorId/authorKey both null)', async () => {
+    mocks.getPollWithCommentAuthors.mockResolvedValue(
+      makePollWithComment({ authorId: null, authorKey: null }, { creatorId: 'owner-x' }),
+    );
+    // 레거시 댓글이라 본인 판정은 불가하지만 폴 소유자는 여전히 관리할 수 있다.
+    await expect(service.deleteComment('abc123', 1, 'owner-x', null, false)).resolves.toMatchObject(
+      { deleted: true },
+    );
+    // 일반인은 레거시 댓글을 못 지운다(본인 판정 불가).
+    mocks.deleteComment.mockClear();
+    mocks.getPollWithCommentAuthors.mockResolvedValue(
+      makePollWithComment({ authorId: null, authorKey: null }, { creatorId: 'owner-x' }),
+    );
+    await expect(service.deleteComment('abc123', 1, null, 'any-key', false)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+    expect(mocks.deleteComment).not.toHaveBeenCalled();
+  });
+
+  it('throws 404 when the comment id does not exist', async () => {
+    mocks.getPollWithCommentAuthors.mockResolvedValue(
+      makePollWithComment({ authorKey: 'guest-key-1' }),
+    );
+    await expect(
+      service.deleteComment('abc123', 999, null, 'guest-key-1', false),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(mocks.deleteComment).not.toHaveBeenCalled();
+  });
+});
+
+describe('PollService.editComment (author-self only, moderation cannot rewrite)', () => {
+  let mocks: ReturnType<typeof createDbMock>;
+  let service: PollService;
+
+  beforeEach(() => {
+    mocks = createDbMock();
+    service = new PollService(mocks.db);
+  });
+
+  it('lets the GUEST author edit their own comment via matching voterKey', async () => {
+    mocks.getPollWithCommentAuthors.mockResolvedValue(
+      makePollWithComment({ authorKey: 'guest-key-1' }, { creatorId: 'owner-x' }),
+    );
+    // 비회원 본인: userId 없음, 바디 voterKey 가 authorKey 와 일치해야 한다.
+    await service.editComment(
+      'abc123',
+      1,
+      { comment: '  고친 한마디 ', voterKey: 'guest-key-1' },
+      null,
+      false,
+    );
+    // 텍스트는 trim 되어 저장된다.
+    expect(mocks.updateComment).toHaveBeenCalledWith('abc123', 1, '고친 한마디');
+  });
+
+  it('lets the MEMBER author edit their own comment via matching userId', async () => {
+    mocks.getPollWithCommentAuthors.mockResolvedValue(
+      makePollWithComment({ authorId: 'u-author' }, { creatorId: 'owner-x' }),
+    );
+    await service.editComment('abc123', 1, { comment: '회원이 고침' }, 'u-author', false);
+    expect(mocks.updateComment).toHaveBeenCalledWith('abc123', 1, '회원이 고침');
+  });
+
+  it('rejects a non-author (different voterKey) from editing', async () => {
+    mocks.getPollWithCommentAuthors.mockResolvedValue(
+      makePollWithComment({ authorKey: 'guest-key-1' }, { creatorId: 'owner-x' }),
+    );
+    await expect(
+      service.editComment(
+        'abc123',
+        1,
+        { comment: '몰래 수정', voterKey: 'other-key' },
+        null,
+        false,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(mocks.updateComment).not.toHaveBeenCalled();
+  });
+
+  it('does NOT let the poll OWNER rewrite someone else’s comment (only admin may)', async () => {
+    mocks.getPollWithCommentAuthors.mockResolvedValue(
+      makePollWithComment({ authorKey: 'guest-key-1' }, { creatorId: 'owner-x' }),
+    );
+    // 폴 소유자라도 남의 한마디 내용은 변조할 수 없다(작성자 신뢰 보존).
+    await expect(
+      service.editComment('abc123', 1, { comment: '소유자 변조' }, 'owner-x', false),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(mocks.updateComment).not.toHaveBeenCalled();
+  });
+
+  it('lets an ADMIN edit any comment', async () => {
+    mocks.getPollWithCommentAuthors.mockResolvedValue(
+      makePollWithComment({ authorKey: 'guest-key-1' }, { creatorId: 'owner-x' }),
+    );
+    await service.editComment('abc123', 1, { comment: '운영자 정정' }, 'rando-admin', true);
+    expect(mocks.updateComment).toHaveBeenCalledWith('abc123', 1, '운영자 정정');
+  });
+
+  it('throws 404 when editing a missing comment', async () => {
+    mocks.getPollWithCommentAuthors.mockResolvedValue(
+      makePollWithComment({ authorKey: 'guest-key-1' }),
+    );
+    await expect(
+      service.editComment('abc123', 42, { comment: '없음', voterKey: 'guest-key-1' }, null, false),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(mocks.updateComment).not.toHaveBeenCalled();
+  });
+});
+
+describe('PollService.addComment (author identity persistence)', () => {
+  let mocks: ReturnType<typeof createDbMock>;
+  let service: PollService;
+
+  beforeEach(() => {
+    mocks = createDbMock();
+    service = new PollService(mocks.db);
+  });
+
+  it('stores the MEMBER userId as authorId when authenticated', async () => {
+    mocks.getPollById.mockResolvedValue(makePoll());
+    await service.addComment('abc123', { comment: '회원 한마디' }, 'u-member');
+    expect(mocks.appendComment).toHaveBeenCalledWith(
+      'abc123',
+      expect.objectContaining({ authorId: 'u-member', authorKey: null }),
+    );
+  });
+
+  it('stores the GUEST voterKey as authorKey when no userId', async () => {
+    mocks.getPollById.mockResolvedValue(makePoll());
+    await service.addComment('abc123', { comment: '비회원 한마디', voterKey: 'guest-key-9' }, null);
+    expect(mocks.appendComment).toHaveBeenCalledWith(
+      'abc123',
+      expect.objectContaining({ authorId: null, authorKey: 'guest-key-9' }),
+    );
   });
 });

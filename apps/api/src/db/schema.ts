@@ -58,6 +58,12 @@ export const pollComments = pgTable('poll_comments', {
   selectedOptionText: text('selected_option_text'),
   // 대댓글: 부모 댓글 id (최상위면 null). 비파괴 추가.
   parentId: integer('parent_id'),
+  // 작성자 식별값 — 본인 수정/삭제 권한 판정용. 둘 다 비밀(응답에 절대 노출 금지).
+  // authorId: 회원 JWT userId, authorKey: 비회원 안정 식별키(voterKey). 레거시 댓글은 둘 다 null.
+  authorId: text('author_id'),
+  authorKey: text('author_key'),
+  // 본인이 댓글을 수정한 시각. 한 번도 수정 안 했으면 null. 공개 표시값.
+  editedAt: timestamp('edited_at'),
 });
 
 // Poll votes table — 서버측 1인1표. (poll_id, voter_key) 유니크로 재투표를 막는다.

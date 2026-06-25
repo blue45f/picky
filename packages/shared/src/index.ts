@@ -202,9 +202,35 @@ export const CreateCommentSchema = z.object({
   voterName: z.string().trim().max(20, '닉네임은 최대 20자예요.').optional().nullable(),
   /** 대댓글: 답글을 달 부모 댓글 id. 최상위 댓글이면 생략. */
   parentId: z.number().int().positive().optional().nullable(),
+  /**
+   * 비회원 작성자 안정 식별키(vote의 voterKey와 동일). 회원이면 JWT userId가 우선이라 생략 가능.
+   * 서버가 이 값을 댓글의 authorKey로 저장해 두면, 나중에 같은 키로 본인 수정/삭제를 허용한다.
+   * authorKey 원문은 응답에 절대 노출하지 않는다(voterKey처럼 비밀).
+   */
+  voterKey: z.string().max(256, '식별키가 너무 깁니다.').optional().nullable(),
 });
 
 export type CreateCommentInput = z.infer<typeof CreateCommentSchema>;
+
+/**
+ * 댓글 수정 입력 — 작성자 본인만(authorId===userId OR authorKey===voterKey) 텍스트를 고칠 수 있다.
+ * 작성자/원시각은 불변, 텍스트만 교체하고 editedAt이 갱신된다.
+ */
+export const EditCommentSchema = z.object({
+  comment: z.string().trim().min(1, '한마디를 입력해 주세요.').max(100, '한마디는 최대 100자예요.'),
+  /** 비회원 본인 확인용 식별키. 회원이면 JWT userId로 판정하므로 생략 가능. 응답 비노출. */
+  voterKey: z.string().max(256, '식별키가 너무 깁니다.').optional().nullable(),
+});
+
+export type EditCommentInput = z.infer<typeof EditCommentSchema>;
+
+/** 댓글 삭제 바디 — 비회원 본인 확인용 voterKey를 POST/DELETE 바디로 전송(GET 쿼리 누출 방지). 응답 비노출. */
+export const DeleteCommentSchema = z.object({
+  /** 비회원 본인 확인용 식별키. 회원이면 JWT userId로 판정하므로 생략 가능. 폴 소유자/어드민은 불필요. */
+  voterKey: z.string().max(256, '식별키가 너무 깁니다.').optional().nullable(),
+});
+
+export type DeleteCommentInput = z.infer<typeof DeleteCommentSchema>;
 
 export interface PollOption {
   id: number;
@@ -222,6 +248,8 @@ export interface PollComment {
   selectedOptionText?: string;
   /** 대댓글: 부모 댓글 id. 최상위 댓글이면 null/미설정. */
   parentId?: number | null;
+  /** 본인이 댓글을 수정한 시각(ISO). 한 번도 수정 안 했으면 null/미설정. 공개 표시값. */
+  editedAt?: string | null;
 }
 
 export type PollAttachment = z.infer<typeof PollAttachmentSchema>;

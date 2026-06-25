@@ -16,6 +16,7 @@ import {
 } from '../lib/pollShare';
 import { isPollClosed, leadingOption, optionsByVotes } from '../lib/poll';
 import { getVotedOptionId, rememberVote } from '../lib/votes';
+import { canManageComment, isMyComment } from '../lib/myComments';
 import {
   buildTossShareLink,
   fetchConsentedProfile,
@@ -47,8 +48,17 @@ export function PollDetailPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const urlCode = searchParams.get('code') ?? undefined;
-  const { currentPoll, isLoading, error, fetchPoll, vote, deletePoll, deleteComment, addComment } =
-    usePollStore();
+  const {
+    currentPoll,
+    isLoading,
+    error,
+    fetchPoll,
+    vote,
+    deletePoll,
+    deleteComment,
+    addComment,
+    editComment,
+  } = usePollStore();
   const { displayName, setDisplayName, userKey } = useIdentity();
   const myId = useAuthStore((state) => state.user?.id ?? null);
   const { showToast } = useToast();
@@ -131,6 +141,14 @@ export function PollDetailPage() {
   const isOwner = Boolean(poll && myId && poll.creatorId === myId);
   const isAdmin = Boolean(useAuthStore.getState().user?.isAdmin);
   const canManage = isOwner || isAdmin;
+  // 댓글별 관리(수정/삭제) 노출 여부 — 본인(이 기기에서 내가 단 댓글) 또는 폴 소유자/어드민.
+  // 서버가 최종 권한을 강제하므로 여기선 버튼 노출만 결정한다.
+  const canManageCommentById = (commentId: number): boolean =>
+    canManageComment({
+      mine: poll ? isMyComment(poll.id, commentId) : false,
+      isPollOwner: isOwner,
+      isAdmin,
+    });
 
   // 토스 안: 토스 공유 링크 우선. 밖: 공개 웹 URL. (QR·공유·링크복사 모두 이 값을 사용)
   const shareUrl = tossShareLink ?? (poll ? resolvePollShareUrl(poll) : '');
@@ -233,7 +251,8 @@ export function PollDetailPage() {
 
   const handleDeleteComment = async (commentId: number) => {
     if (!poll) return;
-    const ok = await deleteComment(poll.id, commentId);
+    // 비회원 본인 확인용 voterKey(getAnonymousKey 해시)를 바디로 보내 서버가 authorKey 와 대조한다.
+    const ok = await deleteComment(poll.id, commentId, userKey ?? null);
     if (ok) {
       hapticFeedback('success');
       showToast('한마디를 지웠어요 🧹');
@@ -241,6 +260,25 @@ export function PollDetailPage() {
       hapticFeedback('error');
       showToast('한마디를 지우지 못했어요 😢');
     }
+  };
+
+  const handleEditComment = async (commentId: number, text: string) => {
+    if (!poll) return false;
+    const result = await editComment(
+      poll.id,
+      commentId,
+      // voterKey 를 바디로 함께 보내 서버가 작성자 본인(authorId/authorKey)인지 강제 검증한다.
+      { comment: text, voterKey: userKey ?? null },
+      activeCode,
+    );
+    if (result) {
+      hapticFeedback('success');
+      showToast('한마디를 고쳤어요 ✏️');
+      return true;
+    }
+    hapticFeedback('error');
+    showToast('한마디를 고치지 못했어요 😢');
+    return false;
   };
 
   const handleAddReply = async (parentId: number, text: string) => {
@@ -251,6 +289,8 @@ export function PollDetailPage() {
         comment: text,
         parentId,
         voterName: voterName.trim() || null,
+        // 답글 작성자 식별키 — 비회원이라도 본인 답글을 나중에 관리할 수 있게 한다.
+        voterKey: userKey ?? null,
       },
       // 비공개 투표면 활성 접근 코드를 함께 보내 서버 게이트를 통과한다(공개 폴은 undefined).
       activeCode,
@@ -364,10 +404,12 @@ export function PollDetailPage() {
       winnerId={winnerId}
       isOwner={isOwner}
       canManage={canManage}
+      canManageCommentById={canManageCommentById}
       confirmDelete={confirmDelete}
       onDelete={handleDelete}
       onEdit={handleEdit}
       onDeleteComment={handleDeleteComment}
+      onEditComment={handleEditComment}
       onAddReply={handleAddReply}
       remaining={remaining}
       shareUrl={shareUrl}

@@ -6,12 +6,14 @@ import type {
   UpdatePollInput,
   VoteInput,
   CreateCommentInput,
+  EditCommentInput,
 } from '../../../shared/src/index';
 import type { AuthState } from './authStoreFactory';
 import {
   isLocalPollFallbackAllowed as defaultIsLocalPollFallbackAllowed,
   isRetryableLocalPollStatus,
 } from './localFallbackPolicy';
+import { forgetMyComment, rememberNewCommentsFromSnapshot } from '../lib/myComments';
 
 type StoreSet<T> = (
   partial: Partial<T> | T | ((state: T) => Partial<T> | T),
@@ -71,8 +73,16 @@ export interface PollState {
   // 비공개(private) 투표는 접근 코드를 ?code= 로 함께 보내야 서버 게이트를 통과한다(공개 폴은 생략).
   vote: (id: string, input: VoteInput, code?: string | null) => Promise<boolean>;
   deletePoll: (id: string) => Promise<boolean>;
-  deleteComment: (id: string, commentId: number) => Promise<boolean>;
+  // voterKey 는 비회원 본인 확인용 — GET 쿼리가 아니라 요청 바디로 보낸다(로그 누출 방지).
+  deleteComment: (id: string, commentId: number, voterKey?: string | null) => Promise<boolean>;
   addComment: (id: string, input: CreateCommentInput, code?: string | null) => Promise<Poll | null>;
+  // 댓글 텍스트 수정(작성자 본인) — voterKey 는 바디로 전송, 서버가 authorId/authorKey 와 대조해 강제.
+  editComment: (
+    id: string,
+    commentId: number,
+    input: EditCommentInput,
+    code?: string | null,
+  ) => Promise<Poll | null>;
 }
 
 interface PollAuthStore {
@@ -761,6 +771,9 @@ export const createPollStoreState = ({
         return false;
       }
 
+      // 투표 시 남긴 한마디를 "내 댓글"로 추적하기 위해 제출 전 댓글 id 스냅샷을 잡아 둔다.
+      const previousCommentIds = new Set((knownPoll?.comments ?? []).map((comment) => comment.id));
+
       try {
         const token = getAuthToken(useAuthStore);
         const headers: Record<string, string> = {
@@ -809,6 +822,11 @@ export const createPollStoreState = ({
           throw new Error(message);
         }
         const data = ensurePollPayload(await parseApiPayload(res));
+        // 투표 시 한마디를 남겼다면, 응답에서 새로 생긴 댓글을 "내 댓글"로 기록한다(본인 수정/삭제 노출용).
+        // 서버가 작성자 식별값을 응답에 안 주므로(비밀) 직전 스냅샷 대비 증가분으로 추론한다.
+        if (input.comment?.trim()) {
+          rememberNewCommentsFromSnapshot(id, previousCommentIds, data.comments);
+        }
         set((state) => ({
           currentPoll: data,
           polls: replacePollById(state.polls, id, data),
@@ -901,7 +919,7 @@ export const createPollStoreState = ({
       }
     },
 
-    deleteComment: async (id, commentId) => {
+    deleteComment: async (id, commentId, voterKey) => {
       set({ error: null });
       const removeComment = (poll: Poll): Poll => ({
         ...poll,
@@ -910,14 +928,16 @@ export const createPollStoreState = ({
 
       try {
         const token = getAuthToken(useAuthStore);
-        const headers: Record<string, string> = {};
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
         if (token) {
           headers.Authorization = `Bearer ${token}`;
         }
 
+        // 비회원 본인 확인용 voterKey 는 바디로 보낸다(GET 쿼리 누출 방지). 서버가 authorKey 와 대조해 강제.
         const res = await requestApi(`/polls/${id}/comments/${commentId}`, {
           method: 'DELETE',
           headers,
+          body: JSON.stringify({ voterKey: voterKey ?? null }),
         });
         if (!res.ok) {
           const message = await setAuthSessionExpired(
@@ -930,6 +950,8 @@ export const createPollStoreState = ({
           return false;
         }
 
+        // 기기의 "내 댓글" 기록도 정리한다(낙관적).
+        forgetMyComment(id, commentId);
         const current = get().currentPoll;
         if (current?.id === id) {
           upsertPollToCache(removeComment(current), get().polls);
@@ -947,6 +969,41 @@ export const createPollStoreState = ({
       }
     },
 
+    editComment: async (id, commentId, input, code) => {
+      set({ error: null });
+      try {
+        const token = getAuthToken(useAuthStore);
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (token) {
+          headers.Authorization = `Bearer ${token}`;
+        }
+
+        // voterKey 는 바디(input)로 함께 전송 — 서버가 authorId/authorKey 와 대조해 본인만 통과시킨다.
+        const res = await requestApi(`/polls/${id}/comments/${commentId}${buildCodeQuery(code)}`, {
+          method: 'PATCH',
+          headers,
+          body: JSON.stringify(input),
+        });
+        if (!res.ok) {
+          const errData = await parseApiPayload(res);
+          set({ error: resolvePollErrorMessage(errData, '한마디를 수정하지 못했습니다.') });
+          return null;
+        }
+
+        const data = ensurePollPayload(await parseApiPayload(res));
+        upsertPollToCache(data, get().polls);
+        set((state) => ({
+          currentPoll: state.currentPoll?.id === id ? data : state.currentPoll,
+          polls: state.polls.map((poll) => (poll.id === id ? data : poll)),
+          error: null,
+        }));
+        return data;
+      } catch (err: any) {
+        set({ error: err.message || '에러가 발생했습니다.' });
+        return null;
+      }
+    },
+
     addComment: async (id, input, code) => {
       // 동시 중복 차단(한마디·답글) — 같은 폴·같은 부모·같은 내용·같은 작성자의 제출이 아직
       // 진행 중이면 즉시 무시한다. 연타·StrictMode 이중 호출·네트워크 재시도로 생기는 중복 POST 방지.
@@ -960,6 +1017,12 @@ export const createPollStoreState = ({
       inFlightWrites.add(commentGuardKey);
 
       set({ error: null });
+      // 제출 전 댓글 id 스냅샷 — 응답에서 새로 생긴 댓글(증가분)을 "내 댓글"로 추적한다.
+      const knownPoll =
+        get().currentPoll?.id === id
+          ? get().currentPoll
+          : get().polls.find((poll) => poll.id === id);
+      const previousCommentIds = new Set((knownPoll?.comments ?? []).map((comment) => comment.id));
       try {
         const token = getAuthToken(useAuthStore);
         const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -980,6 +1043,8 @@ export const createPollStoreState = ({
         }
 
         const data = ensurePollPayload(await parseApiPayload(res));
+        // 새로 생긴 댓글을 "내 댓글"로 기록(본인 수정/삭제 버튼 노출용). 멱등으로 안 늘면 변화 없음.
+        rememberNewCommentsFromSnapshot(id, previousCommentIds, data.comments);
         upsertPollToCache(data, get().polls);
         set((state) => ({
           currentPoll: state.currentPoll?.id === id ? data : state.currentPoll,
