@@ -504,6 +504,31 @@ const buildPollRemovalUpdate =
 const normalizeGuardText = (value: string | null | undefined): string =>
   (value ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
 
+/**
+ * 한마디(댓글) 멱등키 — 한 번의 제출마다 새 uuid를 만들어 바디에 실어 보낸다.
+ * 서버는 (poll_id, client_comment_id) DB 유니크로 동시 중복 POST(연타·StrictMode·재시도)를
+ * 원자적으로 한 건으로 만든다(read-then-write 레이스 차단). 페이지 코드는 그대로 — 스토어에서만 채운다.
+ * crypto.randomUUID 가 없는 구형 웹뷰를 위해 무작위 폴백을 둔다(형식은 동일한 uuid v4 모양).
+ */
+const randomClientCommentId = (): string => {
+  const globalCrypto = (globalThis as { crypto?: Crypto }).crypto;
+  if (globalCrypto?.randomUUID) {
+    return globalCrypto.randomUUID();
+  }
+  const bytes = new Uint8Array(16);
+  if (globalCrypto?.getRandomValues) {
+    globalCrypto.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < bytes.length; i += 1) {
+      bytes[i] = Math.floor(Math.random() * 256);
+    }
+  }
+  bytes[6] = (bytes[6]! & 0x0f) | 0x40; // version 4
+  bytes[8] = (bytes[8]! & 0x3f) | 0x80; // variant 10xx
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+};
+
 export const createPollStoreState = ({
   parseApiPayload,
   requestApi,
@@ -1027,6 +1052,15 @@ export const createPollStoreState = ({
       }
       inFlightWrites.add(commentGuardKey);
 
+      // 멱등키 — 호출부가 이미 지정했으면 존중하고, 없으면 이 제출에 새 uuid를 만든다(페이지 코드 변경 없음).
+      // 서버의 (poll_id, client_comment_id) DB 유니크가 동시 중복 POST를 원자적으로 한 건으로 만든다.
+      const payload: CreateCommentInput = {
+        ...input,
+        clientCommentId: input.clientCommentId?.trim()
+          ? input.clientCommentId.trim()
+          : randomClientCommentId(),
+      };
+
       set({ error: null });
       // 제출 전 댓글 id 스냅샷 — 응답에서 새로 생긴 댓글(증가분)을 "내 댓글"로 추적한다.
       const knownPoll =
@@ -1045,7 +1079,7 @@ export const createPollStoreState = ({
         const res = await requestApi(`/polls/${id}/comments${buildCodeQuery(code)}`, {
           method: 'POST',
           headers,
-          body: JSON.stringify(input),
+          body: JSON.stringify(payload),
         });
         if (!res.ok) {
           const errData = await parseApiPayload(res);

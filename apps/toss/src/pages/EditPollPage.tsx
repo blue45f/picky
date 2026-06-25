@@ -826,7 +826,17 @@ export function EditPollPage() {
       </div>
 
       <div style={stickyActionBar}>
-        <div style={{ maxWidth: 520, margin: '0 auto', display: 'flex', gap: 10 }}>
+        {/* 외곽 stickyActionBar는 pointerEvents:none(투명 페이드가 뒤 콘텐츠 탭/스크롤을 막지 않게).
+            버튼이 실제로 눌리려면 내부 래퍼에서 pointerEvents:auto로 복원해야 해요(목록/상세와 동일 패턴). */}
+        <div
+          style={{
+            maxWidth: 520,
+            margin: '0 auto',
+            display: 'flex',
+            gap: 10,
+            pointerEvents: 'auto',
+          }}
+        >
           <Button
             variant="weak"
             style={{ flex: 1, borderRadius: 16 }}

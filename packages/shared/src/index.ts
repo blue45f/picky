@@ -261,6 +261,12 @@ export const CreateCommentSchema = z.object({
   /** 대댓글: 답글을 달 부모 댓글 id. 최상위 댓글이면 생략. */
   parentId: z.number().int().positive().optional().nullable(),
   /**
+   * 멱등키 — 클라가 한 번의 제출마다 새로 만드는 uuid. (poll_id, client_comment_id) DB 유니크로
+   * 동시 중복 POST(연타·StrictMode 이중 호출·네트워크 재시도)를 원자적으로 한 건으로 만든다.
+   * 충돌이면 서버는 새 댓글을 만들지 않고 기존 상태를 멱등 반환한다. 미전송(레거시)이면 기존 시간창 dedup만 적용.
+   */
+  clientCommentId: z.string().uuid('잘못된 멱등키 형식입니다.').optional().nullable(),
+  /**
    * 비회원 작성자 안정 식별키(vote의 voterKey와 동일). 회원이면 JWT userId가 우선이라 생략 가능.
    * 서버가 이 값을 댓글의 authorKey로 저장해 두면, 나중에 같은 키로 본인 수정/삭제를 허용한다.
    * authorKey 원문은 응답에 절대 노출하지 않는다(voterKey처럼 비밀).

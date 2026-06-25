@@ -639,6 +639,9 @@ export class PollService {
       authorId: userId,
       authorKey: input.voterKey?.trim() ? input.voterKey.trim() : null,
       passwordHash,
+      // 멱등키 — (poll_id, client_comment_id) DB 유니크로 동시 중복 POST를 원자적으로 한 건으로 만든다.
+      // 충돌(inserted=false)이면 새 댓글을 만들지 않고 기존 상태를 그대로 멱등 반환한다(시간창 dedup의 레이스 보완).
+      clientCommentId: input.clientCommentId?.trim() ? input.clientCommentId.trim() : null,
     });
     // 응답은 열람용 redaction을 거쳐 비공개 폴의 게이트 데이터가 새지 않게 한다(코드 통과 시 전체 반환).
     return this.getPollForViewer(id, code);

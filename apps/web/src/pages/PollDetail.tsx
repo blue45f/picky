@@ -6980,7 +6980,10 @@ export const PollDetail: React.FC = () => {
 
   const handleManageEdit = () => {
     if (id) {
-      navigate(`/poll/${encodeURIComponent(id)}/edit`);
+      // 비공개 폴은 수정 화면이 코드 없이 폴을 받으면 선택지가 비어 온다(getPollForViewer redaction).
+      // 여기서 이미 잠금 해제된 활성 코드(activeCode)를 ?code= 로 넘겨 정상 로드되게 한다.
+      const codeQuery = activeCode ? `?code=${encodeURIComponent(activeCode)}` : '';
+      navigate(`/poll/${encodeURIComponent(id)}/edit${codeQuery}`);
     }
   };
 
@@ -7059,6 +7062,8 @@ export const PollDetail: React.FC = () => {
         comment: text,
         parentId,
         voterName: (user?.nickname || guestName || '').trim() || null,
+        // voterKey 를 함께 보내 서버가 authorKey 로 저장 → 나중에 같은 키로 본인 답글 수정/삭제(403 방지).
+        voterKey: getVoterKey(),
         password: password ?? null,
       },
       // 비공개 투표면 활성 접근 코드를 함께 보내 서버 게이트를 통과한다(공개 폴은 undefined).

@@ -197,7 +197,10 @@ const matchesSignalMode = (poll: Poll, signal: SignalMode) => {
   }
 };
 
-const getPollSignalLabel = (poll: Poll) => {
+// revealResults: 이 뷰어에게 결과 파생 정보를 드러내도 되는지(canRevealResults).
+// 접전·한마디 활발은 표/댓글 집계에서 파생되므로, 결과를 못 보는(afterVote 미투표) 뷰어에겐
+// 배지로도 노출하지 않는다(목록 필터 게이트 :2122/:2156 와 라벨을 정합시킨다). 미지정이면 보수적으로 숨긴다.
+const getPollSignalLabel = (poll: Poll, revealResults = false) => {
   if (isPollClosed(poll)) {
     return '마감';
   }
@@ -210,11 +213,12 @@ const getPollSignalLabel = (poll: Poll) => {
     return '참여 대기';
   }
 
-  if (isCloseRacePoll(poll)) {
+  // 결과 파생 신호(접전·한마디 활발)는 결과를 드러내도 되는 뷰어에게만 배지로 보여준다.
+  if (revealResults && isCloseRacePoll(poll)) {
     return '접전';
   }
 
-  if (isFeedbackRichPoll(poll)) {
+  if (revealResults && isFeedbackRichPoll(poll)) {
     return SIGNAL_CHIP_LABELS.feedbackRich;
   }
 
@@ -503,12 +507,13 @@ function PollCard(
   const pollCategory = categoryMeta((poll as { categoryId?: string | null }).categoryId);
   const isMine = userId && poll.creatorId === userId;
   const isCompact = viewMode === 'compact';
-  const signalLabel = getPollSignalLabel(poll);
+  // afterVote 폴은 이 기기가 투표(또는 마감/always)했을 때만 결과 파생 표시(득표순·퍼센트)를 드러낸다.
+  const revealResults = useMemo(() => canRevealResults(poll, votedPollIds().has(poll.id)), [poll]);
+  // 결과 파생 신호(접전·한마디 활발) 배지는 결과를 드러내도 되는 뷰어에게만 노출한다(누출 방지).
+  const signalLabel = getPollSignalLabel(poll, revealResults);
   const endAtLabel = formatPollEndAt(poll);
   const resultsVisibilityLabel = getPollResultsVisibilityLabel(poll);
   const attachmentCount = poll.attachments?.length || 0;
-  // afterVote 폴은 이 기기가 투표(또는 마감/always)했을 때만 결과 파생 표시(득표순·퍼센트)를 드러낸다.
-  const revealResults = useMemo(() => canRevealResults(poll, votedPollIds().has(poll.id)), [poll]);
 
   return (
     <article
@@ -2429,7 +2434,12 @@ export const PollList: React.FC = () => {
             description: livePoll?.description ?? item.description,
             totalVotes: livePoll?.totalVotes ?? item.totalVotes,
             commentCount: livePoll?.comments.length ?? item.commentCount,
-            signal: livePoll ? getPollSignalLabel(livePoll) : '최근 조회',
+            signal: livePoll
+              ? getPollSignalLabel(
+                  livePoll,
+                  canRevealResults(livePoll, votedPollIds().has(livePoll.id)),
+                )
+              : '최근 조회',
           };
         })
         .slice(0, 4),
@@ -3055,7 +3065,10 @@ export const PollList: React.FC = () => {
                 }}
               >
                 {pinnedPollCards.map((poll) => {
-                  const signalLabel = getPollSignalLabel(poll);
+                  const signalLabel = getPollSignalLabel(
+                    poll,
+                    canRevealResults(poll, votedPollIds().has(poll.id)),
+                  );
                   const signalStyle = getPollSignalStyle(signalLabel);
 
                   return (

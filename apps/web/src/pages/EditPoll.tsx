@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   AlertTriangle,
   ArrowLeft,
@@ -112,6 +112,7 @@ export const EditPoll: React.FC = () => {
   useDocumentTitle('고민 수정');
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const fetchPoll = usePollStore((state) => state.fetchPoll);
   const updatePoll = usePollStore((state) => state.updatePoll);
@@ -133,14 +134,22 @@ export const EditPoll: React.FC = () => {
   const [formError, setFormError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
-  // 마운트 시 한 번 로드 — 폼 초기값으로 채운다.
+  // 비공개 폴은 코드 없이 받으면 선택지/설명이 비어 온다(getPollForViewer redaction, 소유자 우회 없음).
+  // 상세 화면에서 잠금 해제 후 넘어오면 ?code= 로 코드가 실려 있고, 없으면 게이트로 코드를 받아 전체 폴을 로드한다.
+  const urlCode = searchParams.get('code') ?? undefined;
+  // 폼 전송(updatePoll) 때도 게이트를 통과하려면 활성 코드를 함께 보내야 하므로 별도 상태로 보관한다.
+  const [activeCode, setActiveCode] = useState<string | undefined>(urlCode);
+  const [codeInput, setCodeInput] = useState('');
+  const [codeError, setCodeError] = useState<string | null>(null);
+
+  // 로드 — 폼 초기값으로 채운다. activeCode(코드) 가 바뀌면(게이트 통과) 다시 로드한다.
   useEffect(() => {
     if (!id) {
       return;
     }
     let cancelled = false;
     clearError();
-    fetchPoll(id).then((poll) => {
+    fetchPoll(id, activeCode).then((poll) => {
       if (cancelled) {
         return;
       }
@@ -149,6 +158,10 @@ export const EditPoll: React.FC = () => {
         return;
       }
       setLoadedPoll(poll);
+      // 비공개 폴이 코드 게이트에 막혀(requiresCode) 선택지가 비어 오면, 폼을 채우지 않고 코드 입력을 기다린다.
+      if (poll.requiresCode) {
+        return;
+      }
       setQuestion(poll.question ?? '');
       setDescription(poll.description ?? '');
       setEndsAtLocal(endsAtToLocalInput(poll.endsAt));
@@ -167,7 +180,26 @@ export const EditPoll: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [id, fetchPoll, clearError]);
+  }, [id, fetchPoll, clearError, activeCode]);
+
+  // 비공개 폴 코드 게이트 — 코드로 재조회해 통과하면 activeCode 를 갱신해 위 effect 가 전체 폴을 다시 로드한다.
+  const handleUnlockCode = async () => {
+    if (!id) {
+      return;
+    }
+    const trimmed = codeInput.trim();
+    if (trimmed.length < 4) {
+      setCodeError('코드는 4자 이상이에요.');
+      return;
+    }
+    setCodeError(null);
+    const result = await fetchPoll(id, trimmed);
+    if (!result || result.requiresCode) {
+      setCodeError('코드가 맞지 않아요. 🔒');
+      return;
+    }
+    setActiveCode(trimmed);
+  };
 
   const isOwner = !!(user?.id && loadedPoll?.creatorId === user.id);
   const isAdmin = !!user?.isAdmin;
@@ -269,7 +301,10 @@ export const EditPoll: React.FC = () => {
     const result = await updatePoll(id, patch);
     setIsSaving(false);
     if (result) {
-      navigate(`/poll/${encodeURIComponent(id)}`);
+      // 비공개로 남는 폴은 상세에서 다시 코드 게이트에 막히지 않게, 활성/새 코드를 ?code= 로 넘긴다.
+      const codeForReturn = visibility === 'private' ? trimmedAccessCode || activeCode : undefined;
+      const codeQuery = codeForReturn ? `?code=${encodeURIComponent(codeForReturn)}` : '';
+      navigate(`/poll/${encodeURIComponent(id)}${codeQuery}`);
     }
   };
 
@@ -310,6 +345,98 @@ export const EditPoll: React.FC = () => {
         title="이 고민을 수정할 권한이 없어요"
         message="작성자 또는 운영자만 고민을 수정할 수 있어요."
       />
+    );
+  }
+
+  // 비공개 폴인데 코드가 없어 선택지가 가려진 상태(requiresCode) — 권한자(소유자/운영자)에게 코드 입력을 받는다.
+  // 코드가 맞으면 위 effect 가 전체 폴(선택지 포함)을 다시 로드해 정상 편집 화면으로 전환된다.
+  if (loadedPoll && loadedPoll.requiresCode) {
+    return (
+      <div
+        className="content-card animate-slide-up"
+        style={{
+          display: 'grid',
+          gap: '1rem',
+          padding: '1.6rem',
+          maxWidth: '440px',
+          justifyItems: 'center',
+          textAlign: 'center',
+        }}
+      >
+        <div aria-hidden="true" style={{ fontSize: '2.4rem' }}>
+          🔒
+        </div>
+        <div style={{ display: 'grid', gap: '6px' }}>
+          <h1
+            style={{
+              margin: 0,
+              fontSize: '1.05rem',
+              fontWeight: 800,
+              color: 'var(--text-primary)',
+            }}
+          >
+            비공개 고민을 수정하려면 코드가 필요해요
+          </h1>
+          <p
+            style={{
+              margin: 0,
+              fontSize: '0.82rem',
+              color: 'var(--text-secondary)',
+              lineHeight: 1.6,
+            }}
+          >
+            내가 만든 비공개 고민이라도, 선택지를 안전하게 불러오려면 접근 코드를 한 번 입력해
+            주세요.
+          </p>
+        </div>
+        <input
+          type="text"
+          value={codeInput}
+          onChange={(event) => {
+            setCodeError(null);
+            setCodeInput(event.target.value);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              void handleUnlockCode();
+            }
+          }}
+          placeholder="접근 코드"
+          maxLength={20}
+          aria-label="비공개 투표 접근 코드"
+          className="form-input"
+          style={{ width: '100%', textAlign: 'center', fontSize: '0.95rem' }}
+        />
+        {codeError ? (
+          <p
+            role="alert"
+            style={{ margin: 0, fontSize: '0.78rem', color: 'var(--brand-accent-coral)' }}
+          >
+            {codeError}
+          </p>
+        ) : null}
+        <button
+          type="button"
+          onClick={() => void handleUnlockCode()}
+          disabled={isLoading}
+          className="btn-primary"
+          style={{ width: '100%', padding: '12px', fontSize: '0.9rem' }}
+        >
+          코드 확인하고 수정하기 🔓
+        </button>
+        <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+          <Link
+            to={`/poll/${encodeURIComponent(id)}`}
+            className="btn-secondary"
+            style={{ textDecoration: 'none' }}
+          >
+            고민 상세로
+          </Link>
+          <Link to="/" className="btn-secondary" style={{ textDecoration: 'none' }}>
+            고민 목록으로
+          </Link>
+        </div>
+      </div>
     );
   }
 

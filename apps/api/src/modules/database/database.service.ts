@@ -22,6 +22,8 @@ export type PollCommentWithAuthor = PollComment & {
   authorKey?: string | null;
   // 게스트 댓글 관리 비번 해시(salt:hash). 비밀 — 권한 판정 전용, 응답엔 절대 싣지 않는다.
   passwordHash?: string | null;
+  // 멱등키(클라 uuid) — 내부 dedup 전용. 비공개라 응답엔 싣지 않는다(stripCommentAuthors로 제거).
+  clientCommentId?: string | null;
 };
 export type PollWithCommentAuthors = Omit<Poll, 'comments'> & {
   comments: PollCommentWithAuthor[];
@@ -136,7 +138,8 @@ export class DatabaseService implements OnModuleInit {
             author_id TEXT,
             author_key TEXT,
             edited_at TIMESTAMP,
-            password_hash TEXT
+            password_hash TEXT,
+            client_comment_id TEXT
           );
         `);
         // 서버측 1인1표(#12). (poll_id, voter_key) 유니크로 재투표를 막는다. 비파괴·멱등.
@@ -164,6 +167,13 @@ export class DatabaseService implements OnModuleInit {
           ALTER TABLE poll_comments ADD COLUMN IF NOT EXISTS author_key TEXT;
           ALTER TABLE poll_comments ADD COLUMN IF NOT EXISTS edited_at TIMESTAMP;
           ALTER TABLE poll_comments ADD COLUMN IF NOT EXISTS password_hash TEXT;
+          ALTER TABLE poll_comments ADD COLUMN IF NOT EXISTS client_comment_id TEXT;
+        `);
+        // 댓글 멱등키 — (poll_id, client_comment_id) 부분 유니크로 동시 중복 INSERT를 한 건으로 만든다.
+        // NULL(레거시·멱등키 미전송) 행은 다중 허용해야 하므로 WHERE 절로 부분 인덱스를 만든다. 비파괴·멱등.
+        await pool.query(`
+          CREATE UNIQUE INDEX IF NOT EXISTS poll_comments_poll_client_id_unique_idx
+          ON poll_comments (poll_id, client_comment_id) WHERE client_comment_id IS NOT NULL;
         `);
         // users.email UNIQUE 제약 마이그레이션:
         // 익명/게스트/토스 로그인은 email='' 로 사용자를 만들기 때문에, 기존 `email TEXT NOT NULL UNIQUE`는
@@ -457,6 +467,7 @@ export class DatabaseService implements OnModuleInit {
       delete next.authorId;
       delete next.authorKey;
       delete next.passwordHash;
+      delete next.clientCommentId;
       return { ...next, hasPassword } as PollComment;
     });
   }
@@ -1199,6 +1210,10 @@ export class DatabaseService implements OnModuleInit {
   /**
    * 폴에 새 댓글(의견/답글)만 추가한다. 카운트는 castVote가 이미 원자적으로 올렸으므로 건드리지 않는다.
    * SQL은 단일 INSERT, Blob은 commit. 새 댓글의 DB serial id 정합은 호출부 재조회로 맞춘다.
+   *
+   * 멱등키(clientCommentId)가 있으면 (poll_id, client_comment_id) 부분 유니크에 onConflictDoNothing 으로
+   * INSERT 해 동시 중복 POST(연타·StrictMode·재시도)를 원자적으로 한 건으로 만든다(castVote 패턴 재사용).
+   * @returns inserted=true 면 이번 호출이 새 댓글을 만들었고, false 면 멱등키 충돌이라 미반영(기존 한 건 유지).
    */
   async appendComment(
     pollId: string,
@@ -1214,10 +1229,13 @@ export class DatabaseService implements OnModuleInit {
       authorKey?: string | null;
       // 게스트 댓글 관리 비번 해시(비밀, salt:hash). 미설정이면 null. 다른 기기서 본인 인정용.
       passwordHash?: string | null;
+      // 멱등키(클라 uuid). (poll_id, client_comment_id) 유니크로 동시 중복 INSERT를 한 건으로 만든다.
+      clientCommentId?: string | null;
     },
-  ): Promise<void> {
+  ): Promise<{ inserted: boolean }> {
+    const clientCommentId = comment.clientCommentId?.trim() ? comment.clientCommentId.trim() : null;
     if (this.useSqlDb) {
-      await db.insert(schema.pollComments).values({
+      const values = {
         pollId,
         voterName: comment.voterName,
         comment: comment.comment,
@@ -1228,17 +1246,39 @@ export class DatabaseService implements OnModuleInit {
         authorId: comment.authorId ?? null,
         authorKey: comment.authorKey ?? null,
         passwordHash: comment.passwordHash ?? null,
-      });
-      return;
+        clientCommentId,
+      };
+      // 멱등키가 있으면 부분 유니크(client_comment_id IS NOT NULL) 충돌 시 새 행을 만들지 않는다.
+      // 멱등키가 없으면(레거시) 기존처럼 평범한 INSERT — 시간창 dedup(서비스)만 적용된다.
+      if (clientCommentId) {
+        const inserted = await db
+          .insert(schema.pollComments)
+          .values(values)
+          .onConflictDoNothing({
+            target: [schema.pollComments.pollId, schema.pollComments.clientCommentId],
+            where: sql`${schema.pollComments.clientCommentId} IS NOT NULL`,
+          })
+          .returning({ id: schema.pollComments.id });
+        return { inserted: inserted.length > 0 };
+      }
+      await db.insert(schema.pollComments).values(values);
+      return { inserted: true };
     }
 
     await this.refresh();
     const nextPolls = [...this.data.polls];
     const idx = nextPolls.findIndex((p) => p.id === pollId);
     if (idx === -1) {
-      return;
+      return { inserted: false };
     }
     const target = nextPolls[idx] as PollWithVotedKeys;
+    // Blob/in-memory(dev 폴백)도 멱등키 충돌이면 새 댓글을 만들지 않는다(SQL 부분 유니크와 동일 의미, best-effort).
+    if (
+      clientCommentId &&
+      target.comments.some((c) => (c as PollCommentWithAuthor).clientCommentId === clientCommentId)
+    ) {
+      return { inserted: false };
+    }
     const nextId = target.comments.reduce((max, c) => Math.max(max, c.id), 0) + 1;
     const nextComment: PollCommentWithAuthor = {
       id: nextId,
@@ -1251,12 +1291,14 @@ export class DatabaseService implements OnModuleInit {
       authorId: comment.authorId ?? null,
       authorKey: comment.authorKey ?? null,
       passwordHash: comment.passwordHash ?? null,
+      clientCommentId,
     };
     nextPolls[idx] = {
       ...target,
       comments: [...target.comments, nextComment],
     } as PollWithVotedKeys;
     await this.commit({ ...this.data, polls: nextPolls });
+    return { inserted: true };
   }
 
   /** 댓글 텍스트 수정 — 작성자/원시각은 불변, comment 와 edited_at 만 갱신한다(권한 검사는 서비스). */

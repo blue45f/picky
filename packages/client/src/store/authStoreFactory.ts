@@ -571,8 +571,26 @@ export const createAuthStoreState =
           });
 
           if (!res.ok) {
+            // 401 = 서버가 토큰/세션을 거부함(만료·탈퇴·비활성). 토큰 디코드 폴백으로 세션을 유지하면
+            // 서버가 탈퇴/비활성으로 막아도 클라가 로그인 상태로 남는 치명적 우회가 된다 → 즉시 로그아웃한다.
+            if (res.status === 401) {
+              localStorage.removeItem('picky_token');
+              persistUser(null);
+              set({
+                user: null,
+                token: null,
+                error: '로그인 세션이 만료되었거나 유효하지 않습니다. 다시 로그인해 주세요.',
+                isLoading: false,
+                needsReauth: true,
+                validationErrors: {},
+              });
+              return;
+            }
+
+            // 401 이 아닌 실패(5xx 등 일시적 서버 오류)에서만 토큰 디코드 폴백으로 세션을 유지한다.
+            // 일시 장애로 세션을 통째로 날리지 않되, 인증 거부(401)는 위에서 이미 로그아웃했다.
             const fallbackUser = decodeAuthToken(token);
-            if (fallbackUser && res.status === 401) {
+            if (fallbackUser) {
               persistUser(fallbackUser);
               set({
                 user: fallbackUser,
@@ -583,19 +601,10 @@ export const createAuthStoreState =
               return;
             }
 
-            localStorage.removeItem('picky_token');
-            persistUser(null);
-            const nextError =
-              res.status === 401
-                ? '로그인 세션이 만료되었거나 유효하지 않습니다. 다시 로그인해 주세요.'
-                : '내 정보를 가져오는데 실패했습니다.';
-
             set({
-              user: null,
-              token: null,
-              error: nextError,
+              error: '내 정보를 가져오는데 실패했습니다.',
               isLoading: false,
-              needsReauth: res.status === 401,
+              needsReauth: false,
               validationErrors: {},
             });
             return;

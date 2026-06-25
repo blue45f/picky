@@ -67,6 +67,9 @@ export const pollComments = pgTable('poll_comments', {
   // 게스트 댓글 선택적 관리 비밀번호 해시(salt:hash, pbkdf2). 미설정이면 null.
   // 비밀 — 응답에 절대 노출 금지(hasPassword 불리언만 파생). 비번 일치 시 다른 기기서도 본인 인정.
   passwordHash: text('password_hash'),
+  // 멱등키(클라 uuid). (poll_id, client_comment_id) 부분 유니크로 동시 중복 INSERT를 한 건으로 만든다.
+  // 레거시/멱등키 미전송 댓글은 null(부분 유니크라 다중 null 허용). 비공개 — 응답에 노출하지 않는다.
+  clientCommentId: text('client_comment_id'),
 });
 
 // Poll votes table — 서버측 1인1표. (poll_id, voter_key) 유니크로 재투표를 막는다.
