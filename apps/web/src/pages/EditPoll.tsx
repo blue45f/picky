@@ -14,31 +14,17 @@ import {
 import { usePollStore } from '../store/usePollStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
-import { VISIBILITY_OPTIONS } from '@picky/shared';
+import { fromDateTimeLocalValue, toDateTimeLocalValue, VISIBILITY_OPTIONS } from '@picky/shared';
 import type { Poll, PollResultsVisibility, PollVisibility, UpdatePollInput } from '@picky/shared';
 
-// CreatePoll.tsx 와 동일한 datetime-local <-> ISO 변환 규약을 그대로 따른다.
-const toDateTimeLocalValue = (value?: string | null): string => {
+// datetime-local <-> ISO 변환은 @picky/shared format 단일 소스를 쓴다(web/toss 동일 규약).
+// ISO 문자열을 datetime-local 입력값으로 — 무효/빈 값이면 빈 칸.
+const endsAtToLocalInput = (value?: string | null): string => {
   if (!value) {
     return '';
   }
   const date = new Date(value);
-  if (!Number.isFinite(date.getTime())) {
-    return '';
-  }
-  const offsetMs = date.getTimezoneOffset() * 60 * 1000;
-  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
-};
-
-const resolveIsoEndAt = (value: string): string | null => {
-  if (!value.trim()) {
-    return null;
-  }
-  const date = new Date(value);
-  if (!Number.isFinite(date.getTime())) {
-    return null;
-  }
-  return date.toISOString();
+  return Number.isFinite(date.getTime()) ? toDateTimeLocalValue(date) : '';
 };
 
 const RESULT_VISIBILITY_OPTIONS: Array<{
@@ -165,7 +151,7 @@ export const EditPoll: React.FC = () => {
       setLoadedPoll(poll);
       setQuestion(poll.question ?? '');
       setDescription(poll.description ?? '');
-      setEndsAtLocal(toDateTimeLocalValue(poll.endsAt));
+      setEndsAtLocal(endsAtToLocalInput(poll.endsAt));
       setResultsVisibility(poll.resultsVisibility ?? 'afterVote');
       setVisibility(poll.visibility ?? 'public');
       // 코드는 서버가 반환하지 않으므로 빈 칸으로 시작한다(미입력 시 기존 코드를 유지).
@@ -243,7 +229,7 @@ export const EditPoll: React.FC = () => {
       return;
     }
 
-    const isoEndsAt = resolveIsoEndAt(endsAtLocal);
+    const isoEndsAt = fromDateTimeLocalValue(endsAtLocal);
     if (endsAtLocal.trim() && !isoEndsAt) {
       setFormError('마감 시간 형식이 올바르지 않습니다.');
       return;

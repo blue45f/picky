@@ -5,7 +5,9 @@ import {
   CreatePollSchema,
   DEADLINE_PRESETS,
   POLL_CATEGORIES,
+  POLL_LIMITS,
   RESULTS_VISIBILITY_LABELS,
+  resolveDeadlinePresetEndsAt,
   VISIBILITY_OPTIONS,
   type CreatePollInput,
   type DeadlinePreset,
@@ -22,11 +24,12 @@ import { copyText } from '../lib/pollShare';
 import { evaluatePollReadiness } from '../lib/pollReadiness';
 import { AppBar, Chip, SegmentedControl } from '../components/ui';
 
-const MAX_OPTIONS = 10;
-const MIN_OPTIONS = 2;
-const QUESTION_MAX = 100;
-const DESC_MAX = 500;
-const OPTION_MAX = 60;
+// 입력 한도는 @picky/shared POLL_LIMITS 단일 소스를 쓴다(CreatePollSchema 와 동일 수치).
+const MAX_OPTIONS = POLL_LIMITS.OPTIONS_MAX;
+const MIN_OPTIONS = POLL_LIMITS.OPTIONS_MIN;
+const QUESTION_MAX = POLL_LIMITS.QUESTION_MAX;
+const DESC_MAX = POLL_LIMITS.DESC_MAX;
+const OPTION_MAX = POLL_LIMITS.OPTION_TEXT_MAX;
 const DEADLINE_BUFFER_MS = 60_000;
 
 interface OptionDraft {
@@ -1049,13 +1052,11 @@ export function CreatePollPage() {
 
   const selectDeadlinePreset = (value: DeadlinePreset) => {
     setDeadlinePreset(value);
-    if (value === 'none') {
-      setEndsAtIso(null);
-    } else if (value === 'custom') {
+    if (value === 'custom') {
       setEndsAtIso(fromDateTimeLocalValue(customDeadline));
     } else {
-      const preset = DEADLINE_PRESETS.find((item) => item.value === value);
-      setEndsAtIso(preset && preset.ms > 0 ? new Date(Date.now() + preset.ms).toISOString() : null);
+      // none → null, 그 외 → 지금 + ms 의 ISO. ms→ISO 환산은 @picky/shared 단일 소스를 쓴다.
+      setEndsAtIso(resolveDeadlinePresetEndsAt(value));
     }
   };
 

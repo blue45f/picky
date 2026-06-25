@@ -1,7 +1,7 @@
 import type { Poll } from '@picky/shared';
-import { canRevealResults } from '@picky/shared';
+// 공유 텍스트·오리진 정규화 코어는 @picky/shared 단일 소스. URL resolver(아래)는 web 전용으로 유지.
+import { canRevealResults, normalizeOrigin, resolveShareText } from '@picky/shared';
 
-const SHARE_PREFIX = '[피키 투표] ';
 const DEFAULT_SHARE_TITLE = 'picky - 고민 투표 공유 플랫폼';
 const DEFAULT_SHARE_DESCRIPTION =
   '고민을 선택지 투표로 만들고 링크로 공유해 빠르게 의견을 모아보세요.';
@@ -13,34 +13,8 @@ const safeEncode = (value: string): string => encodeURIComponent(value);
 
 const wait = (ms: number) => new Promise((resolve) => globalThis.setTimeout(resolve, ms));
 
-const trimTrailingSlashes = (value: string): string => {
-  let end = value.length;
-  while (end > 0 && value.codePointAt(end - 1) === 47) {
-    end -= 1;
-  }
-  return end === value.length ? value : value.slice(0, end);
-};
-
 const isDataUrl = (value: string | null | undefined): boolean =>
   Boolean(value?.startsWith('data:'));
-
-const normalizeOrigin = (value: string | null | undefined): string | null => {
-  const trimmed = value ? trimTrailingSlashes(value.trim()) : '';
-  if (!trimmed) {
-    return null;
-  }
-
-  const withProtocol =
-    trimmed.startsWith('http://') || trimmed.startsWith('https://')
-      ? trimmed
-      : `https://${trimmed}`;
-
-  try {
-    return new URL(withProtocol).origin;
-  } catch {
-    return null;
-  }
-};
 
 const getRuntimeOrigin = (): string | null => {
   if (!('window' in globalThis)) {
@@ -350,9 +324,8 @@ export const buildPollEmbedCode = (poll: Poll, mode: PollEmbedMode = 'standard')
 </script>`;
 };
 
-export const resolveShareText = (poll: Poll): string => {
-  return `${SHARE_PREFIX}${poll.question}\n\n결정에 참여하고 의견을 남겨주세요.`;
-};
+// 공유 본문 텍스트는 @picky/shared 코어를 그대로 재수출(기존 import 경로 호환).
+export { resolveShareText };
 
 export const buildPollShareMessage = (poll: Poll): string => {
   return `${resolveShareText(poll)}\n${resolvePollShareUrl(poll)}`;

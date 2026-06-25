@@ -1,48 +1,14 @@
 import type { Poll } from '../shared';
+// 공유 텍스트·오리진 정규화 코어는 @picky/shared 단일 소스(../shared 어댑터 경유).
+// 오리진을 어떻게 고를지(getShareOrigin/resolvePollShareUrl)는 토스 전용이라 아래에 둬요.
+import { isPublicWebHost, normalizeOrigin, resolveShareText, SHARE_PREFIX } from '../shared';
 import { optionPercent, optionsByVotes } from './poll';
 import { extractKeywords } from './keywords';
 import { buildTossShareLink, shareMessage } from './toss';
 
-const SHARE_PREFIX = '[피키 투표] ';
-
 // 공유 링크가 외부(토스 밖)에서도 열려야 하므로, 공개 웹 오리진으로 폴백해요.
 // 미니앱 WebView 호스트(*.tossmini.com)나 localhost는 공유 대상이 아니에요.
 const DEFAULT_PUBLIC_ORIGIN = 'https://picky-olive.vercel.app';
-
-const trimTrailingSlashes = (value: string): string => {
-  let end = value.length;
-  while (end > 0 && value.codePointAt(end - 1) === 47) {
-    end -= 1;
-  }
-  return end === value.length ? value : value.slice(0, end);
-};
-
-const isPublicWebHost = (origin: string): boolean => {
-  try {
-    const { hostname } = new URL(origin);
-    if (hostname === 'localhost' || hostname === '127.0.0.1') return false;
-    if (hostname.endsWith('.tossmini.com')) return false;
-    return true;
-  } catch {
-    return false;
-  }
-};
-
-const normalizeOrigin = (value: string | null | undefined): string | null => {
-  const trimmed = value ? trimTrailingSlashes(value.trim()) : '';
-  if (!trimmed) {
-    return null;
-  }
-  const withProtocol =
-    trimmed.startsWith('http://') || trimmed.startsWith('https://')
-      ? trimmed
-      : `https://${trimmed}`;
-  try {
-    return new URL(withProtocol).origin;
-  } catch {
-    return null;
-  }
-};
 
 /** 외부에서도 열리는 공개 웹 공유 오리진 (picky-olive 등). */
 const getShareOrigin = (): string => {
@@ -69,9 +35,8 @@ export const resolvePollShareUrl = (poll: Poll | null | undefined): string => {
   return origin ? `${origin}${path}` : path;
 };
 
-export const resolveShareText = (poll: Poll): string => {
-  return `${SHARE_PREFIX}${poll.question}\n\n결정에 참여하고 의견을 남겨주세요.`;
-};
+// 공유 본문 텍스트는 @picky/shared 코어를 그대로 재수출(기존 import 경로 호환).
+export { resolveShareText };
 
 /** 토스 미니앱 딥링크 경로. 출시 후 picky 미니앱의 해당 투표 화면으로 열려요. */
 export const pollTossDeepLink = (pollId: string): string =>

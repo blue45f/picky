@@ -42,6 +42,7 @@ import {
   isFeedbackRichPoll,
   isPollClosed,
   optionPercent,
+  optionsByVotes,
   resolveCreatorLabel,
   SIGNAL_CHIP_LABELS,
   SORT_OPTIONS,
@@ -645,27 +646,22 @@ function PollCard(
         </span>
         {poll.options.length > 0 ? (
           // afterVote 미공개면 득표순 정렬을 숨기고(원래 순서) 결과 잠금 안내를 덧붙인다.
-          (revealResults
-            ? [...poll.options].sort((a, b) => b.voteCount - a.voteCount)
-            : poll.options
-          )
-            .slice(0, 2)
-            .map((opt) => (
-              <span
-                key={opt.id}
-                style={{
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.08)',
-                  borderRadius: '8px',
-                  padding: '3px 8px',
-                  fontSize: '0.72rem',
-                  color: 'var(--text-secondary)',
-                  fontWeight: 700,
-                }}
-              >
-                {opt.text}
-              </span>
-            ))
+          (revealResults ? optionsByVotes(poll) : poll.options).slice(0, 2).map((opt) => (
+            <span
+              key={opt.id}
+              style={{
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: '8px',
+                padding: '3px 8px',
+                fontSize: '0.72rem',
+                color: 'var(--text-secondary)',
+                fontWeight: 700,
+              }}
+            >
+              {opt.text}
+            </span>
+          ))
         ) : (
           <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>등록 없음</span>
         )}

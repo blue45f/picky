@@ -18,6 +18,9 @@ export * from './pollReport';
 export * from './snsPreview';
 export * from './pollNarrative';
 
+// 공유 텍스트·오리진 정규화 코어(앱별 URL resolver 는 각 앱 lib/pollShare.ts 에 둠).
+export * from './pollShare';
+
 export const PollResultsVisibilitySchema = z.enum(['afterVote', 'always']);
 
 export type PollResultsVisibility = z.infer<typeof PollResultsVisibilitySchema>;
@@ -77,6 +80,34 @@ export const DEADLINE_PRESETS: ReadonlyArray<{
   { value: 'custom', label: '직접 선택 ✏️', ms: -1 },
 ];
 
+/**
+ * 마감 프리셋(value)을 지금 기준 마감 ISO 문자열로 환산하는 순수 계산.
+ * - ms<=0 (none/custom) 또는 미지정 프리셋 → null(마감 없음/직접 선택)
+ * - 그 외 → new Date(Date.now() + ms).toISOString()
+ * web/toss가 같은 ms→ISO 규약을 쓰도록 단일화(세트 라벨은 앱별로 둘 수 있다).
+ */
+export const resolveDeadlinePresetEndsAt = (preset: DeadlinePreset): string | null => {
+  const entry = DEADLINE_PRESETS.find((item) => item.value === preset);
+  if (!entry || entry.ms <= 0) {
+    return null;
+  }
+  return new Date(Date.now() + entry.ms).toISOString();
+};
+
+/**
+ * 작성/수정 폼 입력 한도 — CreatePollSchema/UpdatePollSchema 의 수치와 동일한 단일 소스.
+ * web/toss 두 앱의 로컬 상수(QUESTION_MAX 등) 드리프트를 막고, 웹 이미지 한도(과거 140KB)를
+ * 스키마 한도(160KB)와 정합시킨다.
+ */
+export const POLL_LIMITS = {
+  QUESTION_MAX: 100,
+  DESC_MAX: 500,
+  OPTION_TEXT_MAX: 60,
+  OPTIONS_MIN: 2,
+  OPTIONS_MAX: 10,
+  IMAGE_DATA_URL_MAX: 160_000,
+} as const;
+
 /** 비공개(private) 투표의 접근 코드. 4~20자. */
 export const PollAccessCodeSchema = z
   .string()
@@ -102,8 +133,12 @@ export const CreatePollSchema = z.object({
   question: z
     .string()
     .min(2, '질문은 최소 2글자 이상이어야 합니다.')
-    .max(100, '질문은 최대 100글자 이하이어야 합니다.'),
-  description: z.string().max(500, '설명은 최대 500글자 이하이어야 합니다.').optional().nullable(),
+    .max(POLL_LIMITS.QUESTION_MAX, '질문은 최대 100글자 이하이어야 합니다.'),
+  description: z
+    .string()
+    .max(POLL_LIMITS.DESC_MAX, '설명은 최대 500글자 이하이어야 합니다.')
+    .optional()
+    .nullable(),
   endsAt: z.string().datetime('마감 시간 형식이 올바르지 않습니다.').optional().nullable(),
   resultsVisibility: PollResultsVisibilitySchema.optional().nullable(),
   visibility: PollVisibilitySchema.optional(),
@@ -114,13 +149,13 @@ export const CreatePollSchema = z.object({
         text: z.string().min(1, '선택지는 빈 칸일 수 없습니다.'),
         imageUrl: z
           .string()
-          .max(160_000, '이미지 데이터는 선택지당 160KB 이하이어야 합니다.')
+          .max(POLL_LIMITS.IMAGE_DATA_URL_MAX, '이미지 데이터는 선택지당 160KB 이하이어야 합니다.')
           .optional()
           .nullable(),
       }),
     )
-    .min(2, '최소 2개 이상의 선택지가 필요합니다.')
-    .max(10, '최대 10개까지의 선택지만 등록 가능합니다.'),
+    .min(POLL_LIMITS.OPTIONS_MIN, '최소 2개 이상의 선택지가 필요합니다.')
+    .max(POLL_LIMITS.OPTIONS_MAX, '최대 10개까지의 선택지만 등록 가능합니다.'),
   attachments: z
     .array(PollAttachmentSchema)
     .max(3, '첨부파일은 최대 3개까지 등록 가능합니다.')
@@ -141,11 +176,11 @@ export const UpdatePollSchema = z
     question: z
       .string()
       .min(2, '질문은 최소 2글자 이상이어야 합니다.')
-      .max(100, '질문은 최대 100글자 이하이어야 합니다.')
+      .max(POLL_LIMITS.QUESTION_MAX, '질문은 최대 100글자 이하이어야 합니다.')
       .optional(),
     description: z
       .string()
-      .max(500, '설명은 최대 500글자 이하이어야 합니다.')
+      .max(POLL_LIMITS.DESC_MAX, '설명은 최대 500글자 이하이어야 합니다.')
       .optional()
       .nullable(),
     endsAt: z.string().datetime('마감 시간 형식이 올바르지 않습니다.').optional().nullable(),
@@ -158,13 +193,16 @@ export const UpdatePollSchema = z
           text: z.string().min(1, '선택지는 빈 칸일 수 없습니다.'),
           imageUrl: z
             .string()
-            .max(160_000, '이미지 데이터는 선택지당 160KB 이하이어야 합니다.')
+            .max(
+              POLL_LIMITS.IMAGE_DATA_URL_MAX,
+              '이미지 데이터는 선택지당 160KB 이하이어야 합니다.',
+            )
             .optional()
             .nullable(),
         }),
       )
-      .min(2, '최소 2개 이상의 선택지가 필요합니다.')
-      .max(10, '최대 10개까지의 선택지만 등록 가능합니다.')
+      .min(POLL_LIMITS.OPTIONS_MIN, '최소 2개 이상의 선택지가 필요합니다.')
+      .max(POLL_LIMITS.OPTIONS_MAX, '최대 10개까지의 선택지만 등록 가능합니다.')
       .optional(),
     attachments: z
       .array(PollAttachmentSchema)

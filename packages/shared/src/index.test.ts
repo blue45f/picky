@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { CreatePollSchema, VoteSchema, PollListSortSchema, PollListStatusSchema } from './index';
+import {
+  CreatePollSchema,
+  POLL_LIMITS,
+  PollListSortSchema,
+  PollListStatusSchema,
+  resolveDeadlinePresetEndsAt,
+  VoteSchema,
+} from './index';
 
 describe('Shared Schemas', () => {
   describe('CreatePollSchema', () => {
@@ -100,6 +107,51 @@ describe('Shared Schemas', () => {
     it('falls back to latest/all via .catch for invalid input', () => {
       expect(PollListSortSchema.catch('latest').parse('nope')).toBe('latest');
       expect(PollListStatusSchema.catch('all').parse('nope')).toBe('all');
+    });
+  });
+
+  describe('POLL_LIMITS (single source for form limits)', () => {
+    it('matches the values enforced by CreatePollSchema', () => {
+      expect(POLL_LIMITS.QUESTION_MAX).toBe(100);
+      expect(POLL_LIMITS.DESC_MAX).toBe(500);
+      expect(POLL_LIMITS.OPTION_TEXT_MAX).toBe(60);
+      expect(POLL_LIMITS.OPTIONS_MIN).toBe(2);
+      expect(POLL_LIMITS.OPTIONS_MAX).toBe(10);
+      expect(POLL_LIMITS.IMAGE_DATA_URL_MAX).toBe(160_000);
+    });
+
+    it('rejects a question over QUESTION_MAX and accepts one at the limit', () => {
+      const base = {
+        options: [
+          { text: 'a', imageUrl: null },
+          { text: 'b', imageUrl: null },
+        ],
+      };
+      expect(
+        CreatePollSchema.safeParse({ ...base, question: 'q'.repeat(POLL_LIMITS.QUESTION_MAX) })
+          .success,
+      ).toBe(true);
+      expect(
+        CreatePollSchema.safeParse({ ...base, question: 'q'.repeat(POLL_LIMITS.QUESTION_MAX + 1) })
+          .success,
+      ).toBe(false);
+    });
+  });
+
+  describe('resolveDeadlinePresetEndsAt (ms -> ISO pure calc)', () => {
+    it('returns null for none/custom (no deadline)', () => {
+      expect(resolveDeadlinePresetEndsAt('none')).toBeNull();
+      expect(resolveDeadlinePresetEndsAt('custom')).toBeNull();
+    });
+
+    it('returns a future ISO string for positive-ms presets', () => {
+      const before = Date.now();
+      const iso = resolveDeadlinePresetEndsAt('6h');
+      expect(iso).not.toBeNull();
+      const ts = new Date(iso as string).getTime();
+      // 6h ahead, within a generous tolerance of "now".
+      expect(ts).toBeGreaterThan(before + 6 * 3_600_000 - 5_000);
+      expect(ts).toBeLessThan(Date.now() + 6 * 3_600_000 + 5_000);
     });
   });
 });

@@ -28,9 +28,13 @@ import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { SnsPreviewCard } from '../components/SnsPreviewCard';
 import { ParticipantPreviewPanel } from '../components/ParticipantPreviewPanel';
 import { buildShareablePollSnapshot, copyText } from '../lib/pollShare';
+import { fileToDownscaledDataUrl } from '../lib/image';
 import {
+  fromDateTimeLocalValue,
   isPollVisibility,
   POLL_CATEGORIES,
+  POLL_LIMITS,
+  toDateTimeLocalValue,
   VISIBILITY_OPTIONS,
   type Poll,
   type PollResultsVisibility,
@@ -199,12 +203,13 @@ interface AttachmentInput {
 type EmbedPreviewDevice = 'desktop' | 'mobile';
 type DeadlinePreset = 'none' | 'tonight' | 'day' | 'threeDays' | 'week';
 
-const MAX_OPTIONS = 10;
+// 선택지 개수 한도는 @picky/shared POLL_LIMITS 단일 소스를 쓴다(스키마와 동일).
+const MAX_OPTIONS = POLL_LIMITS.OPTIONS_MAX;
 const POLL_DRAFT_STORAGE_KEY = 'picky_create_poll_draft_v1';
 const AUTO_SAVE_INTERVAL_MS = 700;
+// 업로드 원본 파일 크기 상한·허용 포맷은 작성 화면 UX(친절한 거절 메시지)로 유지한다.
+// 다운스케일·data URL 한도(160KB)는 @picky/client fileToDownscaledDataUrl 가 담당한다.
 const MAX_IMAGE_SOURCE_BYTES = 5 * 1024 * 1024;
-const MAX_IMAGE_DATA_URL_BYTES = 140 * 1024;
-const IMAGE_OUTPUT_MAX_SIDE = 720;
 const SUPPORTED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const MAX_ATTACHMENTS = 3;
 const MAX_ATTACHMENT_FILE_BYTES = 300 * 1024;
@@ -259,25 +264,11 @@ const isResultsVisibility = (value: unknown): value is PollResultsVisibility => 
 
 // 공개 범위 옵션(목록 노출/링크전용/접근코드 비공개)·타입 가드는 @picky/shared 단일 소스를 쓴다.
 // 비공개 선택 시 접근 코드 입력을 노출한다(렌더링 로직은 동일).
+// datetime-local <-> ISO 변환(toDateTimeLocalValue/fromDateTimeLocalValue)도 @picky/shared 단일 소스.
 
-const resolveIsoEndAt = (value: string): string | null => {
-  if (!value.trim()) {
-    return null;
-  }
-
-  const date = new Date(value);
-  if (!Number.isFinite(date.getTime())) {
-    return null;
-  }
-
-  return date.toISOString();
-};
-
-const toDateTimeLocalValue = (date: Date): string => {
-  const offsetMs = date.getTimezoneOffset() * 60 * 1000;
-  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
-};
-
+// 웹 작성 화면 마감 프리셋은 "오늘 밤(tonight)" 특례 등 toss 와 세트가 달라 의도적으로 분기 유지한다.
+// (toss 는 shared DEADLINE_PRESETS 의 ms 를 ISO 로 환산하는 resolveDeadlinePresetEndsAt 를 쓴다.)
+// 여기서는 datetime-local 입력값을 만들어 endsAtLocal 상태에 채운다(앱별 입력 흐름 차이).
 const resolveDeadlinePresetValue = (preset: DeadlinePreset): string => {
   const now = new Date();
 
@@ -442,15 +433,8 @@ const readFileAsDataUrl = (file: File): Promise<string> => {
   });
 };
 
-const loadImageElement = (src: string): Promise<HTMLImageElement> => {
-  return new Promise((resolve, reject) => {
-    const image = new Image();
-    image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error('이미지를 불러올 수 없습니다.'));
-    image.src = src;
-  });
-};
-
+// 다운스케일·data URL 한도(160KB) 처리는 @picky/client fileToDownscaledDataUrl 로 단일화한다.
+// 여기서는 작성 화면 UX(포맷 화이트리스트·원본 5MB 캡·흰 배경 평탄화)만 얹어 위임한다.
 const compressImageFile = async (file: File): Promise<string> => {
   if (!SUPPORTED_IMAGE_TYPES.has(file.type)) {
     throw new Error('JPG, PNG, WebP 이미지만 업로드할 수 있습니다.');
@@ -460,30 +444,8 @@ const compressImageFile = async (file: File): Promise<string> => {
     throw new Error('이미지 파일은 5MB 이하만 업로드할 수 있습니다.');
   }
 
-  const sourceDataUrl = await readFileAsDataUrl(file);
-  const image = await loadImageElement(sourceDataUrl);
-  const scale = Math.min(1, IMAGE_OUTPUT_MAX_SIDE / Math.max(image.width, image.height));
-  const width = Math.max(1, Math.round(image.width * scale));
-  const height = Math.max(1, Math.round(image.height * scale));
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const context = canvas.getContext('2d');
-
-  if (!context) {
-    throw new Error('이미지 변환을 지원하지 않는 브라우저입니다.');
-  }
-
-  context.fillStyle = '#f4fffc';
-  context.fillRect(0, 0, width, height);
-  context.drawImage(image, 0, 0, width, height);
-  const compressed = canvas.toDataURL('image/jpeg', 0.78);
-
-  if (getDataUrlByteLength(compressed) > MAX_IMAGE_DATA_URL_BYTES) {
-    throw new Error('이미지가 너무 큽니다. 더 작은 이미지로 다시 선택해 주세요.');
-  }
-
-  return compressed;
+  // 투명 PNG가 검정 배경으로 변환되지 않도록 브랜드 흰 배경(#f4fffc)을 깔고 다운스케일한다.
+  return fileToDownscaledDataUrl(file, { background: '#f4fffc' });
 };
 
 const buildLaunchActionItems = (args: {
@@ -3470,7 +3432,7 @@ export const CreatePoll: React.FC = () => {
 
   const normalizedQuestion = question.trim();
   const normalizedDescription = description.trim();
-  const normalizedEndsAt = useMemo(() => resolveIsoEndAt(endsAtLocal), [endsAtLocal]);
+  const normalizedEndsAt = useMemo(() => fromDateTimeLocalValue(endsAtLocal), [endsAtLocal]);
   const isEndsAtInvalid = Boolean(
     endsAtLocal.trim() &&
     (!normalizedEndsAt || new Date(normalizedEndsAt).getTime() <= Date.now() + 60 * 1000),

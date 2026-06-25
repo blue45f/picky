@@ -51,7 +51,9 @@ import {
   VOICE,
   categoryMeta,
   canRevealResults,
+  isPollClosed,
   optionPercent,
+  optionsByVotes,
   buildConsensusNarrative as buildConsensusNarrative_shared,
   buildDecisionMemo,
   RESULTS_VISIBILITY_LABELS as SHARED_RESULTS_VISIBILITY_LABELS,
@@ -363,7 +365,7 @@ const buildPollCsvExport = (poll: Poll, shareUrl: string) => {
 };
 
 const buildPollMarkdownReport = (poll: Poll, shareUrl: string) => {
-  const sortedOptions = [...poll.options].sort((a, b) => b.voteCount - a.voteCount);
+  const sortedOptions = optionsByVotes(poll);
   const optionLines = sortedOptions.map((option, index) => {
     const percentage = optionPercent(option.voteCount, poll.totalVotes);
 
@@ -407,14 +409,8 @@ const buildPollMarkdownReport = (poll: Poll, shareUrl: string) => {
   ].join('\n');
 };
 
-const isPollClosed = (poll: Poll | null | undefined) => {
-  if (!poll?.endsAt) {
-    return false;
-  }
-
-  const endsAtTime = new Date(poll.endsAt).getTime();
-  return Number.isFinite(endsAtTime) && Date.now() >= endsAtTime;
-};
+// 마감 판정(isPollClosed)·득표순 정렬(optionsByVotes)은 @picky/shared 단일 소스를 쓴다.
+// shared optionsByVotes 는 동률 시 원본 index 를 보존하는 안정 정렬이라 web/toss/OG 표시순서가 일치한다.
 
 const formatEndAt = (value: string | null | undefined) => {
   if (!value) {
@@ -435,7 +431,7 @@ const formatEndAt = (value: string | null | undefined) => {
 };
 
 const buildPollResultSummary = (poll: Poll, shareUrl: string, mode: ResultSummaryMode) => {
-  const sortedOptions = [...poll.options].sort((a, b) => b.voteCount - a.voteCount);
+  const sortedOptions = optionsByVotes(poll);
   const leader = sortedOptions[0] || null;
   const leaderPercentage =
     leader && poll.totalVotes > 0 ? optionPercent(leader.voteCount, poll.totalVotes) : 0;
@@ -5459,7 +5455,7 @@ function buildPollViewModel(
     currentPoll.resultsVisibility === 'always' ? 'always' : 'afterVote';
   // 결과 공개 게이트는 @picky/shared canRevealResults 단일 소스로(투표/마감/always 판단을 web/toss/OG 동일하게).
   const canViewResults = canRevealResults(currentPoll, hasVoted);
-  const sortedOptionsByVotes = [...currentPoll.options].sort((a, b) => b.voteCount - a.voteCount);
+  const sortedOptionsByVotes = optionsByVotes(currentPoll);
   const leadingOption = sortedOptionsByVotes[0] || null;
   const runnerUpOption = sortedOptionsByVotes[1] || null;
   const leadingShare =
