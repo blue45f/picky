@@ -129,6 +129,71 @@ describe('DatabaseService in-memory vote path (#B1 atomic relative increment)', 
   });
 });
 
+describe('DatabaseService getPolls sort=commented (댓글 많은순 — no crash, correct order)', () => {
+  let tmpFile: string;
+
+  const newService = (state: ServiceState) => {
+    fs.writeFileSync(tmpFile, JSON.stringify(state), 'utf-8');
+    process.env.PICKY_DB_PATH = tmpFile;
+    return new DatabaseService();
+  };
+
+  beforeEach(() => {
+    tmpFile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'picky-db-')), 'db.json');
+  });
+
+  afterEach(() => {
+    try {
+      fs.rmSync(path.dirname(tmpFile), { recursive: true, force: true });
+    } catch {
+      // ignore
+    }
+    delete process.env.PICKY_DB_PATH;
+  });
+
+  const withComments = (id: string, n: number, createdAt: string): Poll =>
+    seedPoll({
+      id,
+      createdAt,
+      comments: Array.from({ length: n }, (_, i) => ({
+        id: i + 1,
+        voterName: '익명',
+        comment: `c${i}`,
+        createdAt,
+      })),
+    });
+
+  it('orders public polls by comment count desc and paginates without throwing', async () => {
+    const service = await newService({
+      polls: [
+        withComments('p-low', 1, '2026-01-01T00:00:00.000Z'),
+        withComments('p-high', 5, '2026-01-02T00:00:00.000Z'),
+        withComments('p-mid', 3, '2026-01-03T00:00:00.000Z'),
+      ],
+      users: [],
+    });
+
+    const result = await service.getPolls({ page: 1, limit: 20, sort: 'commented', status: 'all' });
+
+    expect(result.items.map((p) => p.id)).toEqual(['p-high', 'p-mid', 'p-low']);
+    expect(result.total).toBe(3);
+    expect(result.hasMore).toBe(false);
+  });
+
+  it('breaks comment-count ties by newest createdAt', async () => {
+    const service = await newService({
+      polls: [
+        withComments('older', 2, '2026-01-01T00:00:00.000Z'),
+        withComments('newer', 2, '2026-02-01T00:00:00.000Z'),
+      ],
+      users: [],
+    });
+
+    const result = await service.getPolls({ page: 1, limit: 20, sort: 'commented', status: 'all' });
+    expect(result.items.map((p) => p.id)).toEqual(['newer', 'older']);
+  });
+});
+
 describe('DatabaseService creatorNickname resolution (#B4)', () => {
   let tmpFile: string;
 

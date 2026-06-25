@@ -11,7 +11,12 @@ import { isPollClosed, leadingOption, optionPercent } from '../lib/poll';
 import { hasVotedLocally } from '../lib/votes';
 import { hapticFeedback } from '../lib/toss';
 import { getRecentPollHistory, type RecentPollHistoryItem } from '../lib/pollHistory';
-import { countPollsBySignal, filterPollsBySignal, type PollSignal } from '../lib/pollSignal';
+import {
+  countPollsBySignal,
+  filterPollsBySignal,
+  hottestActivePoll,
+  type PollSignal,
+} from '../lib/pollSignal';
 import { Chip, ProgressBar, SegmentedControl, Skeleton } from '../components/ui';
 import { BannerAd } from '../components/BannerAd';
 import { useCountdown } from '../components/Countdown';
@@ -1000,15 +1005,7 @@ export function PollListPage() {
 
   const totalVotes = useMemo(() => polls.reduce((sum, poll) => sum + poll.totalVotes, 0), [polls]);
 
-  const hotPoll = useMemo(() => {
-    const activePolls = polls.filter((p) => !isPollClosed(p));
-    if (activePolls.length === 0) return null;
-    return activePolls.reduce((prev, current) => {
-      const prevScore = prev.totalVotes + prev.comments.length * 3;
-      const currentScore = current.totalVotes + current.comments.length * 3;
-      return currentScore > prevScore ? current : prev;
-    });
-  }, [polls]);
+  const hotPoll = useMemo(() => hottestActivePoll(polls), [polls]);
 
   // 서버 쿼리(q/sort/status) 적용 후 현재 페이지에 보조필터(myOnly=내 글만)만 덧입힌 기준 목록.
   // signal 칩 카운트도 이 목록을 기준으로 세서, 화면에 보이는 모수와 일치하게 한다.

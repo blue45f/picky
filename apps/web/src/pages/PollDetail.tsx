@@ -44,7 +44,7 @@ import { OpinionTopicCloud } from '../components/OpinionTopicCloud';
 import { ActionItemPlanner } from '../components/ActionItemPlanner';
 import { StakeholderReportBuilder } from '../components/StakeholderReportBuilder';
 import type { Poll, PollResultsVisibility } from '@picky/shared';
-import { MASCOT, VOICE, categoryMeta } from '@picky/shared';
+import { MASCOT, VOICE, categoryMeta, optionPercent } from '@picky/shared';
 import {
   resolvePollShareUrl,
   buildPollEmbedCode,
@@ -274,8 +274,7 @@ const buildPollCsvExport = (poll: Poll, shareUrl: string) => {
   const createdAt = new Date(poll.createdAt).toISOString();
   const endsAt = poll.endsAt ? new Date(poll.endsAt).toISOString() : '';
   const resultRows = poll.options.map((option, index) => {
-    const percentage =
-      poll.totalVotes > 0 ? Math.round((option.voteCount / poll.totalVotes) * 100) : 0;
+    const percentage = optionPercent(option.voteCount, poll.totalVotes);
 
     return [
       'option_result',
@@ -354,8 +353,7 @@ const buildPollCsvExport = (poll: Poll, shareUrl: string) => {
 const buildPollMarkdownReport = (poll: Poll, shareUrl: string) => {
   const sortedOptions = [...poll.options].sort((a, b) => b.voteCount - a.voteCount);
   const optionLines = sortedOptions.map((option, index) => {
-    const percentage =
-      poll.totalVotes > 0 ? Math.round((option.voteCount / poll.totalVotes) * 100) : 0;
+    const percentage = optionPercent(option.voteCount, poll.totalVotes);
 
     return `${index + 1}. ${option.text} - ${option.voteCount}표 (${percentage}%)`;
   });
@@ -488,10 +486,9 @@ const buildPollResultSummary = (poll: Poll, shareUrl: string, mode: ResultSummar
   const sortedOptions = [...poll.options].sort((a, b) => b.voteCount - a.voteCount);
   const leader = sortedOptions[0] || null;
   const leaderPercentage =
-    leader && poll.totalVotes > 0 ? Math.round((leader.voteCount / poll.totalVotes) * 100) : 0;
+    leader && poll.totalVotes > 0 ? optionPercent(leader.voteCount, poll.totalVotes) : 0;
   const optionLines = sortedOptions.map((option, index) => {
-    const percentage =
-      poll.totalVotes > 0 ? Math.round((option.voteCount / poll.totalVotes) * 100) : 0;
+    const percentage = optionPercent(option.voteCount, poll.totalVotes);
     return `${index + 1}. ${option.text}: ${option.voteCount}표 (${percentage}%)`;
   });
   const latestComments = [...poll.comments]
@@ -580,8 +577,7 @@ const drawResultImageOptionBars = (
   const sortedOptions = [...poll.options].sort((a, b) => b.voteCount - a.voteCount).slice(0, 4);
   let barY = 318;
   sortedOptions.forEach((option, index) => {
-    const percentage =
-      poll.totalVotes > 0 ? Math.round((option.voteCount / poll.totalVotes) * 100) : 0;
+    const percentage = optionPercent(option.voteCount, poll.totalVotes);
     context.fillStyle = themeConfig.title;
     context.font = '800 22px "Pretendard Variable", Arial, sans-serif';
     drawWrappedText(context, `${index + 1}. ${option.text}`, 80, barY, 560, 26, 1);
@@ -1051,10 +1047,7 @@ function PollPresentationView(
       <div className="present-grid">
         <section className="present-results-panel">
           {sortedOptionsByVotes.map((option, index) => {
-            const percentage =
-              currentPoll.totalVotes > 0
-                ? Math.round((option.voteCount / currentPoll.totalVotes) * 100)
-                : 0;
+            const percentage = optionPercent(option.voteCount, currentPoll.totalVotes);
             return (
               <article key={option.id} className={index === 0 ? 'leader' : undefined}>
                 <div>
@@ -1166,7 +1159,9 @@ function SocialComparisonBadge(
   if (!voted) {
     return null;
   }
-  const percent = Math.round((voted.voteCount / totalVotes) * 100);
+  // totalVotes >= 1 is guaranteed by the early return above, so optionPercent
+  // takes its total>0 branch — behavior-identical to the prior inline Math.round.
+  const percent = optionPercent(voted.voteCount, totalVotes);
   const topVote = currentPoll.options.reduce((max, option) => Math.max(max, option.voteCount), 0);
   const isMajority = voted.voteCount === topVote && voted.voteCount > 0;
   const avg = 100 / Math.max(1, currentPoll.options.length);
@@ -1734,10 +1729,7 @@ function PollResultsScreen(
           </div>
 
           {currentPoll.options.map((opt, idx) => {
-            const percentage =
-              currentPoll.totalVotes > 0
-                ? Math.round((opt.voteCount / currentPoll.totalVotes) * 100)
-                : 0;
+            const percentage = optionPercent(opt.voteCount, currentPoll.totalVotes);
             const isMyChoice = votedHistory[currentPoll.id] === opt.id;
             const barColor = OPTION_COLORS[idx % OPTION_COLORS.length];
 
@@ -4733,10 +4725,7 @@ function LiveResultPreview(props: Readonly<{ currentPoll: Poll }>) {
       </div>
       <div style={{ display: 'grid', gap: '0.55rem' }}>
         {currentPoll.options.map((option) => {
-          const percentage =
-            currentPoll.totalVotes > 0
-              ? Math.round((option.voteCount / currentPoll.totalVotes) * 100)
-              : 0;
+          const percentage = optionPercent(option.voteCount, currentPoll.totalVotes);
           return (
             <div key={option.id} style={{ display: 'grid', gap: '0.25rem' }}>
               <div
@@ -5569,7 +5558,7 @@ function buildPollViewModel(
   const runnerUpOption = sortedOptionsByVotes[1] || null;
   const leadingShare =
     currentPoll.totalVotes > 0 && leadingOption
-      ? Math.round((leadingOption.voteCount / currentPoll.totalVotes) * 100)
+      ? optionPercent(leadingOption.voteCount, currentPoll.totalVotes)
       : 0;
   const voteGap = leadingOption ? leadingOption.voteCount - (runnerUpOption?.voteCount || 0) : 0;
   const voteGapShare =
@@ -6909,14 +6898,20 @@ export const PollDetail: React.FC = () => {
     if (!id) {
       return;
     }
-    await addComment(id, {
-      comment: text,
-      parentId,
-      voterName: (user?.nickname || guestName || '').trim() || null,
-    });
+    await addComment(
+      id,
+      {
+        comment: text,
+        parentId,
+        voterName: (user?.nickname || guestName || '').trim() || null,
+      },
+      // 비공개 투표면 활성 접근 코드를 함께 보내 서버 게이트를 통과한다(공개 폴은 undefined).
+      activeCode,
+    );
   };
 
   // 비공개 투표 잠금 해제 — 코드로 재조회하면 성공 시 서버가 requiresCode=false 로 응답해 게이트가 풀린다.
+  // 성공한 코드는 activeCode 로 보관해 이후 투표/한마디 쓰기 요청(?code=)에도 함께 실어 보낸다.
   const handleUnlockCode = async () => {
     if (!id) {
       return;
@@ -6930,7 +6925,9 @@ export const PollDetail: React.FC = () => {
     const result = await fetchPoll(id, trimmed);
     if (!result || result.requiresCode) {
       setCodeError('코드가 맞지 않아요. 🔒');
+      return;
     }
+    setActiveCode(trimmed);
   };
 
   // Modal share check
@@ -6942,6 +6939,8 @@ export const PollDetail: React.FC = () => {
   const urlCode = searchParams.get('code') ?? undefined;
   const [codeInput, setCodeInput] = useState('');
   const [codeError, setCodeError] = useState<string | null>(null);
+  // 비공개 투표 쓰기 경로(투표/한마디)에 함께 보낼 활성 접근 코드. URL 코드로 시작하고, 잠금 해제 성공 시 갱신한다.
+  const [activeCode, setActiveCode] = useState<string | undefined>(urlCode);
 
   // Forms
   const [votedOptionId, setVotedOptionId] = useState<number | null>(null);
@@ -7002,6 +7001,11 @@ export const PollDetail: React.FC = () => {
       fetchPoll(id, urlCode);
     }
   }, [id, fetchPoll, snapshotParam, urlCode]);
+
+  // URL ?code= 가 바뀌면 활성 접근 코드도 따라간다(잠금 해제 입력은 handleUnlockCode가 별도 갱신).
+  useEffect(() => {
+    setActiveCode(urlCode);
+  }, [urlCode]);
 
   useEffect(() => {
     if (showShareParam) {
@@ -7232,12 +7236,17 @@ export const PollDetail: React.FC = () => {
     setVoteMessage('');
 
     try {
-      const success = await vote(id, {
-        optionId: votedOptionId,
-        voterName: voterName.trim() || null,
-        comment: comment.trim() || null,
-        voterKey: getVoterKey(),
-      });
+      const success = await vote(
+        id,
+        {
+          optionId: votedOptionId,
+          voterName: voterName.trim() || null,
+          comment: comment.trim() || null,
+          voterKey: getVoterKey(),
+        },
+        // 비공개 투표면 활성 접근 코드를 함께 보내 서버 게이트를 통과한다(공개 폴은 undefined).
+        activeCode,
+      );
 
       if (success) {
         const nextHistory = { ...votedHistory, [id]: votedOptionId };

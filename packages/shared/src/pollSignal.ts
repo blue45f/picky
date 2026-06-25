@@ -87,3 +87,21 @@ export const countPollsBySignal = (polls: Poll[], signal: PollSignal): number =>
   }
   return polls.reduce((count, poll) => (matchesPollSignal(poll, signal) ? count + 1 : count), 0);
 };
+
+/** 참여 활발도 점수(표 + 한마디×3). 홈 '지금 뜨는' 추천 정렬용. */
+export const pollEngagementScore = (poll: Poll): number =>
+  poll.totalVotes + poll.comments.length * 3;
+
+/**
+ * 진행 중(마감 전) 투표 중 참여 활발도가 가장 높은 1개. 진행 중인 게 없으면 null.
+ * 동점이면 먼저 나온(목록 순서상 앞선) 투표를 유지한다(`>` 비교라 안정적).
+ */
+export const hottestActivePoll = (polls: Poll[]): Poll | null => {
+  const activePolls = polls.filter((poll) => !isPollClosed(poll));
+  if (activePolls.length === 0) {
+    return null;
+  }
+  return activePolls.reduce((prev, current) =>
+    pollEngagementScore(current) > pollEngagementScore(prev) ? current : prev,
+  );
+};

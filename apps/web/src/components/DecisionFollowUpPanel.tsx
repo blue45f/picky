@@ -11,6 +11,7 @@ import {
   Users,
 } from 'lucide-react';
 import type { Poll } from '@picky/shared';
+import { optionPercent } from '@picky/shared';
 import { copyText } from '../lib/pollShare';
 
 type DecisionState = 'collect' | 'runoff' | 'discussion' | 'ready';
@@ -85,8 +86,7 @@ const computeDecisionStats = (poll: Poll, pollClosed: boolean): DecisionStats =>
   const runnerUp = sortedOptions[1] || null;
   const totalVotes = poll.totalVotes || 0;
   const minimumVotes = Math.max(7, poll.options.length * 3);
-  const leaderShare =
-    totalVotes > 0 && leader ? Math.round((leader.voteCount / totalVotes) * 100) : 0;
+  const leaderShare = totalVotes > 0 && leader ? optionPercent(leader.voteCount, totalVotes) : 0;
   const voteGap = leader ? leader.voteCount - (runnerUp?.voteCount || 0) : 0;
   const voteGapShare = totalVotes > 0 ? Math.round((voteGap / totalVotes) * 100) : 0;
   const feedbackRate = totalVotes > 0 ? Math.round((comments.length / totalVotes) * 100) : 0;

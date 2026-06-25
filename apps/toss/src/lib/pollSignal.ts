@@ -7,9 +7,11 @@ export {
   countPollsBySignal,
   filterPollsBySignal,
   getPollAgeDays,
+  hottestActivePoll,
   isCloseRacePoll,
   isClosingSoonPoll,
   isFeedbackRichPoll,
   isFreshPoll,
   matchesPollSignal,
+  pollEngagementScore,
 } from '../shared';

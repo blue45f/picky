@@ -151,6 +151,8 @@ export const Navbar: React.FC = () => {
             </span>
           </span>
           <span
+            // BETA 배지는 장식 — 접근성 이름에서 제외해 가시 텍스트(picky)와 라벨('picky 홈')을 정합시킨다(WCAG 2.5.3).
+            aria-hidden="true"
             style={{
               fontSize: '0.58rem',
               letterSpacing: '0.08em',

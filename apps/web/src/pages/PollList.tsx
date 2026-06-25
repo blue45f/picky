@@ -34,10 +34,12 @@ import { MASCOT, VOICE, categoryMeta, BETA_NOTICE } from '@picky/shared';
 // 시그널 분류(접전/신규/마감임박/피드백)·마감 판정 순수 로직은 @picky/shared 로 단일화했어요.
 import {
   getPollAgeDays,
+  hottestActivePoll,
   isCloseRacePoll,
   isClosingSoonPoll,
   isFeedbackRichPoll,
   isPollClosed,
+  optionPercent,
 } from '@picky/shared';
 import { usePollStore } from '../store/usePollStore';
 import { useAuthStore } from '../store/useAuthStore';
@@ -2140,15 +2142,7 @@ export const PollList: React.FC = () => {
   );
   const openPollCount = useMemo(() => polls.filter((poll) => !isPollClosed(poll)).length, [polls]);
 
-  const hotPoll = useMemo(() => {
-    const activePolls = polls.filter((p) => !isPollClosed(p));
-    if (activePolls.length === 0) return null;
-    return activePolls.reduce((prev, current) => {
-      const prevScore = prev.totalVotes + prev.comments.length * 3;
-      const currentScore = current.totalVotes + current.comments.length * 3;
-      return currentScore > prevScore ? current : prev;
-    });
-  }, [polls]);
+  const hotPoll = useMemo(() => hottestActivePoll(polls), [polls]);
 
   // Animated hero counters — count up to the live totals once data arrives.
   const pollsCountDisplay = useCountUp(polls.length);
@@ -2777,10 +2771,7 @@ export const PollList: React.FC = () => {
 
               <div style={{ display: 'grid', gap: '0.45rem', marginTop: '0.2rem' }}>
                 {hotPoll.options.slice(0, 2).map((opt) => {
-                  const pct =
-                    hotPoll.totalVotes > 0
-                      ? Math.round((opt.voteCount / hotPoll.totalVotes) * 100)
-                      : 0;
+                  const pct = optionPercent(opt.voteCount, hotPoll.totalVotes);
                   return (
                     <div key={opt.id} style={{ display: 'grid', gap: '2px' }}>
                       <div

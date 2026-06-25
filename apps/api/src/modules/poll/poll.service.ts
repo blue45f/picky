@@ -319,11 +319,29 @@ export class PollService {
     return { id, commentId, deleted: true };
   }
 
-  async vote(id: string, input: VoteInput): Promise<Poll> {
+  /**
+   * 비공개(private) 투표의 쓰기 경로(vote/comment) 접근 코드 게이트.
+   * 공개/unlisted 투표는 코드 없이 그대로 통과시키고, private 투표만 verifyAccessCode로 강제 검증한다.
+   * 코드가 없거나 틀리면 ForbiddenException으로 차단해 게이트 데이터(질문/옵션/결과/댓글) 작성·노출을 막는다.
+   */
+  private async assertWriteAccess(poll: Poll, code?: string | null): Promise<void> {
+    if (poll.visibility !== 'private') {
+      return;
+    }
+    const ok = await this.db.verifyAccessCode(poll.id, code ?? null);
+    if (!ok) {
+      throw new ForbiddenException('비공개 투표예요. 올바른 접근 코드가 필요합니다.');
+    }
+  }
+
+  async vote(id: string, input: VoteInput, code?: string | null): Promise<Poll> {
     const poll = await this.db.getPollById(id);
     if (!poll) {
       throw new NotFoundException(`고민(투표) ID ${id}를 찾을 수 없습니다.`);
     }
+
+    // 비공개 투표는 접근 코드 검증을 통과해야 한다(코드 없거나 틀리면 403, 폴 내용 미노출).
+    await this.assertWriteAccess(poll, code);
 
     if (this.isPollClosed(poll)) {
       throw new BadRequestException('마감된 투표에는 더 이상 참여할 수 없습니다.');
@@ -352,16 +370,19 @@ export class PollService {
       });
     }
 
-    // 최신 카운트·DB serial id 정합을 위해 재조회한다.
-    return (await this.db.getPollById(id)) ?? poll;
+    // 응답은 열람용 redaction을 거쳐 비공개 폴의 게이트 데이터가 새지 않게 한다(코드 통과 시 전체 반환).
+    return this.getPollForViewer(id, code);
   }
 
   /** 한마디(댓글)·답글 작성 — 투표와 무관. parentId가 있으면 해당 댓글의 답글. */
-  async addComment(id: string, input: CreateCommentInput): Promise<Poll> {
+  async addComment(id: string, input: CreateCommentInput, code?: string | null): Promise<Poll> {
     const poll = await this.db.getPollById(id);
     if (!poll) {
       throw new NotFoundException(`고민(투표) ID ${id}를 찾을 수 없습니다.`);
     }
+
+    // 비공개 투표는 접근 코드 검증을 통과해야 한마디를 남길 수 있다.
+    await this.assertWriteAccess(poll, code);
 
     let parentId: number | null = input.parentId ?? null;
     if (parentId != null) {
@@ -381,7 +402,7 @@ export class PollService {
       createdAt: new Date().toISOString(),
       parentId,
     });
-    // 새 댓글이 DB serial id를 갖도록 재조회(직후 답글 parentId 정합성).
-    return (await this.db.getPollById(id)) ?? poll;
+    // 응답은 열람용 redaction을 거쳐 비공개 폴의 게이트 데이터가 새지 않게 한다(코드 통과 시 전체 반환).
+    return this.getPollForViewer(id, code);
   }
 }

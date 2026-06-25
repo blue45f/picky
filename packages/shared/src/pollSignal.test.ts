@@ -3,10 +3,12 @@ import type { Poll } from './index';
 import {
   countPollsBySignal,
   filterPollsBySignal,
+  hottestActivePoll,
   isCloseRacePoll,
   isFeedbackRichPoll,
   isFreshPoll,
   matchesPollSignal,
+  pollEngagementScore,
 } from './pollSignal';
 
 const makePoll = (over: Partial<Poll> = {}): Poll => ({
@@ -102,5 +104,50 @@ describe('matchesPollSignal / filter / count', () => {
   it('countPollsBySignal counts matches', () => {
     expect(countPollsBySignal([close, landslide], 'closeRace')).toBe(1);
     expect(countPollsBySignal([close, landslide], 'all')).toBe(2);
+  });
+});
+
+describe('pollEngagementScore / hottestActivePoll', () => {
+  afterEach(() => vi.useRealTimers());
+
+  it('scores votes plus comments weighted x3', () => {
+    expect(
+      pollEngagementScore(
+        makePoll({
+          totalVotes: 4,
+          comments: [
+            { id: 1, voterName: 'a', comment: 'x', createdAt: '' },
+            { id: 2, voterName: 'b', comment: 'y', createdAt: '' },
+          ],
+        }),
+      ),
+    ).toBe(10);
+  });
+
+  it('returns null when there are no active polls', () => {
+    expect(hottestActivePoll([])).toBeNull();
+  });
+
+  it('picks the highest-engagement active poll and ignores closed ones', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-25T00:00:00Z'));
+    const quiet = makePoll({ id: 'quiet', totalVotes: 2 });
+    const loud = makePoll({
+      id: 'loud',
+      totalVotes: 3,
+      comments: [{ id: 1, voterName: 'a', comment: 'x', createdAt: '' }],
+    });
+    const closedButLoud = makePoll({
+      id: 'closed',
+      totalVotes: 100,
+      endsAt: '2026-06-24T00:00:00Z',
+    });
+    expect(hottestActivePoll([quiet, loud, closedButLoud])?.id).toBe('loud');
+  });
+
+  it('keeps the first poll on an engagement tie', () => {
+    const first = makePoll({ id: 'first', totalVotes: 5 });
+    const second = makePoll({ id: 'second', totalVotes: 5 });
+    expect(hottestActivePoll([first, second])?.id).toBe('first');
   });
 });

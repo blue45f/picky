@@ -12,6 +12,7 @@ import {
   Users,
 } from 'lucide-react';
 import type { Poll } from '@picky/shared';
+import { optionPercent } from '@picky/shared';
 import { copyText } from '../lib/pollShare';
 
 type CommentSignal = 'support' | 'risk' | 'question' | 'neutral';
@@ -107,7 +108,7 @@ export function LiveFacilitationConsole({
     const voteProgress =
       targetVotes > 0 ? Math.min(100, Math.round((poll.totalVotes / targetVotes) * 100)) : 0;
     const leaderShare =
-      poll.totalVotes > 0 && leader ? Math.round((leader.voteCount / poll.totalVotes) * 100) : 0;
+      poll.totalVotes > 0 && leader ? optionPercent(leader.voteCount, poll.totalVotes) : 0;
     const voteGap = leader ? leader.voteCount - (runnerUp?.voteCount || 0) : 0;
     const hasEnoughVotes = poll.totalVotes >= targetVotes;
     const hasDiscussion = comments.length > 0;

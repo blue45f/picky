@@ -64,10 +64,11 @@ export interface PollState {
   fetchPoll: (id: string, code?: string) => Promise<Poll | null>;
   createPoll: (input: CreatePollInput) => Promise<Poll | null>;
   updatePoll: (id: string, patch: UpdatePollInput) => Promise<Poll | null>;
-  vote: (id: string, input: VoteInput) => Promise<boolean>;
+  // 비공개(private) 투표는 접근 코드를 ?code= 로 함께 보내야 서버 게이트를 통과한다(공개 폴은 생략).
+  vote: (id: string, input: VoteInput, code?: string | null) => Promise<boolean>;
   deletePoll: (id: string) => Promise<boolean>;
   deleteComment: (id: string, commentId: number) => Promise<boolean>;
-  addComment: (id: string, input: CreateCommentInput) => Promise<Poll | null>;
+  addComment: (id: string, input: CreateCommentInput, code?: string | null) => Promise<Poll | null>;
 }
 
 interface PollAuthStore {
@@ -457,6 +458,12 @@ const parsePollsPage = (
   return { items, total, page, limit, hasMore };
 };
 
+/** 비공개 투표 쓰기 경로(vote/comment)에 붙일 ?code= 쿼리. 코드가 없으면 빈 문자열(공개 폴은 그대로). */
+const buildCodeQuery = (code?: string | null): string => {
+  const trimmed = (code ?? '').trim();
+  return trimmed ? `?code=${encodeURIComponent(trimmed)}` : '';
+};
+
 const excludePollById = (polls: Poll[], pollId: string): Poll[] =>
   polls.filter((poll) => poll.id !== pollId);
 
@@ -705,7 +712,7 @@ export const createPollStoreState =
       }
     },
 
-    vote: async (id, input) => {
+    vote: async (id, input, code) => {
       set({ isLoading: true, error: null });
       const knownPoll =
         get().currentPoll ||
@@ -726,7 +733,8 @@ export const createPollStoreState =
           headers.Authorization = `Bearer ${token}`;
         }
 
-        const res = await requestApi(`/polls/${id}/vote`, {
+        // 비공개 투표면 ?code= 로 접근 코드를 함께 보낸다(공개 폴은 빈 쿼리라 동작 동일).
+        const res = await requestApi(`/polls/${id}/vote${buildCodeQuery(code)}`, {
           method: 'POST',
           headers,
           body: JSON.stringify(input),
@@ -900,7 +908,7 @@ export const createPollStoreState =
       }
     },
 
-    addComment: async (id, input) => {
+    addComment: async (id, input, code) => {
       set({ error: null });
       try {
         const token = getAuthToken(useAuthStore);
@@ -909,7 +917,8 @@ export const createPollStoreState =
           headers.Authorization = `Bearer ${token}`;
         }
 
-        const res = await requestApi(`/polls/${id}/comments`, {
+        // 비공개 투표면 ?code= 로 접근 코드를 함께 보낸다(공개 폴은 빈 쿼리라 동작 동일).
+        const res = await requestApi(`/polls/${id}/comments${buildCodeQuery(code)}`, {
           method: 'POST',
           headers,
           body: JSON.stringify(input),

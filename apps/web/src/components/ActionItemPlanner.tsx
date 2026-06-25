@@ -11,6 +11,7 @@ import {
   UserRound,
 } from 'lucide-react';
 import type { Poll } from '@picky/shared';
+import { optionPercent } from '@picky/shared';
 import { copyText } from '../lib/pollShare';
 
 type ActionItemPlannerProps = Readonly<{
@@ -65,7 +66,7 @@ export function ActionItemPlanner({ poll, shareUrl }: ActionItemPlannerProps) {
     const leader = sortedOptions[0] || null;
     const runnerUp = sortedOptions[1] || null;
     const leaderShare =
-      poll.totalVotes > 0 && leader ? Math.round((leader.voteCount / poll.totalVotes) * 100) : 0;
+      poll.totalVotes > 0 && leader ? optionPercent(leader.voteCount, poll.totalVotes) : 0;
     const voteGap = leader ? leader.voteCount - (runnerUp?.voteCount || 0) : 0;
     const representativeComments = (poll.comments || [])
       .filter((commentItem) => !leader || commentItem.selectedOptionId === leader.id)

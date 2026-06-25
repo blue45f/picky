@@ -252,13 +252,15 @@ export class PollController {
   }
 
   @Post(':id/vote')
-  vote(@Param('id') id: string, @Body() dto: VoteDto) {
-    return this.pollService.vote(id, dto);
+  vote(@Param('id') id: string, @Body() dto: VoteDto, @Query('code') code?: string) {
+    // 비공개(private) 투표는 GET 상세와 동일하게 ?code= 로 접근 코드를 검증한 뒤에만 표를 받는다.
+    return this.pollService.vote(id, dto, code);
   }
 
   @Post(':id/comments')
-  addComment(@Param('id') id: string, @Body() dto: CreateCommentDto) {
-    return this.pollService.addComment(id, dto);
+  addComment(@Param('id') id: string, @Body() dto: CreateCommentDto, @Query('code') code?: string) {
+    // 비공개(private) 투표는 ?code= 접근 코드 검증을 통과해야 한마디를 남길 수 있다.
+    return this.pollService.addComment(id, dto, code);
   }
 
   @Patch(':id')

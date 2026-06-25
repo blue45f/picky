@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, ForbiddenException } from '@nestjs/common';
 import type { Poll, PaginatedPolls } from '@picky/shared';
 import { POLLS_PAGE_MAX_LIMIT } from '@picky/shared';
 import { PollService } from './poll.service';
@@ -42,8 +42,15 @@ const createDbMock = () => {
   const getPollById = vi.fn(async (_id: string): Promise<Poll | undefined> => makePoll());
   const castVote = vi.fn(async () => ({ recorded: true }));
   const appendComment = vi.fn(async () => undefined);
-  const db = { getPolls, getPollById, castVote, appendComment } as unknown as DatabaseService;
-  return { db, getPolls, getPollById, castVote, appendComment };
+  const verifyAccessCode = vi.fn(async () => true);
+  const db = {
+    getPolls,
+    getPollById,
+    castVote,
+    appendComment,
+    verifyAccessCode,
+  } as unknown as DatabaseService;
+  return { db, getPolls, getPollById, castVote, appendComment, verifyAccessCode };
 };
 
 describe('PollService.getPolls (pagination clamp + server filters)', () => {
@@ -148,6 +155,74 @@ describe('PollService.vote (atomic cast + dedup gate)', () => {
 
     await service.vote('abc123', { optionId: 1, voterKey: 'k', comment: '좋아요' });
     expect(mocks.appendComment).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('PollService private-poll write gate (vote/comment access-code enforcement)', () => {
+  let mocks: ReturnType<typeof createDbMock>;
+  let service: PollService;
+  const privatePoll = () => makePoll({ visibility: 'private' });
+
+  beforeEach(() => {
+    mocks = createDbMock();
+    service = new PollService(mocks.db);
+  });
+
+  it('blocks voting on a private poll when the access code is missing/wrong (403, no cast)', async () => {
+    mocks.getPollById.mockResolvedValue(privatePoll());
+    mocks.verifyAccessCode.mockResolvedValue(false);
+
+    await expect(service.vote('abc123', { optionId: 1 }, undefined)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+    // 게이트에서 막혔으니 표는 절대 기록되지 않는다.
+    expect(mocks.castVote).not.toHaveBeenCalled();
+  });
+
+  it('blocks commenting on a private poll when the access code is wrong (403, no append)', async () => {
+    mocks.getPollById.mockResolvedValue(privatePoll());
+    mocks.verifyAccessCode.mockResolvedValue(false);
+
+    await expect(
+      service.addComment('abc123', { comment: '안녕' }, 'wrong-code'),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(mocks.appendComment).not.toHaveBeenCalled();
+  });
+
+  it('redacts the vote response for a private poll (no options/results leak) even after a valid cast', async () => {
+    // 코드 검증은 통과하지만, 응답 단계의 getPollForViewer는 redaction을 위해 다시 코드를 확인한다.
+    // 응답 redaction에서 코드가 비면 options=[] 게이트 응답이 나가야 데이터 노출이 없다.
+    mocks.getPollById.mockResolvedValue(privatePoll());
+    mocks.verifyAccessCode.mockResolvedValueOnce(true).mockResolvedValue(false);
+    mocks.castVote.mockResolvedValue({ recorded: true });
+
+    const result = await service.vote('abc123', { optionId: 1, voterKey: 'k' }, 'ok-code');
+
+    expect(mocks.castVote).toHaveBeenCalledWith('abc123', 'k', 1);
+    // 응답은 열람용 redaction을 거쳐 옵션/결과가 비노출(requiresCode=true)이어야 한다.
+    expect(result.requiresCode).toBe(true);
+    expect(result.options).toEqual([]);
+    expect(result.totalVotes).toBe(0);
+  });
+
+  it('returns the full poll in the response when the access code stays valid through redaction', async () => {
+    mocks.getPollById.mockResolvedValue(privatePoll());
+    mocks.verifyAccessCode.mockResolvedValue(true);
+    mocks.castVote.mockResolvedValue({ recorded: true });
+
+    const result = await service.vote('abc123', { optionId: 1, voterKey: 'k' }, 'ok-code');
+
+    expect(result.requiresCode).toBe(false);
+    expect(result.options.length).toBeGreaterThan(0);
+  });
+
+  it('does not require a code for public polls (verifyAccessCode untouched)', async () => {
+    mocks.getPollById.mockResolvedValue(makePoll({ visibility: 'public' }));
+    mocks.castVote.mockResolvedValue({ recorded: true });
+
+    await expect(service.vote('abc123', { optionId: 1, voterKey: 'k' })).resolves.toBeDefined();
+    expect(mocks.verifyAccessCode).not.toHaveBeenCalled();
+    expect(mocks.castVote).toHaveBeenCalledWith('abc123', 'k', 1);
   });
 });
 

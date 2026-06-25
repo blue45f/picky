@@ -304,26 +304,14 @@ export class AuthService {
       throw new UnauthorizedException('유효하지 않은 사용자입니다.');
     }
 
-    if (
-      payload.isGuest === undefined ||
-      typeof payload.nickname !== 'string' ||
-      typeof payload.email !== 'string'
-    ) {
-      const user = await this.db.getUserById(payload.sub);
-      if (!user) {
-        throw new UnauthorizedException('유효하지 않은 사용자입니다.');
-      }
-      return this.toProfile(user);
+    // 탈퇴/삭제된 계정의 토큰을 막기 위해 DB 존재를 항상 확인한다(stateless 토큰 유지 + 탈퇴자 차단).
+    // 사용자를 못 찾으면 만료 전이라도 401 — 탈퇴 후 /me 200 노출을 닫는다.
+    // 프로필은 payload가 아니라 DB 최신 값으로 재구성해 닉네임/권한 변경도 즉시 반영한다.
+    const user = await this.db.getUserById(payload.sub);
+    if (!user) {
+      throw new UnauthorizedException('유효하지 않은 사용자입니다.');
     }
-
-    return {
-      id: payload.sub,
-      email: payload.email,
-      nickname: payload.nickname,
-      createdAt: new Date().toISOString(),
-      isGuest: payload.isGuest,
-      isAdmin: isAdminEmail(payload.email),
-    };
+    return this.toProfile(user);
   }
 
   /** 회원 탈퇴 — 본인 계정 삭제. 작성한 고민은 익명화되어 보존된다. */

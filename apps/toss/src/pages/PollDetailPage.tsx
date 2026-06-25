@@ -60,6 +60,8 @@ export function PollDetailPage() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [codeInput, setCodeInput] = useState('');
   const [codeError, setCodeError] = useState<string | null>(null);
+  // 비공개 투표 쓰기 경로(투표/한마디)에 함께 보낼 활성 접근 코드. URL 코드로 시작, 잠금 해제 성공 시 갱신.
+  const [activeCode, setActiveCode] = useState<string | undefined>(urlCode);
   // 옵트인 '토스 프로필 불러오기' 상태(키 없거나 토스 밖이면 버튼 자체가 안 떠요).
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileNotice, setProfileNotice] = useState<string | null>(null);
@@ -69,6 +71,11 @@ export function PollDetailPage() {
   useEffect(() => {
     fetchPoll(id, urlCode).catch(() => {});
   }, [id, urlCode, fetchPoll]);
+
+  // URL ?code= 가 바뀌면 활성 접근 코드도 따라간다(잠금 해제 입력은 handleUnlock이 별도 갱신).
+  useEffect(() => {
+    setActiveCode(urlCode);
+  }, [urlCode]);
 
   useEffect(() => {
     setVotedOptionId(getVotedOptionId(id));
@@ -138,13 +145,18 @@ export function PollDetailPage() {
     if (trimmedName) {
       setDisplayName(trimmedName);
     }
-    const ok = await vote(poll.id, {
-      optionId: selectedOptionId,
-      voterName: trimmedName || null,
-      comment: comment.trim() || null,
-      // 서버측 1인1표(#12): 안정 식별키(getAnonymousKey 해시). null이면 미전송 → 레거시 허용.
-      voterKey: userKey ?? null,
-    });
+    const ok = await vote(
+      poll.id,
+      {
+        optionId: selectedOptionId,
+        voterName: trimmedName || null,
+        comment: comment.trim() || null,
+        // 서버측 1인1표(#12): 안정 식별키(getAnonymousKey 해시). null이면 미전송 → 레거시 허용.
+        voterKey: userKey ?? null,
+      },
+      // 비공개 투표면 활성 접근 코드를 함께 보내 서버 게이트를 통과한다(공개 폴은 undefined).
+      activeCode,
+    );
     if (ok) {
       rememberVote(poll.id, selectedOptionId);
       setVotedOptionId(selectedOptionId);
@@ -231,11 +243,16 @@ export function PollDetailPage() {
 
   const handleAddReply = async (parentId: number, text: string) => {
     if (!poll) return;
-    const result = await addComment(poll.id, {
-      comment: text,
-      parentId,
-      voterName: voterName.trim() || null,
-    });
+    const result = await addComment(
+      poll.id,
+      {
+        comment: text,
+        parentId,
+        voterName: voterName.trim() || null,
+      },
+      // 비공개 투표면 활성 접근 코드를 함께 보내 서버 게이트를 통과한다(공개 폴은 undefined).
+      activeCode,
+    );
     if (result) {
       hapticFeedback('success');
       showToast('답글을 남겼어요 💬');
@@ -274,6 +291,8 @@ export function PollDetailPage() {
     setCodeError(null);
     const result = await fetchPoll(id, trimmed);
     if (result && !result.requiresCode) {
+      // 성공한 코드를 보관해 이후 투표/한마디 쓰기(?code=)에도 함께 보낸다.
+      setActiveCode(trimmed);
       hapticFeedback('success');
     } else {
       setCodeError('코드가 맞지 않아요 🔒');

@@ -7,7 +7,7 @@ import { createClient, type VercelKV } from '@vercel/kv';
 import { Pool } from 'pg';
 import { db, pool } from '../../db/index';
 import * as schema from '../../db/schema';
-import { eq, and, desc, asc, sql, count, ilike, or, isNull, type SQL } from 'drizzle-orm';
+import { eq, and, desc, asc, sql, count, ilike, or, isNull, inArray, type SQL } from 'drizzle-orm';
 
 /** Blob 경로에서 비표시 1인1표 메타를 폴 객체에 덧붙이기 위한 내부 확장 타입. */
 type PollWithVotedKeys = Poll & { votedKeys?: string[] };
@@ -603,6 +603,42 @@ export class DatabaseService implements OnModuleInit {
       const countRows = await db.select({ value: count() }).from(schema.polls).where(where);
       const total = countRows[0]?.value ?? 0;
 
+      // '댓글 많은순'(commented)은 상관 서브쿼리를 RQB(findMany)의 orderBy에 넘기면 무효 SQL이 돼 500이 난다.
+      // (RQB가 베이스 테이블을 서브쿼리로 감싸므로 polls.id 참조가 ORDER BY 스코프 밖으로 나간다.)
+      // → 코어 select + leftJoin + groupBy 로 정렬·페이지네이션된 poll id 만 먼저 뽑고,
+      //   그 id들로 RQB 본문(options/comments 포함)을 로드해 같은 순서로 재정렬한다.
+      if (sort === 'commented') {
+        const orderedIdRows = await db
+          .select({ id: schema.polls.id })
+          .from(schema.polls)
+          .leftJoin(schema.pollComments, eq(schema.pollComments.pollId, schema.polls.id))
+          .where(where)
+          .groupBy(schema.polls.id)
+          .orderBy(desc(count(schema.pollComments.id)), desc(schema.polls.createdAt))
+          .limit(limit)
+          .offset(offset);
+        const orderedIds = orderedIdRows.map((r) => r.id);
+        if (orderedIds.length === 0) {
+          return { items: [], total, page, limit, hasMore: false };
+        }
+        const detailedRows = await db.query.polls.findMany({
+          where: inArray(schema.polls.id, orderedIds),
+          with: {
+            options: {
+              orderBy: (opt, { asc: ascFn }) => [ascFn(opt.optionIndex)],
+            },
+            comments: {
+              orderBy: (cmt, { asc: ascFn }) => [ascFn(cmt.createdAt)],
+            },
+          },
+        });
+        const byId = new Map(detailedRows.map((r) => [r.id, this.mapPollRow(r)]));
+        const items: Poll[] = orderedIds
+          .map((id) => byId.get(id))
+          .filter((poll): poll is Poll => Boolean(poll));
+        return { items, total, page, limit, hasMore: offset + items.length < total };
+      }
+
       const rows = await db.query.polls.findMany({
         where,
         orderBy: this.buildPollOrderBy(sort),
@@ -645,18 +681,15 @@ export class DatabaseService implements OnModuleInit {
     return { items, total, page, limit, hasMore: offset + items.length < total };
   }
 
-  /** SQL ORDER BY 절을 정렬 키로 매핑한다. commented는 댓글 수 서브쿼리로 집계. */
+  /**
+   * SQL ORDER BY 절을 정렬 키로 매핑한다.
+   * 'commented'(댓글 많은순)는 상관 서브쿼리가 RQB orderBy에서 무효 SQL이 되므로 여기서 다루지 않고,
+   * getPolls가 코어 select(leftJoin+groupBy) 전용 경로로 별도 처리한다.
+   */
   private buildPollOrderBy(sort: PollListSort): SQL[] {
     switch (sort) {
       case 'popular':
         return [desc(schema.polls.totalVotes), desc(schema.polls.createdAt)];
-      case 'commented': {
-        const commentCount = sql<number>`(
-          SELECT COUNT(*) FROM ${schema.pollComments}
-          WHERE ${schema.pollComments.pollId} = ${schema.polls.id}
-        )`;
-        return [desc(commentCount), desc(schema.polls.createdAt)];
-      }
       case 'closing': {
         // 열린 것(마감 미래/없음) 우선, 그 안에서 마감 가까운 순. 마감된 건 뒤로 최신순.
         const closingRank = sql`CASE WHEN ${schema.polls.endsAt} IS NOT NULL AND ${schema.polls.endsAt} > NOW() THEN 0 ELSE 1 END`;
