@@ -1507,7 +1507,13 @@ function PollResultsScreen(
                 gap: '4px',
               }}
             >
-              <BarChart3 size={14} />
+              {/* 진행 중인 폴엔 LIVE 펄스 점을 붙여 '실시간'을 시각적으로 강화(A).
+                  마감된 폴은 확정 결과라 점을 숨긴다. reduced-motion 에선 CSS 가드로 펄스 정지. */}
+              {isPollClosed(currentPoll) ? (
+                <BarChart3 size={14} />
+              ) : (
+                <span className="stat-live-dot" aria-hidden="true" />
+              )}
               {/* N1: 마감된 폴은 "실시간"이 아니라 확정된 최종 결과다. */}
               <span>{isPollClosed(currentPoll) ? '최종 결과' : '실시간 투표 통계'}</span>
             </span>

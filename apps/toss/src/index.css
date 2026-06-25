@@ -3,6 +3,11 @@
   --picky-accent: #13c2a3;
   --picky-gradient-accent: linear-gradient(135deg, #13c2a3 0%, #2ee0bf 100%);
   --picky-gradient-gold: linear-gradient(135deg, #f4c560 0%, #ffde92 100%);
+  /* 이징 토큰 — 웹 index.css 와 동일한 결. 공유 모션 훅(Reveal/CountUp)의
+     키프레임이 이 토큰을 참조해, web/toss 진입 모션이 같은 감속 곡선을 그려요. */
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
   color-scheme: dark;
 }
 
@@ -147,6 +152,80 @@ a {
   pointer-events: none;
   color: var(--picky-accent);
   font-weight: 400;
+}
+
+/* ───────────────────────────────────────────────
+   브랜드 시머 글로우 — 웹 .hero-shimmer 와 동일 결.
+   긴 에메랄드→골드→에메랄드 그라데이션을 글자에 클리핑하고
+   좌→우로 끊임없이 흘려 빛이 일렁이게(pf-brand-shimmer) +
+   은은한 에메랄드 글로우가 호흡(pf-brand-glow). 대비는
+   고명도 에메랄드 끝쪽으로 치우쳐 골드는 지나가는 하이라이트만
+   담당 → 다크 내비바 위에서도 또렷. reduced-motion 에선
+   정적 솔리드 색으로 되돌려 글자가 사라지지 않게 가드.
+   ─────────────────────────────────────────────── */
+.brand-shimmer {
+  background-image: linear-gradient(
+    100deg,
+    #2ee0bf 0%,
+    #13c2a3 22%,
+    #f4c560 42%,
+    #2ee0bf 62%,
+    #13c2a3 82%,
+    #2ee0bf 100%
+  );
+  background-size: 220% auto;
+  background-position: 0% 50%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation:
+    pf-brand-shimmer 4.2s linear infinite,
+    pf-brand-glow 3s ease-in-out infinite;
+}
+@keyframes pf-brand-shimmer {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 220% 50%;
+  }
+}
+@keyframes pf-brand-glow {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 1px rgba(46, 224, 191, 0.18));
+  }
+  50% {
+    filter: drop-shadow(0 0 10px rgba(46, 224, 191, 0.42));
+  }
+}
+
+/* ───────────────────────────────────────────────
+   라이브 표시점 — 웹 .hero-live-dot/livePulse 와 동일 결.
+   '진행중' 상태 옆에서 에메랄드 점이 레이더처럼 확산하는 링을
+   주기적으로 내보내 실시간 투표성을 신호. 장식이라 a11y 이름엔
+   포함하지 않고, reduced-motion 에선 정적 점으로 멈춤.
+   ─────────────────────────────────────────────── */
+.live-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--picky-accent);
+  box-shadow: 0 0 0 0 rgba(19, 194, 163, 0.55);
+  animation: pf-live-pulse 2.4s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+@keyframes pf-live-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(19, 194, 163, 0.5);
+  }
+  70% {
+    box-shadow: 0 0 0 7px rgba(19, 194, 163, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(19, 194, 163, 0);
+  }
 }
 
 /* 진행률 바 채움 트랜지션 (통통 튀는 게이지바) */
@@ -301,6 +380,134 @@ a {
   transition: all 0.4s cubic-bezier(0.34, 1.76, 0.64, 1);
 }
 
+/* ───────────────────────────────────────────────
+   공유 스크롤-진입 모션 — packages/client `lib/motion` 의 <Reveal>/useReveal 이
+   배출하는 클래스 계약(`.reveal`/`.reveal-soft` + `.is-revealed`)을 토스 토큰으로
+   소유. 웹 index.css 와 같은 결: 기본은 from-state(살짝 내려가 투명)이고,
+   IO 가 화면 진입을 감지하면 `.is-revealed` 가 붙어 키프레임으로 안착.
+   가시성은 모션과 분리돼 있어 JS/IO 미지원·헤드리스·reduced-motion 에선 그냥 보임(CLS 0).
+   `--reveal-delay`(ms)로 형제 목록 스태거. ─────────────────────────────────── */
+.reveal {
+  opacity: 0;
+  transform: translateY(22px) scale(0.985);
+  will-change: opacity, transform;
+}
+.reveal.is-revealed {
+  animation: pf-reveal-up 0.62s var(--ease-out-quint) both;
+  animation-delay: calc(var(--reveal-delay, 0) * 1ms);
+}
+.reveal-soft {
+  opacity: 0;
+  will-change: opacity;
+}
+.reveal-soft.is-revealed {
+  animation: pf-reveal-fade 0.6s var(--ease-out-quart) both;
+  animation-delay: calc(var(--reveal-delay, 0) * 1ms);
+}
+@keyframes pf-reveal-up {
+  from {
+    opacity: 0;
+    transform: translateY(22px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes pf-reveal-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* 공유 useCountUp/<CountUp> 의 "톡" 팝 — 숫자가 올라오며 살짝 솟구쳤다 안착.
+   className="count-pop is-revealed" 로 opt-in. 웹과 동일한 expo 곡선. */
+.count-pop {
+  display: inline-block;
+  font-variant-numeric: tabular-nums;
+}
+.count-pop.is-revealed {
+  animation: pf-count-pop 0.55s var(--ease-out-expo) both;
+}
+@keyframes pf-count-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.9);
+  }
+  60% {
+    transform: translateY(-2px) scale(1.04);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ───────────────────────────────────────────────
+   호버 시머 스윕(.sheen) — 웹 .hero-cta::after/heroSheen 과 동일 결.
+   비스듬한 반투명 띠가 표면을 한 번 가로질러 '빛이 스치는' 프리미엄 질감.
+   포인터(마우스) 호버에서만 1회 — 루프 금지. 터치 기기엔 발화하지 않아요. ── */
+.sheen {
+  position: relative;
+  overflow: hidden;
+}
+.sheen::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -130%;
+  width: 55%;
+  z-index: 0;
+  transform: skewX(-16deg);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.16), transparent);
+  opacity: 0;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: no-preference) and (pointer: fine) {
+  .sheen:hover::after {
+    animation: pf-sheen 0.9s var(--ease-out-quart);
+  }
+}
+@keyframes pf-sheen {
+  0% {
+    left: -130%;
+    opacity: 1;
+  }
+  100% {
+    left: 230%;
+    opacity: 1;
+  }
+}
+
+/* ───────────────────────────────────────────────
+   카드 리프트/프레스(.card-lift) — 웹 .content-card/.poll-card 의 호버 리프트를
+   터치-퍼스트로 옮긴 결. 포인터 호버에선 살짝 떠오르고(그림자 강화),
+   터치/클릭(:active)에선 눌리는 깊이감. transform/box-shadow GPU 합성만 써요. ── */
+.card-lift {
+  transition:
+    transform 0.28s var(--ease-out-expo),
+    border-color 0.28s var(--ease-out-expo),
+    box-shadow 0.28s var(--ease-out-expo);
+}
+@media (pointer: fine) {
+  .card-lift:hover {
+    transform: translateY(-3px);
+    border-color: var(--picky-accent);
+    box-shadow:
+      0 14px 40px rgba(0, 0, 0, 0.32),
+      0 0 0 1px rgba(19, 194, 163, 0.18),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+}
+.card-lift:active {
+  transform: translateY(0) scale(0.985);
+  transition-duration: 0.12s;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .rise,
   .rise-stagger {
@@ -314,6 +521,30 @@ a {
   }
   .pf-skeleton {
     animation: none;
+  }
+  /* 공유 진입 모션 — 모션을 끄고 from-state(투명/이동) 자체를 무효화해
+     콘텐츠가 항상 또렷이 보이게(가시성은 모션과 분리). */
+  .reveal,
+  .reveal-soft {
+    opacity: 1;
+    transform: none;
+    animation: none;
+  }
+  .count-pop.is-revealed {
+    animation: none;
+  }
+  /* 호버 시머/카드 리프트는 모션 민감 사용자에겐 멈춰요(transition만 무효화). */
+  .sheen:hover::after {
+    animation: none;
+  }
+  .card-lift {
+    transition: none;
+  }
+  .card-lift:hover {
+    transform: none;
+  }
+  .card-lift:active {
+    transform: none;
   }
   /* 역동적 로더 — 모션 민감 사용자에겐 회전/둥실거림을 멈추고 정적 마스코트로 표시. */
   .pf-loader::before {
@@ -330,5 +561,17 @@ a {
   .sparkle-icon {
     animation: none;
     opacity: 0;
+  }
+  /* 시머 off → 또렷한 솔리드 제목으로 복원(클립된 투명 글자 그대로 멈추면 제목이 사라짐). */
+  .brand-shimmer {
+    animation: none;
+    background-image: none;
+    -webkit-text-fill-color: currentColor;
+    color: var(--picky-accent);
+    filter: none;
+  }
+  /* 라이브 점은 확산 링을 멈추고 정적 점으로 유지. */
+  .live-dot {
+    animation: none;
   }
 }

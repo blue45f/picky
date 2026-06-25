@@ -2638,24 +2638,27 @@ export const PollList: React.FC = () => {
 
   return (
     <section
-      className="animate-slide-up"
+      className="animate-slide-up home-shell"
       style={{ display: 'flex', flexDirection: 'column', gap: '1.4rem' }}
     >
       <div className="hero-shell">
-        <div style={{ display: 'grid', gap: '0.95rem', position: 'relative' }}>
+        <div
+          className="hero-stack"
+          style={{ display: 'grid', gap: '0.95rem', position: 'relative' }}
+        >
           <span className="hero-live-badge hero-enter" style={{ ['--enter-i' as string]: 0 }}>
             <span className="hero-live-dot" aria-hidden="true" />
             지금 {openPollCount}개 투표 진행 중
           </span>
 
           <p
-            className="hero-lede hero-enter"
+            className="hero-lede hero-enter hero-beta-note"
             style={{ ['--enter-i' as string]: 0.5, fontSize: '0.8rem', fontWeight: 600, margin: 0 }}
           >
             🧪 {BETA_NOTICE}
           </p>
 
-          <h1 className="hero-title hero-enter" style={{ ['--enter-i' as string]: 1 }}>
+          <h1 className="hero-title hero-shimmer hero-enter" style={{ ['--enter-i' as string]: 1 }}>
             고민되는 선택, <span className="hero-accent">링크 하나</span>로 빠르게 물어보세요
           </h1>
 
@@ -2915,6 +2918,9 @@ export const PollList: React.FC = () => {
 
           <form
             onSubmit={handleJoinCodeSubmit}
+            // 모바일에선 같은 JOIN 동선이 상단 메뉴(모바일 메뉴 다이얼로그)에 이미 있어,
+            // 첫 화면 스크롤 압축을 위해 히어로 내 JOIN 폼은 데스크탑·태블릿에만 노출한다(B).
+            className="hero-join-form desktop-only"
             style={{
               display: 'grid',
               gap: '0.55rem',

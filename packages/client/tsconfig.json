@@ -22,6 +22,6 @@
     "verbatimModuleSyntax": true,
     "noUncheckedIndexedAccess": true
   },
-  "include": ["src/lib/audio/**/*", "src/store/useSoundSettings.ts"],
+  "include": ["src/lib/audio/**/*", "src/lib/motion/**/*", "src/store/useSoundSettings.ts"],
   "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]
 }

@@ -899,6 +899,35 @@ body.present-mode .page-shell {
   }
 }
 
+/* A: 상세 '실시간 투표 통계' 배지의 LIVE 펄스 점 — 골드 톤으로 배지 색과 맞춘다.
+   확장 링이 퍼지며 사라지는 livePulse 를 골드 색으로 재사용한다(진행 중일 때만 렌더). */
+.stat-live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--brand-accent-gold);
+  flex-shrink: 0;
+  animation: statLivePulse 2.4s var(--ease-out-quart) infinite;
+}
+
+@keyframes statLivePulse {
+  0% {
+    box-shadow: 0 0 0 0 oklch(78% 0.14 85 / 0.5);
+  }
+  70% {
+    box-shadow: 0 0 0 6px oklch(78% 0.14 85 / 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 oklch(78% 0.14 85 / 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stat-live-dot {
+    animation: none;
+  }
+}
+
 /* Bold display heading for the hero */
 .hero-title {
   margin: 0;
@@ -910,10 +939,89 @@ body.present-mode .page-shell {
   text-wrap: balance;
 }
 
+/* Hero brand-shimmer — a long teal→gold→teal ramp clipped to the headline
+   glyphs, drifting left→right so light keeps washing across the title, with a
+   breathing teal glow underneath. This is the one deliberate brand moment on
+   the home hero (brand register), not decorative gradient-text scaffolding.
+   Contrast is biased toward the high-L teal/primary ends so the display
+   heading clears the large-text bar; gold is only the travelling highlight.
+   prefers-reduced-motion users get a crisp, static solid color (below). */
+.hero-shimmer {
+  background-image: linear-gradient(
+    100deg,
+    var(--brand-primary-light) 0%,
+    var(--brand-accent-teal) 22%,
+    var(--brand-accent-gold) 42%,
+    var(--brand-primary-light) 62%,
+    var(--brand-accent-teal) 82%,
+    var(--brand-primary-light) 100%
+  );
+  background-size: 220% auto;
+  background-position: 0% 50%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation:
+    heroShimmer 4.2s linear infinite,
+    heroGlow 3s ease-in-out infinite;
+}
+
+/* When the shimmer headline also carries the staggered hero entrance, keep both
+   the one-shot rise AND the looping shimmer/glow (a lone `animation` shorthand
+   on either class would clobber the other). */
+.hero-shimmer.hero-enter {
+  animation:
+    heroRise 0.62s var(--ease-out-expo) both,
+    heroShimmer 4.2s linear infinite,
+    heroGlow 3s ease-in-out infinite;
+  animation-delay: calc(var(--enter-i, 0) * 90ms), 0s, 0s;
+}
+
+/* Light mode: the same ramp but seated on the darkened brand tokens so the
+   clipped glyphs stay legible against the bright hero surface. */
+:root[data-theme='light'] .hero-shimmer {
+  background-image: linear-gradient(
+    100deg,
+    var(--brand-primary) 0%,
+    var(--brand-accent-teal) 22%,
+    var(--brand-accent-gold) 42%,
+    var(--brand-primary) 62%,
+    var(--brand-accent-teal) 82%,
+    var(--brand-primary) 100%
+  );
+}
+
+@keyframes heroShimmer {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 220% 50%;
+  }
+}
+
+@keyframes heroGlow {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 1px oklch(72% 0.15 170 / 0.18));
+  }
+  50% {
+    filter: drop-shadow(0 0 10px oklch(72% 0.15 170 / 0.42));
+  }
+}
+
 .hero-title .hero-accent {
   position: relative;
   color: var(--brand-primary-light);
   white-space: nowrap;
+}
+
+/* When the title shimmers, the accent word inherits the clipped transparent
+   fill so the whole headline reads as one continuous light-wash (the colored
+   underline still renders — it's a sibling pseudo-element, not glyph fill). */
+.hero-shimmer .hero-accent {
+  color: inherit;
 }
 
 /* Animated underline sweep beneath the accent words */
@@ -968,6 +1076,52 @@ body.present-mode .page-shell {
 
 .hero-cta:hover:not(:disabled) svg:last-child {
   transform: translateX(3px);
+}
+
+/* Light sheen sweep — a skewed translucent band glints across the primary CTA
+   once on hover, reading as light catching a confident, single primary action.
+   The band sits above the solid fill (via ::after) but below the label/icons
+   (lifted to z-index 1). Hover- and pointer-gated, so it never loops; the
+   pseudo only animates under prefers-reduced-motion: no-preference. */
+.hero-cta {
+  position: relative;
+  overflow: hidden;
+}
+
+.hero-cta > * {
+  position: relative;
+  z-index: 1;
+}
+
+.hero-cta::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -130%;
+  width: 55%;
+  z-index: 0;
+  transform: skewX(-16deg);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.32), transparent);
+  opacity: 0;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: no-preference) and (pointer: fine) {
+  .hero-cta:hover:not(:disabled)::after {
+    animation: heroSheen 0.9s var(--ease-out-quart);
+  }
+}
+
+@keyframes heroSheen {
+  0% {
+    left: -130%;
+    opacity: 1;
+  }
+  100% {
+    left: 230%;
+    opacity: 1;
+  }
 }
 
 .hero-secondary-cta {
@@ -1902,6 +2056,7 @@ body.present-mode .page-shell {
   .hero-shell::after,
   .hero-enter,
   .hero-live-dot,
+  .hero-shimmer,
   .hero-title .hero-accent::after,
   .kpi-item,
   .kpi-value,
@@ -1927,6 +2082,18 @@ body.present-mode .page-shell {
   /* Accent underline must still render in its completed state */
   .hero-title .hero-accent::after {
     transform: scaleX(1);
+  }
+
+  /* Shimmer off → restore a crisp solid heading (transparent glyph fill would
+     leave the title invisible once the gradient animation is frozen out). */
+  .hero-shimmer {
+    background-image: none;
+    -webkit-text-fill-color: currentColor;
+    color: var(--brand-primary-light);
+    filter: none;
+  }
+  :root[data-theme='light'] .hero-shimmer {
+    color: var(--brand-primary);
   }
 
   .upload-dropzone:hover,
@@ -2239,19 +2406,48 @@ body.present-mode .page-shell {
 
 /* 모바일 최적화 및 토스 스타일 심플 UI 고도화 */
 @media (max-width: 560px) {
-  /* Hero & KPI 영역 미니멀화 */
+  /* B(최우선): 모바일 첫 화면 스크롤 압축 — 히어로/인트로를 컴팩트화해 투표 목록이
+     더 빨리 보이게 한다. 폰트·줄간격·상하 여백을 줄이고, 부동선(JOIN 폼 등)은 메뉴로
+     위임해 숨긴다. 데스크탑 밀도는 위쪽 기본값 그대로 유지(이 블록은 ≤560px 한정). */
+
+  /* 페이지 상단 여백을 줄여 히어로가 더 높이 올라오게 한다. */
+  .page-shell {
+    padding-top: 1rem !important;
+  }
+
+  /* 히어로↔하위 섹션 사이 큰 간격을 좁힌다(목록까지 거리 단축). */
+  .home-shell {
+    gap: 0.9rem !important;
+  }
+
+  /* 히어로 내부 블록 간 간격도 촘촘하게. */
+  .hero-stack {
+    gap: 0.6rem !important;
+  }
+
+  /* Hero & KPI 영역 미니멀화 — 패딩/타이틀/리드를 한 단계 더 줄인다. */
   .hero-shell {
-    padding: 1.5rem 1rem !important;
+    padding: 1.15rem 1rem !important;
     border-radius: 20px !important;
   }
   .hero-title {
-    font-size: 1.6rem !important;
-    line-height: 1.3 !important;
+    font-size: 1.46rem !important;
+    line-height: 1.28 !important;
+    letter-spacing: -0.02em !important;
   }
   .hero-lede {
-    font-size: 0.96rem !important;
-    line-height: 1.6 !important;
+    font-size: 0.9rem !important;
+    line-height: 1.5 !important;
     opacity: 0.86;
+  }
+  /* 베타 안내는 한 줄로 압축(줄바꿈 억제 + 말줄임)해 세로 길이를 아낀다. */
+  .hero-beta-note {
+    font-size: 0.74rem !important;
+    line-height: 1.35 !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    opacity: 0.78;
   }
   .kpi-grid {
     display: none !important; /* 모바일에서 복잡한 KPI 수치는 숨김 처리하여 즉각성 확보 */
@@ -2279,14 +2475,23 @@ body.present-mode .page-shell {
   }
 
   /* 카드 디자인 둥글고 세련되게 모바일화. 보더/섀도는 테마 토큰을 써서 라이트에서도
-     면이 또렷이 분리되게 한다(다크=섀도만, 라이트=옅은 섀도+보더). */
+     면이 또렷이 분리되게 한다(다크=섀도만, 라이트=옅은 섀도+보더).
+     B: 패딩을 한 단계 줄이고 카드 내부 gap 도 좁혀 한 화면에 더 많은 카드가 들어오게 한다. */
   .poll-card,
   .content-card {
     border-radius: 20px !important;
     border: var(--border-card-mobile) !important;
     background-color: var(--bg-card) !important;
     box-shadow: var(--shadow-card-mobile) !important;
-    padding: 1.15rem !important;
+    padding: 1rem !important;
+  }
+  .poll-card {
+    gap: 0.7rem !important;
+  }
+
+  /* 피드 카드 사이 간격을 좁혀 스크롤 길이를 줄인다. */
+  .poll-feed-grid {
+    gap: 0.6rem !important;
   }
 
   /* 탭 타깃 — 선택지 카드는 카드 공통 스타일에 더해 손가락에 맞게 키움 (≥48px).
@@ -2354,16 +2559,16 @@ body.present-mode .page-shell {
     width: 210px !important;
   }
 
-  /* 더 큼직하고 시인성이 좋은 텍스트와 레이아웃 */
+  /* 시인성 좋은 텍스트 — 단, B 압축을 위해 제목 크기/여백은 한 단계 낮춘다(가독 하한 유지). */
   .poll-card h3 {
-    font-size: 1.22rem !important;
-    font-weight: 900 !important;
-    line-height: 1.4 !important;
-    margin-bottom: 0.55rem !important;
+    font-size: 1.1rem !important;
+    font-weight: 800 !important;
+    line-height: 1.38 !important;
+    margin-bottom: 0.4rem !important;
   }
   .poll-card p {
-    font-size: 0.92rem !important;
-    line-height: 1.55 !important;
+    font-size: 0.88rem !important;
+    line-height: 1.5 !important;
   }
 
   /* 메타·칩·태그 — 모바일에서 읽히도록 최소 크기 상향(약 12px↑) */
@@ -2400,11 +2605,20 @@ body.present-mode .page-shell {
     font-size: 0.76rem !important;
   }
 
+  /* 핫 고민 카드도 컴팩트화 — 패딩을 줄여 히어로 전체 높이를 낮춘다(B). */
   .hot-poll-card {
-    padding: 1.4rem !important;
+    padding: 1.05rem !important;
   }
   .hot-poll-card h3 {
-    font-size: 1.32rem !important;
+    font-size: 1.18rem !important;
+  }
+
+  /* 히어로 CTA 행 — 두 버튼을 한 줄에 꽉 채워 세로 낭비를 줄인다(가로 분할). */
+  .hero-cta,
+  .hero-secondary-cta {
+    flex: 1 1 0 !important;
+    justify-content: center !important;
+    min-width: 0 !important;
   }
 }
 
@@ -2572,6 +2786,32 @@ body.present-mode .page-shell {
   .sparkle-icon {
     animation: none;
     opacity: 0;
+  }
+}
+
+/* C: GNB 브랜드 스파클 누출 방지 — 데스크탑은 글자 주변으로 살짝 번지는 음수 오프셋을
+   유지하되(여백이 충분), 좁은 모바일에선 스파클을 브랜드 마크 안쪽으로 끌어당겨
+   좌상단 모서리에 ✦ 가 동떨어져 떠 보이던 문제를 없앤다. 컨테이너는 글자 박스라
+   overflow 로 자르면 스파클이 잘리므로, 위치만 안쪽으로 조여 자연스럽게 가둔다. */
+@media (max-width: 560px) {
+  .brand-mark .sparkle-icon {
+    /* 인라인 style 의 음수 오프셋(left:-10/right:-8/bottom:-1 등)을 덮어 글자 영역 안으로 모은다. */
+    left: auto !important;
+    bottom: auto !important;
+    top: -3px !important;
+    right: -2px !important;
+    font-size: 9px !important;
+  }
+  /* 3개가 한 점에 겹치지 않게 두 번째·세 번째 스파클만 살짝 어긋난 위치로.
+     (sparkle-icon 은 brand-mark 의 3·4·5번째 span 이라 span:nth-of-type 로 짚는다.) */
+  .brand-mark span.sparkle-icon:nth-of-type(4) {
+    top: auto !important;
+    bottom: -2px !important;
+    right: 2px !important;
+  }
+  .brand-mark span.sparkle-icon:nth-of-type(5) {
+    top: 1px !important;
+    right: -5px !important;
   }
 }
 

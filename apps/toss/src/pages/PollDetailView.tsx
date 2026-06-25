@@ -15,6 +15,7 @@ import { ResultImageExport } from '../components/ResultImageExport';
 import { OpinionTopicCloud } from '../components/OpinionTopicCloud';
 import { ShareTemplates } from '../components/ShareTemplates';
 import { BannerAd } from '../components/BannerAd';
+import { CountUp, Reveal } from '../lib/motion';
 
 interface PollDetailViewProps {
   poll: Poll | null;
@@ -310,7 +311,6 @@ function ResultDonutSection(
   const legendOptions = options.filter((option) => option.voteCount > 0);
   return (
     <div
-      className="rise"
       style={{
         marginTop: 14,
         padding: '18px 16px',
@@ -1641,7 +1641,9 @@ function PollHero(
           fontWeight: 600,
         }}
       >
-        <span>🗳️ {formatNumber(totalVotes)}명 참여</span>
+        <span>
+          🗳️ <CountUp value={totalVotes} suffix="명 참여" />
+        </span>
         {leader ? (
           <span>
             👑 {leader.text} ({optionPercent(leader.voteCount, totalVotes)}%)
@@ -1746,7 +1748,13 @@ export function PollDetailView(props: Readonly<PollDetailViewProps>) {
           totalVotes === 0 || displayOptions.length < 2 ? (
             <ResultPendingNotice />
           ) : (
-            <ResultDonutSection options={displayOptions} totalVotes={totalVotes} closed={closed} />
+            <Reveal variant="up">
+              <ResultDonutSection
+                options={displayOptions}
+                totalVotes={totalVotes}
+                closed={closed}
+              />
+            </Reveal>
           )
         ) : null}
 
@@ -1809,16 +1817,18 @@ export function PollDetailView(props: Readonly<PollDetailViewProps>) {
           <OpinionTopicCloud poll={poll} onCopyText={onCopyText} />
         ) : null}
 
-        <CommentsSection
-          comments={comments}
-          canManage={canManage}
-          canManageCommentById={canManageCommentById}
-          commentNeedsPassword={commentNeedsPassword}
-          closed={closed}
-          onDeleteComment={onDeleteComment}
-          onEditComment={onEditComment}
-          onAddReply={onAddReply}
-        />
+        <Reveal variant="soft">
+          <CommentsSection
+            comments={comments}
+            canManage={canManage}
+            canManageCommentById={canManageCommentById}
+            commentNeedsPassword={commentNeedsPassword}
+            closed={closed}
+            onDeleteComment={onDeleteComment}
+            onEditComment={onEditComment}
+            onAddReply={onAddReply}
+          />
+        </Reveal>
 
         {/*
           상세 인앱 배너 — 투표를 마쳤거나 마감된 '결과 읽기' 단계에서만 댓글 아래에 노출해요.

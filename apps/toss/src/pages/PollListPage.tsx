@@ -30,6 +30,7 @@ import { SoundControls } from '../components/SoundControls';
 import { BannerAd } from '../components/BannerAd';
 import { useCountdown } from '../components/Countdown';
 import { triggerParticleBurst } from '../lib/particles';
+import { CountUp, Reveal } from '../lib/motion';
 
 type StatusFilter = 'all' | 'open' | 'closed';
 
@@ -149,7 +150,7 @@ function PollCard({
   return (
     <button
       type="button"
-      className="pressable rise-stagger"
+      className="pressable rise-stagger card-lift sheen"
       onClick={onClick}
       style={{
         display: 'block',
@@ -159,8 +160,8 @@ function PollCard({
         backdropFilter: 'blur(8px)',
         WebkitBackdropFilter: 'blur(8px)',
         borderRadius: theme.radius,
-        padding: '24px 20px',
-        marginBottom: 14,
+        padding: '18px 16px',
+        marginBottom: 10,
         color: theme.text,
         border: `1px solid ${theme.border}`,
         cursor: 'pointer',
@@ -194,7 +195,17 @@ function PollCard({
           </span>
         )}
         {voted && <span>·</span>}
-        <span style={{ color: closed ? theme.textFaint : theme.accent, fontWeight: 600 }}>
+        <span
+          style={{
+            color: closed ? theme.textFaint : theme.accent,
+            fontWeight: 600,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 5,
+          }}
+        >
+          {/* 진행중일 때만 라이브 점(레이더 펄스)으로 실시간 투표성을 신호 — 장식이라 a11y 이름 제외. */}
+          {!closed && <span className="live-dot" aria-hidden="true" />}
           {closed ? '마감됨' : '진행중'}
         </span>
         <span>·</span>
@@ -302,7 +313,9 @@ function PollCard({
           alignItems: 'center',
         }}
       >
-        <span>🗳️ {formatNumber(poll.totalVotes)}명이 고민을 나누는 중</span>
+        <span>
+          🗳️ <CountUp value={poll.totalVotes} suffix="명이 고민을 나누는 중" />
+        </span>
         <span>·</span>
         <span>💬 한마디 {poll.comments.length}개</span>
       </div>
@@ -321,8 +334,8 @@ function RecentStrip({
     return null;
   }
   return (
-    <section style={{ marginBottom: 24 }}>
-      <h2 style={{ fontSize: 13, fontWeight: 700, color: theme.textMuted, margin: '0 0 12px' }}>
+    <section style={{ marginBottom: 18 }}>
+      <h2 style={{ fontSize: 13, fontWeight: 700, color: theme.textMuted, margin: '0 0 10px' }}>
         최근 둘러본 고민 🧐
       </h2>
       <div
@@ -340,11 +353,11 @@ function RecentStrip({
           <button
             key={item.id}
             type="button"
-            className="pressable"
+            className="pressable card-lift"
             onClick={() => onSelect(item.id)}
             style={{
               flexShrink: 0,
-              width: 176,
+              width: 168,
               textAlign: 'left',
               background: theme.surface,
               backdropFilter: 'blur(8px)',
@@ -443,7 +456,7 @@ function HotPollBanner(props: Readonly<{ poll: Poll; onClick: () => void }>) {
   return (
     <button
       type="button"
-      className="pressable"
+      className="pressable card-lift sheen"
       onClick={onClick}
       style={{
         display: 'block',
@@ -451,8 +464,8 @@ function HotPollBanner(props: Readonly<{ poll: Poll; onClick: () => void }>) {
         textAlign: 'left',
         background: 'linear-gradient(135deg, #123249 0%, #0e2b28 100%)',
         borderRadius: theme.radius,
-        padding: '24px 20px',
-        marginBottom: 20,
+        padding: '18px 16px',
+        marginBottom: 16,
         color: theme.text,
         border: `1.5px solid rgba(49, 130, 246, 0.35)`,
         cursor: 'pointer',
@@ -724,7 +737,12 @@ function ListHeader(props: Readonly<{ onTitleTap: (x: number, y: number) => void
                 alignItems: 'center',
               }}
             >
-              <span>피키 🥑</span>
+              {/* 브랜드 워드마크 '피키'에 연속 그라데이션 시머+글로우(웹 .hero-shimmer 동일 결).
+                  🥑 이모지는 background-clip:text 에 클리핑되면 사라지므로 시머 밖 별도 span 으로 둔다. */}
+              <span className="brand-shimmer">피키</span>
+              <span aria-hidden="true" style={{ marginLeft: 4 }}>
+                🥑
+              </span>
               <span
                 // 브랜드 마크 옆 베타 표식 — 웹 Navbar BETA pill과 시각 정합.
                 // 장식이라 접근성 이름에서 제외(가시 텍스트 '피키'와 라벨 정합, WCAG 2.5.3).
@@ -817,10 +835,18 @@ function ListStats(props: Readonly<{ pollCount: number; totalVotes: number }>) {
       }}
     >
       <span>
-        고민 <strong style={{ color: theme.text }}>{formatNumber(pollCount)}</strong>개
+        고민{' '}
+        <strong style={{ color: theme.text }}>
+          <CountUp value={pollCount} className="count-pop is-revealed" />
+        </strong>
+        개
       </span>
       <span>
-        참여 <strong style={{ color: theme.text }}>{formatNumber(totalVotes)}</strong>명
+        참여{' '}
+        <strong style={{ color: theme.text }}>
+          <CountUp value={totalVotes} className="count-pop is-revealed" />
+        </strong>
+        명
       </span>
     </div>
   );
@@ -1146,7 +1172,9 @@ export function PollListPage() {
         <ListStats pollCount={polls.length} totalVotes={totalVotes} />
 
         {featuredHotPoll ? (
-          <HotPollBanner poll={featuredHotPoll} onClick={() => goToPoll(featuredHotPoll.id)} />
+          <Reveal variant="up">
+            <HotPollBanner poll={featuredHotPoll} onClick={() => goToPoll(featuredHotPoll.id)} />
+          </Reveal>
         ) : null}
 
         <SearchBar query={query} onChange={setQuery} />
@@ -1165,7 +1193,11 @@ export function PollListPage() {
           <SignalChips polls={scopedPolls} signal={signal} onChange={setSignal} />
         ) : null}
 
-        {showRecent ? <RecentStrip items={recent} onSelect={goToPoll} /> : null}
+        {showRecent ? (
+          <Reveal variant="soft">
+            <RecentStrip items={recent} onSelect={goToPoll} />
+          </Reveal>
+        ) : null}
 
         <ListBody
           polls={polls}

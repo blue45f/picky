@@ -215,6 +215,8 @@ export const Navbar: React.FC = () => {
         >
           <span
             // 상시 스파클이 절대배치될 컨테이너 — 토스 인앱 헤더("피키 🥑")와 동일한 반짝임을 웹에도.
+            // brand-mark 클래스로 스파클의 음수 오프셋을 컨테이너 안에 가둔다(모바일 좌상단 모서리 누출 방지, C).
+            className="brand-mark"
             style={{
               fontSize: '1.22rem',
               fontWeight: 900,
