@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@toss/tds-mobile';
-import { theme, pageShell } from '../theme';
+import { theme, pageShell, FONT } from '../theme';
 import { hapticFeedback } from '../lib/toss';
-import { AppBar, SegmentedControl } from '../components/ui';
+import { AppBar, SegmentedControl, Skeleton } from '../components/ui';
 import {
   INQUIRY_CATEGORIES,
   listInquiries,
@@ -28,12 +28,14 @@ const STATUS_LABELS: Record<string, string> = {
 
 const inputStyle: React.CSSProperties = {
   width: '100%',
+  minHeight: 48,
   padding: '12px 14px',
   borderRadius: theme.radiusSm,
   border: `1px solid ${theme.borderStrong}`,
   background: theme.surface,
   color: theme.text,
-  fontSize: 15,
+  // iOS는 16px 미만 입력 포커스 시 화면을 강제 확대해요 → 16px 플로어로 줌 방지.
+  fontSize: 16,
   outline: 'none',
   boxSizing: 'border-box',
 };
@@ -41,7 +43,8 @@ const inputStyle: React.CSSProperties = {
 const labelStyle: React.CSSProperties = {
   display: 'grid',
   gap: 6,
-  fontSize: 13,
+  fontSize: FONT.small,
+  fontWeight: 700,
   color: theme.textMuted,
 };
 
@@ -135,7 +138,7 @@ export function SupportPage() {
     <div>
       <AppBar title="고객센터" onBack={() => navigate(-1)} />
       <div style={{ ...pageShell, display: 'grid', gap: 16 }}>
-        <p style={{ margin: 0, color: theme.textMuted, fontSize: 14, lineHeight: 1.6 }}>
+        <p style={{ margin: 0, color: theme.textMuted, fontSize: FONT.body, lineHeight: 1.6 }}>
           버그 제보·기능 제안·문의를 남겨주세요. 공개 게시판에 등록되며, 연락처는 운영자에게만
           전달돼요.
         </p>
@@ -204,7 +207,8 @@ export function SupportPage() {
               role={message.tone === 'err' ? 'alert' : 'status'}
               style={{
                 margin: 0,
-                fontSize: 13,
+                fontSize: FONT.small,
+                lineHeight: 1.5,
                 color: message.tone === 'err' ? theme.danger : theme.accentStrong,
               }}
             >
@@ -222,15 +226,30 @@ export function SupportPage() {
         </section>
 
         <section style={{ display: 'grid', gap: 10 }} aria-label="최근 문의">
-          <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: theme.text }}>최근 문의</h2>
+          <h2 style={{ margin: 0, fontSize: FONT.subtitle, fontWeight: 800, color: theme.text }}>
+            최근 문의
+          </h2>
           {listLoading ? (
-            <div
-              style={{ height: 72, borderRadius: theme.radiusSm, background: theme.track }}
-              aria-hidden="true"
-            />
+            <div aria-hidden="true" style={{ display: 'grid', gap: 10 }}>
+              {[0, 1].map((key) => (
+                <div key={key} style={cardStyle}>
+                  <Skeleton width={64} height={18} radius={999} />
+                  <Skeleton height={16} radius={6} style={{ marginTop: 6 }} />
+                  <Skeleton width="80%" height={14} radius={6} style={{ marginTop: 4 }} />
+                </div>
+              ))}
+            </div>
           ) : null}
           {!listLoading && items.length === 0 ? (
-            <p style={{ margin: 0, color: theme.textMuted, fontSize: 14 }}>
+            <p
+              style={{
+                margin: 0,
+                color: theme.textMuted,
+                fontSize: FONT.body,
+                lineHeight: 1.5,
+                padding: '8px 0',
+              }}
+            >
               아직 등록된 문의가 없어요. 첫 문의를 남겨보세요!
             </p>
           ) : null}
@@ -239,9 +258,9 @@ export function SupportPage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <span
                   style={{
-                    fontSize: 11,
+                    fontSize: FONT.caption,
                     fontWeight: 700,
-                    padding: '2px 8px',
+                    padding: '3px 9px',
                     borderRadius: theme.radiusPill,
                     color: theme.accentStrong,
                     background: theme.accentSoft,
@@ -249,15 +268,17 @@ export function SupportPage() {
                 >
                   {CATEGORY_LABELS[inquiry.category] ?? inquiry.category}
                 </span>
-                <span style={{ fontSize: 12, color: theme.textFaint }}>
+                <span style={{ fontSize: FONT.caption, color: theme.textFaint }}>
                   {STATUS_LABELS[inquiry.status] ?? inquiry.status}
                 </span>
               </div>
-              <strong style={{ fontSize: 15, color: theme.text }}>{inquiry.title}</strong>
+              <strong style={{ fontSize: FONT.bodyLg, fontWeight: 800, color: theme.text }}>
+                {inquiry.title}
+              </strong>
               <p
                 style={{
                   margin: 0,
-                  fontSize: 14,
+                  fontSize: FONT.body,
                   color: theme.textMuted,
                   lineHeight: 1.55,
                   whiteSpace: 'pre-wrap',
@@ -266,7 +287,9 @@ export function SupportPage() {
                 {inquiry.body}
               </p>
               {inquiry.authorName ? (
-                <span style={{ fontSize: 12, color: theme.textFaint }}>— {inquiry.authorName}</span>
+                <span style={{ fontSize: FONT.caption, color: theme.textFaint }}>
+                  — {inquiry.authorName}
+                </span>
               ) : null}
             </article>
           ))}

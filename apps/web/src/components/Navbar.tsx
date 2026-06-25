@@ -483,7 +483,7 @@ export const Navbar: React.FC = () => {
               color: 'var(--text-primary)',
               background: 'var(--bg-card-hover)',
             }}
-            className="mobile-menu-trigger"
+            className="mobile-menu-trigger nav-icon-btn"
           >
             {mobileOpen ? <X size={16} /> : <Menu size={16} />}
           </button>

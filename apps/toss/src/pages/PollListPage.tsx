@@ -12,7 +12,7 @@ import {
 } from '../shared';
 import { usePollStore } from '../store/usePollStore';
 import { useAuthStore } from '../store/useAuthStore';
-import { theme, pageShell, stickyActionBar } from '../theme';
+import { theme, pageShell, stickyActionBar, FONT } from '../theme';
 import { formatNumber, formatRelativeTime } from '../lib/format';
 import { isPollClosed, leadingOption, optionPercent } from '../lib/poll';
 import { hasVotedLocally } from '../lib/votes';
@@ -77,13 +77,13 @@ function SignalChips(
               onClick={() => onChange(option.value)}
               style={{
                 flexShrink: 0,
-                minHeight: 40,
+                minHeight: 44,
                 padding: '8px 14px',
                 borderRadius: theme.radiusPill,
                 border: `1px solid ${active ? theme.accent : theme.border}`,
                 background: active ? theme.accentSoft : 'rgba(255,255,255,0.04)',
                 color: active ? theme.accent : theme.textMuted,
-                fontSize: 13.5,
+                fontSize: FONT.small,
                 fontWeight: 700,
                 cursor: 'pointer',
                 opacity: muted ? 0.55 : 1,
@@ -475,7 +475,7 @@ function HotPollBanner(props: Readonly<{ poll: Poll; onClick: () => void }>) {
             padding: '4px 10px',
             borderRadius: '999px',
             fontWeight: 800,
-            fontSize: 12.5,
+            fontSize: FONT.small,
           }}
         >
           실시간 인기 고민 🔥
@@ -597,7 +597,7 @@ function LoadingState() {
           gap: 8,
           marginBottom: 14,
           color: theme.textMuted,
-          fontSize: 13.5,
+          fontSize: FONT.small,
           fontWeight: 600,
         }}
       >
@@ -627,10 +627,10 @@ function NoMatchState() {
   return (
     <div style={{ textAlign: 'center', padding: '40px 0', color: theme.textMuted }}>
       <div style={{ fontSize: 44, marginBottom: 10 }}>{MASCOT.curious.emoji}</div>
-      <p style={{ fontSize: 15.5, color: theme.text, fontWeight: 700 }}>
+      <p style={{ fontSize: FONT.bodyLg, color: theme.text, fontWeight: 700 }}>
         앗, 이 페이지엔 조건에 맞는 고민이 없어요 😢
       </p>
-      <p style={{ fontSize: 13.5, marginTop: 4, lineHeight: 1.5 }}>
+      <p style={{ fontSize: FONT.small, marginTop: 4, lineHeight: 1.5 }}>
         발견성 필터는 지금 페이지(최대 20개)에서만 찾아요.
         <br />
         다음 페이지로 넘겨 보거나, 필터를 ‘전체’로 되돌려 볼까요?
@@ -646,10 +646,10 @@ function EmptyState(props: Readonly<{ onCreate: () => void }>) {
       <div className="rise" style={{ fontSize: 56, marginBottom: 14 }}>
         {MASCOT.empty.emoji}
       </div>
-      <p style={{ fontSize: 16.5, color: theme.text, fontWeight: 800, lineHeight: 1.45 }}>
+      <p style={{ fontSize: FONT.subtitle, color: theme.text, fontWeight: 800, lineHeight: 1.45 }}>
         {MASCOT.empty.line}
       </p>
-      <p style={{ fontSize: 13.5, marginTop: 6, lineHeight: 1.5 }}>
+      <p style={{ fontSize: FONT.small, marginTop: 6, lineHeight: 1.5 }}>
         가장 먼저 재미있는 고민 투표를 만들어 볼까요? 🚀
       </p>
       <Button style={{ marginTop: 18, borderRadius: 16 }} onClick={onCreate}>
@@ -851,7 +851,7 @@ function ListFilters(
               backdropFilter: 'blur(16px)',
               WebkitBackdropFilter: 'blur(16px)',
               color: myOnly ? theme.accent : theme.textMuted,
-              fontSize: 13.5,
+              fontSize: FONT.small,
               fontWeight: 700,
               border: `1px solid ${myOnly ? theme.accent : theme.border}`,
               cursor: 'pointer',
@@ -933,13 +933,14 @@ function ListPagination(
   const canNext = hasMore || page < totalPages;
 
   const pillStyle = (active: boolean, disabled: boolean): React.CSSProperties => ({
-    minWidth: 40,
+    minWidth: 44,
+    minHeight: 44,
     padding: '8px 12px',
     borderRadius: theme.radiusPill,
     border: `1px solid ${active ? theme.accent : theme.border}`,
     background: active ? theme.accentSoft : 'transparent',
     color: active ? theme.accentStrong : theme.textMuted,
-    fontSize: 13,
+    fontSize: FONT.small,
     fontWeight: active ? 800 : 600,
     cursor: disabled ? 'not-allowed' : 'pointer',
     opacity: disabled ? 0.45 : 1,
@@ -1144,15 +1145,20 @@ export function PollListPage() {
 
         <button
           type="button"
+          className="pressable"
           onClick={() => navigate('/support')}
           style={{
             margin: '18px auto 0',
             display: 'block',
+            minHeight: 44,
+            padding: '8px 16px',
             background: 'none',
             border: 'none',
             color: theme.textMuted,
-            fontSize: 13,
+            fontSize: FONT.small,
+            fontWeight: 600,
             textDecoration: 'underline',
+            textUnderlineOffset: 3,
             cursor: 'pointer',
           }}
         >

@@ -1,6 +1,6 @@
 /** 피키 미니앱 공용 UI 프리미티브. TDS 셰임 드리프트 없이 일관된 디자인을 유지해요. */
 import type { CSSProperties, ReactNode } from 'react';
-import { theme } from '../theme';
+import { theme, FONT } from '../theme';
 import { RADIUS } from '../shared';
 
 type ChipTone = 'accent' | 'gold' | 'muted' | 'danger' | 'neutral';
@@ -29,7 +29,7 @@ export function Chip({
         display: 'inline-flex',
         alignItems: 'center',
         gap: 5,
-        fontSize: 13,
+        fontSize: FONT.small,
         fontWeight: 700,
         lineHeight: 1.4,
         padding: '4px 11px',
@@ -133,7 +133,7 @@ export function SegmentedControl<T extends string>({
               borderRadius: RADIUS.md - 4,
               background: active ? theme.accent : 'rgba(255, 255, 255, 0.06)',
               color: active ? theme.accentInk : theme.textMuted,
-              fontSize: 13.5,
+              fontSize: FONT.small,
               fontWeight: 700,
               cursor: 'pointer',
             }}
@@ -210,7 +210,9 @@ export function AppBar({
           ←
         </button>
       ) : null}
-      <h1 style={{ flex: 1, fontSize: 18, fontWeight: 800, minWidth: 0, margin: 0 }}>{title}</h1>
+      <h1 style={{ flex: 1, fontSize: FONT.title, fontWeight: 800, minWidth: 0, margin: 0 }}>
+        {title}
+      </h1>
       {right ? <div style={{ flexShrink: 0 }}>{right}</div> : null}
     </header>
   );

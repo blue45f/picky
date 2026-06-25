@@ -11,7 +11,7 @@ import {
 } from '../shared';
 import { usePollStore } from '../store/usePollStore';
 import { useAuthStore } from '../store/useAuthStore';
-import { theme, stickyActionBar } from '../theme';
+import { theme, stickyActionBar, FONT } from '../theme';
 import { fromDateTimeLocalValue, toDateTimeLocalValue } from '../lib/format';
 import { fileToDownscaledDataUrl, isUsableImageUrl } from '../lib/image';
 import { hapticFeedback } from '../lib/toss';
@@ -44,6 +44,7 @@ const RESULT_OPTIONS = [
 
 const fieldStyle: React.CSSProperties = {
   width: '100%',
+  minHeight: 48,
   background: 'rgba(255,255,255,0.02)',
   backdropFilter: 'blur(16px)',
   WebkitBackdropFilter: 'blur(16px)',
@@ -51,14 +52,16 @@ const fieldStyle: React.CSSProperties = {
   borderRadius: 12,
   color: theme.text,
   padding: '12px 14px',
-  fontSize: 15,
+  // iOS는 16px 미만 입력 포커스 시 화면을 강제 확대해요 → 16px 플로어로 줌 방지.
+  fontSize: 16,
   outline: 'none',
   boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.02)',
 };
 
 const squareBtnStyle: React.CSSProperties = {
   flexShrink: 0,
-  width: 44,
+  width: 48,
+  minHeight: 48,
   border: 'none',
   borderRadius: 12,
   background: 'rgba(255,255,255,0.04)',
@@ -142,19 +145,23 @@ function OptionImageEditor(
               border: '1px solid rgba(255,255,255,0.08)',
             }}
           />
-          <span style={{ flex: 1, fontSize: 13, color: theme.textMuted }}>사진 추가됨 🖼️</span>
+          <span style={{ flex: 1, fontSize: FONT.small, color: theme.textMuted }}>
+            사진 추가됨 🖼️
+          </span>
           <button
             type="button"
             className="pressable"
+            aria-label="추가한 사진 삭제"
             onClick={() => onClearImage(index)}
             style={{
+              minHeight: 44,
               background: 'none',
               border: 'none',
               color: theme.danger,
-              fontSize: 13,
+              fontSize: FONT.small,
               fontWeight: 700,
               cursor: 'pointer',
-              padding: 0,
+              padding: '0 8px',
             }}
           >
             삭제
@@ -169,12 +176,13 @@ function OptionImageEditor(
               alignItems: 'center',
               justifyContent: 'center',
               gap: 6,
+              minHeight: 44,
               padding: '10px',
               borderRadius: 10,
               background: 'rgba(255, 255, 255, 0.05)',
               color: theme.text,
               fontWeight: 700,
-              fontSize: 13,
+              fontSize: FONT.body,
               cursor: 'pointer',
             }}
           >
@@ -198,7 +206,6 @@ function OptionImageEditor(
                 ...fieldStyle,
                 background: 'rgba(255,255,255,0.02)',
                 border: `1px solid rgba(255,255,255,0.04)`,
-                fontSize: 13,
               }}
               value={linkDraft}
               placeholder="또는 이미지 인터넷 주소(URL)"
@@ -218,12 +225,13 @@ function OptionImageEditor(
               onClick={() => onApplyLink(index)}
               style={{
                 flexShrink: 0,
-                padding: '0 14px',
+                minHeight: 48,
+                padding: '0 16px',
                 borderRadius: 10,
                 background: theme.accentSoft,
                 color: theme.accent,
                 fontWeight: 700,
-                fontSize: 13,
+                fontSize: FONT.body,
                 border: `1px solid rgba(19,194,163,0.2)`,
                 cursor: 'pointer',
               }}
@@ -386,12 +394,13 @@ function EditDeadlineField(
             onClick={onClearDeadline}
             style={{
               flexShrink: 0,
-              padding: '0 14px',
+              minHeight: 48,
+              padding: '0 16px',
               borderRadius: 12,
               background: 'rgba(255,255,255,0.04)',
               color: theme.textMuted,
               fontWeight: 700,
-              fontSize: 13,
+              fontSize: FONT.small,
               border: `1px solid rgba(255,255,255,0.05)`,
               cursor: 'pointer',
             }}

@@ -48,19 +48,35 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   overscroll-behavior-y: none;
+  /* 불투명 다크 베이스 — 콘텐츠 대비 측정이 그라데이션이 아닌 이 색 위에서 일관되게 이뤄져요. */
+  background-color: var(--picky-bg);
+}
 
-  /* 움직이는 그라데이션 세팅 */
+/* 움직이는 오로라는 콘텐츠 뒤 고정 장식 레이어로 분리 — 카드 텍스트 대비에 영향을 주지 않아요. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
   background:
-    radial-gradient(circle at 10% 0%, rgba(19, 194, 163, 0.18), transparent 45%),
+    radial-gradient(circle at 10% 0%, rgba(19, 194, 163, 0.16), transparent 45%),
     radial-gradient(circle at 90% 85%, rgba(244, 197, 96, 0.1), transparent 50%),
-    radial-gradient(circle at 50% 50%, rgba(19, 194, 163, 0.05), transparent 60%), var(--picky-bg);
+    radial-gradient(circle at 50% 50%, rgba(19, 194, 163, 0.05), transparent 60%);
   background-size: 200% 200%;
-  background-attachment: fixed;
   animation: pf-aurora 15s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::before {
+    animation: none;
+  }
 }
 
 #root {
   min-height: 100dvh;
+  /* 불투명 다크 베이스 — 본문 오로라 그라데이션 위에서도 카드 텍스트 대비가 일정하게 유지돼요. */
+  background-color: var(--picky-bg);
 }
 
 a {

@@ -41,7 +41,7 @@ export const ThemeSwitcher: React.FC<ThemeSwitcherProps> = ({ className }) => {
         e.currentTarget.style.borderColor = 'var(--bg-card-border)';
         e.currentTarget.style.transform = 'scale(1)';
       }}
-      className={className}
+      className={['nav-icon-btn', className].filter(Boolean).join(' ')}
     >
       {isDark ? <Sun size={16} /> : <Moon size={16} />}
     </button>

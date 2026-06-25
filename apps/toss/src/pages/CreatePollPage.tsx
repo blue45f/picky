@@ -14,7 +14,7 @@ import {
   type PollVisibility,
 } from '../shared';
 import { usePollStore } from '../store/usePollStore';
-import { theme, stickyActionBar } from '../theme';
+import { theme, stickyActionBar, FONT } from '../theme';
 import { fromDateTimeLocalValue, toDateTimeLocalValue } from '../lib/format';
 import { fileToDownscaledDataUrl, isUsableImageUrl } from '../lib/image';
 import { hapticFeedback } from '../lib/toss';
@@ -50,6 +50,7 @@ const RESULT_OPTIONS = [
 
 const fieldStyle: React.CSSProperties = {
   width: '100%',
+  minHeight: 48,
   background: 'rgba(255,255,255,0.02)',
   backdropFilter: 'blur(16px)',
   WebkitBackdropFilter: 'blur(16px)',
@@ -57,14 +58,16 @@ const fieldStyle: React.CSSProperties = {
   borderRadius: 12,
   color: theme.text,
   padding: '12px 14px',
-  fontSize: 15,
+  // iOS는 16px 미만 입력 포커스 시 화면을 강제 확대해요 → 16px 플로어로 줌 방지.
+  fontSize: 16,
   outline: 'none',
   boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.02)',
 };
 
 const squareBtnStyle: React.CSSProperties = {
   flexShrink: 0,
-  width: 44,
+  width: 48,
+  minHeight: 48,
   border: 'none',
   borderRadius: 12,
   background: 'rgba(255,255,255,0.04)',
@@ -144,7 +147,7 @@ function AdvancedSettings(
               aria-pressed={active}
               onClick={() => onSelectPreset(preset.value)}
               style={{
-                minHeight: 40,
+                minHeight: 44,
                 padding: '8px 16px',
                 borderRadius: theme.radiusPill,
                 border: `1px solid ${active ? 'rgba(19,194,163,0.3)' : 'rgba(255,255,255,0.04)'}`,
@@ -152,7 +155,7 @@ function AdvancedSettings(
                 backdropFilter: 'blur(16px)',
                 WebkitBackdropFilter: 'blur(16px)',
                 color: active ? theme.accent : theme.textMuted,
-                fontSize: 13.5,
+                fontSize: FONT.small,
                 fontWeight: 700,
                 cursor: 'pointer',
                 boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.01)',
@@ -319,13 +322,13 @@ function Step1Form(
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: 6,
-                minHeight: 40,
+                minHeight: 44,
                 padding: '8px 16px',
                 borderRadius: theme.radiusPill,
                 border: `1px solid ${active ? category.color : 'rgba(255,255,255,0.04)'}`,
                 background: active ? `${category.color}26` : 'rgba(255,255,255,0.02)',
                 color: active ? category.color : theme.textMuted,
-                fontSize: 13.5,
+                fontSize: FONT.small,
                 fontWeight: 700,
                 cursor: 'pointer',
                 whiteSpace: 'nowrap',
@@ -363,7 +366,7 @@ function Step1Form(
       >
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
           <span>⚙️ 마감·결과 공개 설정</span>
-          <span style={{ fontSize: 12.5, fontWeight: 600, color: theme.textFaint }}>
+          <span style={{ fontSize: FONT.small, fontWeight: 600, color: theme.textFaint }}>
             {advancedOpen ? '' : '(선택)'}
           </span>
         </span>
@@ -430,19 +433,23 @@ function OptionImageEditor(
               border: '1px solid rgba(255,255,255,0.08)',
             }}
           />
-          <span style={{ flex: 1, fontSize: 13, color: theme.textMuted }}>사진 추가됨 🖼️</span>
+          <span style={{ flex: 1, fontSize: FONT.small, color: theme.textMuted }}>
+            사진 추가됨 🖼️
+          </span>
           <button
             type="button"
             className="pressable"
+            aria-label="추가한 사진 삭제"
             onClick={() => onClearImage(index)}
             style={{
+              minHeight: 44,
               background: 'none',
               border: 'none',
               color: theme.danger,
-              fontSize: 13,
+              fontSize: FONT.small,
               fontWeight: 700,
               cursor: 'pointer',
-              padding: 0,
+              padding: '0 8px',
             }}
           >
             삭제
@@ -457,12 +464,13 @@ function OptionImageEditor(
               alignItems: 'center',
               justifyContent: 'center',
               gap: 6,
+              minHeight: 44,
               padding: '10px',
               borderRadius: 10,
               background: 'rgba(255, 255, 255, 0.05)',
               color: theme.text,
               fontWeight: 700,
-              fontSize: 13,
+              fontSize: FONT.body,
               cursor: 'pointer',
             }}
           >
@@ -486,7 +494,6 @@ function OptionImageEditor(
                 ...fieldStyle,
                 background: 'rgba(255,255,255,0.02)',
                 border: `1px solid rgba(255,255,255,0.04)`,
-                fontSize: 13,
               }}
               value={linkDraft}
               placeholder="또는 이미지 인터넷 주소(URL)"
@@ -506,12 +513,13 @@ function OptionImageEditor(
               onClick={() => onApplyLink(index)}
               style={{
                 flexShrink: 0,
-                padding: '0 14px',
+                minHeight: 48,
+                padding: '0 16px',
                 borderRadius: 10,
                 background: theme.accentSoft,
                 color: theme.accent,
                 fontWeight: 700,
-                fontSize: 13,
+                fontSize: FONT.body,
                 border: `1px solid rgba(19,194,163,0.2)`,
                 cursor: 'pointer',
               }}
@@ -668,10 +676,12 @@ function ReadinessCard(
       <div
         style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}
       >
-        <span style={{ fontSize: 13.5, fontWeight: 800, color: theme.text }}>📋 참가 준비도</span>
+        <span style={{ fontSize: FONT.small, fontWeight: 800, color: theme.text }}>
+          📋 참가 준비도
+        </span>
         <span style={{ fontSize: 18, fontWeight: 900, color: scoreColor }}>{readiness.score}%</span>
       </div>
-      <p style={{ margin: 0, fontSize: 12.5, color: theme.textFaint, lineHeight: 1.5 }}>
+      <p style={{ margin: 0, fontSize: FONT.small, color: theme.textFaint, lineHeight: 1.5 }}>
         공유 전 응답 부담을 낮추는 점검이에요. 통과하지 않아도 그대로 올릴 수 있어요 🙂
       </p>
       <ul
@@ -709,7 +719,7 @@ function ReadinessCard(
               >
                 {item.label}
               </span>
-              <span style={{ fontSize: 12.5, color: theme.textMuted, lineHeight: 1.45 }}>
+              <span style={{ fontSize: FONT.small, color: theme.textMuted, lineHeight: 1.45 }}>
                 {item.help}
               </span>
             </span>
@@ -858,7 +868,7 @@ function Step2Form(
           border: `1px solid ${theme.border}`,
           background: 'rgba(255,255,255,0.02)',
           color: theme.textMuted,
-          fontSize: 13.5,
+          fontSize: FONT.small,
           fontWeight: 700,
           cursor: 'pointer',
           textAlign: 'left',
@@ -945,7 +955,7 @@ function CreatedPrivateScreen(
           <h1 style={{ fontSize: 20, fontWeight: 900, color: theme.text, margin: '0 0 8px' }}>
             비공개 고민이 만들어졌어요
           </h1>
-          <p style={{ fontSize: 13.5, color: theme.textMuted, lineHeight: 1.55, margin: 0 }}>
+          <p style={{ fontSize: FONT.small, color: theme.textMuted, lineHeight: 1.55, margin: 0 }}>
             아래 <strong style={{ color: theme.text }}>접근 코드</strong>를 아는 사람만 참여할 수
             있어요. 링크와 함께 코드를 꼭 전달해 주세요. 코드는 다시 표시되지 않으니 지금 복사해
             두는 게 좋아요.
@@ -985,7 +995,10 @@ function CreatedPrivateScreen(
           </Button>
         </div>
         {copied ? (
-          <p role="status" style={{ margin: '10px 2px 0', fontSize: 12.5, color: theme.accent }}>
+          <p
+            role="status"
+            style={{ margin: '10px 2px 0', fontSize: FONT.small, color: theme.accent }}
+          >
             접근 코드를 복사했어요. 참여자에게 링크와 함께 전달해 주세요.
           </p>
         ) : null}

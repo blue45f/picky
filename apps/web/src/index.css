@@ -2096,16 +2096,8 @@ body.present-mode .page-shell {
     padding: 1.45rem 0.85rem 4rem;
   }
 
-  .kpi-grid {
-    grid-template-columns: 1fr;
-  }
-
   .quality-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .insight-grid {
-    grid-template-columns: 1fr;
   }
 
   .vote-input-grid {
@@ -2118,6 +2110,52 @@ body.present-mode .page-shell {
 
   .present-stat-grid,
   .present-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── 태블릿 중간 구간(≈600–1024px) ───────────────────────────────────
+   기존엔 모바일↔데스크탑만 있어 태블릿에서 KPI·피드가 1열로 접히며 가로 여백이
+   크게 낭비됐다. 이 밴드는 집중 컬럼을 넉넉히 넓히고(읽기 위해 lede 는 60ch 로 제한됨)
+   피드를 2열로, 통계/인사이트 그리드를 다열로 되살려 태블릿 밀도를 회복한다.
+   OKLCH 토큰·간격 스케일·다크/라이트는 그대로 상속(시각 변경 없음, 배치만 조정). */
+@media (min-width: 600px) and (max-width: 1024px) {
+  .page-shell {
+    /* 720 집중 컬럼은 태블릿에서 좌우 여백만 키웠다 → 2열 피드가 숨 쉴 폭으로 확장.
+       히어로 lede/본문은 자체 max-ch 로 줄 길이가 통제되므로 가독성은 유지된다. */
+    max-width: 900px;
+    padding: 1.7rem 1.4rem 4.5rem;
+  }
+
+  /* 통계/인사이트/진입 타일 — 태블릿 폭에선 다열이 자연스럽다(1열 스택은 과도한 세로 낭비). */
+  .kpi-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .insight-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* 작성 폼: 설정 영역 2열 유지로 라벨↔컨트롤 쌍이 한 시야에 들어온다. */
+  .poll-settings-grid {
+    grid-template-columns: minmax(180px, 0.85fr) minmax(0, 1.15fr);
+  }
+}
+
+/* 고민 피드 2열은 카드가 충분히 넓어지는 ≥680px 부터 — 그 아래(좁은 태블릿/큰 폰
+   가로)에선 카드가 짓눌리므로 1열을 유지한다. 카드 1장당 ≈320px+ 확보. */
+@media (min-width: 680px) and (max-width: 1024px) {
+  .poll-feed-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+    align-items: start;
+  }
+}
+
+/* 태블릿 밴드(≥600px) 아래에선 인사이트 타일을 1열로 — 좁은 폭에서 3열 기본값이
+   글자를 짓눌러 읽기 어렵던 것을 막는다(태블릿 밴드가 ≥600에서 2열로 되살림). */
+@media (max-width: 599px) {
+  .insight-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -2304,9 +2342,16 @@ body.present-mode .page-shell {
     min-height: 48px !important;
     font-size: 0.96rem !important;
   }
+  /* 필터·정렬·범위 칩은 모바일에서 가장 자주 누르는 컨트롤 — 탭 타깃 ≥44px 로 키운다. */
   .ghost-btn {
-    min-height: 40px !important;
+    min-height: 44px !important;
     font-size: 0.8rem !important;
+  }
+
+  /* 빠른 검색 시드 칩 — 작은 보조 칩이라 세로 패딩을 키워 손가락에 편한 탭 영역 확보. */
+  .quick-seed-chip {
+    padding-block: 9px !important;
+    font-size: 0.76rem !important;
   }
 
   .hot-poll-card {
@@ -2388,11 +2433,36 @@ body.present-mode .page-shell {
 
 /* 작은 아이콘 버튼(핀·삭제·X)의 히트 영역을 WCAG 타깃 크기까지 확장 — 시각 크기는 유지. */
 .icon-hit {
-  min-width: 34px;
-  min-height: 34px;
+  min-width: 36px;
+  min-height: 36px;
   align-items: center;
   justify-content: center;
   border-radius: 999px;
+}
+
+/* 터치 기기에선 작은 아이콘 버튼도 손가락에 맞게 ≥44px 로 — 시각 크기는 유지. */
+@media (pointer: coarse) {
+  .icon-hit {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+/* Navbar 아이콘 버튼(테마 토글·모바일 메뉴) — 데스크탑은 컴팩트한 36px 원형 유지,
+   터치 기기에선 보이지 않는 ::after 로 탭 영역만 ≥44px 로 넓혀 오발탭을 줄인다. */
+.nav-icon-btn {
+  position: relative;
+}
+@media (pointer: coarse) {
+  .nav-icon-btn::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 44px;
+    height: 44px;
+    transform: translate(-50%, -50%);
+  }
 }
 .icon-hit:hover {
   background: var(--bg-card-hover) !important;

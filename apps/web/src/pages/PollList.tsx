@@ -1487,7 +1487,7 @@ function QuickSeedChips(
           key={seed}
           type="button"
           onClick={() => setSearchInput(seed)}
-          className="ghost-inline"
+          className="ghost-inline quick-seed-chip"
           style={{
             padding: '4px 8px',
             borderRadius: '999px',
@@ -1744,7 +1744,7 @@ function PollResultsRegion(
           ? `조건에 맞는 고민 ${visiblePolls.length}개`
           : `고민 ${visiblePolls.length}개`}
       </p>
-      <div style={{ display: 'grid', gap: '0.9rem' }}>
+      <div className="poll-feed-grid" style={{ display: 'grid', gap: '0.9rem' }}>
         {visiblePolls.map((poll, index) => (
           <PollCard
             key={poll.id}

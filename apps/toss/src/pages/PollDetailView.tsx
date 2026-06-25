@@ -4,7 +4,7 @@ import type { Poll, PollComment, PollOption } from '../shared';
 import { MASCOT, VOICE, resolveCreatorLabel } from '../shared';
 import { formatNumber } from '../lib/format';
 import { optionPercent } from '../lib/poll';
-import { theme, stickyActionBar } from '../theme';
+import { theme, stickyActionBar, FONT } from '../theme';
 import { AppBar, Chip, ProgressBar } from '../components/ui';
 import { CountdownChip } from '../components/Countdown';
 import { PollShareQrSection } from '../components/PollShareQrSection';
@@ -387,8 +387,10 @@ function ResultPendingNotice() {
         🫧
       </span>
       <div style={{ minWidth: 0 }}>
-        <div style={{ fontSize: 14.5, fontWeight: 800, color: theme.text }}>참여 대기</div>
-        <div style={{ fontSize: 12.5, color: theme.textMuted, marginTop: 2, lineHeight: 1.4 }}>
+        <div style={{ fontSize: FONT.bodyLg, fontWeight: 800, color: theme.text }}>참여 대기</div>
+        <div
+          style={{ fontSize: FONT.small, color: theme.textMuted, marginTop: 2, lineHeight: 1.4 }}
+        >
           아직 결과를 해석할 만큼 표가 모이지 않았어요. 첫 한 표가 들어오면 결과가 채워져요.
         </div>
       </div>
@@ -443,8 +445,8 @@ function SocialComparisonBadge(
         {emoji}
       </span>
       <div style={{ minWidth: 0 }}>
-        <div style={{ fontSize: 14.5, fontWeight: 800, color: theme.text }}>{title}</div>
-        <div style={{ fontSize: 12.5, color: theme.textMuted, marginTop: 2 }}>
+        <div style={{ fontSize: FONT.bodyLg, fontWeight: 800, color: theme.text }}>{title}</div>
+        <div style={{ fontSize: FONT.small, color: theme.textMuted, marginTop: 2 }}>
           내 선택: {voted.text}
         </div>
       </div>
@@ -462,17 +464,16 @@ function CommentDeleteButton(props: Readonly<{ onClick: () => void }>) {
       onClick={onClick}
       style={{
         flexShrink: 0,
-        minWidth: 28,
-        minHeight: 28,
+        minWidth: 44,
+        minHeight: 44,
         display: 'grid',
         placeItems: 'center',
         background: 'none',
         border: 'none',
         color: theme.textFaint ?? theme.textMuted,
-        fontSize: 13,
+        fontSize: FONT.small,
         fontWeight: 700,
         cursor: 'pointer',
-        padding: '4px 6px',
         borderRadius: theme.radiusSm,
       }}
     >
@@ -686,12 +687,14 @@ function CommentsSection(
                   style={{
                     flex: 1,
                     minWidth: 0,
+                    minHeight: 44,
                     padding: '10px 14px',
                     borderRadius: theme.radiusSm,
                     border: `1px solid ${theme.borderStrong}`,
                     background: theme.surface,
                     color: theme.text,
-                    fontSize: 14,
+                    // iOS 16px 미만 입력은 포커스 시 화면 확대 → 줌 방지 플로어.
+                    fontSize: 16,
                   }}
                 />
                 <button
@@ -700,12 +703,13 @@ function CommentsSection(
                   onClick={() => void submitReply(c.id)}
                   style={{
                     flexShrink: 0,
-                    padding: '10px 16px',
+                    minHeight: 44,
+                    padding: '0 18px',
                     borderRadius: theme.radiusSm,
                     border: 'none',
                     background: theme.accent,
                     color: theme.accentInk,
-                    fontSize: 14,
+                    fontSize: FONT.body,
                     fontWeight: 800,
                     cursor: 'pointer',
                   }}
@@ -780,7 +784,10 @@ function ConsentedProfileButton(
         {loading ? '불러오는 중…' : '토스 프로필로 이름 채우기'}
       </button>
       {notice ? (
-        <span role="status" style={{ fontSize: 12.5, color: theme.textMuted, lineHeight: 1.4 }}>
+        <span
+          role="status"
+          style={{ fontSize: FONT.small, color: theme.textMuted, lineHeight: 1.4 }}
+        >
           {notice}
         </span>
       ) : null}
