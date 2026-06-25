@@ -140,6 +140,13 @@ describe('resolveCreatorLabel', () => {
     expect(resolveCreatorLabel(null, null, false)).toBe('익명');
     expect(resolveCreatorLabel(undefined, undefined, undefined)).toBe('익명');
   });
+
+  it("distinguishes a withdrawn member poll ('익명') from an original guest poll ('비회원')", () => {
+    // 탈퇴 회원: deleteUser 가 creatorId=null·creatorIsGuest=false 로 익명화한다.
+    expect(resolveCreatorLabel(null, null, false)).toBe('익명');
+    // 처음부터 비회원으로 작성한 게스트 폴.
+    expect(resolveCreatorLabel(null, null, true)).toBe('비회원');
+  });
 });
 
 describe('SORT_OPTIONS', () => {

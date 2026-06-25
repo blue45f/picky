@@ -2285,11 +2285,18 @@ export const PollList: React.FC = () => {
         .sort(
           (a, b) => new Date(a.endsAt || '').getTime() - new Date(b.endsAt || '').getTime(),
         )[0] || null;
+    // 결과 파생 추천(접전·의견 활발)은 칩/배지와 동일하게 per-viewer reveal 게이트를 거친다 —
+    // 이 기기가 결과를 볼 수 있는(투표함/마감/always) 폴만 후보로 삼아, 미투표·미마감 폴의
+    // '접전'·'의견 활발' 같은 결과 신호가 추천 카드로 새지 않게 한다(matchesPollSignalForViewer 정합).
+    const voted = votedPollIds();
+    const canReveal = (poll: Poll) => canRevealResults(poll, voted.has(poll.id));
     const closeRacePoll =
-      [...openPolls].filter(isCloseRacePoll).sort((a, b) => b.totalVotes - a.totalVotes)[0] || null;
+      [...openPolls]
+        .filter((poll) => isCloseRacePoll(poll) && canReveal(poll))
+        .sort((a, b) => b.totalVotes - a.totalVotes)[0] || null;
     const feedbackPoll =
       [...openPolls]
-        .filter(isFeedbackRichPoll)
+        .filter((poll) => isFeedbackRichPoll(poll) && canReveal(poll))
         .sort((a, b) => b.comments.length - a.comments.length)[0] || null;
     const attachmentPoll =
       [...openPolls]
@@ -2373,8 +2380,15 @@ export const PollList: React.FC = () => {
     const openPolls = polls.filter((poll) => !isPollClosed(poll));
     const waitingPolls = openPolls.filter((poll) => poll.totalVotes === 0);
     const closingSoonPolls = openPolls.filter(isClosingSoonPoll);
-    const closeRacePolls = openPolls.filter(isCloseRacePoll);
-    const feedbackRichPolls = openPolls.filter(isFeedbackRichPoll);
+    // 결과 파생 인사이트(접전·의견 활발) 카운트도 큐/칩/목록과 동일하게 per-viewer 게이트를 거친다 —
+    // 미투표·미마감 폴의 결과 신호(접전 등)가 운영 카드 수치로 새지 않게 하고 클릭 목록과 정합시킨다.
+    // (feedbackRate 는 폴 단위가 아닌 전체 표/의견 집계 비율이라 특정 폴 결과를 드러내지 않아 게이트 불필요.)
+    const voted = votedPollIds();
+    const canReveal = (poll: Poll) => canRevealResults(poll, voted.has(poll.id));
+    const closeRacePolls = openPolls.filter((poll) => isCloseRacePoll(poll) && canReveal(poll));
+    const feedbackRichPolls = openPolls.filter(
+      (poll) => isFeedbackRichPoll(poll) && canReveal(poll),
+    );
     const feedbackRate = totalVotes > 0 ? Math.round((totalComments / totalVotes) * 100) : 0;
 
     return [
@@ -2456,6 +2470,10 @@ export const PollList: React.FC = () => {
 
   const liveQueueItems = useMemo(() => {
     const openPolls = polls.filter((poll) => !isPollClosed(poll));
+    // 결과 파생 큐(접전·의견 활발) 카운트는 칩 카운트·실제 목록과 동일하게 per-viewer 게이트를 거친다 —
+    // 이 기기가 결과를 볼 수 있는 폴만 세서, 클릭 시 보이는 목록(visiblePolls)과 카운트가 어긋나지 않게 한다.
+    const voted = votedPollIds();
+    const canReveal = (poll: Poll) => canRevealResults(poll, voted.has(poll.id));
 
     return [
       {
@@ -2488,7 +2506,7 @@ export const PollList: React.FC = () => {
       {
         key: 'closeRace',
         label: '접전',
-        count: openPolls.filter(isCloseRacePoll).length,
+        count: openPolls.filter((poll) => isCloseRacePoll(poll) && canReveal(poll)).length,
         help: '한 표가 결과 해석을 바꿀 수 있는 투표입니다.',
         signal: 'closeRace' as SignalMode,
         icon: Sparkles,
@@ -2497,7 +2515,7 @@ export const PollList: React.FC = () => {
       {
         key: 'feedbackRich',
         label: '의견 활발',
-        count: openPolls.filter(isFeedbackRichPoll).length,
+        count: openPolls.filter((poll) => isFeedbackRichPoll(poll) && canReveal(poll)).length,
         help: '댓글 맥락이 충분해 결과를 읽기 좋은 투표입니다.',
         signal: 'feedbackRich' as SignalMode,
         icon: MessageSquare,

@@ -1463,12 +1463,17 @@ export class DatabaseService implements OnModuleInit {
     await this.commit(next);
   }
 
-  /** 회원 탈퇴 — 사용자의 고민을 익명화(creator 해제)해 토론은 보존하고 계정을 삭제한다. */
+  /**
+   * 회원 탈퇴 — 사용자의 고민을 익명화(creator 해제)해 토론은 보존하고 계정을 삭제한다.
+   * creatorIsGuest 는 false 로 둔다(원작성자는 게스트가 아니라 탈퇴 회원). 이렇게 해야
+   * resolveCreatorLabel 이 탈퇴 회원 폴(creatorId=null·게스트 아님)을 '익명' 으로,
+   * 원래 게스트 폴(creatorIsGuest=true)을 '비회원' 으로 구분해 표기한다.
+   */
   async deleteUser(userId: string) {
     if (this.useSqlDb) {
       await db
         .update(schema.polls)
-        .set({ creatorId: null, creatorIsGuest: true })
+        .set({ creatorId: null, creatorIsGuest: false })
         .where(eq(schema.polls.creatorId, userId));
       await db.delete(schema.users).where(eq(schema.users.id, userId));
       return;
@@ -1478,7 +1483,7 @@ export class DatabaseService implements OnModuleInit {
     const next = {
       ...this.data,
       polls: this.data.polls.map((p) =>
-        p.creatorId === userId ? { ...p, creatorId: null, creatorIsGuest: true } : p,
+        p.creatorId === userId ? { ...p, creatorId: null, creatorIsGuest: false } : p,
       ),
       users: this.data.users.filter((u) => u.id !== userId),
     };

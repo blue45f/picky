@@ -398,4 +398,32 @@ describe('DatabaseService creatorNickname resolution (#B4)', () => {
     expect(anon?.creatorNickname).toBeNull();
     expect(unknown?.creatorNickname).toBeNull();
   });
+
+  it('anonymizes a withdrawn member poll as not-guest so it reads as 익명, not 비회원', async () => {
+    const service = await newService({
+      polls: [seedPoll({ id: 'p1', creatorId: 'u-1', creatorIsGuest: false })],
+      users: [
+        {
+          id: 'u-1',
+          email: 'a@b.com',
+          passwordHash: 'x',
+          salt: 'y',
+          nickname: '희준',
+          createdAt: new Date().toISOString(),
+          isGuest: false,
+        },
+      ],
+    });
+
+    await service.deleteUser('u-1');
+
+    const poll = await service.getPollById('p1');
+    // 탈퇴 회원 폴은 작성자가 해제되고(creatorId=null) 게스트가 아니라(creatorIsGuest=false)
+    // resolveCreatorLabel 이 '익명'으로 표기한다(원래 게스트 '비회원'과 구분).
+    expect(poll?.creatorId).toBeNull();
+    expect(poll?.creatorIsGuest).toBe(false);
+    expect(poll?.creatorNickname).toBeNull();
+    // 계정은 삭제된다.
+    expect(await service.getUserById('u-1')).toBeUndefined();
+  });
 });

@@ -61,11 +61,15 @@ export const RESULTS_LOCKED_HINT = '투표하면 결과가 보여요';
  * 작성자 표시 라벨 — web/toss 두 앱이 같은 표기 정책을 쓰도록 단일화한 헬퍼.
  * 우선순위:
  * 1) 닉네임이 있으면 닉네임 그대로(회원 글이 '익명/비회원'으로 잘못 표기되는 모순 제거)
- * 2) 게스트면 '비회원'
- * 3) creatorId가 있으면 '회원', 없으면(완전 익명) '익명'
+ * 2) 게스트면 '비회원'(처음부터 비회원으로 작성한 게스트 폴 — creatorIsGuest=true 또는 guest- 접두 id)
+ * 3) creatorId가 있으면 '회원', 없으면 '익명'
+ *
+ * '익명'은 creatorId가 없고 게스트도 아닌 경우 — 회원이 탈퇴해 작성자가 해제된(익명화된) 폴이 여기 해당한다.
+ * deleteUser 가 탈퇴 회원 폴을 creatorId=null·creatorIsGuest=false 로 익명화하므로, 원래 게스트('비회원')와
+ * 구분돼 '익명'으로 표기된다(탈퇴 회원은 게스트가 아니므로 '비회원'이 아니라 '익명'이 맞다).
  *
  * 닉네임은 단건 상세 응답에만 채워지므로(목록엔 비움), 목록 카드는 닉네임 없이
- * 회원/비회원만 구분된다(정책상 의도된 동작).
+ * 회원/비회원/익명만 구분된다(정책상 의도된 동작).
  */
 export const resolveCreatorLabel = (
   nickname: string | null | undefined,
