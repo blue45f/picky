@@ -86,7 +86,9 @@ export interface PollState {
 }
 
 interface PollAuthStore {
-  getState: () => Pick<AuthState, 'user' | 'token' | 'invalidateSession' | 'ensureIdentity'>;
+  // ensureIdentity(자동 비회원 토큰 발급)는 폴 작성 로그인 게이트 도입으로 더 이상 쓰지 않는다.
+  // 작성은 실로그인만 통과하고, 투표·댓글은 voterKey 로 토큰 없이 게스트 참여를 유지한다.
+  getState: () => Pick<AuthState, 'user' | 'token' | 'invalidateSession'>;
 }
 
 interface PollStoreFactoryOptions {
@@ -701,8 +703,10 @@ export const createPollStoreState = ({
       };
 
       try {
-        // 비회원이라도 식별 세션을 먼저 확보해 creatorId 없는 '고아 고민'을 막는다.
-        await useAuthStore.getState().ensureIdentity?.();
+        // 하이브리드 정체성 정책(폴 작성 로그인 게이트): 자동 비회원 토큰을 발급하지 않는다.
+        // 작성은 실로그인(웹 회원/소셜·토스 SSO)만 통과하므로, 진입 게이트가 보장한 기존 토큰을
+        // 그대로 싣는다. 토큰이 없으면 서버 AuthGuard 가 401 로 막아 '고아 고민'이 생기지 않는다.
+        // (투표·댓글은 이 경로를 타지 않고 voterKey 로 토큰 없이 게스트 참여를 유지한다.)
         const token = getAuthToken(useAuthStore);
         const headers: Record<string, string> = {
           'Content-Type': 'application/json',

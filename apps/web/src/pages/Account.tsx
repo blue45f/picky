@@ -3,7 +3,11 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import { UserRound, TriangleAlert } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 
-/** 내 계정 — 프로필 요약 + 회원 탈퇴. 탈퇴 시 고민은 익명화되어 보존된다. */
+/**
+ * 내 계정 — 프로필 요약 + 계정 정리.
+ * 회원 탈퇴 시 내가 만든 고민은 작성자 정보만 익명화되어 보존된다.
+ * 비회원(게스트)은 폴 작성 권한이 없으므로 '비회원 세션 종료'로 표기하고, 남긴 투표·한마디는 보존된다.
+ */
 export default function Account() {
   const navigate = useNavigate();
   const { user, deleteAccount, isLoading } = useAuthStore();
@@ -79,7 +83,8 @@ export default function Account() {
             margin: '0 0 0.5rem',
           }}
         >
-          <TriangleAlert size={17} style={{ color: 'var(--brand-accent-gold)' }} /> 회원 탈퇴
+          <TriangleAlert size={17} style={{ color: 'var(--brand-accent-gold)' }} />{' '}
+          {user.isGuest ? '비회원 세션 종료' : '회원 탈퇴'}
         </h2>
         <p
           style={{
@@ -89,9 +94,18 @@ export default function Account() {
             margin: '0 0 1rem',
           }}
         >
-          탈퇴하면 계정이 삭제돼요. 내가 만든 고민은 지워지지 않고{' '}
-          <strong>작성자 정보만 익명</strong>으로 바뀌어 다른 사람들의 투표·한마디는 그대로
-          보존돼요. 이 작업은 되돌릴 수 없어요.
+          {user.isGuest ? (
+            <>
+              비회원(게스트) 세션을 종료하면 이 기기의 닉네임 세션이 삭제돼요. 그동안 남긴 투표와
+              한마디는 그대로 보존됩니다. 이 작업은 되돌릴 수 없어요.
+            </>
+          ) : (
+            <>
+              탈퇴하면 계정이 삭제돼요. 내가 만든 고민은 지워지지 않고{' '}
+              <strong>작성자 정보만 익명</strong>으로 바뀌어 다른 사람들의 투표·한마디는 그대로
+              보존돼요. 이 작업은 되돌릴 수 없어요.
+            </>
+          )}
         </p>
 
         {error ? (
@@ -121,7 +135,7 @@ export default function Account() {
               cursor: 'pointer',
             }}
           >
-            회원 탈퇴하기
+            {user.isGuest ? '비회원 세션 종료하기' : '회원 탈퇴하기'}
           </button>
         ) : (
           <div style={{ display: 'grid', gap: '0.7rem' }}>
@@ -133,7 +147,7 @@ export default function Account() {
                 margin: 0,
               }}
             >
-              정말 탈퇴할까요? 😢
+              {user.isGuest ? '정말 세션을 종료할까요? 😢' : '정말 탈퇴할까요? 😢'}
             </p>
             <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
               <button
@@ -152,7 +166,7 @@ export default function Account() {
                   opacity: isLoading ? 0.6 : 1,
                 }}
               >
-                {isLoading ? '처리 중…' : '네, 탈퇴할게요'}
+                {isLoading ? '처리 중…' : user.isGuest ? '네, 종료할게요' : '네, 탈퇴할게요'}
               </button>
               <button
                 type="button"

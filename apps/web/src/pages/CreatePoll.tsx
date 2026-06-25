@@ -11,6 +11,7 @@ import {
   ImageIcon,
   Link2,
   Lock,
+  LogIn,
   Monitor,
   Plus,
   Search,
@@ -20,10 +21,12 @@ import {
   TimerReset,
   Trash2,
   Upload,
+  UserPlus,
   X,
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { usePollStore } from '../store/usePollStore';
+import { useAuthStore } from '../store/useAuthStore';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { SnsPreviewCard } from '../components/SnsPreviewCard';
 import { ParticipantPreviewPanel } from '../components/ParticipantPreviewPanel';
@@ -3391,6 +3394,11 @@ function MobileSubmitBar({ canSubmit, isLoading }: MobileSubmitBarProps) {
 export const CreatePoll: React.FC = () => {
   useDocumentTitle('새 고민 작성');
   const { createPoll, isLoading, error, clearError } = usePollStore();
+  // 하이브리드 정체성 정책: 폴 작성은 실로그인(웹 회원/소셜) 필수. 비회원(게스트) 토큰은 작성 불가.
+  // 미로그인/게스트면 자동 게스트 토큰을 발급하지 않고 로그인/회원가입을 유도한다.
+  // (투표·댓글은 voterKey 기반이라 토큰 없이도 게스트 그대로 참여 — 이 게이트와 무관.)
+  const user = useAuthStore((state) => state.user);
+  const canCreate = Boolean(user) && !user?.isGuest;
   const navigate = useNavigate();
   const [cachedDraft, setCachedDraft] = useState<PollDraft | null>(() => loadDraftFromStorage());
 
@@ -4151,6 +4159,89 @@ export const CreatePoll: React.FC = () => {
     return 'PDF/TXT/CSV/JSON 파일 업로드';
   };
   const attachmentDropzoneLabel = resolveAttachmentDropzoneLabel();
+
+  // 폴 작성 로그인 게이트 — 미로그인/게스트면 폼 대신 로그인 유도 화면을 보여준다.
+  // 투표·댓글은 게스트 그대로 가능하므로, 여기 안내는 '작성만 로그인 필요'임을 분명히 한다.
+  if (!canCreate) {
+    return (
+      <div
+        className="animate-slide-up"
+        style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', maxWidth: '560px' }}
+      >
+        <div className="content-card" style={{ display: 'grid', gap: '1.1rem', padding: '1.6rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+            <Lock size={22} style={{ color: 'var(--brand-accent-teal)' }} />
+            <h1
+              style={{
+                margin: 0,
+                fontSize: '1.2rem',
+                fontWeight: 900,
+                color: 'var(--text-primary)',
+              }}
+            >
+              로그인하고 고민을 올려보세요 🥑
+            </h1>
+          </div>
+          <p
+            style={{
+              margin: 0,
+              fontSize: '0.9rem',
+              color: 'var(--text-secondary)',
+              lineHeight: 1.65,
+            }}
+          >
+            고민(폴) <strong>작성·수정·삭제</strong>는 로그인한 회원만 할 수 있어요. 내가 올린
+            고민을 계정에 모아두고 안전하게 관리할 수 있습니다.
+            {user?.isGuest
+              ? ' 지금은 비회원(게스트)으로 이용 중이라, 회원가입 후 작성할 수 있어요.'
+              : ''}
+          </p>
+          <p
+            style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: 1.6 }}
+          >
+            투표와 한마디(댓글)는 로그인 없이도 자유롭게 참여할 수 있어요.
+          </p>
+          <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+            <Link
+              to="/auth/login"
+              className="btn-primary"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                textDecoration: 'none',
+              }}
+            >
+              <LogIn size={16} />
+              로그인하기
+            </Link>
+            <Link
+              to="/auth/register"
+              className="btn-secondary"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                textDecoration: 'none',
+              }}
+            >
+              <UserPlus size={16} />
+              회원가입
+            </Link>
+            <button
+              type="button"
+              onClick={() => navigate('/')}
+              className="ghost-btn"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+            >
+              <ArrowLeft size={14} />
+              목록으로
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (createdPrivatePoll) {
     return (

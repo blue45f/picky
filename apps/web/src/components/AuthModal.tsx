@@ -63,7 +63,8 @@ const getDefaultSubTitle = (mode: AuthMode): string => {
   if (mode === 'register') {
     return '가입하면 만든 고민과 투표 결과를 한곳에 모아둘 수 있어요';
   }
-  return '닉네임만으로 바로 이용을 시작하세요';
+  // 비회원: 투표·한마디 참여용 닉네임. 고민 작성은 회원가입 후 가능.
+  return '닉네임만으로 투표와 한마디에 바로 참여하세요';
 };
 
 function SubmitLabel({ mode, isLoading }: Readonly<{ mode: AuthMode; isLoading: boolean }>) {

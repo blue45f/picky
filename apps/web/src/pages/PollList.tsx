@@ -272,7 +272,8 @@ const resolveEmptyStateHint = (hasActiveFilters: boolean, isGuestUser: boolean) 
   }
 
   if (isGuestUser) {
-    return '비회원으로도 바로 시작할 수 있어요. 첫 고민을 올리고 친구들에게 링크로 물어보세요 🥑';
+    // 하이브리드 정책: 비회원(게스트)은 투표·한마디는 자유롭게, 고민 작성은 회원가입 후.
+    return '투표와 한마디는 지금 바로 참여할 수 있어요. 직접 고민을 올리려면 회원가입을 해보세요 🥑';
   }
 
   return '첫 고민을 올리고 친구·동료에게 링크로 빠르게 물어보세요 🥑';

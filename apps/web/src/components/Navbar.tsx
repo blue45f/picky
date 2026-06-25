@@ -450,7 +450,9 @@ export const Navbar: React.FC = () => {
 
               <button
                 type="button"
-                onClick={() => handleAuthModalOpen('guest', '비회원으로 바로 시작해요')}
+                onClick={() =>
+                  handleAuthModalOpen('guest', '닉네임만으로 투표·한마디에 바로 참여해요')
+                }
                 className="btn-secondary desktop-auth-action"
                 style={{
                   padding: '8px 12px',
@@ -694,7 +696,9 @@ export const Navbar: React.FC = () => {
                 </Link>
                 <button
                   type="button"
-                  onClick={() => handleAuthModalOpen('guest', '비회원으로 바로 시작해요')}
+                  onClick={() =>
+                    handleAuthModalOpen('guest', '닉네임만으로 투표·한마디에 바로 참여해요')
+                  }
                   style={{
                     marginTop: '0.15rem',
                     textAlign: 'left',

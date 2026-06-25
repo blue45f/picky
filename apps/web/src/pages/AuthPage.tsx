@@ -281,7 +281,7 @@ export const AuthPage: React.FC = () => {
             </h1>
             <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
               {activeMode === 'guest'
-                ? '닉네임만으로 즉시 시작하고, 추후 회원가입으로 업그레이드할 수 있어요.'
+                ? '닉네임만으로 투표·한마디에 바로 참여하세요. 고민을 직접 올리려면 회원가입이 필요해요.'
                 : '로그인/가입 후에도 익명 사용자 데이터와 동일하게 이어집니다.'}
             </p>
           </div>
@@ -582,12 +582,13 @@ export const AuthPage: React.FC = () => {
                   <div style={{ display: 'grid', gap: '0.8rem' }}>
                     <h2 style={{ margin: 0, fontSize: '1.05rem' }}>회원/비회원 인증 정책 안내</h2>
                     <p style={{ margin: 0, color: 'var(--text-secondary)', lineHeight: 1.7 }}>
-                      회원은 투표/삭제/작업 이력을 계정에 바인딩할 수 있고, 비회원은 닉네임 기반
-                      임시 세션으로 빠르게 시작할 수 있습니다. 추후 회원가입 시 기존 닉네임 데이터는
-                      유지됩니다.
+                      투표와 한마디(댓글)는 회원·비회원 모두 닉네임만으로 바로 참여할 수 있어요.
+                      고민(폴) 작성·수정·삭제는 내 계정에 안전하게 귀속되도록 로그인한 회원만 할 수
+                      있습니다.
                     </p>
                     <p style={{ margin: 0, color: 'var(--text-secondary)', lineHeight: 1.7 }}>
-                      로그인 후에는 투표 이력/생성 이력이 닉네임 대신 계정 기반으로 관리됩니다.
+                      회원가입하면 내가 올린 고민과 투표 결과를 한곳에서 관리할 수 있어요. 추후
+                      회원가입 시 기존 닉네임으로 남긴 참여 데이터도 그대로 이어집니다.
                     </p>
                     <Dialog.Close asChild>
                       <button

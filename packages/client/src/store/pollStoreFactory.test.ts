@@ -28,14 +28,20 @@ const failingResponse = (status: number): any => ({
 
 const parseApiPayload = async (res: any) => (typeof res.json === 'function' ? res.json() : {});
 
-/** vote/createPoll 가 ensureIdentity/invalidateSession 을 호출해도 throw 하지 않도록 채워둔 인증 스토어. */
+/**
+ * 폴 작성 로그인 게이트 도입 후 인증 스토어는 token/user/invalidateSession 만 제공한다.
+ * createPoll 은 더 이상 자동 비회원 토큰을 발급(ensureIdentity)하지 않으므로,
+ * 진입 게이트가 보장한 기존 token 을 그대로 싣는다.
+ */
+const ensureIdentitySpy = vi.fn(async () => {});
 const makeAuthStore = () => ({
   getState: () => ({
     user: null,
     // getAuthToken 이 localStorage(node 미존재)로 새지 않도록 토큰을 제공한다.
     token: 'test-token',
     invalidateSession: vi.fn(),
-    ensureIdentity: vi.fn(async () => {}),
+    // 더 이상 호출되지 않아야 하는 자동 게스트 발급 — 호출 여부를 회귀 검증한다.
+    ensureIdentity: ensureIdentitySpy,
   }),
 });
 
@@ -79,6 +85,7 @@ const buildState = (opts: { status: number; allowFallback: boolean }) => {
 };
 
 beforeEach(() => {
+  ensureIdentitySpy.mockClear();
   // jsdom 환경이면 localStorage 가 존재하므로 캐시 잔여를 비운다(node면 no-op).
   if ('window' in globalThis) {
     try {
@@ -264,5 +271,71 @@ describe('createPollStoreState — duplicate-submit in-flight guard (#dup)', () 
     expect(requestApi).toHaveBeenCalledTimes(1);
     expect(r1).not.toBeNull();
     expect(r2).toBeNull();
+  });
+});
+
+/** ok:true 로 항상 같은 poll 을 돌려주는 요청 모킹 + 자동 게스트 발급 검증용 인증 스토어. */
+const buildOkState = (poll: Poll) => {
+  const requestApi = vi.fn(async () => okPollResponse(poll));
+  const auth = makeAuthStore();
+  const creator = createPollStoreState({
+    parseApiPayload,
+    requestApi: requestApi as any,
+    useAuthStore: auth as any,
+    isLocalFallbackAllowed: () => false,
+  });
+  const store = makeStore(creator as any);
+  return { store, requestApi };
+};
+
+describe('createPollStoreState — 하이브리드 정체성 정책(폴 작성 로그인 게이트)', () => {
+  it('createPoll 은 자동 비회원 토큰을 발급하지 않는다(ensureIdentity 미호출)', async () => {
+    const created = makeOpenPoll({ id: 'p-created' });
+    const { store } = buildOkState(created);
+
+    const result = await store.get().createPoll(createInput);
+
+    expect(result).not.toBeNull();
+    // 핵심 회귀: 작성 경로에서 자동 게스트 발급(ensureIdentity)이 절대 호출되지 않아야 한다.
+    expect(ensureIdentitySpy).not.toHaveBeenCalled();
+  });
+
+  it('createPoll 은 진입 게이트가 보장한 기존 토큰을 그대로 Authorization 으로 싣는다', async () => {
+    const created = makeOpenPoll({ id: 'p-created' });
+    const { store, requestApi } = buildOkState(created);
+
+    await store.get().createPoll(createInput);
+
+    const [, init] = requestApi.mock.calls[0]!;
+    expect((init as RequestInit).method).toBe('POST');
+    expect((init as RequestInit).headers).toMatchObject({
+      Authorization: 'Bearer test-token',
+    });
+  });
+
+  it('vote 는 토큰 없이도(게스트 voterKey) 그대로 동작한다 — 저마찰 보존', async () => {
+    const poll = makeOpenPoll({ id: 'p1' });
+    const { store, requestApi } = buildOkState(poll);
+    store.get().setCurrentPoll(poll);
+
+    const ok = await store.get().vote('p1', { optionId: 1, voterKey: 'guest-key' } as VoteInput);
+
+    expect(ok).toBe(true);
+    // 투표 경로 역시 자동 게스트 발급을 트리거하지 않는다(voterKey 로 식별).
+    expect(ensureIdentitySpy).not.toHaveBeenCalled();
+    expect(requestApi).toHaveBeenCalledTimes(1);
+  });
+
+  it('addComment 는 토큰 없이도(게스트 voterKey) 그대로 동작한다 — 저마찰 보존', async () => {
+    const poll = makeOpenPoll({ id: 'p1' });
+    const { store, requestApi } = buildOkState(poll);
+
+    const result = await store
+      .get()
+      .addComment('p1', { comment: '한마디', voterKey: 'guest-key' } as any);
+
+    expect(result).not.toBeNull();
+    expect(ensureIdentitySpy).not.toHaveBeenCalled();
+    expect(requestApi).toHaveBeenCalledTimes(1);
   });
 });

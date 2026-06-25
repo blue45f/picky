@@ -10,6 +10,7 @@ import {
   ParseIntPipe,
   UsePipes,
   UseGuards,
+  ForbiddenException,
   Request,
   Res,
 } from '@nestjs/common';
@@ -46,6 +47,17 @@ const trimTrailingSlashes = (value: string): string => {
 export class PollController {
   constructor(private readonly pollService: PollService) {}
 
+  /**
+   * 폴 작성/관리(생성·수정·삭제) 게이트 — 자동 발급된 비회원 토큰(isGuest=true)을 거부한다.
+   * AuthGuard 가 토큰 자체가 없으면 401 을 먼저 던지므로, 여기서는 "로그인은 했지만 게스트"인
+   * 경우만 403 으로 막는다. (투표·댓글은 이 게이트를 거치지 않아 게스트가 그대로 참여한다.)
+   */
+  private assertNotGuest(user: any): void {
+    if (user?.isGuest === true) {
+      throw new ForbiddenException('고민(폴) 작성·관리는 로그인 후 이용할 수 있어요.');
+    }
+  }
+
   @Get()
   getPolls(
     @Query('page') page?: string,
@@ -68,12 +80,15 @@ export class PollController {
   }
 
   @Post()
-  @UseGuards(OptionalAuthGuard)
+  @UseGuards(AuthGuard)
   createPoll(@Request() req: any, @Body() dto: CreatePollDto) {
-    const user = req.user;
-    const creatorId = user?.sub || null;
-    const creatorIsGuest = user ? Boolean(user.isGuest) : true;
-    return this.pollService.createPoll(dto, creatorId, creatorIsGuest);
+    // 하이브리드 정체성 정책: 폴 작성은 실로그인(웹 회원/소셜·토스 SSO) 필수.
+    // AuthGuard 가 토큰 없으면 401 을 던지고, 자동 발급된 게스트 토큰(isGuest=true)은
+    // 여기서 403 으로 거부한다. (투표·댓글은 OptionalAuthGuard·voterKey 로 게스트 그대로 허용.)
+    this.assertNotGuest(req.user);
+    const creatorId = req.user?.sub || null;
+    // 작성 경로는 실로그인만 통과하므로 creatorIsGuest 는 항상 false.
+    return this.pollService.createPoll(dto, creatorId, false);
   }
 
   @Get(':id/share')
@@ -294,12 +309,16 @@ export class PollController {
   @Patch(':id')
   @UseGuards(AuthGuard)
   updatePoll(@Param('id') id: string, @Request() req: any, @Body() dto: UpdatePollDto) {
+    // 폴 수정도 실로그인 필수 — 자동 게스트 토큰은 거부한다(작성/관리 게이트 일관).
+    this.assertNotGuest(req.user);
     return this.pollService.updatePoll(id, dto, req.user?.sub ?? null, Boolean(req.user?.isAdmin));
   }
 
   @Delete(':id')
   @UseGuards(AuthGuard)
   deletePoll(@Param('id') id: string, @Request() req: any) {
+    // 폴 삭제도 실로그인 필수 — 자동 게스트 토큰은 거부한다(작성/관리 게이트 일관).
+    this.assertNotGuest(req.user);
     return this.pollService.deletePoll(id, req.user?.sub ?? null, Boolean(req.user?.isAdmin));
   }
 

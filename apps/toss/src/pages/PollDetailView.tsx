@@ -1278,13 +1278,16 @@ function PollHero(
     leader: PollOption | null;
     creatorNickname: string | null | undefined;
     creatorId: string | null | undefined;
-    creatorIsGuest: boolean | undefined;
   }>,
 ) {
-  const { question, description, totalVotes, leader, creatorNickname, creatorId, creatorIsGuest } =
-    props;
+  const { question, description, totalVotes, leader, creatorNickname, creatorId } = props;
   // 작성자 라벨은 web/toss 공통 resolveCreatorLabel(@picky/shared)로 단일화.
-  const authorLabel = resolveCreatorLabel(creatorNickname, creatorId, creatorIsGuest);
+  // 토스 비회원 라벨 정규화(#4): 토스는 전원 SSO(isGuest=false)라 '비회원 작성'이 존재할 수 없다.
+  // 레거시 guest-uuid 폴이 토스에서 '비회원'으로 잘못 뜨지 않도록 경계에서 항상 회원으로 정규화한다.
+  //  - creatorIsGuest 를 항상 false 로 고정
+  //  - resolveCreatorLabel 내부의 'guest-' 접두 판정도 우회하도록 creatorId 를 정규화해 전달
+  const normalizedCreatorId = creatorId?.startsWith('guest-') ? `member-${creatorId}` : creatorId;
+  const authorLabel = resolveCreatorLabel(creatorNickname, normalizedCreatorId, false);
   return (
     <>
       {/* Hero main issue question - stands out first like NatePan main post for eye-catch on mobile */}
@@ -1418,7 +1421,6 @@ export function PollDetailView(props: Readonly<PollDetailViewProps>) {
           leader={leader}
           creatorNickname={poll.creatorNickname}
           creatorId={poll.creatorId}
-          creatorIsGuest={poll.creatorIsGuest}
         />
 
         {hasVoted && !closed ? <VoteCelebration /> : null}
