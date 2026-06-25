@@ -4,7 +4,9 @@ import { relations } from 'drizzle-orm';
 // Users table
 export const users = pgTable('users', {
   id: text('id').primaryKey(), // UUID or guest ID
-  email: text('email').notNull().unique(),
+  // 익명/게스트/토스 사용자는 email='' 라서 전역 UNIQUE를 쓰지 않는다(2번째 익명 사용자부터 충돌 방지).
+  // 실제 이메일의 유일성은 부분 유니크 인덱스(WHERE email <> '')로 보장한다 — database.service onModuleInit.
+  email: text('email').notNull(),
   passwordHash: text('password_hash').notNull(),
   salt: text('salt').notNull(),
   nickname: text('nickname').notNull(),

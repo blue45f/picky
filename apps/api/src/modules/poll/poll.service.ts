@@ -299,7 +299,8 @@ export class PollService {
 
     // Add comment if present
     if (input.comment?.trim()) {
-      const commentId = poll.comments.length + 1;
+      // length+1은 삭제 갭에서 기존 serial id와 충돌해 SQL 경로에서 조용히 누락될 수 있다 → max+1 사용.
+      const commentId = poll.comments.reduce((max, c) => Math.max(max, c.id), 0) + 1;
       const newComment: PollComment = {
         id: commentId,
         voterName: input.voterName?.trim() ? input.voterName.trim() : '익명',

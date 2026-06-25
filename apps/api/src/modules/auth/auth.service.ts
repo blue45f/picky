@@ -132,7 +132,10 @@ export class AuthService {
     }
 
     const hash = this.hashPassword(input.password, user.salt);
-    if (hash !== user.passwordHash) {
+    // 타이밍 사이드채널을 막기 위해 상수 시간 비교를 사용한다(단순 !== 비교 금지).
+    const expected = Buffer.from(user.passwordHash, 'hex');
+    const actual = Buffer.from(hash, 'hex');
+    if (expected.length !== actual.length || !crypto.timingSafeEqual(expected, actual)) {
       throw new UnauthorizedException('이메일 또는 비밀번호가 올바르지 않습니다.');
     }
 

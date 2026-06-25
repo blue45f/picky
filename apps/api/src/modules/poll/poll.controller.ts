@@ -52,7 +52,10 @@ export class PollController {
 
   @Get(':id/share')
   async getPollSharePreview(@Param('id') id: string, @Request() req: any, @Res() res: any) {
-    const poll = await this.pollService.getPoll(id);
+    // 비공개(private) 투표는 올바른 접근 코드가 없으면 선택지·득표를 OG/JSON-LD로 노출하지 않는다.
+    // getPollForViewer가 코드 미검증 시 options=[]의 게이트 응답을 돌려준다.
+    const shareCode = typeof req.query?.code === 'string' ? req.query.code : undefined;
+    const poll = await this.pollService.getPollForViewer(id, shareCode);
     const requestOrigin = this.getRequestOrigin(req);
     const appOrigin = this.getPublicAppOrigin(req);
     const pollUrl = this.resolveSafePollRedirectUrl(
@@ -198,7 +201,9 @@ export class PollController {
     @Request() req: any,
     @Res() res: any,
   ) {
-    const poll = await this.pollService.getPoll(id);
+    // 비공개 투표 옵션 이미지도 코드 게이트를 거친다(미검증 시 options=[]라 자연히 fallback).
+    const imageCode = typeof req.query?.code === 'string' ? req.query.code : undefined;
+    const poll = await this.pollService.getPollForViewer(id, imageCode);
     const fallbackImageUrl = `${this.getPublicAppOrigin(req)}/og-default.png`;
     const option = poll.options.find((pollOption) => String(pollOption.id) === optionId);
     const imageUrl = option?.imageUrl || '';

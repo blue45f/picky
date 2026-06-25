@@ -4,13 +4,14 @@ import { DatabaseModule } from '../database/database.module';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { AuthGuard, AdminGuard, OptionalAuthGuard } from './auth.guard';
+import { JWT_SECRET } from './jwt.constant';
 
 @Module({
   imports: [
     DatabaseModule,
     JwtModule.register({
       global: true,
-      secret: 'picky-secret-key-12345!',
+      secret: JWT_SECRET,
       signOptions: { expiresIn: '7d' },
     }),
   ],

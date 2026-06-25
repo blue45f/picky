@@ -52,7 +52,7 @@ export class DatabaseService implements OnModuleInit {
         await pool.query(`
           CREATE TABLE IF NOT EXISTS users (
             id TEXT PRIMARY KEY,
-            email TEXT NOT NULL UNIQUE,
+            email TEXT NOT NULL,
             password_hash TEXT NOT NULL,
             salt TEXT NOT NULL,
             nickname TEXT NOT NULL,
@@ -106,6 +106,27 @@ export class DatabaseService implements OnModuleInit {
           ALTER TABLE polls ADD COLUMN IF NOT EXISTS visibility TEXT DEFAULT 'public' NOT NULL;
           ALTER TABLE polls ADD COLUMN IF NOT EXISTS access_code TEXT;
           ALTER TABLE poll_comments ADD COLUMN IF NOT EXISTS parent_id INTEGER;
+        `);
+        // users.email UNIQUE 제약 마이그레이션:
+        // 익명/게스트/토스 로그인은 email='' 로 사용자를 만들기 때문에, 기존 `email TEXT NOT NULL UNIQUE`는
+        // 두 번째 익명 사용자부터 UNIQUE 충돌(500)을 일으킨다(토스앱 1차 로그인 경로가 이것).
+        // 기존 email UNIQUE 제약을 제거하고, 빈 문자열을 제외한 부분 유니크 인덱스로 교체한다.
+        // (실제 이메일만 유일성 보장, 익명 사용자의 다중 '' 는 허용. 멱등 — 매 부팅 안전하게 재실행.)
+        await pool.query(`
+          DO $$
+          DECLARE c text;
+          BEGIN
+            FOR c IN
+              SELECT conname FROM pg_constraint
+              WHERE conrelid = 'users'::regclass AND contype = 'u'
+            LOOP
+              EXECUTE 'ALTER TABLE users DROP CONSTRAINT ' || quote_ident(c);
+            END LOOP;
+          END $$;
+        `);
+        await pool.query(`
+          CREATE UNIQUE INDEX IF NOT EXISTS users_email_unique_idx
+          ON users (email) WHERE email <> '';
         `);
         console.log('✓ Drizzle PostgreSQL database tables verified/created successfully.');
       } catch (err) {

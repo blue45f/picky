@@ -16417,7 +16417,7 @@ var require_schema2 = __commonJS({
     var drizzle_orm_1 = require_drizzle_orm();
     exports2.users = (0, pg_core_1.pgTable)("users", {
       id: (0, pg_core_1.text)("id").primaryKey(),
-      email: (0, pg_core_1.text)("email").notNull().unique(),
+      email: (0, pg_core_1.text)("email").notNull(),
       passwordHash: (0, pg_core_1.text)("password_hash").notNull(),
       salt: (0, pg_core_1.text)("salt").notNull(),
       nickname: (0, pg_core_1.text)("nickname").notNull(),
@@ -16435,7 +16435,9 @@ var require_schema2 = __commonJS({
       resultsVisibility: (0, pg_core_1.text)("results_visibility").default("afterVote").notNull(),
       creatorId: (0, pg_core_1.text)("creator_id"),
       creatorIsGuest: (0, pg_core_1.boolean)("creator_is_guest").default(true).notNull(),
-      attachments: (0, pg_core_1.jsonb)("attachments").default([]).notNull()
+      attachments: (0, pg_core_1.jsonb)("attachments").default([]).notNull(),
+      visibility: (0, pg_core_1.text)("visibility").default("public").notNull(),
+      accessCode: (0, pg_core_1.text)("access_code")
     });
     exports2.pollOptions = (0, pg_core_1.pgTable)("poll_options", {
       id: (0, pg_core_1.serial)("id").primaryKey(),
@@ -16452,7 +16454,8 @@ var require_schema2 = __commonJS({
       comment: (0, pg_core_1.text)("comment").notNull(),
       createdAt: (0, pg_core_1.timestamp)("created_at").defaultNow().notNull(),
       selectedOptionId: (0, pg_core_1.integer)("selected_option_id"),
-      selectedOptionText: (0, pg_core_1.text)("selected_option_text")
+      selectedOptionText: (0, pg_core_1.text)("selected_option_text"),
+      parentId: (0, pg_core_1.integer)("parent_id")
     });
     exports2.usersRelations = (0, drizzle_orm_1.relations)(exports2.users, ({ many }) => ({
       polls: many(exports2.polls)
@@ -16633,7 +16636,7 @@ var require_database_service = __commonJS({
             await index_1.pool.query(`
           CREATE TABLE IF NOT EXISTS users (
             id TEXT PRIMARY KEY,
-            email TEXT NOT NULL UNIQUE,
+            email TEXT NOT NULL,
             password_hash TEXT NOT NULL,
             salt TEXT NOT NULL,
             nickname TEXT NOT NULL,
@@ -16646,10 +16649,13 @@ var require_database_service = __commonJS({
             id TEXT PRIMARY KEY,
             question TEXT NOT NULL,
             description TEXT,
+            category_id TEXT,
             created_at TIMESTAMP DEFAULT NOW() NOT NULL,
             ends_at TIMESTAMP,
             total_votes INTEGER DEFAULT 0 NOT NULL,
             results_visibility TEXT DEFAULT 'afterVote' NOT NULL,
+            visibility TEXT DEFAULT 'public' NOT NULL,
+            access_code TEXT,
             creator_id TEXT,
             creator_is_guest BOOLEAN DEFAULT TRUE NOT NULL,
             attachments JSONB DEFAULT '[]'::jsonb NOT NULL
@@ -16673,8 +16679,31 @@ var require_database_service = __commonJS({
             comment TEXT NOT NULL,
             created_at TIMESTAMP DEFAULT NOW() NOT NULL,
             selected_option_id INTEGER,
-            selected_option_text TEXT
+            selected_option_text TEXT,
+            parent_id INTEGER
           );
+        `);
+            await index_1.pool.query(`
+          ALTER TABLE polls ADD COLUMN IF NOT EXISTS category_id TEXT;
+          ALTER TABLE polls ADD COLUMN IF NOT EXISTS visibility TEXT DEFAULT 'public' NOT NULL;
+          ALTER TABLE polls ADD COLUMN IF NOT EXISTS access_code TEXT;
+          ALTER TABLE poll_comments ADD COLUMN IF NOT EXISTS parent_id INTEGER;
+        `);
+            await index_1.pool.query(`
+          DO $$
+          DECLARE c text;
+          BEGIN
+            FOR c IN
+              SELECT conname FROM pg_constraint
+              WHERE conrelid = 'users'::regclass AND contype = 'u'
+            LOOP
+              EXECUTE 'ALTER TABLE users DROP CONSTRAINT ' || quote_ident(c);
+            END LOOP;
+          END $$;
+        `);
+            await index_1.pool.query(`
+          CREATE UNIQUE INDEX IF NOT EXISTS users_email_unique_idx
+          ON users (email) WHERE email <> '';
         `);
             console.log("\u2713 Drizzle PostgreSQL database tables verified/created successfully.");
           } catch (err) {
@@ -16995,6 +17024,7 @@ var require_database_service = __commonJS({
       async getPolls() {
         if (this.useSqlDb) {
           const rows = await index_1.db.query.polls.findMany({
+            where: (0, drizzle_orm_1.eq)(schema.polls.visibility, "public"),
             orderBy: [(0, drizzle_orm_1.desc)(schema.polls.createdAt)],
             with: {
               options: {
@@ -17013,6 +17043,8 @@ var require_database_service = __commonJS({
             endsAt: r.endsAt ? r.endsAt.toISOString() : null,
             totalVotes: r.totalVotes,
             resultsVisibility: r.resultsVisibility,
+            visibility: r.visibility,
+            requiresCode: r.visibility === "private",
             creatorId: r.creatorId,
             creatorIsGuest: r.creatorIsGuest,
             categoryId: r.categoryId,
@@ -17029,12 +17061,13 @@ var require_database_service = __commonJS({
               comment: c.comment,
               createdAt: c.createdAt.toISOString(),
               selectedOptionId: c.selectedOptionId || void 0,
-              selectedOptionText: c.selectedOptionText || void 0
+              selectedOptionText: c.selectedOptionText || void 0,
+              parentId: c.parentId ?? void 0
             }))
           }));
         }
         await this.refresh();
-        return [...this.data.polls];
+        return this.data.polls.filter((p) => (p.visibility ?? "public") === "public");
       }
       async getPollById(id) {
         if (this.useSqlDb) {
@@ -17059,6 +17092,8 @@ var require_database_service = __commonJS({
             endsAt: r.endsAt ? r.endsAt.toISOString() : null,
             totalVotes: r.totalVotes,
             resultsVisibility: r.resultsVisibility,
+            visibility: r.visibility,
+            requiresCode: r.visibility === "private",
             creatorId: r.creatorId,
             creatorIsGuest: r.creatorIsGuest,
             categoryId: r.categoryId,
@@ -17075,12 +17110,36 @@ var require_database_service = __commonJS({
               comment: c.comment,
               createdAt: c.createdAt.toISOString(),
               selectedOptionId: c.selectedOptionId || void 0,
-              selectedOptionText: c.selectedOptionText || void 0
+              selectedOptionText: c.selectedOptionText || void 0,
+              parentId: c.parentId ?? void 0
             }))
           };
         }
         await this.refresh();
         return this.data.polls.find((p) => p.id === id);
+      }
+      async verifyAccessCode(pollId, code) {
+        if (!code) {
+          return false;
+        }
+        if (this.useSqlDb) {
+          const r = await index_1.db.query.polls.findFirst({
+            where: (0, drizzle_orm_1.eq)(schema.polls.id, pollId),
+            columns: { accessCode: true, visibility: true }
+          });
+          if (!r)
+            return false;
+          if (r.visibility !== "private")
+            return true;
+          return r.accessCode === code;
+        }
+        await this.refresh();
+        const p = this.data.polls.find((x) => x.id === pollId);
+        if (!p)
+          return false;
+        if ((p.visibility ?? "public") !== "private")
+          return true;
+        return p.accessCode === code;
       }
       async createPoll(poll) {
         if (this.useSqlDb) {
@@ -17092,6 +17151,8 @@ var require_database_service = __commonJS({
             endsAt: poll.endsAt ? new Date(poll.endsAt) : null,
             totalVotes: poll.totalVotes,
             resultsVisibility: poll.resultsVisibility || "afterVote",
+            visibility: poll.visibility || "public",
+            accessCode: poll.accessCode ?? null,
             creatorId: poll.creatorId,
             creatorIsGuest: poll.creatorIsGuest ?? true,
             categoryId: poll.categoryId ?? null,
@@ -17135,7 +17196,8 @@ var require_database_service = __commonJS({
               comment: c.comment,
               createdAt: new Date(c.createdAt),
               selectedOptionId: c.selectedOptionId || null,
-              selectedOptionText: c.selectedOptionText || null
+              selectedOptionText: c.selectedOptionText || null,
+              parentId: c.parentId ?? null
             })));
           }
           return;
@@ -17284,6 +17346,20 @@ var require_database_service = __commonJS({
         const next = {
           ...this.data,
           users: [...this.data.users, user]
+        };
+        await this.commit(next);
+      }
+      async deleteUser(userId) {
+        if (this.useSqlDb) {
+          await index_1.db.update(schema.polls).set({ creatorId: null, creatorIsGuest: true }).where((0, drizzle_orm_1.eq)(schema.polls.creatorId, userId));
+          await index_1.db.delete(schema.users).where((0, drizzle_orm_1.eq)(schema.users.id, userId));
+          return;
+        }
+        await this.refresh();
+        const next = {
+          ...this.data,
+          polls: this.data.polls.map((p) => p.creatorId === userId ? { ...p, creatorId: null, creatorIsGuest: true } : p),
+          users: this.data.users.filter((u) => u.id !== userId)
         };
         await this.commit(next);
       }
@@ -17498,7 +17574,9 @@ var require_auth_service = __commonJS({
           throw new common_1.UnauthorizedException("\uC774\uBA54\uC77C \uB610\uB294 \uBE44\uBC00\uBC88\uD638\uAC00 \uC62C\uBC14\uB974\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.");
         }
         const hash = this.hashPassword(input.password, user.salt);
-        if (hash !== user.passwordHash) {
+        const expected = Buffer.from(user.passwordHash, "hex");
+        const actual = Buffer.from(hash, "hex");
+        if (expected.length !== actual.length || !crypto2.timingSafeEqual(expected, actual)) {
           throw new common_1.UnauthorizedException("\uC774\uBA54\uC77C \uB610\uB294 \uBE44\uBC00\uBC88\uD638\uAC00 \uC62C\uBC14\uB974\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.");
         }
         const accessToken = await this.signPayload({
@@ -17635,6 +17713,14 @@ var require_auth_service = __commonJS({
           isAdmin: (0, admin_1.isAdminEmail)(payload.email)
         };
       }
+      async deleteAccount(userId) {
+        const user = await this.db.getUserById(userId);
+        if (!user) {
+          throw new common_1.BadRequestException("\uC774\uBBF8 \uD0C8\uD1F4\uD588\uAC70\uB098 \uC874\uC7AC\uD558\uC9C0 \uC54A\uB294 \uACC4\uC815\uC785\uB2C8\uB2E4.");
+        }
+        await this.db.deleteUser(userId);
+        return { deleted: true };
+      }
     };
     exports2.AuthService = AuthService;
     exports2.AuthService = AuthService = __decorate([
@@ -17671,6 +17757,7 @@ var require_dist2 = __commonJS({
     var index_exports = {};
     __export(index_exports, {
       BETA_NOTICE: () => BETA_NOTICE,
+      CreateCommentSchema: () => CreateCommentSchema,
       CreatePollSchema: () => CreatePollSchema,
       GuestRegisterSchema: () => GuestRegisterSchema,
       LoginSchema: () => LoginSchema,
@@ -17678,8 +17765,10 @@ var require_dist2 = __commonJS({
       MASCOT_EMOJI: () => MASCOT_EMOJI,
       MASCOT_NAME: () => MASCOT_NAME,
       POLL_CATEGORIES: () => POLL_CATEGORIES,
+      PollAccessCodeSchema: () => PollAccessCodeSchema,
       PollAttachmentSchema: () => PollAttachmentSchema,
       PollResultsVisibilitySchema: () => PollResultsVisibilitySchema,
+      PollVisibilitySchema: () => PollVisibilitySchema,
       RADIUS: () => RADIUS,
       RegisterSchema: () => RegisterSchema,
       TossIdentitySchema: () => TossIdentitySchema,
@@ -17723,6 +17812,8 @@ var require_dist2 = __commonJS({
     var RADIUS = { sm: 12, md: 18, lg: 24, pill: 999 };
     var BETA_NOTICE = "\uBCA0\uD0C0 \uAE30\uAC04\uC774\uB77C \uD22C\uD45C \uB370\uC774\uD130\uAC00 \uCD08\uAE30\uD654\uB420 \uC218 \uC788\uC5B4\uC694";
     var PollResultsVisibilitySchema = import_zod.z.enum(["afterVote", "always"]);
+    var PollVisibilitySchema = import_zod.z.enum(["public", "unlisted", "private"]);
+    var PollAccessCodeSchema = import_zod.z.string().trim().min(4, "\uC811\uADFC \uCF54\uB4DC\uB294 \uCD5C\uC18C 4\uC790 \uC774\uC0C1\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4.").max(20, "\uC811\uADFC \uCF54\uB4DC\uB294 \uCD5C\uB300 20\uC790 \uC774\uD558\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4.");
     var PollAttachmentSchema = import_zod.z.object({
       name: import_zod.z.string().min(1, "\uCCA8\uBD80\uD30C\uC77C \uC774\uB984\uC740 \uD544\uC218\uC785\uB2C8\uB2E4.").max(120, "\uCCA8\uBD80\uD30C\uC77C \uC774\uB984\uC740 120\uC790 \uC774\uD558\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4."),
       type: import_zod.z.string().max(80, "\uCCA8\uBD80\uD30C\uC77C \uD615\uC2DD\uC740 80\uC790 \uC774\uD558\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4."),
@@ -17734,6 +17825,8 @@ var require_dist2 = __commonJS({
       description: import_zod.z.string().max(500, "\uC124\uBA85\uC740 \uCD5C\uB300 500\uAE00\uC790 \uC774\uD558\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4.").optional().nullable(),
       endsAt: import_zod.z.string().datetime("\uB9C8\uAC10 \uC2DC\uAC04 \uD615\uC2DD\uC774 \uC62C\uBC14\uB974\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.").optional().nullable(),
       resultsVisibility: PollResultsVisibilitySchema.optional().nullable(),
+      visibility: PollVisibilitySchema.optional(),
+      accessCode: PollAccessCodeSchema.optional().nullable(),
       options: import_zod.z.array(
         import_zod.z.object({
           text: import_zod.z.string().min(1, "\uC120\uD0DD\uC9C0\uB294 \uBE48 \uCE78\uC77C \uC218 \uC5C6\uC2B5\uB2C8\uB2E4."),
@@ -17748,6 +17841,8 @@ var require_dist2 = __commonJS({
       description: import_zod.z.string().max(500, "\uC124\uBA85\uC740 \uCD5C\uB300 500\uAE00\uC790 \uC774\uD558\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4.").optional().nullable(),
       endsAt: import_zod.z.string().datetime("\uB9C8\uAC10 \uC2DC\uAC04 \uD615\uC2DD\uC774 \uC62C\uBC14\uB974\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.").optional().nullable(),
       resultsVisibility: PollResultsVisibilitySchema.optional().nullable(),
+      visibility: PollVisibilitySchema.optional(),
+      accessCode: PollAccessCodeSchema.optional().nullable(),
       options: import_zod.z.array(
         import_zod.z.object({
           text: import_zod.z.string().min(1, "\uC120\uD0DD\uC9C0\uB294 \uBE48 \uCE78\uC77C \uC218 \uC5C6\uC2B5\uB2C8\uB2E4."),
@@ -17763,6 +17858,12 @@ var require_dist2 = __commonJS({
       optionId: import_zod.z.number({ required_error: "\uC120\uD0DD\uD560 \uC635\uC158 ID\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4." }),
       voterName: import_zod.z.string().max(20, "\uD22C\uD45C\uC790 \uB2C9\uB124\uC784\uC740 \uCD5C\uB300 20\uC790 \uC774\uD558\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4.").optional().nullable(),
       comment: import_zod.z.string().max(100, "\uC758\uACAC\uC740 \uCD5C\uB300 100\uC790 \uC774\uD558\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4.").optional().nullable()
+    });
+    var CreateCommentSchema = import_zod.z.object({
+      comment: import_zod.z.string().trim().min(1, "\uD55C\uB9C8\uB514\uB97C \uC785\uB825\uD574 \uC8FC\uC138\uC694.").max(100, "\uD55C\uB9C8\uB514\uB294 \uCD5C\uB300 100\uC790\uC608\uC694."),
+      voterName: import_zod.z.string().trim().max(20, "\uB2C9\uB124\uC784\uC740 \uCD5C\uB300 20\uC790\uC608\uC694.").optional().nullable(),
+      /** 대댓글: 답글을 달 부모 댓글 id. 최상위 댓글이면 생략. */
+      parentId: import_zod.z.number().int().positive().optional().nullable()
     });
     var RegisterSchema = import_zod.z.object({
       email: import_zod.z.string({ required_error: "\uC774\uBA54\uC77C\uC740 \uD544\uC218\uC785\uB2C8\uB2E4." }).trim().email("\uC62C\uBC14\uB978 \uC774\uBA54\uC77C \uD615\uC2DD\uC774 \uC544\uB2D9\uB2C8\uB2E4."),
@@ -17801,6 +17902,16 @@ var require_dist2 = __commonJS({
   }
 });
 
+// apps/api/dist/modules/auth/jwt.constant.js
+var require_jwt_constant = __commonJS({
+  "apps/api/dist/modules/auth/jwt.constant.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", { value: true });
+    exports2.JWT_SECRET = void 0;
+    exports2.JWT_SECRET = process.env.JWT_SECRET?.trim() || "picky-dev-secret-change-me";
+  }
+});
+
 // apps/api/dist/modules/auth/auth.guard.js
 var require_auth_guard = __commonJS({
   "apps/api/dist/modules/auth/auth.guard.js"(exports2) {
@@ -17819,6 +17930,7 @@ var require_auth_guard = __commonJS({
     var common_1 = require("@nestjs/common");
     var jwt_1 = require("@nestjs/jwt");
     var admin_1 = require_admin();
+    var jwt_constant_1 = require_jwt_constant();
     var AuthGuard = class AuthGuard {
       jwtService;
       constructor(jwtService) {
@@ -17832,7 +17944,7 @@ var require_auth_guard = __commonJS({
         }
         try {
           const payload = await this.jwtService.verifyAsync(token, {
-            secret: "picky-secret-key-12345!"
+            secret: jwt_constant_1.JWT_SECRET
           });
           request["user"] = { ...payload, isAdmin: (0, admin_1.isAdminEmail)(payload?.email) };
         } catch {
@@ -17864,7 +17976,7 @@ var require_auth_guard = __commonJS({
         let payload;
         try {
           payload = await this.jwtService.verifyAsync(token, {
-            secret: "picky-secret-key-12345!"
+            secret: jwt_constant_1.JWT_SECRET
           });
         } catch {
           throw new common_1.UnauthorizedException("\uC720\uD6A8\uD558\uC9C0 \uC54A\uAC70\uB098 \uB9CC\uB8CC\uB41C \uD1A0\uD070\uC785\uB2C8\uB2E4.");
@@ -17896,7 +18008,7 @@ var require_auth_guard = __commonJS({
         if (token) {
           try {
             const payload = await this.jwtService.verifyAsync(token, {
-              secret: "picky-secret-key-12345!"
+              secret: jwt_constant_1.JWT_SECRET
             });
             request["user"] = payload;
           } catch {
@@ -17976,6 +18088,9 @@ var require_auth_controller = __commonJS({
         const user = await this.authService.validateUser(req.user);
         return user;
       }
+      async deleteAccount(req) {
+        return this.authService.deleteAccount(req.user.sub);
+      }
     };
     exports2.AuthController = AuthController;
     __decorate([
@@ -18021,6 +18136,14 @@ var require_auth_controller = __commonJS({
       __metadata("design:paramtypes", [Object]),
       __metadata("design:returntype", Promise)
     ], AuthController.prototype, "me", null);
+    __decorate([
+      (0, common_1.Delete)("account"),
+      (0, common_1.UseGuards)(auth_guard_1.AuthGuard),
+      __param(0, (0, common_1.Request)()),
+      __metadata("design:type", Function),
+      __metadata("design:paramtypes", [Object]),
+      __metadata("design:returntype", Promise)
+    ], AuthController.prototype, "deleteAccount", null);
     exports2.AuthController = AuthController = __decorate([
       (0, common_1.Controller)("auth"),
       (0, common_1.UsePipes)(nestjs_zod_1.ZodValidationPipe),
@@ -18047,6 +18170,7 @@ var require_auth_module = __commonJS({
     var auth_service_1 = require_auth_service();
     var auth_controller_1 = require_auth_controller();
     var auth_guard_1 = require_auth_guard();
+    var jwt_constant_1 = require_jwt_constant();
     var AuthModule = class AuthModule {
     };
     exports2.AuthModule = AuthModule;
@@ -18056,7 +18180,7 @@ var require_auth_module = __commonJS({
           database_module_1.DatabaseModule,
           jwt_1.JwtModule.register({
             global: true,
-            secret: "picky-secret-key-12345!",
+            secret: jwt_constant_1.JWT_SECRET,
             signOptions: { expiresIn: "7d" }
           })
         ],
@@ -18134,6 +18258,10 @@ var require_poll_service = __commonJS({
           voteCount: 0,
           imageUrl: opt.imageUrl || null
         }));
+        const visibility = input.visibility ?? "public";
+        if (visibility === "private" && !input.accessCode) {
+          throw new common_1.BadRequestException("\uBE44\uACF5\uAC1C(private) \uD22C\uD45C\uB294 \uC811\uADFC \uCF54\uB4DC\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4.");
+        }
         const newPoll = {
           id: pollId,
           question: input.question,
@@ -18145,12 +18273,43 @@ var require_poll_service = __commonJS({
           endsAt: normalizedEndsAt,
           totalVotes: 0,
           resultsVisibility: input.resultsVisibility || "afterVote",
+          visibility,
+          requiresCode: visibility === "private",
           creatorId,
           creatorIsGuest,
           categoryId: input.categoryId || null
         };
-        await this.db.createPoll(newPoll);
+        await this.db.createPoll({
+          ...newPoll,
+          accessCode: visibility === "private" ? input.accessCode ?? null : null
+        });
         return newPoll;
+      }
+      async getPollForViewer(id, code) {
+        const poll = await this.getPoll(id);
+        if (poll.visibility !== "private") {
+          return poll;
+        }
+        const ok = await this.db.verifyAccessCode(id, code ?? null);
+        if (ok) {
+          return { ...poll, requiresCode: false };
+        }
+        return {
+          id: poll.id,
+          question: poll.question,
+          description: null,
+          options: [],
+          comments: [],
+          attachments: [],
+          createdAt: poll.createdAt,
+          endsAt: poll.endsAt ?? null,
+          totalVotes: 0,
+          resultsVisibility: poll.resultsVisibility ?? "afterVote",
+          visibility: "private",
+          requiresCode: true,
+          creatorId: poll.creatorId ?? null,
+          categoryId: poll.categoryId ?? null
+        };
       }
       assertCanManage(poll, userId, isAdmin, action) {
         if (isAdmin) {
@@ -18263,7 +18422,7 @@ var require_poll_service = __commonJS({
         option.voteCount += 1;
         poll.totalVotes += 1;
         if (input.comment?.trim()) {
-          const commentId = poll.comments.length + 1;
+          const commentId = poll.comments.reduce((max, c) => Math.max(max, c.id), 0) + 1;
           const newComment = {
             id: commentId,
             voterName: input.voterName?.trim() ? input.voterName.trim() : "\uC775\uBA85",
@@ -18275,7 +18434,34 @@ var require_poll_service = __commonJS({
           poll.comments.push(newComment);
         }
         await this.db.updatePoll(poll);
-        return poll;
+        return await this.db.getPollById(id) ?? poll;
+      }
+      async addComment(id, input) {
+        const poll = await this.db.getPollById(id);
+        if (!poll) {
+          throw new common_1.NotFoundException(`\uACE0\uBBFC(\uD22C\uD45C) ID ${id}\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.`);
+        }
+        let parentId = input.parentId ?? null;
+        if (parentId != null) {
+          const parent = poll.comments.find((c) => c.id === parentId);
+          if (!parent) {
+            throw new common_1.BadRequestException("\uB2F5\uAE00\uC744 \uB2EC \uD55C\uB9C8\uB514\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.");
+          }
+          if (parent.parentId != null) {
+            parentId = parent.parentId;
+          }
+        }
+        const commentId = poll.comments.reduce((max, c) => Math.max(max, c.id), 0) + 1;
+        const newComment = {
+          id: commentId,
+          voterName: input.voterName?.trim() ? input.voterName.trim() : "\uC775\uBA85",
+          comment: input.comment.trim(),
+          createdAt: (/* @__PURE__ */ new Date()).toISOString(),
+          parentId
+        };
+        poll.comments.push(newComment);
+        await this.db.updatePoll(poll);
+        return await this.db.getPollById(id) ?? poll;
       }
     };
     exports2.PollService = PollService;
@@ -18317,6 +18503,8 @@ var require_poll_controller = __commonJS({
     };
     var VoteDto = class extends (0, nestjs_zod_1.createZodDto)(shared_1.VoteSchema) {
     };
+    var CreateCommentDto = class extends (0, nestjs_zod_1.createZodDto)(shared_1.CreateCommentSchema) {
+    };
     var trimTrailingSlashes = (value) => {
       let end = value.length;
       while (end > 0 && value.codePointAt(end - 1) === 47) {
@@ -18339,7 +18527,8 @@ var require_poll_controller = __commonJS({
         return this.pollService.createPoll(dto, creatorId, creatorIsGuest);
       }
       async getPollSharePreview(id, req, res) {
-        const poll = await this.pollService.getPoll(id);
+        const shareCode = typeof req.query?.code === "string" ? req.query.code : void 0;
+        const poll = await this.pollService.getPollForViewer(id, shareCode);
         const requestOrigin = this.getRequestOrigin(req);
         const appOrigin = this.getPublicAppOrigin(req);
         const pollUrl = this.resolveSafePollRedirectUrl(req, `${appOrigin}/poll/${encodeURIComponent(poll.id)}`);
@@ -18467,7 +18656,8 @@ var require_poll_controller = __commonJS({
 </html>`);
       }
       async getPollOptionImage(id, optionId, req, res) {
-        const poll = await this.pollService.getPoll(id);
+        const imageCode = typeof req.query?.code === "string" ? req.query.code : void 0;
+        const poll = await this.pollService.getPollForViewer(id, imageCode);
         const fallbackImageUrl = `${this.getPublicAppOrigin(req)}/og-default.png`;
         const option = poll.options.find((pollOption) => String(pollOption.id) === optionId);
         const imageUrl = option?.imageUrl || "";
@@ -18486,11 +18676,14 @@ var require_poll_controller = __commonJS({
           "Cache-Control": "public, max-age=31536000, immutable"
         }).send(dataImage.buffer);
       }
-      getPoll(id) {
-        return this.pollService.getPoll(id);
+      getPoll(id, code) {
+        return this.pollService.getPollForViewer(id, code);
       }
       vote(id, dto) {
         return this.pollService.vote(id, dto);
+      }
+      addComment(id, dto) {
+        return this.pollService.addComment(id, dto);
       }
       updatePoll(id, req, dto) {
         return this.pollService.updatePoll(id, dto, req.user?.sub ?? null, Boolean(req.user?.isAdmin));
@@ -18635,8 +18828,9 @@ var require_poll_controller = __commonJS({
     __decorate([
       (0, common_1.Get)(":id"),
       __param(0, (0, common_1.Param)("id")),
+      __param(1, (0, common_1.Query)("code")),
       __metadata("design:type", Function),
-      __metadata("design:paramtypes", [String]),
+      __metadata("design:paramtypes", [String, String]),
       __metadata("design:returntype", void 0)
     ], PollController.prototype, "getPoll", null);
     __decorate([
@@ -18647,6 +18841,14 @@ var require_poll_controller = __commonJS({
       __metadata("design:paramtypes", [String, VoteDto]),
       __metadata("design:returntype", void 0)
     ], PollController.prototype, "vote", null);
+    __decorate([
+      (0, common_1.Post)(":id/comments"),
+      __param(0, (0, common_1.Param)("id")),
+      __param(1, (0, common_1.Body)()),
+      __metadata("design:type", Function),
+      __metadata("design:paramtypes", [String, CreateCommentDto]),
+      __metadata("design:returntype", void 0)
+    ], PollController.prototype, "addComment", null);
     __decorate([
       (0, common_1.Patch)(":id"),
       (0, common_1.UseGuards)(auth_guard_1.AuthGuard),

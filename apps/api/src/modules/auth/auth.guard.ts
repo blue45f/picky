@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { isAdminEmail } from './admin';
+import { JWT_SECRET } from './jwt.constant';
 
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -20,7 +21,7 @@ export class AuthGuard implements CanActivate {
     }
     try {
       const payload = await this.jwtService.verifyAsync(token, {
-        secret: 'picky-secret-key-12345!',
+        secret: JWT_SECRET,
       });
       request['user'] = { ...payload, isAdmin: isAdminEmail(payload?.email) };
     } catch {
@@ -52,7 +53,7 @@ export class AdminGuard implements CanActivate {
     let payload: any;
     try {
       payload = await this.jwtService.verifyAsync(token, {
-        secret: 'picky-secret-key-12345!',
+        secret: JWT_SECRET,
       });
     } catch {
       throw new UnauthorizedException('유효하지 않거나 만료된 토큰입니다.');
@@ -80,7 +81,7 @@ export class OptionalAuthGuard implements CanActivate {
     if (token) {
       try {
         const payload = await this.jwtService.verifyAsync(token, {
-          secret: 'picky-secret-key-12345!',
+          secret: JWT_SECRET,
         });
         request['user'] = payload;
       } catch {
