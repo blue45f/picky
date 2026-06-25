@@ -8,6 +8,7 @@ import {
   getAnonymousKey,
   getOperationalEnvironment,
   getSchemeUri,
+  getTossShareLink,
   requestReview,
   share,
   type HapticFeedbackType,
@@ -25,6 +26,27 @@ export function getTossEnv(): TossEnv {
 }
 
 export const isInToss = (): boolean => getTossEnv() !== 'web';
+
+/**
+ * 토스 미니앱으로 열리는 공유 링크(https) 생성.
+ * `intoss://picky/...` 딥링크를 토스앱이 여는 링크로 변환해요(미설치 시 앱/플레이스토어 이동).
+ * 토스 밖이거나 미지원·오류면 null을 반환 → 호출부가 공개 웹 URL로 폴백해요.
+ * 주의: `intoss://` 스킴은 미니앱이 정식 출시된 이후에만 실제로 열려요(출시 전엔 테스트 스킴 사용).
+ */
+export async function buildTossShareLink(
+  path: string,
+  ogImageUrl?: string,
+): Promise<string | null> {
+  if (!isInToss()) {
+    return null;
+  }
+  try {
+    const link = await getTossShareLink(path, ogImageUrl);
+    return typeof link === 'string' && link.length > 0 ? link : null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * 비게임 미니앱 사용자 식별키(hash). 서버/동의 없이 미니앱 내 고유 사용자 식별.

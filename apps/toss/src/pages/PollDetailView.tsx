@@ -8,7 +8,6 @@ import { theme, stickyActionBar } from '../theme';
 import { AppBar, Chip, ProgressBar } from '../components/ui';
 import { CountdownChip } from '../components/Countdown';
 import { PollShareQrSection } from '../components/PollShareQrSection';
-import { isInToss } from '../lib/toss';
 
 interface PollDetailViewProps {
   poll: Poll | null;
@@ -639,7 +638,6 @@ function CommentDraftFields(
 
 function ShareSection(
   props: Readonly<{
-    pollId: string;
     shareUrl: string;
     showResults: boolean;
     onShare: () => void;
@@ -647,7 +645,7 @@ function ShareSection(
     onCopyResult?: () => void;
   }>,
 ) {
-  const { pollId, shareUrl, showResults, onShare, onCopy, onCopyResult } = props;
+  const { shareUrl, showResults, onShare, onCopy, onCopyResult } = props;
   return (
     <div
       style={{
@@ -751,13 +749,7 @@ function ShareSection(
         >
           {VOICE.scanHint}
         </div>
-        {shareUrl ? (
-          <PollShareQrSection
-            shareUrl={shareUrl}
-            qrUrl={isInToss() ? `intoss://picky/poll/${pollId}` : shareUrl}
-            onCopyLink={onCopy}
-          />
-        ) : null}
+        {shareUrl ? <PollShareQrSection shareUrl={shareUrl} onCopyLink={onCopy} /> : null}
       </div>
     </div>
   );
@@ -1068,7 +1060,6 @@ export function PollDetailView(props: Readonly<PollDetailViewProps>) {
         />
 
         <ShareSection
-          pollId={poll.id}
           shareUrl={shareUrl}
           showResults={showResults}
           onShare={onShare}

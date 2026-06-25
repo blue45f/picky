@@ -7,10 +7,16 @@ import { usePollStore } from '../store/usePollStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useIdentity } from '../store/useIdentity';
 import { rememberRecentPoll } from '../lib/pollHistory';
-import { buildPollResultText, resolvePollShareUrl, sharePoll, copyText } from '../lib/pollShare';
+import {
+  buildPollResultText,
+  pollTossDeepLink,
+  resolvePollShareUrl,
+  sharePoll,
+  copyText,
+} from '../lib/pollShare';
 import { isPollClosed, leadingOption, optionsByVotes } from '../lib/poll';
 import { getVotedOptionId, rememberVote } from '../lib/votes';
-import { hapticFeedback, requestAppReview } from '../lib/toss';
+import { buildTossShareLink, hapticFeedback, isInToss, requestAppReview } from '../lib/toss';
 import { theme } from '../theme';
 import { useCountdown } from '../components/Countdown';
 import { useToast } from '../components/Toast';
@@ -47,6 +53,8 @@ export function PollDetailPage() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [codeInput, setCodeInput] = useState('');
   const [codeError, setCodeError] = useState<string | null>(null);
+  // 토스 안에선 토스앱으로 열리는 공유 링크(getTossShareLink). 토스 밖이면 null → 웹 URL 사용.
+  const [tossShareLink, setTossShareLink] = useState<string | null>(null);
 
   useEffect(() => {
     fetchPoll(id, urlCode).catch(() => {});
@@ -74,6 +82,23 @@ export function PollDetailPage() {
     }
   }, [poll, id, votedOptionId]);
 
+  // 토스 공유 링크(딥링크→토스앱 오픈)를 비동기로 해석해 공유/QR/복사에 사용.
+  useEffect(() => {
+    let alive = true;
+    if (id && isInToss()) {
+      buildTossShareLink(pollTossDeepLink(id))
+        .then((link) => {
+          if (alive) setTossShareLink(link);
+        })
+        .catch(() => {});
+    } else {
+      setTossShareLink(null);
+    }
+    return () => {
+      alive = false;
+    };
+  }, [id]);
+
   const displayOptions = useMemo<PollOption[]>(() => {
     if (!poll) return [];
     return showResults ? optionsByVotes(poll) : poll.options;
@@ -88,7 +113,8 @@ export function PollDetailPage() {
   const isAdmin = Boolean(useAuthStore.getState().user?.isAdmin);
   const canManage = isOwner || isAdmin;
 
-  const shareUrl = poll ? resolvePollShareUrl(poll) : '';
+  // 토스 안: 토스 공유 링크 우선. 밖: 공개 웹 URL. (QR·공유·링크복사 모두 이 값을 사용)
+  const shareUrl = tossShareLink ?? (poll ? resolvePollShareUrl(poll) : '');
 
   const handleSelect = (optionId: number) => {
     if (hasVoted || closed) return;
@@ -131,21 +157,21 @@ export function PollDetailPage() {
   const handleShare = async () => {
     if (!poll) return;
     hapticFeedback('tap');
-    const result = await sharePoll(poll);
+    const result = await sharePoll(poll, shareUrl);
     if (result === 'clipboard') showToast('링크를 클립보드에 담았어요 📋');
     else if (result == null) showToast('공유를 취소했어요 🥺');
   };
 
   const handleCopy = async () => {
     if (!poll) return;
-    const ok = await copyText(resolvePollShareUrl(poll));
+    const ok = await copyText(shareUrl);
     hapticFeedback(ok ? 'tap' : 'error');
     showToast(ok ? '링크를 복사했어요 📋' : '복사에 실패했어요 😢');
   };
 
   const handleCopyResult = async () => {
     if (!poll) return;
-    const ok = await copyText(buildPollResultText(poll));
+    const ok = await copyText(buildPollResultText(poll, shareUrl));
     hapticFeedback(ok ? 'tap' : 'error');
     showToast(ok ? '투표 결과를 복사했어요 📊' : '복사에 실패했어요 😢');
   };

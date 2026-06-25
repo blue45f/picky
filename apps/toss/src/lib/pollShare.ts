@@ -1,6 +1,6 @@
 import type { Poll } from '../shared';
 import { optionPercent, optionsByVotes } from './poll';
-import { shareMessage } from './toss';
+import { buildTossShareLink, shareMessage } from './toss';
 
 const SHARE_PREFIX = '[피키 투표] ';
 
@@ -72,14 +72,29 @@ export const resolveShareText = (poll: Poll): string => {
   return `${SHARE_PREFIX}${poll.question}\n\n결정에 참여하고 의견을 남겨주세요.`;
 };
 
-/** 투표를 토스 네이티브 공유(→웹공유→클립보드)로 공유. */
-export const sharePoll = async (poll: Poll): Promise<'toss' | 'web-share' | 'clipboard' | null> => {
-  const message = `${resolveShareText(poll)}\n${resolvePollShareUrl(poll)}`;
+/** 토스 미니앱 딥링크 경로. 출시 후 picky 미니앱의 해당 투표 화면으로 열려요. */
+export const pollTossDeepLink = (pollId: string): string =>
+  `intoss://picky/poll/${encodeURIComponent(pollId)}`;
+
+/**
+ * 투표를 토스 네이티브 공유(→웹공유→클립보드)로 공유.
+ * 토스 안에선 **토스앱으로 열리는 공유 링크**(getTossShareLink)를, 밖에선 공개 웹 URL을 공유해요.
+ * 이미 해석된 공유 URL이 있으면(shareUrlOverride) 재요청 없이 그대로 사용해요.
+ */
+export const sharePoll = async (
+  poll: Poll,
+  shareUrlOverride?: string | null,
+): Promise<'toss' | 'web-share' | 'clipboard' | null> => {
+  const url =
+    shareUrlOverride ||
+    (await buildTossShareLink(pollTossDeepLink(poll.id))) ||
+    resolvePollShareUrl(poll);
+  const message = `${resolveShareText(poll)}\n${url}`;
   return shareMessage(message);
 };
 
-/** 득표순 결과를 사람이 읽기 좋은 텍스트로. 공유 링크 포함. */
-export const buildPollResultText = (poll: Poll): string => {
+/** 득표순 결과를 사람이 읽기 좋은 텍스트로. 공유 링크 포함(토스 안이면 토스 링크 전달 권장). */
+export const buildPollResultText = (poll: Poll, shareUrlOverride?: string): string => {
   const lines = optionsByVotes(poll).map((option, index) => {
     const percent = optionPercent(option.voteCount, poll.totalVotes);
     const crown = index === 0 && option.voteCount > 0 ? '👑 ' : '';
@@ -91,7 +106,7 @@ export const buildPollResultText = (poll: Poll): string => {
     '',
     ...lines,
     '',
-    resolvePollShareUrl(poll),
+    shareUrlOverride || resolvePollShareUrl(poll),
   ].join('\n');
 };
 
