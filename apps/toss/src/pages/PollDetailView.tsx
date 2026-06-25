@@ -14,6 +14,7 @@ import { DecisionMemoSheet } from '../components/DecisionMemoSheet';
 import { ResultImageExport } from '../components/ResultImageExport';
 import { OpinionTopicCloud } from '../components/OpinionTopicCloud';
 import { ShareTemplates } from '../components/ShareTemplates';
+import { BannerAd } from '../components/BannerAd';
 
 interface PollDetailViewProps {
   poll: Poll | null;
@@ -1818,6 +1819,13 @@ export function PollDetailView(props: Readonly<PollDetailViewProps>) {
           onEditComment={onEditComment}
           onAddReply={onAddReply}
         />
+
+        {/*
+          상세 인앱 배너 — 투표를 마쳤거나 마감된 '결과 읽기' 단계에서만 댓글 아래에 노출해요.
+          미투표 진행중 화면에는 하단 고정 투표 바가 있어, 핵심 액션(투표) 흐름을 광고로
+          방해하지 않도록 이 슬롯을 띄우지 않아요(정책: Value First / ATF 금지).
+        */}
+        {hasVoted || closed ? <BannerAd format="banner" /> : null}
 
         {/* 결과 이미지 내보내기 — buildPollResultImageDataUrl(순수 Canvas) 소비. */}
         {decisionToolsVisible ? (

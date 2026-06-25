@@ -12,6 +12,10 @@ interface ImportMetaEnv {
    * 비어 있으면 옵트인 '토스 프로필 불러오기' 버튼이 숨겨지고 기능이 꺼져요.
    */
   readonly VITE_TOSS_CUD_PROFILE_KEY?: string;
+  /** 인앱 배너(리스트형) 광고 그룹 ID(콘솔 발급). 미설정 시 운영 빌드는 광고 미노출. */
+  readonly VITE_TOSS_AD_GROUP_ID?: string;
+  /** 인앱 피드형(네이티브 이미지) 광고 그룹 ID(콘솔 발급). 미설정 시 배너 ID로 폴백. */
+  readonly VITE_TOSS_FEED_AD_GROUP_ID?: string;
 }
 
 interface ImportMeta {

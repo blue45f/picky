@@ -8,23 +8,37 @@ import { useCallback, useEffect, useState } from 'react';
  */
 
 // WebView 배너 테스트 ID(공식 문서). 실제 광고 ID로 테스트하면 정책 위반이라 dev 전용.
+// - 리스트형: 가로로 긴 표준 배너(목록/상세 본문 사이에 자연스러움)
+// - 피드형(네이티브 이미지): 카드 사이에 끼우기 좋은 이미지형
 const TEST_BANNER_AD_GROUP_ID = 'ait-ad-test-banner-id';
+const TEST_FEED_AD_GROUP_ID = 'ait-ad-test-native-image-id';
+
+/** 배너 광고 형태(슬롯 종류). 운영 광고 그룹 ID를 형태별로 분리 주입할 수 있어요. */
+export type AdFormat = 'banner' | 'feed';
 
 /**
  * 노출할 배너 광고 그룹 ID.
- * - 운영: `VITE_TOSS_AD_GROUP_ID`(콘솔 발급값)
- * - 개발: 테스트 ID
+ * - 운영: 형태별 콘솔 발급값(`VITE_TOSS_AD_GROUP_ID` / `VITE_TOSS_FEED_AD_GROUP_ID`)
+ *   - 피드형 전용 값이 없으면 일반 배너 값으로 폴백(둘 다 없으면 미노출)
+ * - 개발: 형태별 테스트 ID
  * - 그 외(운영인데 미설정): null → 광고 미노출(빈 슬롯 방지)
  */
-export function getBannerAdGroupId(): string | null {
-  const configured = import.meta.env.VITE_TOSS_AD_GROUP_ID?.trim();
-  if (configured) {
-    return configured;
+export function getBannerAdGroupId(format: AdFormat = 'banner'): string | null {
+  const banner = import.meta.env.VITE_TOSS_AD_GROUP_ID?.trim();
+  const feed = import.meta.env.VITE_TOSS_FEED_AD_GROUP_ID?.trim();
+  if (format === 'feed') {
+    if (feed) {
+      return feed;
+    }
+    if (banner) {
+      return banner;
+    }
+    return import.meta.env.DEV ? TEST_FEED_AD_GROUP_ID : null;
   }
-  if (import.meta.env.DEV) {
-    return TEST_BANNER_AD_GROUP_ID;
+  if (banner) {
+    return banner;
   }
-  return null;
+  return import.meta.env.DEV ? TEST_BANNER_AD_GROUP_ID : null;
 }
 
 // SDK는 앱 전체에서 한 번만 초기화(중복 초기화 금지) — 모듈 스코프로 상태 공유.

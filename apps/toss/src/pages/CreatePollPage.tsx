@@ -23,6 +23,7 @@ import { hapticFeedback } from '../lib/toss';
 import { copyText } from '../lib/pollShare';
 import { evaluatePollReadiness } from '../lib/pollReadiness';
 import { AppBar, Chip, SegmentedControl } from '../components/ui';
+import { BannerAd } from '../components/BannerAd';
 
 // 입력 한도는 @picky/shared POLL_LIMITS 단일 소스를 쓴다(CreatePollSchema 와 동일 수치).
 const MAX_OPTIONS = POLL_LIMITS.OPTIONS_MAX;
@@ -1014,6 +1015,12 @@ function CreatedPrivateScreen(
             공유하러 가기 🚀
           </Button>
         </div>
+
+        {/*
+          작성 완료 화면 하단 배너 — 핵심 액션(코드 복사·공유·이동) 아래의 자연스러운
+          마무리 지점이라 흐름을 가리지 않아요(정책: ATF·핵심 액션 가림 금지).
+        */}
+        <BannerAd format="banner" gap={4} />
       </div>
     </div>
   );

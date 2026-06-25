@@ -891,10 +891,21 @@ function ListBody(
       {visiblePolls.map((poll, index) => (
         <Fragment key={poll.id}>
           <PollCard poll={poll} index={index} onClick={() => onSelect(poll.id)} />
-          {/* 첫 화면 아래(3번째 카드 뒤)에 인앱 배너 광고 — 정책상 진입 직후 전면 광고 금지 */}
-          {index === 2 ? <BannerAd /> : null}
+          {/*
+            목록 인앱 배너 — 정책상 진입 직후(ATF) 전면 광고 금지라 첫 화면 아래부터 배치하고,
+            연속 중복 노출을 피하려고 카드 6개 간격(3번째·9번째 뒤)으로만 띄워요.
+            - 3번째 뒤: 가로 리스트형 배너
+            - 9번째 뒤: 피드형(네이티브 이미지) — 카드 흐름에 자연스럽게 섞여요
+          */}
+          {index === 2 ? <BannerAd format="banner" /> : null}
+          {index === 8 ? <BannerAd format="feed" /> : null}
         </Fragment>
       ))}
+      {/*
+        목록 끝(마지막 카드 뒤) 배너 — 12개 이상일 때만(9번째 광고와 최소 3카드 간격 확보).
+        스크롤 끝에 도달한 자연스러운 지점이라 핵심 흐름을 가리지 않아요.
+      */}
+      {visiblePolls.length >= 12 ? <BannerAd format="banner" gap={6} /> : null}
     </>
   );
 }
