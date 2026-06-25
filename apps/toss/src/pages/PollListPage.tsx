@@ -717,6 +717,26 @@ function ListHeader(props: Readonly<{ onTitleTap: (x: number, y: number) => void
             >
               <span>피키 🥑</span>
               <span
+                // 브랜드 마크 옆 베타 표식 — 웹 Navbar BETA pill과 시각 정합.
+                // 장식이라 접근성 이름에서 제외(가시 텍스트 '피키'와 라벨 정합, WCAG 2.5.3).
+                // 다크 내비바 대비 확보: 골드 글자 + 골드 보더 pill + 살짝 채운 골드 배경.
+                aria-hidden="true"
+                style={{
+                  fontSize: 9,
+                  letterSpacing: '0.08em',
+                  color: theme.gold,
+                  fontWeight: 700,
+                  padding: '2px 5px',
+                  borderRadius: 12,
+                  border: `1px solid ${theme.gold}55`,
+                  background: theme.goldSoft,
+                  marginLeft: 6,
+                  lineHeight: 1.4,
+                }}
+              >
+                BETA
+              </span>
+              <span
                 className="sparkle-icon"
                 style={{ top: -6, left: -14, fontSize: 16, animationDelay: '0.1s' }}
               >

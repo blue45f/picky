@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 
-const BASE = 'picky';
-const DEFAULT_TITLE = `${BASE} - 고민 투표 공유 플랫폼`;
+const BASE = '피키';
+const DEFAULT_TITLE = `${BASE} - 고민을 투표로 빠르게 결정`;
 
 /**
  * 페이지별 document.title 설정 — SPA 에서 탭·북마크·공유·SEO 타이틀을 페이지 내용에 맞춘다.

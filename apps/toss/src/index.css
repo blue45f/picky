@@ -210,4 +210,9 @@ a {
   .pf-skeleton {
     animation: none;
   }
+  /* 상시 스파클은 모션 민감 사용자에게 멈추고 숨김(정지 시 scale(0)이라 보이지 않음 — opacity:0로 명시). */
+  .sparkle-icon {
+    animation: none;
+    opacity: 0;
+  }
 }

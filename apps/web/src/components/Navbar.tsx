@@ -112,7 +112,7 @@ export const Navbar: React.FC = () => {
       >
         <Link
           to="/"
-          aria-label="picky 홈"
+          aria-label="피키 홈"
           // 토스 인앱과 동일하게 클릭 시 "팡" 파티클을 터뜨려요.
           onClick={(e) => {
             setBrandPop((prev) => prev + 1);
@@ -130,12 +130,14 @@ export const Navbar: React.FC = () => {
           }}
         >
           <span
+            // 상시 스파클이 절대배치될 컨테이너 — 토스 인앱 헤더("피키 🥑")와 동일한 반짝임을 웹에도.
             style={{
               fontSize: '1.22rem',
               fontWeight: 900,
               display: 'inline-flex',
               alignItems: 'center',
               gap: '5px',
+              position: 'relative',
             }}
           >
             <span key={brandPop} className="brand-bounce" aria-hidden="true">
@@ -147,11 +149,40 @@ export const Navbar: React.FC = () => {
                 color: 'var(--brand-primary-light)',
               }}
             >
-              picky
+              피키
+            </span>
+            {/* 토스 타이틀과 동일한 3개 스파클(✦ ✨ ✦) — 장식이라 a11y 이름에서 제외.
+                reduced-motion 에선 index.css 가드로 멈추고 숨긴다. */}
+            <span
+              className="sparkle-icon"
+              aria-hidden="true"
+              style={{ top: -6, left: -12, fontSize: 13, animationDelay: '0.1s' }}
+            >
+              ✦
+            </span>
+            <span
+              className="sparkle-icon"
+              aria-hidden="true"
+              style={{
+                top: -11,
+                right: 8,
+                fontSize: 11,
+                animationDelay: '0.6s',
+                color: 'var(--brand-accent-gold)',
+              }}
+            >
+              ✨
+            </span>
+            <span
+              className="sparkle-icon"
+              aria-hidden="true"
+              style={{ bottom: -3, right: -10, fontSize: 11, animationDelay: '1.2s' }}
+            >
+              ✦
             </span>
           </span>
           <span
-            // BETA 배지는 장식 — 접근성 이름에서 제외해 가시 텍스트(picky)와 라벨('picky 홈')을 정합시킨다(WCAG 2.5.3).
+            // BETA 배지는 장식 — 접근성 이름에서 제외해 가시 텍스트(피키)와 라벨('피키 홈')을 정합시킨다(WCAG 2.5.3).
             aria-hidden="true"
             style={{
               fontSize: '0.58rem',

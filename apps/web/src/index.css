@@ -2517,6 +2517,37 @@ body.present-mode .page-shell {
   }
 }
 
+/* 브랜드 타이틀("피키 🥑") 옆 상시 스파클 — 토스 인앱 헤더와 동일한 반짝임을 웹에도 이식.
+   타이틀 글자가 아니라 절대배치된 ✦/✨ 아이콘이 무한 반복하는 방식(다크·라이트 공통). */
+@keyframes pf-sparkle {
+  0% {
+    transform: scale(0) rotate(0deg);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.2) rotate(180deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0) rotate(360deg);
+    opacity: 0;
+  }
+}
+.sparkle-icon {
+  position: absolute;
+  animation: pf-sparkle 2.2s ease-in-out infinite;
+  pointer-events: none;
+  color: var(--brand-accent-teal);
+  font-weight: 400;
+}
+/* 모션 최소화 선호 시 반짝임을 끄고 숨긴다(scale(0)로 멈추면 안 보이므로 opacity:0). */
+@media (prefers-reduced-motion: reduce) {
+  .sparkle-icon {
+    animation: none;
+    opacity: 0;
+  }
+}
+
 /* 작성 페이지 참가자 미리보기 미니폰은 항상 다크 배경(#061411)이라, 라이트 모드에서 테마
    텍스트 변수가 어두워져 보이지 않던 문제를 막기 위해 내부 토큰을 다크값으로 고정한다.
    (CSS 커스텀 프로퍼티는 상속되므로 하위 전체에 적용 — 대비 AA 충족) */
