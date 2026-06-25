@@ -2,10 +2,11 @@
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
-    <!-- 접근성(WCAG 1.4.4): 사용자 확대/축소를 막지 않아요. viewport-fit=cover로 세이프에어리어 대응. -->
+    <!-- 토스 비게임 출시 정책: 핀치줌(제스처 확대/축소) 비활성화는 하드 요건(활성 시 심사 반려) → maximum-scale=1·user-scalable=no. -->
+    <!-- 확대 a11y(WCAG 1.4.4)는 일반 웹(apps/web)에서 유지하고, 토스 셸만 토스 정책을 따라요. viewport-fit=cover로 세이프에어리어 대응. -->
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
     />
     <meta name="theme-color" content="#061411" />
     <!-- 일반 웹과 동일한 아보카도(피키 🥑) 파비콘으로 브랜드 통일 -->
