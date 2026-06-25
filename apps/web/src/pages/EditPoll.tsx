@@ -6,6 +6,7 @@ import {
   Eye,
   GripVertical,
   ImageIcon,
+  Lock,
   Plus,
   Save,
   Trash2,
@@ -13,7 +14,7 @@ import {
 import { usePollStore } from '../store/usePollStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
-import type { Poll, PollResultsVisibility, UpdatePollInput } from '@picky/shared';
+import type { Poll, PollResultsVisibility, PollVisibility, UpdatePollInput } from '@picky/shared';
 
 // CreatePoll.tsx 와 동일한 datetime-local <-> ISO 변환 규약을 그대로 따른다.
 const toDateTimeLocalValue = (value?: string | null): string => {
@@ -53,6 +54,29 @@ const RESULT_VISIBILITY_OPTIONS: Array<{
     value: 'always',
     label: '항상 공개',
     description: '공유 전부터 실시간 흐름을 보여줍니다.',
+  },
+];
+
+// 공개 범위 — CreatePoll.tsx 와 동일한 라벨/설명을 그대로 따른다. 비공개 선택 시 접근 코드 입력을 노출한다.
+const VISIBILITY_OPTIONS: Array<{
+  value: PollVisibility;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: 'public',
+    label: '공개 🌍',
+    description: '목록에 노출되고 누구나 참여할 수 있어요.',
+  },
+  {
+    value: 'unlisted',
+    label: '링크전용 🔗',
+    description: '목록엔 안 보이고, 링크를 받은 사람만 참여해요.',
+  },
+  {
+    value: 'private',
+    label: '비공개 🔒',
+    description: '접근 코드를 아는 사람만 참여할 수 있어요.',
   },
 ];
 
@@ -135,6 +159,9 @@ export const EditPoll: React.FC = () => {
   const [description, setDescription] = useState('');
   const [endsAtLocal, setEndsAtLocal] = useState('');
   const [resultsVisibility, setResultsVisibility] = useState<PollResultsVisibility>('afterVote');
+  const [visibility, setVisibility] = useState<PollVisibility>('public');
+  // 서버는 접근 코드를 돌려주지 않으므로 항상 빈 값으로 시작한다. 사용자가 입력할 때만 전송한다.
+  const [accessCode, setAccessCode] = useState('');
   const [options, setOptions] = useState<OptionDraft[]>([]);
   const [formError, setFormError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -159,6 +186,9 @@ export const EditPoll: React.FC = () => {
       setDescription(poll.description ?? '');
       setEndsAtLocal(toDateTimeLocalValue(poll.endsAt));
       setResultsVisibility(poll.resultsVisibility ?? 'afterVote');
+      setVisibility(poll.visibility ?? 'public');
+      // 코드는 서버가 반환하지 않으므로 빈 칸으로 시작한다(미입력 시 기존 코드를 유지).
+      setAccessCode('');
       setOptions(
         poll.options.map((option) => ({
           key: `existing-${option.id}`,
@@ -238,11 +268,30 @@ export const EditPoll: React.FC = () => {
       return;
     }
 
+    const trimmedAccessCode = accessCode.trim();
+    // 이미 비공개였던 폴은 코드를 갖고 있으므로 빈 칸이면 서버가 기존 코드를 유지한다.
+    // 공개/링크전용 -> 비공개로 처음 전환할 때는 새 코드(4~20자)가 반드시 있어야 한다.
+    const wasAlreadyPrivate = loadedPoll.visibility === 'private';
+    if (visibility === 'private') {
+      const needsNewCode = !wasAlreadyPrivate || trimmedAccessCode.length > 0;
+      if (needsNewCode && (trimmedAccessCode.length < 4 || trimmedAccessCode.length > 20)) {
+        setFormError(
+          wasAlreadyPrivate
+            ? '접근 코드는 최소 4자 이상이어야 합니다. (4~20자) 비워두면 기존 코드가 유지됩니다.'
+            : '비공개로 바꾸려면 접근 코드(4~20자)를 입력해 주세요.',
+        );
+        return;
+      }
+    }
+
     const patch: UpdatePollInput = {
       question: normalizedQuestion,
       description: description.trim() ? description.trim() : null,
       endsAt: isoEndsAt,
       resultsVisibility,
+      visibility,
+      // 비공개이면서 새 코드를 입력했을 때만 코드를 전송한다(빈 칸이면 서버가 기존 코드 유지).
+      ...(visibility === 'private' && trimmedAccessCode ? { accessCode: trimmedAccessCode } : {}),
       options: normalizedOptions.map((option) => ({
         text: option.text,
         imageUrl: option.imageUrl,
@@ -458,6 +507,85 @@ export const EditPoll: React.FC = () => {
               );
             })}
           </div>
+        </div>
+
+        {/* 공개 범위 */}
+        <div style={{ display: 'grid', gap: '0.45rem' }}>
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
+              color: 'var(--text-secondary)',
+              fontSize: '0.76rem',
+              fontWeight: 800,
+            }}
+          >
+            <Lock size={13} style={{ color: 'var(--brand-accent-teal)' }} />
+            공개 범위
+          </span>
+          <div className="result-mode-grid">
+            {VISIBILITY_OPTIONS.map((option) => {
+              const active = visibility === option.value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => {
+                    clearError();
+                    setFormError('');
+                    setVisibility(option.value);
+                  }}
+                  className="result-mode-button"
+                  aria-pressed={active}
+                  style={{
+                    borderColor: active ? 'rgba(45, 212, 191, 0.42)' : 'var(--bg-card-border)',
+                    background: active ? 'rgba(45, 212, 191, 0.08)' : 'rgba(255,255,255,0.02)',
+                  }}
+                >
+                  <strong
+                    style={{ color: active ? 'var(--brand-accent-teal)' : 'var(--text-primary)' }}
+                  >
+                    {option.label}
+                  </strong>
+                  <span>{option.description}</span>
+                </button>
+              );
+            })}
+          </div>
+          {visibility === 'private' ? (
+            <label style={{ display: 'grid', gap: '0.35rem', marginTop: '0.2rem' }}>
+              <span
+                style={{ color: 'var(--text-secondary)', fontSize: '0.72rem', fontWeight: 700 }}
+              >
+                접근 코드 (4~20자)
+              </span>
+              <input
+                type="text"
+                value={accessCode}
+                onChange={(event) => {
+                  clearError();
+                  setFormError('');
+                  setAccessCode(event.target.value);
+                }}
+                placeholder={
+                  loadedPoll.visibility === 'private'
+                    ? '바꿀 코드를 입력하세요 (비우면 기존 코드 유지)'
+                    : '참여자에게 따로 알려줄 코드를 정해주세요'
+                }
+                maxLength={20}
+                minLength={4}
+                className="form-input"
+                aria-label="비공개 투표 접근 코드"
+                style={{ fontSize: '0.82rem' }}
+              />
+              <small style={{ color: 'var(--text-muted)', fontSize: '0.66rem', lineHeight: 1.4 }}>
+                {loadedPoll.visibility === 'private'
+                  ? '이 코드를 아는 사람만 참여할 수 있어요. 비워두면 기존 코드가 그대로 유지됩니다.'
+                  : '비공개로 바꾸려면 코드(4~20자)가 필요해요. 이 코드를 아는 사람만 참여할 수 있어요.'}
+              </small>
+            </label>
+          ) : null}
         </div>
 
         {/* 선택지 */}

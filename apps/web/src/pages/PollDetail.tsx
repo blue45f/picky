@@ -31,6 +31,7 @@ import {
   Settings,
   Pencil,
   Trash2,
+  Lock,
 } from 'lucide-react';
 import { usePollStore } from '../store/usePollStore';
 import { useAuthStore } from '../store/useAuthStore';
@@ -44,7 +45,13 @@ import { OpinionTopicCloud } from '../components/OpinionTopicCloud';
 import { ActionItemPlanner } from '../components/ActionItemPlanner';
 import { StakeholderReportBuilder } from '../components/StakeholderReportBuilder';
 import type { Poll, PollResultsVisibility } from '@picky/shared';
-import { MASCOT, VOICE, categoryMeta, optionPercent } from '@picky/shared';
+import {
+  MASCOT,
+  VOICE,
+  categoryMeta,
+  optionPercent,
+  RESULTS_VISIBILITY_LABELS as SHARED_RESULTS_VISIBILITY_LABELS,
+} from '@picky/shared';
 import {
   resolvePollShareUrl,
   buildPollEmbedCode,
@@ -71,9 +78,10 @@ const POLL_AUTHOR_LABELS: {
   guest: '비회원 작성',
 };
 
+// R6: 라벨 문구는 @picky/shared 한 곳에서 통일한다(웹↔토스 동일 소스). 풀 라벨을 쓴다.
 const RESULTS_VISIBILITY_LABELS: Record<PollResultsVisibility, string> = {
-  afterVote: '투표 후 결과 공개',
-  always: '실시간 결과 공개',
+  afterVote: SHARED_RESULTS_VISIBILITY_LABELS.afterVote.full,
+  always: SHARED_RESULTS_VISIBILITY_LABELS.always.full,
 };
 
 type ResultSummaryMode = 'brief' | 'detailed';
@@ -1263,6 +1271,10 @@ function PollResultsScreen(
     handleUseAsTemplateClick,
   } = props;
 
+  // R1: 표가 0개거나 선택지가 1개뿐이면 신뢰도/선두 격차/합의 같은 파생 지표는 오해를 부른다.
+  // (0데이터에 신뢰도 6%·녹색 통과 같은 가짜 신호) → 분석 패널 대신 단일 "참여 대기" 상태로 보여준다.
+  const participationPending = currentPoll.totalVotes === 0 || currentPoll.options.length < 2;
+
   return (
     <div
       style={{
@@ -1291,23 +1303,17 @@ function PollResultsScreen(
           {MASCOT.curious.line}
         </div>
       )}
-      <section
-        style={{
-          border: '1px solid var(--bg-card-border)',
-          borderRadius: 'var(--radius-sm)',
-          background: 'rgba(255,255,255,0.025)',
-          padding: '1rem',
-          display: 'grid',
-          gap: '0.85rem',
-        }}
-      >
-        <div
+      {participationPending ? (
+        <section
+          aria-label="참여 대기"
           style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            gap: '0.75rem',
-            alignItems: 'center',
-            flexWrap: 'wrap',
+            border: '1px solid var(--bg-card-border)',
+            borderRadius: 'var(--radius-sm)',
+            background: 'rgba(255,255,255,0.025)',
+            padding: '1.1rem',
+            display: 'grid',
+            gap: '0.5rem',
+            justifyItems: 'start',
           }}
         >
           <h3
@@ -1321,189 +1327,238 @@ function PollResultsScreen(
             }}
           >
             <Gauge size={16} style={{ color: 'var(--brand-accent-teal)' }} />
-            결정 브리핑
+            참여 대기 중
           </h3>
-          <span
+          <p
             style={{
-              border: '1px solid rgba(45, 212, 191, 0.28)',
-              color:
-                consensusLabel === '접전'
-                  ? 'var(--brand-accent-coral)'
-                  : 'var(--brand-accent-teal)',
-              background:
-                consensusLabel === '접전'
-                  ? 'rgba(251, 113, 133, 0.08)'
-                  : 'rgba(45, 212, 191, 0.08)',
-              borderRadius: '999px',
-              padding: '3px 9px',
-              fontSize: '0.68rem',
-              fontWeight: 800,
+              margin: 0,
+              color: 'var(--text-secondary)',
+              fontSize: '0.8rem',
+              lineHeight: 1.55,
             }}
           >
-            {consensusLabel}
-          </span>
-        </div>
-
-        <div className="insight-grid">
-          <div className="insight-tile">
-            <span>
-              <Trophy size={13} />
-              선두 선택지
-            </span>
-            <strong>{leadingOption?.text || '아직 없음'}</strong>
-            <small>
-              {leadingShare}% · {leadingOption?.voteCount || 0}표
-            </small>
-          </div>
-          <div className="insight-tile">
-            <span>
-              <BarChart3 size={13} />
-              선두 격차
-            </span>
-            <strong>{voteGap}표</strong>
-            <small>전체 대비 {voteGapShare}% 차이</small>
-          </div>
-          <div className="insight-tile">
-            <span>
-              <Users size={13} />
-              참여 규모
-            </span>
-            <strong>{currentPoll.totalVotes}명</strong>
-            <small>피드백률 {feedbackRate}%</small>
-          </div>
-        </div>
-
-        <p
-          style={{
-            margin: 0,
-            color: 'var(--text-secondary)',
-            fontSize: '0.78rem',
-            lineHeight: 1.55,
-          }}
-        >
-          {decisionHint}
-        </p>
-
-        <SocialComparisonBadge
-          currentPoll={currentPoll}
-          votedOptionId={votedHistory[currentPoll.id] ?? null}
-        />
-
+            {currentPoll.options.length < 2
+              ? '선택지가 1개뿐이라 아직 비교할 결과가 없어요.'
+              : '아직 표가 없어요. 첫 참여가 모이면 선두·격차·신뢰도를 보여드릴게요.'}
+          </p>
+        </section>
+      ) : (
         <section
-          aria-label="의사결정 신뢰도"
           style={{
-            border: '1px solid rgba(45, 212, 191, 0.18)',
+            border: '1px solid var(--bg-card-border)',
             borderRadius: 'var(--radius-sm)',
-            background: 'rgba(45, 212, 191, 0.04)',
-            padding: '0.85rem',
+            background: 'rgba(255,255,255,0.025)',
+            padding: '1rem',
             display: 'grid',
-            gap: '0.7rem',
+            gap: '0.85rem',
           }}
         >
           <div
             style={{
               display: 'flex',
               justifyContent: 'space-between',
-              alignItems: 'flex-start',
               gap: '0.75rem',
+              alignItems: 'center',
               flexWrap: 'wrap',
             }}
           >
-            <div style={{ display: 'grid', gap: '0.2rem' }}>
-              <span
-                style={{
-                  color: 'var(--brand-accent-teal)',
-                  fontSize: '0.66rem',
-                  fontWeight: 900,
-                  letterSpacing: '0.05em',
-                }}
-              >
-                DECISION CONFIDENCE
-              </span>
-              <strong
-                style={{
-                  color: 'var(--text-primary)',
-                  fontSize: '0.88rem',
-                  lineHeight: 1.35,
-                }}
-              >
-                {decisionConfidenceLabel}
-              </strong>
-            </div>
-            <strong style={{ color: decisionConfidenceTone, fontSize: '1.05rem' }}>
-              {decisionConfidenceScore}%
-            </strong>
-          </div>
-
-          <div
-            aria-hidden="true"
-            style={{
-              height: '8px',
-              borderRadius: '999px',
-              overflow: 'hidden',
-              background: 'rgba(255,255,255,0.08)',
-            }}
-          >
+            <h3
+              style={{
+                margin: 0,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                color: 'var(--text-primary)',
+                fontSize: '0.94rem',
+              }}
+            >
+              <Gauge size={16} style={{ color: 'var(--brand-accent-teal)' }} />
+              결정 브리핑
+            </h3>
             <span
               style={{
-                display: 'block',
-                width: `${decisionConfidenceScore}%`,
-                height: '100%',
-                borderRadius: 'inherit',
-                background: decisionConfidenceBarGradient,
+                border: '1px solid rgba(45, 212, 191, 0.28)',
+                color:
+                  consensusLabel === '접전'
+                    ? 'var(--brand-accent-coral)'
+                    : 'var(--brand-accent-teal)',
+                background:
+                  consensusLabel === '접전'
+                    ? 'rgba(251, 113, 133, 0.08)'
+                    : 'rgba(45, 212, 191, 0.08)',
+                borderRadius: '999px',
+                padding: '3px 9px',
+                fontSize: '0.68rem',
+                fontWeight: 800,
               }}
-            />
+            >
+              {consensusLabel}
+            </span>
           </div>
 
-          <div
+          <div className="insight-grid">
+            <div className="insight-tile">
+              <span>
+                <Trophy size={13} />
+                선두 선택지
+              </span>
+              <strong>{leadingOption?.text || '아직 없음'}</strong>
+              <small>
+                {leadingShare}% · {leadingOption?.voteCount || 0}표
+              </small>
+            </div>
+            <div className="insight-tile">
+              <span>
+                <BarChart3 size={13} />
+                선두 격차
+              </span>
+              <strong>{voteGap}표</strong>
+              <small>전체 대비 {voteGapShare}% 차이</small>
+            </div>
+            <div className="insight-tile">
+              <span>
+                <Users size={13} />
+                참여 규모
+              </span>
+              <strong>{currentPoll.totalVotes}명</strong>
+              <small>피드백률 {feedbackRate}%</small>
+            </div>
+          </div>
+
+          <p
             style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-              gap: '0.5rem',
+              margin: 0,
+              color: 'var(--text-secondary)',
+              fontSize: '0.78rem',
+              lineHeight: 1.55,
             }}
           >
-            {decisionConfidenceItems.map((item) => (
-              <div
-                key={item.label}
-                style={{
-                  border: '1px solid var(--bg-card-border)',
-                  borderRadius: 'var(--radius-sm)',
-                  background: item.passed ? 'rgba(45, 212, 191, 0.055)' : 'rgba(255,255,255,0.025)',
-                  padding: '0.62rem',
-                  display: 'grid',
-                  gap: '0.28rem',
-                }}
-              >
+            {decisionHint}
+          </p>
+
+          <SocialComparisonBadge
+            currentPoll={currentPoll}
+            votedOptionId={votedHistory[currentPoll.id] ?? null}
+          />
+
+          <section
+            aria-label="의사결정 신뢰도"
+            style={{
+              border: '1px solid rgba(45, 212, 191, 0.18)',
+              borderRadius: 'var(--radius-sm)',
+              background: 'rgba(45, 212, 191, 0.04)',
+              padding: '0.85rem',
+              display: 'grid',
+              gap: '0.7rem',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                gap: '0.75rem',
+                flexWrap: 'wrap',
+              }}
+            >
+              <div style={{ display: 'grid', gap: '0.2rem' }}>
                 <span
                   style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    color: item.passed ? 'var(--brand-accent-teal)' : 'var(--brand-accent-gold)',
-                    fontSize: '0.68rem',
+                    color: 'var(--brand-accent-teal)',
+                    fontSize: '0.66rem',
                     fontWeight: 900,
+                    letterSpacing: '0.05em',
                   }}
                 >
-                  {item.passed ? <CheckCircle2 size={13} /> : <AlertCircle size={13} />}
-                  {item.label}
+                  DECISION CONFIDENCE
                 </span>
-                <strong style={{ color: 'var(--text-primary)', fontSize: '0.78rem' }}>
-                  {item.value}
-                </strong>
-                <small
+                <strong
                   style={{
-                    color: 'var(--text-muted)',
-                    fontSize: '0.63rem',
-                    lineHeight: 1.42,
+                    color: 'var(--text-primary)',
+                    fontSize: '0.88rem',
+                    lineHeight: 1.35,
                   }}
                 >
-                  {item.help}
-                </small>
+                  {decisionConfidenceLabel}
+                </strong>
               </div>
-            ))}
-          </div>
+              <strong style={{ color: decisionConfidenceTone, fontSize: '1.05rem' }}>
+                {decisionConfidenceScore}%
+              </strong>
+            </div>
+
+            <div
+              aria-hidden="true"
+              style={{
+                height: '8px',
+                borderRadius: '999px',
+                overflow: 'hidden',
+                background: 'rgba(255,255,255,0.08)',
+              }}
+            >
+              <span
+                style={{
+                  display: 'block',
+                  width: `${decisionConfidenceScore}%`,
+                  height: '100%',
+                  borderRadius: 'inherit',
+                  background: decisionConfidenceBarGradient,
+                }}
+              />
+            </div>
+
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+                gap: '0.5rem',
+              }}
+            >
+              {decisionConfidenceItems.map((item) => (
+                <div
+                  key={item.label}
+                  style={{
+                    border: '1px solid var(--bg-card-border)',
+                    borderRadius: 'var(--radius-sm)',
+                    background: item.passed
+                      ? 'rgba(45, 212, 191, 0.055)'
+                      : 'rgba(255,255,255,0.025)',
+                    padding: '0.62rem',
+                    display: 'grid',
+                    gap: '0.28rem',
+                  }}
+                >
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      color: item.passed ? 'var(--brand-accent-teal)' : 'var(--brand-accent-gold)',
+                      fontSize: '0.68rem',
+                      fontWeight: 900,
+                    }}
+                  >
+                    {item.passed ? <CheckCircle2 size={13} /> : <AlertCircle size={13} />}
+                    {item.label}
+                  </span>
+                  <strong style={{ color: 'var(--text-primary)', fontSize: '0.78rem' }}>
+                    {item.value}
+                  </strong>
+                  <small
+                    style={{
+                      color: 'var(--text-muted)',
+                      fontSize: '0.63rem',
+                      lineHeight: 1.42,
+                    }}
+                  >
+                    {item.help}
+                  </small>
+                </div>
+              ))}
+            </div>
+          </section>
         </section>
-      </section>
+      )}
 
       <section
         style={{
@@ -1721,7 +1776,8 @@ function PollResultsScreen(
               }}
             >
               <BarChart3 size={14} />
-              <span>실시간 투표 통계</span>
+              {/* N1: 마감된 폴은 "실시간"이 아니라 확정된 최종 결과다. */}
+              <span>{isPollClosed(currentPoll) ? '최종 결과' : '실시간 투표 통계'}</span>
             </span>
             <span style={{ fontSize: '0.725rem', color: 'var(--text-muted)' }}>
               총 {currentPoll.totalVotes}명 참여
@@ -4071,6 +4127,7 @@ function PollFeedbackList(
     visibleComments: Poll['comments'];
     emptyCommentMessage: string;
     canManage: boolean;
+    pollClosed: boolean;
     onDeleteComment: (commentId: number) => void;
     onAddReply: (parentId: number, text: string) => Promise<void> | void;
   }>,
@@ -4085,6 +4142,7 @@ function PollFeedbackList(
     visibleComments,
     emptyCommentMessage,
     canManage,
+    pollClosed,
     onDeleteComment,
     onAddReply,
   } = props;
@@ -4211,6 +4269,23 @@ function PollFeedbackList(
         ) : null}
       </div>
 
+      {pollClosed ? (
+        <p
+          role="note"
+          style={{
+            margin: '0 0 0.85rem',
+            fontSize: '0.76rem',
+            color: 'var(--text-muted)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '5px',
+          }}
+        >
+          <Lock size={12} />
+          마감된 고민이에요. 한마디·답글은 더 남길 수 없어요.
+        </p>
+      ) : null}
+
       {currentPoll.comments.length === 0 ? (
         <div
           className="content-card"
@@ -4249,10 +4324,15 @@ function PollFeedbackList(
                   comm={comm}
                   canManage={canManage}
                   onDeleteComment={onDeleteComment}
-                  onReplyToggle={() => {
-                    setReplyingTo((prev) => (prev === comm.id ? null : comm.id));
-                    setReplyText('');
-                  }}
+                  // B4: 마감된 고민은 답글도 받지 않는다 — '답글 달기' 트리거 자체를 숨긴다.
+                  onReplyToggle={
+                    pollClosed
+                      ? undefined
+                      : () => {
+                          setReplyingTo((prev) => (prev === comm.id ? null : comm.id));
+                          setReplyText('');
+                        }
+                  }
                 />
                 {replies.map((reply) => (
                   <CommentCard
@@ -4263,7 +4343,7 @@ function PollFeedbackList(
                     isReply
                   />
                 ))}
-                {replyingTo === comm.id ? (
+                {!pollClosed && replyingTo === comm.id ? (
                   <div style={{ display: 'flex', gap: '0.5rem', marginLeft: '1.5rem' }}>
                     <input
                       type="text"
@@ -5858,20 +5938,26 @@ function PollQuestionHeader(props: Readonly<{ currentPoll: Poll; creatorLabel: s
         <CountdownChip remaining={remaining} closedFallback />
       </span>
 
-      {/* 실제 작성자 닉네임(서버 해석). 없으면 '익명'. 게스트 배지는 위 creatorLabel로 병기됨. */}
-      <p
-        style={{
-          margin: '8px 0 0',
-          fontSize: '0.78rem',
-          color: 'var(--text-secondary)',
-          fontWeight: 600,
-        }}
-      >
-        작성자{' '}
-        <strong style={{ color: 'var(--text-primary)' }}>
-          {currentPoll.creatorNickname?.trim() || '익명'}
-        </strong>
-      </p>
+      {/*
+        R5: 작성자 신호 중복·모순 제거 — 위 배지(내가/회원/비회원 작성)가 이미 작성자 유형을 말한다.
+        닉네임이 있으면 '작성자 {닉네임}'만 덧붙이고, 닉네임이 없으면 배지로 충분하므로
+        모순되는 '작성자 익명' 줄을 따로 보여주지 않는다(회원 배지 + '익명' 어긋남 제거).
+      */}
+      {currentPoll.creatorNickname?.trim() ? (
+        <p
+          style={{
+            margin: '8px 0 0',
+            fontSize: '0.78rem',
+            color: 'var(--text-secondary)',
+            fontWeight: 600,
+          }}
+        >
+          작성자{' '}
+          <strong style={{ color: 'var(--text-primary)' }}>
+            {currentPoll.creatorNickname.trim()}
+          </strong>
+        </p>
+      ) : null}
 
       <h2
         style={{
@@ -6898,6 +6984,10 @@ export const PollDetail: React.FC = () => {
     if (!id) {
       return;
     }
+    // B4: 마감된 고민은 답글을 받지 않는다(서버도 400으로 막지만 UI에서 선제 차단).
+    if (currentPoll && isPollClosed(currentPoll)) {
+      return;
+    }
     await addComment(
       id,
       {
@@ -6994,18 +7084,38 @@ export const PollDetail: React.FC = () => {
   }, []);
 
   // Fetch current poll data
+  // 코드는 메모리(activeCode)에서 읽어 조회한다 — URL ?code= 는 R3에서 잠금 해제 후 제거되므로,
+  // URL 의존이면 스크럽 직후 재조회 시 코드 없이 다시 잠겨버린다. activeCode 는 urlCode 로 시작한다.
   useEffect(() => {
     restorePollFromSnapshot(snapshotParam);
 
     if (id) {
-      fetchPoll(id, urlCode);
+      fetchPoll(id, activeCode);
     }
-  }, [id, fetchPoll, snapshotParam, urlCode]);
+  }, [id, fetchPoll, snapshotParam, activeCode]);
 
-  // URL ?code= 가 바뀌면 활성 접근 코드도 따라간다(잠금 해제 입력은 handleUnlockCode가 별도 갱신).
+  // URL 에 ?code= 가 새로 들어오면(예: 공유 링크로 진입) 메모리 활성 코드도 그 값으로 맞춘다.
+  // 단, URL 에서 코드가 사라지는 경우(R3 스크럽)는 메모리를 비우지 않는다 — 쓰기 요청에 계속 필요하다.
   useEffect(() => {
-    setActiveCode(urlCode);
+    if (urlCode) {
+      setActiveCode(urlCode);
+    }
   }, [urlCode]);
+
+  // R3: 접근 코드가 URL(?code=)에 남으면 주소창·브라우저 히스토리·리퍼러로 유출된다.
+  // 코드를 메모리(activeCode)에 보관한 뒤, 게이트가 풀린(또는 공개) 폴이면 쿼리에서 code 만 제거한다.
+  // replace:true 라 히스토리 항목을 더 만들지 않고, 다른 쿼리(showShare/snapshot 등)는 보존한다.
+  useEffect(() => {
+    if (!currentPoll || currentPoll.requiresCode) {
+      return;
+    }
+    if (!searchParams.has('code')) {
+      return;
+    }
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('code');
+    setSearchParams(nextParams, { replace: true });
+  }, [currentPoll, searchParams, setSearchParams]);
 
   useEffect(() => {
     if (showShareParam) {
@@ -8050,6 +8160,7 @@ export const PollDetail: React.FC = () => {
             visibleComments={visibleComments}
             emptyCommentMessage={emptyCommentMessage}
             canManage={canManagePoll}
+            pollClosed={pollClosed}
             onDeleteComment={handleDeleteComment}
             onAddReply={handleAddReply}
           />

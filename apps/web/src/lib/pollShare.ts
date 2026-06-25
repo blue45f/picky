@@ -1,4 +1,5 @@
 import type { Poll } from '@picky/shared';
+import { canRevealResults } from '@picky/shared';
 
 const SHARE_PREFIX = '[피키 투표] ';
 const DEFAULT_SHARE_TITLE = 'picky - 고민 투표 공유 플랫폼';
@@ -118,14 +119,22 @@ const resolvePollImageUrl = (poll: Poll | null | undefined): string => {
   return getDefaultOgImageUrl();
 };
 
-const sanitizePollForSnapshot = (poll: Poll): Poll => ({
-  ...poll,
-  attachments: [],
-  options: poll.options.map((option) => ({
-    ...option,
-    imageUrl: isDataUrl(option.imageUrl) ? null : option.imageUrl,
-  })),
-});
+const sanitizePollForSnapshot = (poll: Poll): Poll => {
+  // afterVote 폴은 "투표해야 결과가 보인다"는 약속이라, 공유 스냅샷(미투표 열람자가 보는 데이터)에서
+  // 득표/총표/한마디 같은 결과 파생 데이터를 비운다. always 폴은 그대로 둔다.
+  const revealResults = canRevealResults(poll, false);
+  return {
+    ...poll,
+    attachments: [],
+    totalVotes: revealResults ? poll.totalVotes : 0,
+    comments: revealResults ? poll.comments : [],
+    options: poll.options.map((option) => ({
+      ...option,
+      voteCount: revealResults ? option.voteCount : 0,
+      imageUrl: isDataUrl(option.imageUrl) ? null : option.imageUrl,
+    })),
+  };
+};
 
 const setMetaContent = (selector: string, content: string) => {
   if (typeof document === 'undefined') {

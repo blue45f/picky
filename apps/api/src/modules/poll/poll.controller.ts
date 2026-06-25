@@ -14,7 +14,13 @@ import {
   Res,
 } from '@nestjs/common';
 import { ZodValidationPipe, createZodDto } from 'nestjs-zod';
-import { CreateCommentSchema, CreatePollSchema, UpdatePollSchema, VoteSchema } from '@picky/shared';
+import {
+  CreateCommentSchema,
+  CreatePollSchema,
+  UpdatePollSchema,
+  VoteSchema,
+  canRevealResults,
+} from '@picky/shared';
 import { PollService } from './poll.service';
 import { AuthGuard, OptionalAuthGuard } from '../auth/auth.guard';
 
@@ -98,6 +104,9 @@ export class PollController {
       .map((option, index) => `${index + 1}. ${option.text}`)
       .join(' · ');
     const optionSummary = this.escapeHtml(optionSummaryText);
+    // afterVote 폴은 공유/크롤러(미투표) 컨텍스트에서 득표를 노출하면 "투표해야 결과가 보인다"는
+    // 약속이 새므로, 결과를 드러낼 수 있을 때(always·마감)만 옵션별 upvoteCount를 채운다.
+    const revealResults = canRevealResults(poll, false);
     const appDomain = this.escapeHtml(new URL(appOrigin).host);
     const structuredData = this.escapeJsonForHtml({
       '@context': 'https://schema.org',
@@ -121,7 +130,8 @@ export class PollController {
         suggestedAnswer: poll.options.slice(0, 6).map((option) => ({
           '@type': 'Answer',
           text: option.text,
-          upvoteCount: option.voteCount,
+          // afterVote+미투표 컨텍스트에선 득표(upvoteCount)를 제외해 결과 누출을 막는다.
+          ...(revealResults ? { upvoteCount: option.voteCount } : {}),
         })),
       },
     });

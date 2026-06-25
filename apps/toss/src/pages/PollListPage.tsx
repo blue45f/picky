@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Top } from '@toss/tds-mobile';
 import type { Poll } from '../shared';
-import { MASCOT, BETA_NOTICE } from '../shared';
+import { MASCOT, BETA_NOTICE, canRevealResults, RESULTS_LOCKED_HINT } from '../shared';
 import { usePollStore } from '../store/usePollStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { theme, pageShell, stickyActionBar } from '../theme';
@@ -55,55 +55,58 @@ function SignalChips(
 ) {
   const { polls, signal, onChange } = props;
   return (
-    <div
-      role="group"
-      aria-label="발견성 필터"
-      style={{
-        display: 'flex',
-        gap: 8,
-        overflowX: 'auto',
-        margin: '0 -20px 18px',
-        padding: '0 20px 4px',
-        scrollbarWidth: 'none',
-      }}
-    >
-      {SIGNAL_OPTIONS.map((option) => {
-        const active = option.value === signal;
-        const count = countPollsBySignal(polls, option.value);
-        // 'all'이 아닌데 0건이면 비활성(혼란 방지). 현재 선택 중이면 비활성화하지 않음.
-        const disabled = option.value !== 'all' && count === 0 && !active;
-        return (
-          <button
-            key={option.value}
-            type="button"
-            className="pressable"
-            aria-pressed={active}
-            disabled={disabled}
-            onClick={() => onChange(option.value)}
-            style={{
-              flexShrink: 0,
-              minHeight: 40,
-              padding: '8px 14px',
-              borderRadius: theme.radiusPill,
-              border: `1px solid ${active ? theme.accent : theme.border}`,
-              background: active ? theme.accentSoft : 'rgba(255,255,255,0.04)',
-              color: active ? theme.accent : theme.textMuted,
-              fontSize: 13.5,
-              fontWeight: 700,
-              cursor: disabled ? 'not-allowed' : 'pointer',
-              opacity: disabled ? 0.45 : 1,
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {option.label}
-            {option.value === 'all' ? null : (
-              <span style={{ marginLeft: 6, color: theme.textFaint, fontWeight: 600 }}>
-                {count}
-              </span>
-            )}
-          </button>
-        );
-      })}
+    <div role="group" aria-label="발견성 필터" style={{ marginBottom: 18 }}>
+      <div
+        style={{
+          display: 'flex',
+          gap: 8,
+          overflowX: 'auto',
+          margin: '0 -20px 6px',
+          padding: '0 20px 4px',
+          scrollbarWidth: 'none',
+        }}
+      >
+        {SIGNAL_OPTIONS.map((option) => {
+          const active = option.value === signal;
+          const count = countPollsBySignal(polls, option.value);
+          // 0건이라도 탭은 허용(다음 페이지에 있을 수 있음). 0건은 muted 스타일로만 구분.
+          const muted = option.value !== 'all' && count === 0 && !active;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              className="pressable"
+              aria-pressed={active}
+              onClick={() => onChange(option.value)}
+              style={{
+                flexShrink: 0,
+                minHeight: 40,
+                padding: '8px 14px',
+                borderRadius: theme.radiusPill,
+                border: `1px solid ${active ? theme.accent : theme.border}`,
+                background: active ? theme.accentSoft : 'rgba(255,255,255,0.04)',
+                color: active ? theme.accent : theme.textMuted,
+                fontSize: 13.5,
+                fontWeight: 700,
+                cursor: 'pointer',
+                opacity: muted ? 0.55 : 1,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {option.label}
+              {option.value === 'all' ? null : (
+                <span style={{ marginLeft: 6, color: theme.textFaint, fontWeight: 600 }}>
+                  {count}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+      {/* 칩 카운트는 서버 페이지가 아닌 '지금 보고 있는 페이지'에서만 센다는 점을 분명히 한다. */}
+      <p style={{ margin: 0, fontSize: 12, color: theme.textFaint, fontWeight: 600 }}>
+        지금 페이지(최대 20개) 기준이에요
+      </p>
     </div>
   );
 }
@@ -117,6 +120,8 @@ function PollCard({
   const remaining = useCountdown(poll.endsAt);
   const closed = isPollClosed(poll) || (remaining != null && remaining <= 0);
   const voted = hasVotedLocally(poll.id);
+  // afterVote 폴은 투표 전(미마감)엔 결과(선두 %)를 가린다 — web과 동일 게이트.
+  const revealResults = canRevealResults(poll, voted);
   const percent = leading ? optionPercent(leading.voteCount, poll.totalVotes) : 0;
   const repImage = poll.options.find((option) => option.imageUrl)?.imageUrl ?? null;
 
@@ -252,13 +257,25 @@ function PollCard({
                 fontWeight: 600,
               }}
             >
-              📊 {leading.text}
+              {revealResults ? `📊 ${leading.text}` : `🗳️ ${leading.text}`}
             </span>
-            <span style={{ color: theme.accent, fontWeight: 800, flexShrink: 0 }}>{percent}%</span>
+            {revealResults ? (
+              <span style={{ color: theme.accent, fontWeight: 800, flexShrink: 0 }}>
+                {percent}%
+              </span>
+            ) : (
+              <span style={{ color: theme.textFaint, fontWeight: 700, flexShrink: 0 }}>🔒</span>
+            )}
           </div>
-          <div style={{ marginTop: 8 }}>
-            <ProgressBar percent={percent} height={10} />
-          </div>
+          {revealResults ? (
+            <div style={{ marginTop: 8 }}>
+              <ProgressBar percent={percent} height={10} />
+            </div>
+          ) : (
+            <div style={{ marginTop: 6, fontSize: 12, color: theme.textFaint, fontWeight: 600 }}>
+              {RESULTS_LOCKED_HINT}
+            </div>
+          )}
         </div>
       ) : null}
 
@@ -363,6 +380,8 @@ function HotPollLeading(props: Readonly<{ poll: Poll }>) {
   const leadingOpt = leadingOption(poll);
   if (!leadingOpt) return null;
   const pct = optionPercent(leadingOpt.voteCount, poll.totalVotes);
+  // afterVote 폴은 투표 전(미마감)엔 1위 %·진행바를 가리고 잠금 안내만 — web과 동일 게이트.
+  const revealResults = canRevealResults(poll, hasVotedLocally(poll.id));
   return (
     <div
       style={{
@@ -373,20 +392,30 @@ function HotPollLeading(props: Readonly<{ poll: Poll }>) {
         border: `1px solid rgba(255,255,255,0.02)`,
       }}
     >
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          fontSize: 13,
-          gap: 12,
-        }}
-      >
-        <span style={{ color: theme.textMuted, fontWeight: 600 }}>📊 1위: {leadingOpt.text}</span>
-        <span style={{ color: theme.accent, fontWeight: 800 }}>{pct}%</span>
-      </div>
-      <div style={{ marginTop: 8 }}>
-        <ProgressBar percent={pct} height={10} />
-      </div>
+      {revealResults ? (
+        <>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              fontSize: 13,
+              gap: 12,
+            }}
+          >
+            <span style={{ color: theme.textMuted, fontWeight: 600 }}>
+              📊 1위: {leadingOpt.text}
+            </span>
+            <span style={{ color: theme.accent, fontWeight: 800 }}>{pct}%</span>
+          </div>
+          <div style={{ marginTop: 8 }}>
+            <ProgressBar percent={pct} height={10} />
+          </div>
+        </>
+      ) : (
+        <div style={{ fontSize: 13, color: theme.textMuted, fontWeight: 600 }}>
+          🔒 {RESULTS_LOCKED_HINT}
+        </div>
+      )}
     </div>
   );
 }
@@ -583,10 +612,12 @@ function NoMatchState() {
     <div style={{ textAlign: 'center', padding: '40px 0', color: theme.textMuted }}>
       <div style={{ fontSize: 44, marginBottom: 10 }}>{MASCOT.curious.emoji}</div>
       <p style={{ fontSize: 15.5, color: theme.text, fontWeight: 700 }}>
-        앗, 조건에 맞는 고민을 찾지 못했어요 😢
+        앗, 이 페이지엔 조건에 맞는 고민이 없어요 😢
       </p>
       <p style={{ fontSize: 13.5, marginTop: 4, lineHeight: 1.5 }}>
-        다른 검색어를 입력하거나 필터를 바꿔 볼까요?
+        발견성 필터는 지금 페이지(최대 20개)에서만 찾아요.
+        <br />
+        다음 페이지로 넘겨 보거나, 필터를 ‘전체’로 되돌려 볼까요?
       </p>
     </div>
   );

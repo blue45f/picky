@@ -43,14 +43,16 @@ const createDbMock = () => {
   const castVote = vi.fn(async () => ({ recorded: true }));
   const appendComment = vi.fn(async () => undefined);
   const verifyAccessCode = vi.fn(async () => true);
+  const savePollContent = vi.fn(async () => undefined);
   const db = {
     getPolls,
     getPollById,
     castVote,
     appendComment,
     verifyAccessCode,
+    savePollContent,
   } as unknown as DatabaseService;
-  return { db, getPolls, getPollById, castVote, appendComment, verifyAccessCode };
+  return { db, getPolls, getPollById, castVote, appendComment, verifyAccessCode, savePollContent };
 };
 
 describe('PollService.getPolls (pagination clamp + server filters)', () => {
@@ -155,6 +157,86 @@ describe('PollService.vote (atomic cast + dedup gate)', () => {
 
     await service.vote('abc123', { optionId: 1, voterKey: 'k', comment: '좋아요' });
     expect(mocks.appendComment).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('PollService.updatePoll (visibility / access-code transitions)', () => {
+  let mocks: ReturnType<typeof createDbMock>;
+  let service: PollService;
+
+  beforeEach(() => {
+    mocks = createDbMock();
+    service = new PollService(mocks.db);
+  });
+
+  it('persists a new access code when switching public → private', async () => {
+    mocks.getPollById.mockResolvedValue(makePoll({ creatorId: 'u1', visibility: 'public' }));
+    const result = await service.updatePoll(
+      'abc123',
+      { visibility: 'private', accessCode: 'secret1' },
+      'u1',
+      false,
+    );
+    expect(result.visibility).toBe('private');
+    expect(result.requiresCode).toBe(true);
+    // accessCode 원문은 응답에 실리지 않는다.
+    expect((result as { accessCode?: string }).accessCode).toBeUndefined();
+    // db 에는 새 코드가 전달된다.
+    expect(mocks.savePollContent).toHaveBeenCalledWith(
+      expect.objectContaining({ visibility: 'private' }),
+      expect.objectContaining({ accessCode: 'secret1' }),
+    );
+  });
+
+  it('rejects public → private without an access code', async () => {
+    mocks.getPollById.mockResolvedValue(makePoll({ creatorId: 'u1', visibility: 'public' }));
+    await expect(
+      service.updatePoll('abc123', { visibility: 'private' }, 'u1', false),
+    ).rejects.toThrow();
+    expect(mocks.savePollContent).not.toHaveBeenCalled();
+  });
+
+  it('clears the access code when switching private → public', async () => {
+    mocks.getPollById.mockResolvedValue(makePoll({ creatorId: 'u1', visibility: 'private' }));
+    const result = await service.updatePoll('abc123', { visibility: 'public' }, 'u1', false);
+    expect(result.visibility).toBe('public');
+    expect(result.requiresCode).toBe(false);
+    expect(mocks.savePollContent).toHaveBeenCalledWith(
+      expect.objectContaining({ visibility: 'public' }),
+      expect.objectContaining({ accessCode: null }),
+    );
+  });
+
+  it('keeps the existing code when staying private without sending a new one', async () => {
+    mocks.getPollById.mockResolvedValue(makePoll({ creatorId: 'u1', visibility: 'private' }));
+    await service.updatePoll('abc123', { question: '새 질문이에요' }, 'u1', false);
+    // visibility 미전송 + accessCode 미전송이면 db 옵션에 accessCode 키가 없어 기존 코드를 보존한다.
+    expect(mocks.savePollContent).toHaveBeenCalledWith(
+      expect.objectContaining({ question: '새 질문이에요' }),
+      expect.not.objectContaining({ accessCode: expect.anything() }),
+    );
+  });
+});
+
+describe('PollService.addComment (closed-poll guard)', () => {
+  let mocks: ReturnType<typeof createDbMock>;
+  let service: PollService;
+
+  beforeEach(() => {
+    mocks = createDbMock();
+    service = new PollService(mocks.db);
+  });
+
+  it('appends a comment to an open poll', async () => {
+    mocks.getPollById.mockResolvedValue(makePoll());
+    await service.addComment('abc123', { comment: '나도 김밥!' });
+    expect(mocks.appendComment).toHaveBeenCalledTimes(1);
+  });
+
+  it('blocks comments on a closed poll (no append)', async () => {
+    mocks.getPollById.mockResolvedValue(makePoll({ endsAt: '2000-01-01T00:00:00.000Z' }));
+    await expect(service.addComment('abc123', { comment: '늦었지만…' })).rejects.toThrow();
+    expect(mocks.appendComment).not.toHaveBeenCalled();
   });
 });
 

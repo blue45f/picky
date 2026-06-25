@@ -4,6 +4,7 @@ import { Button } from '@toss/tds-mobile';
 import {
   CreatePollSchema,
   POLL_CATEGORIES,
+  RESULTS_VISIBILITY_LABELS,
   type CreatePollInput,
   type PollResultsVisibility,
   type PollVisibility,
@@ -46,9 +47,10 @@ const DEADLINE_PRESETS = [
   { value: 'custom', label: '직접 선택 ✏️', ms: -1 },
 ] as const satisfies ReadonlyArray<{ value: DeadlinePreset; label: string; ms: number }>;
 
+// 라벨은 web/toss 공통 상수에서 가져와 양 앱이 같은 문구를 쓰도록 한다.
 const RESULT_OPTIONS = [
-  { value: 'afterVote', label: '투표하고 보기 🗳️' },
-  { value: 'always', label: '항상 공개 👀' },
+  { value: 'afterVote', label: RESULTS_VISIBILITY_LABELS.afterVote.short },
+  { value: 'always', label: RESULTS_VISIBILITY_LABELS.always.short },
 ] as const satisfies ReadonlyArray<{ value: PollResultsVisibility; label: string }>;
 
 const VISIBILITY_OPTIONS = [
@@ -1082,7 +1084,11 @@ export function CreatePollPage() {
     }
   };
 
-  const resultVisibilityLabel = resultsVisibility === 'always' ? '항상 공개' : '투표하고 보기';
+  // 양 앱 공통 상수에서 라벨을 가져온다(작성 셀렉터와 동일 문구).
+  const resultVisibilityLabel =
+    resultsVisibility === 'always'
+      ? RESULTS_VISIBILITY_LABELS.always.short
+      : RESULTS_VISIBILITY_LABELS.afterVote.short;
   const deadlineSummary = endsAtIso ? `~ ${deadlinePreview}` : resultVisibilityLabel;
 
   const toggleCategory = (id: string) => {

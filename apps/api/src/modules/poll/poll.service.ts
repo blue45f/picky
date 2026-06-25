@@ -258,6 +258,33 @@ export class PollService {
       next.attachments = input.attachments || [];
     }
 
+    // 공개 범위(visibility)·접근 코드(accessCode) 변경. 생성 규칙과 동일하게 private면 코드가 있어야 한다.
+    // accessCode === undefined 면 "변경 안 함"(기존 코드 유지), '' 또는 값이면 명시적 변경으로 본다.
+    const visibilityChanged = input.visibility !== undefined;
+    let nextAccessCode: string | null | undefined;
+    if (visibilityChanged) {
+      next.visibility = input.visibility ?? 'public';
+    }
+    const resolvedVisibility = next.visibility ?? 'public';
+    if (resolvedVisibility === 'private') {
+      if (input.accessCode !== undefined) {
+        // 명시적으로 코드를 보냈으면 그 값으로 교체.
+        if (!input.accessCode) {
+          throw new BadRequestException('비공개(private) 투표는 접근 코드가 필요합니다.');
+        }
+        nextAccessCode = input.accessCode;
+      } else if (visibilityChanged && poll.visibility !== 'private') {
+        // public/unlisted → private 전환인데 코드가 없으면 거부(기존 코드가 없음).
+        throw new BadRequestException('비공개(private) 투표는 접근 코드가 필요합니다.');
+      }
+      // 그 외(이미 private였고 코드 미전송)는 기존 코드 유지(nextAccessCode=undefined).
+      next.requiresCode = true;
+    } else if (visibilityChanged) {
+      // private → public/unlisted 전환: 더 이상 코드가 필요 없으니 비운다.
+      next.requiresCode = false;
+      nextAccessCode = null;
+    }
+
     let optionsStructurallyChanged = false;
     if (input.options !== undefined) {
       const incoming = input.options;
@@ -290,7 +317,8 @@ export class PollService {
       }
     }
 
-    await this.db.savePollContent(next, { optionsStructurallyChanged });
+    await this.db.savePollContent(next, { optionsStructurallyChanged, accessCode: nextAccessCode });
+    // accessCode 원문은 응답에 절대 싣지 않는다(next 에는 애초에 없음). requiresCode 만 노출.
     return next;
   }
 
@@ -383,6 +411,11 @@ export class PollService {
 
     // 비공개 투표는 접근 코드 검증을 통과해야 한마디를 남길 수 있다.
     await this.assertWriteAccess(poll, code);
+
+    // 마감(종료)된 고민은 투표와 동일하게 한마디·답글도 더 받지 않는다(마감=대화 종료 정합).
+    if (this.isPollClosed(poll)) {
+      throw new BadRequestException('마감된 고민이에요. 더 이상 한마디를 남길 수 없어요.');
+    }
 
     let parentId: number | null = input.parentId ?? null;
     if (parentId != null) {

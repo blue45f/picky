@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@toss/tds-mobile';
-import { UpdatePollSchema, type PollResultsVisibility, type UpdatePollInput } from '../shared';
+import {
+  RESULTS_VISIBILITY_LABELS,
+  UpdatePollSchema,
+  type PollResultsVisibility,
+  type UpdatePollInput,
+} from '../shared';
 import { usePollStore } from '../store/usePollStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { theme, stickyActionBar } from '../theme';
@@ -29,9 +34,10 @@ const emptyOption = (): OptionDraft => ({
   imageUrl: null,
 });
 
+// 라벨은 web/toss 공통 상수에서 가져와 양 앱이 같은 문구를 쓰도록 한다.
 const RESULT_OPTIONS = [
-  { value: 'afterVote', label: '투표하고 보기 🗳️' },
-  { value: 'always', label: '항상 공개 👀' },
+  { value: 'afterVote', label: RESULTS_VISIBILITY_LABELS.afterVote.short },
+  { value: 'always', label: RESULTS_VISIBILITY_LABELS.always.short },
 ] as const satisfies ReadonlyArray<{ value: PollResultsVisibility; label: string }>;
 
 const fieldStyle: React.CSSProperties = {

@@ -268,8 +268,10 @@ function OptionList(
  * `displayOptions`는 득표순 정렬본이라 도넛 조각/범례 색이 OptionList 순서와 1:1로 맞아요.
  * 총 0표면 빈 도넛을 그리지 않도록 숨김 가드를 둬요(차트 컴포넌트도 방어적으로 null 반환).
  */
-function ResultDonutSection(props: Readonly<{ options: PollOption[]; totalVotes: number }>) {
-  const { options, totalVotes } = props;
+function ResultDonutSection(
+  props: Readonly<{ options: PollOption[]; totalVotes: number; closed: boolean }>,
+) {
+  const { options, totalVotes, closed } = props;
   if (totalVotes < 1) {
     return null;
   }
@@ -284,65 +286,112 @@ function ResultDonutSection(props: Readonly<{ options: PollOption[]; totalVotes:
         background: theme.surface,
         border: `1px solid ${theme.border}`,
         boxShadow: '0 4px 16px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.03)',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 16,
       }}
     >
-      <div style={{ flexShrink: 0 }}>
-        <VoteDonutChart options={options} />
-      </div>
-      <ul
+      {/* 마감된 폴은 '실시간'이 아니라 '최종 결과'로 표기해 집계가 끝났음을 분명히 한다. */}
+      <h2
         style={{
-          flex: 1,
-          minWidth: 0,
-          listStyle: 'none',
-          margin: 0,
-          padding: 0,
+          margin: '0 0 12px',
+          fontSize: 14,
+          fontWeight: 800,
+          color: theme.text,
           display: 'flex',
-          flexDirection: 'column',
-          gap: 8,
+          alignItems: 'center',
+          gap: 6,
         }}
       >
-        {legendOptions.map((option) => {
-          const colorIndex = options.findIndex((candidate) => candidate.id === option.id);
-          const color = OPTION_COLORS[colorIndex % OPTION_COLORS.length];
-          return (
-            <li
-              key={option.id}
-              style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}
-            >
-              <span
-                aria-hidden
-                style={{
-                  flexShrink: 0,
-                  width: 10,
-                  height: 10,
-                  borderRadius: 999,
-                  background: color,
-                }}
-              />
-              <span
-                style={{
-                  flex: 1,
-                  minWidth: 0,
-                  fontSize: 13,
-                  fontWeight: 600,
-                  color: theme.textMuted,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}
+        <span aria-hidden>{closed ? '🏁' : '📊'}</span>
+        {closed ? '최종 결과' : '실시간 결과'}
+      </h2>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+        <div style={{ flexShrink: 0 }}>
+          <VoteDonutChart options={options} />
+        </div>
+        <ul
+          style={{
+            flex: 1,
+            minWidth: 0,
+            listStyle: 'none',
+            margin: 0,
+            padding: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 8,
+          }}
+        >
+          {legendOptions.map((option) => {
+            const colorIndex = options.findIndex((candidate) => candidate.id === option.id);
+            const color = OPTION_COLORS[colorIndex % OPTION_COLORS.length];
+            return (
+              <li
+                key={option.id}
+                style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}
               >
-                {option.text}
-              </span>
-              <span style={{ flexShrink: 0, fontSize: 13, fontWeight: 800, color: theme.text }}>
-                {optionPercent(option.voteCount, totalVotes)}%
-              </span>
-            </li>
-          );
-        })}
-      </ul>
+                <span
+                  aria-hidden
+                  style={{
+                    flexShrink: 0,
+                    width: 10,
+                    height: 10,
+                    borderRadius: 999,
+                    background: color,
+                  }}
+                />
+                <span
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: theme.textMuted,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {option.text}
+                </span>
+                <span style={{ flexShrink: 0, fontSize: 13, fontWeight: 800, color: theme.text }}>
+                  {optionPercent(option.voteCount, totalVotes)}%
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 결과를 보여줄 수 있는 상태(showResults)지만 아직 표가 없거나(0표) 선택지가 1개뿐이라
+ * 선두·합의·비율 같은 결과 지표가 의미 없을 때, 가짜 수치 대신 중립 '참여 대기' 상태로 모은다.
+ */
+function ResultPendingNotice() {
+  return (
+    <div
+      className="rise"
+      style={{
+        marginTop: 14,
+        padding: '16px 16px',
+        borderRadius: theme.radius,
+        background: theme.surface,
+        border: `1px solid ${theme.border}`,
+        boxShadow: '0 4px 16px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.03)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+      }}
+    >
+      <span aria-hidden style={{ fontSize: 24, flexShrink: 0 }}>
+        🫧
+      </span>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: 14.5, fontWeight: 800, color: theme.text }}>참여 대기</div>
+        <div style={{ fontSize: 12.5, color: theme.textMuted, marginTop: 2, lineHeight: 1.4 }}>
+          아직 결과를 해석할 만큼 표가 모이지 않았어요. 첫 한 표가 들어오면 결과가 채워져요.
+        </div>
+      </div>
     </div>
   );
 }
@@ -534,16 +583,19 @@ function CommentsSection(
   props: Readonly<{
     comments: PollComment[];
     canManage: boolean;
+    closed: boolean;
     onDeleteComment?: (commentId: number) => void;
     onAddReply?: (parentId: number, text: string) => Promise<void> | void;
   }>,
 ) {
-  const { comments, canManage, onDeleteComment, onAddReply } = props;
+  const { comments, canManage, closed, onDeleteComment, onAddReply } = props;
   const [replyingTo, setReplyingTo] = useState<number | null>(null);
   const [replyText, setReplyText] = useState('');
   if (comments.length === 0) {
     return null;
   }
+  // 마감된 고민은 서버가 한마디/답글 작성을 막는다 → 답글 UI를 숨겨 헛된 시도를 막는다.
+  const replyEnabled = Boolean(onAddReply) && !closed;
 
   const topLevel = comments.filter((c) => c.parentId == null);
   const repliesByParent = new Map<number, PollComment[]>();
@@ -580,6 +632,20 @@ function CommentsSection(
         </span>
         친구들 한마디 {formatNumber(comments.length)}개
       </h2>
+      {closed ? (
+        <p
+          role="note"
+          style={{
+            margin: '0 0 12px',
+            fontSize: 13,
+            color: theme.textMuted,
+            fontWeight: 600,
+            lineHeight: 1.4,
+          }}
+        >
+          🔒 마감된 고민이에요. 한마디·답글은 더 남길 수 없어요.
+        </p>
+      ) : null}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {topLevel.map((c) => (
           <div key={c.id} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -588,7 +654,7 @@ function CommentsSection(
               canManage={canManage}
               onDelete={onDeleteComment}
               onReply={
-                onAddReply
+                replyEnabled
                   ? () => {
                       setReplyingTo((prev) => (prev === c.id ? null : c.id));
                       setReplyText('');
@@ -605,7 +671,7 @@ function CommentsSection(
                 isReply
               />
             ))}
-            {replyingTo === c.id ? (
+            {replyEnabled && replyingTo === c.id ? (
               <div style={{ display: 'flex', gap: 8, marginLeft: 22 }}>
                 <input
                   type="text"
@@ -1039,6 +1105,27 @@ function DetailHeader(
   );
 }
 
+/**
+ * 작성자 라벨 — web getCreatorLabel과 같은 3분기.
+ * 닉네임이 있으면 닉네임을 그대로(회원 글이 '익명'으로 표기되는 모순 제거),
+ * 없으면 비회원/회원 여부로만 표시한다.
+ */
+function resolveAuthorLabel(
+  creatorNickname: string | null | undefined,
+  creatorId: string | null | undefined,
+  creatorIsGuest: boolean | undefined,
+): string {
+  const nickname = creatorNickname?.trim();
+  if (nickname) {
+    return nickname;
+  }
+  const isGuest = creatorIsGuest || Boolean(creatorId?.startsWith('guest-'));
+  if (isGuest) {
+    return '비회원';
+  }
+  return creatorId ? '회원' : '익명';
+}
+
 function PollHero(
   props: Readonly<{
     question: string;
@@ -1046,9 +1133,13 @@ function PollHero(
     totalVotes: number;
     leader: PollOption | null;
     creatorNickname: string | null | undefined;
+    creatorId: string | null | undefined;
+    creatorIsGuest: boolean | undefined;
   }>,
 ) {
-  const { question, description, totalVotes, leader, creatorNickname } = props;
+  const { question, description, totalVotes, leader, creatorNickname, creatorId, creatorIsGuest } =
+    props;
+  const authorLabel = resolveAuthorLabel(creatorNickname, creatorId, creatorIsGuest);
   return (
     <>
       {/* Hero main issue question - stands out first like NatePan main post for eye-catch on mobile */}
@@ -1064,12 +1155,9 @@ function PollHero(
       >
         {question}
       </h1>
-      {/* 작성자 닉네임(서버 해석). 없으면 '익명'. */}
+      {/* 작성자 — 닉네임이 있으면 닉네임, 없으면 비회원/회원/익명 라벨(회원이 '익명'으로 표기되는 모순 제거). */}
       <p style={{ margin: '0 0 8px', fontSize: 13, color: theme.textMuted, fontWeight: 600 }}>
-        작성자{' '}
-        <span style={{ color: theme.text, fontWeight: 800 }}>
-          {creatorNickname?.trim() || '익명'}
-        </span>
+        작성자 <span style={{ color: theme.text, fontWeight: 800 }}>{authorLabel}</span>
       </p>
       {description ? (
         <p
@@ -1182,12 +1270,19 @@ export function PollDetailView(props: Readonly<PollDetailViewProps>) {
           totalVotes={totalVotes}
           leader={leader}
           creatorNickname={poll.creatorNickname}
+          creatorId={poll.creatorId}
+          creatorIsGuest={poll.creatorIsGuest}
         />
 
         {hasVoted && !closed ? <VoteCelebration /> : null}
 
+        {/* 결과를 열 수 있어도 0표/선택지 1개면 선두·합의 같은 지표가 거짓이 되므로 중립 '참여 대기'로 모은다(R1). */}
         {showResults ? (
-          <ResultDonutSection options={displayOptions} totalVotes={totalVotes} />
+          totalVotes === 0 || displayOptions.length < 2 ? (
+            <ResultPendingNotice />
+          ) : (
+            <ResultDonutSection options={displayOptions} totalVotes={totalVotes} closed={closed} />
+          )
         ) : null}
 
         <OptionList
@@ -1225,6 +1320,7 @@ export function PollDetailView(props: Readonly<PollDetailViewProps>) {
         <CommentsSection
           comments={comments}
           canManage={canManage}
+          closed={closed}
           onDeleteComment={onDeleteComment}
           onAddReply={onAddReply}
         />

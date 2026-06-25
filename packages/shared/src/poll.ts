@@ -1,8 +1,61 @@
-import type { Poll, PollOption } from './index';
+import type { Poll, PollOption, PollResultsVisibility } from './index';
 
 /** 마감 시간이 지났는지. */
 export const isPollClosed = (poll: Poll | null | undefined): boolean =>
   Boolean(poll?.endsAt) && Date.now() >= new Date(poll!.endsAt as string).getTime();
+
+/**
+ * 결과(상위 선택지·퍼센트·득표바·총표 등 표 파생 표시)를 드러내도 되는지 — web/toss/OG/스냅샷이
+ * 같은 판단을 쓰도록 단일화한 게이트.
+ *
+ * resultsVisibility:
+ * - 'always'  : 언제나 공개
+ * - 'afterVote'(기본): 투표를 한(hasVoted) 사람에게만 공개. 단, 마감된(closed) 폴은 결과를 공개한다.
+ *
+ * resultsVisibility 미지정(레거시)은 'afterVote' 로 간주한다(서버 기본값과 일치).
+ */
+export const canRevealResults = (
+  poll: Pick<Poll, 'resultsVisibility' | 'endsAt'> | null | undefined,
+  hasVoted: boolean,
+): boolean => {
+  if (!poll) {
+    return false;
+  }
+  if (poll.resultsVisibility === 'always') {
+    return true;
+  }
+  return hasVoted || isPollClosed(poll as Poll);
+};
+
+/** resultsVisibility 정규화 — 'always' 외엔 전부 'afterVote'(레거시·null 포함). */
+export const normalizeResultsVisibility = (
+  value: PollResultsVisibility | null | undefined,
+): PollResultsVisibility => (value === 'always' ? 'always' : 'afterVote');
+
+/**
+ * resultsVisibility 표시 라벨 — web/toss 두 앱이 동일 문구를 쓰도록 한 곳에서 통일.
+ * - full : 설정/상세 헤더용 풀 라벨
+ * - short: 작성 셀렉터/칩용 짧은 라벨(이모지 포함)
+ * - hint : 왜 그렇게 보이는지 한 줄 안내
+ */
+export const RESULTS_VISIBILITY_LABELS: Record<
+  PollResultsVisibility,
+  { full: string; short: string; hint: string }
+> = {
+  afterVote: {
+    full: '투표 후 결과 공개',
+    short: '투표하고 보기 🗳️',
+    hint: '다른 의견에 영향을 덜 받도록 투표한 뒤에 결과가 열려요.',
+  },
+  always: {
+    full: '실시간 결과 공개',
+    short: '항상 공개 👀',
+    hint: '투표하지 않아도 실시간 집계 결과를 볼 수 있어요.',
+  },
+};
+
+/** afterVote 폴에서 아직 결과를 못 본 사람에게 보여줄 안내 문구. */
+export const RESULTS_LOCKED_HINT = '투표하면 결과가 보여요';
 
 /** 옵션 득표율(%) 정수 반올림. */
 export const optionPercent = (voteCount: number, totalVotes: number): number =>

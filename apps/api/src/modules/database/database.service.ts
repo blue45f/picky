@@ -925,7 +925,11 @@ export class DatabaseService implements OnModuleInit {
    */
   async savePollContent(
     poll: Poll & { categoryId?: string | null },
-    options: { optionsStructurallyChanged: boolean },
+    options: {
+      optionsStructurallyChanged: boolean;
+      // accessCode 변경 의미: undefined=변경 안 함(기존 유지), string=교체, null=제거(공개 전환).
+      accessCode?: string | null;
+    },
   ): Promise<void> {
     if (this.useSqlDb) {
       await db
@@ -935,9 +939,12 @@ export class DatabaseService implements OnModuleInit {
           description: poll.description ?? null,
           endsAt: poll.endsAt ? new Date(poll.endsAt) : null,
           resultsVisibility: poll.resultsVisibility || 'afterVote',
+          visibility: poll.visibility || 'public',
           categoryId: poll.categoryId ?? null,
           totalVotes: poll.totalVotes,
           attachments: (poll.attachments ?? []) as any,
+          // 코드 변경이 지정된 경우에만 컬럼을 건드린다(미지정이면 기존 코드 보존).
+          ...(options.accessCode !== undefined ? { accessCode: options.accessCode } : {}),
         })
         .where(eq(schema.polls.id, poll.id));
 
@@ -973,7 +980,14 @@ export class DatabaseService implements OnModuleInit {
     if (idx === -1) {
       return;
     }
-    nextPolls[idx] = poll;
+    const existing = nextPolls[idx] as Poll & { accessCode?: string | null };
+    // poll 객체엔 accessCode 가 없으므로 in-memory 경로에선 기존 코드를 보존하되,
+    // options.accessCode 가 명시되면(교체/제거) 그 값으로 덮어쓴다.
+    nextPolls[idx] = {
+      ...poll,
+      accessCode:
+        options.accessCode !== undefined ? options.accessCode : (existing?.accessCode ?? null),
+    } as Poll;
     await this.commit({ ...this.data, polls: nextPolls });
   }
 

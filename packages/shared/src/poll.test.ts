@@ -1,6 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Poll } from './index';
-import { isPollClosed, leadingOption, optionPercent, optionsByVotes } from './poll';
+import {
+  RESULTS_VISIBILITY_LABELS,
+  canRevealResults,
+  isPollClosed,
+  leadingOption,
+  normalizeResultsVisibility,
+  optionPercent,
+  optionsByVotes,
+} from './poll';
 
 const makePoll = (over: Partial<Poll> = {}): Poll => ({
   id: 'p1',
@@ -60,5 +68,50 @@ describe('isPollClosed', () => {
     vi.setSystemTime(new Date('2026-06-19T00:00:00Z'));
     expect(isPollClosed(makePoll({ endsAt: '2026-06-18T23:59:00Z' }))).toBe(true);
     expect(isPollClosed(makePoll({ endsAt: '2026-06-19T01:00:00Z' }))).toBe(false);
+  });
+});
+
+describe('canRevealResults', () => {
+  afterEach(() => vi.useRealTimers());
+
+  it('always reveals when resultsVisibility is always (regardless of vote)', () => {
+    expect(canRevealResults(makePoll({ resultsVisibility: 'always' }), false)).toBe(true);
+    expect(canRevealResults(makePoll({ resultsVisibility: 'always' }), true)).toBe(true);
+  });
+
+  it('hides afterVote results until the viewer has voted', () => {
+    expect(canRevealResults(makePoll({ resultsVisibility: 'afterVote' }), false)).toBe(false);
+    expect(canRevealResults(makePoll({ resultsVisibility: 'afterVote' }), true)).toBe(true);
+  });
+
+  it('treats a missing resultsVisibility as afterVote', () => {
+    expect(canRevealResults(makePoll(), false)).toBe(false);
+    expect(canRevealResults(makePoll(), true)).toBe(true);
+  });
+
+  it('reveals afterVote results once the poll is closed even without voting', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-19T00:00:00Z'));
+    const closed = makePoll({ resultsVisibility: 'afterVote', endsAt: '2026-06-18T23:00:00Z' });
+    expect(canRevealResults(closed, false)).toBe(true);
+  });
+
+  it('returns false for a null/undefined poll', () => {
+    expect(canRevealResults(null, true)).toBe(false);
+    expect(canRevealResults(undefined, true)).toBe(false);
+  });
+});
+
+describe('normalizeResultsVisibility / RESULTS_VISIBILITY_LABELS', () => {
+  it('normalizes anything other than always to afterVote', () => {
+    expect(normalizeResultsVisibility('always')).toBe('always');
+    expect(normalizeResultsVisibility('afterVote')).toBe('afterVote');
+    expect(normalizeResultsVisibility(null)).toBe('afterVote');
+    expect(normalizeResultsVisibility(undefined)).toBe('afterVote');
+  });
+
+  it('exposes a label set for both visibilities', () => {
+    expect(RESULTS_VISIBILITY_LABELS.always.full).toBe('실시간 결과 공개');
+    expect(RESULTS_VISIBILITY_LABELS.afterVote.full).toBe('투표 후 결과 공개');
   });
 });

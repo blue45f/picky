@@ -33,6 +33,7 @@ import type { Poll } from '@picky/shared';
 import { MASCOT, VOICE, categoryMeta, BETA_NOTICE } from '@picky/shared';
 // 시그널 분류(접전/신규/마감임박/피드백)·마감 판정 순수 로직은 @picky/shared 로 단일화했어요.
 import {
+  canRevealResults,
   getPollAgeDays,
   hottestActivePoll,
   isCloseRacePoll,
@@ -169,6 +170,17 @@ const formatRecentPollViewedAt = (value: string) => {
 const getPollResultsVisibilityLabel = (poll: Poll) => {
   return poll.resultsVisibility === 'always' ? '실시간 결과 공개' : '투표 후 결과 공개';
 };
+
+/**
+ * 목록/히어로에서 이 기기가 이 고민에 투표했는지(최근 본 고민 기록 기준).
+ * afterVote 폴의 결과 누출을 막기 위한 보수적 신호 — 기록이 없으면 미투표로 본다.
+ */
+const votedPollIds = (): Set<string> =>
+  new Set(
+    getRecentPollHistory()
+      .filter((item) => item.hasVoted)
+      .map((item) => item.id),
+  );
 
 const hasAttachmentPoll = (poll: Poll) => {
   return Array.isArray(poll.attachments) && poll.attachments.length > 0;
@@ -515,6 +527,8 @@ function PollCard(
   const endAtLabel = formatPollEndAt(poll);
   const resultsVisibilityLabel = getPollResultsVisibilityLabel(poll);
   const attachmentCount = poll.attachments?.length || 0;
+  // afterVote 폴은 이 기기가 투표(또는 마감/always)했을 때만 결과 파생 표시(득표순·퍼센트)를 드러낸다.
+  const revealResults = useMemo(() => canRevealResults(poll, votedPollIds().has(poll.id)), [poll]);
 
   return (
     <article
@@ -649,11 +663,14 @@ function PollCard(
         }}
       >
         <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600 }}>
-          상위 선택지:
+          {revealResults ? '상위 선택지:' : '선택지:'}
         </span>
         {poll.options.length > 0 ? (
-          [...poll.options]
-            .sort((a, b) => b.voteCount - a.voteCount)
+          // afterVote 미공개면 득표순 정렬을 숨기고(원래 순서) 결과 잠금 안내를 덧붙인다.
+          (revealResults
+            ? [...poll.options].sort((a, b) => b.voteCount - a.voteCount)
+            : poll.options
+          )
             .slice(0, 2)
             .map((opt) => (
               <span
@@ -674,6 +691,11 @@ function PollCard(
         ) : (
           <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>등록 없음</span>
         )}
+        {poll.options.length > 0 && !revealResults ? (
+          <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+            🔒 투표하면 결과가 보여요
+          </span>
+        ) : null}
       </div>
 
       <div className="poll-card-meta-strip">
@@ -1348,7 +1370,7 @@ function OperatorToolsPanel(
               라이브 응답 큐
             </h2>
             <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.76rem' }}>
-              현재 목록에서 먼저 처리해야 할 투표 상태를 한눈에 보고 바로 필터링합니다.
+              지금 페이지(최대 20개) 기준 상태예요. 0개여도 눌러서 다음 페이지를 확인할 수 있어요.
             </p>
           </div>
           <span
@@ -1380,12 +1402,13 @@ function OperatorToolsPanel(
           {liveQueueItems.map((item) => {
             const QueueIcon = item.icon;
             const active = signal === item.signal;
-            const disabled = item.key !== 'all' && item.count === 0;
+            // 카운트가 0이어도 비활성화하지 않는다 — 0은 "현재 페이지엔 없음"일 뿐, 눌러서 다음 페이지를 확인할 수 있어야 한다(B2).
+            const emptyOnPage = item.key !== 'all' && item.count === 0;
             let queueStatusLabel = '필터 적용';
             if (active) {
               queueStatusLabel = '적용 중';
-            } else if (disabled) {
-              queueStatusLabel = '대기 중';
+            } else if (emptyOnPage) {
+              queueStatusLabel = '이 페이지엔 없음';
             }
 
             return (
@@ -1393,12 +1416,9 @@ function OperatorToolsPanel(
                 key={item.key}
                 type="button"
                 onClick={() => {
-                  if (!disabled) {
-                    setSignal(item.signal);
-                  }
+                  setSignal(item.signal);
                 }}
                 aria-pressed={active}
-                disabled={disabled}
                 style={{
                   minWidth: 0,
                   textAlign: 'left',
@@ -1410,9 +1430,9 @@ function OperatorToolsPanel(
                   borderRadius: 'var(--radius-sm)',
                   background: active ? 'rgba(45, 212, 191, 0.1)' : 'rgba(255,255,255,0.025)',
                   padding: '0.75rem',
-                  color: disabled ? 'var(--text-muted)' : 'var(--text-primary)',
-                  cursor: disabled ? 'not-allowed' : 'pointer',
-                  opacity: disabled ? 0.58 : 1,
+                  color: emptyOnPage ? 'var(--text-muted)' : 'var(--text-primary)',
+                  cursor: 'pointer',
+                  opacity: emptyOnPage ? 0.72 : 1,
                   fontFamily: 'var(--font-sans)',
                 }}
               >
@@ -1662,7 +1682,20 @@ function PollResultsRegion(
         >
           {emptyStateHint}
         </p>
-        {hasActiveFilters ? null : (
+        {hasActiveFilters ? (
+          <p
+            style={{
+              fontSize: '0.78rem',
+              color: 'var(--text-muted)',
+              maxWidth: '460px',
+              lineHeight: 1.6,
+              margin: 0,
+            }}
+          >
+            결정 신호 필터는 지금 페이지(최대 20개) 기준이에요. 다음 페이지에는 있을 수 있으니
+            아래에서 넘겨보거나 필터를 초기화해 보세요.
+          </p>
+        ) : (
           <p
             style={{
               fontSize: '0.78rem',
@@ -2143,6 +2176,11 @@ export const PollList: React.FC = () => {
   const openPollCount = useMemo(() => polls.filter((poll) => !isPollClosed(poll)).length, [polls]);
 
   const hotPoll = useMemo(() => hottestActivePoll(polls), [polls]);
+  // 히어로 핫고민도 afterVote면 이 기기가 투표(또는 마감/always)했을 때만 퍼센트 바를 드러낸다.
+  const hotPollRevealResults = useMemo(
+    () => (hotPoll ? canRevealResults(hotPoll, votedPollIds().has(hotPoll.id)) : false),
+    [hotPoll],
+  );
 
   // Animated hero counters — count up to the live totals once data arrives.
   const pollsCountDisplay = useCountUp(polls.length);
@@ -2771,6 +2809,7 @@ export const PollList: React.FC = () => {
 
               <div style={{ display: 'grid', gap: '0.45rem', marginTop: '0.2rem' }}>
                 {hotPoll.options.slice(0, 2).map((opt) => {
+                  // afterVote 미공개면 퍼센트/바를 숨기고 선택지만 미리보기로 보여준다.
                   const pct = optionPercent(opt.voteCount, hotPoll.totalVotes);
                   return (
                     <div key={opt.id} style={{ display: 'grid', gap: '2px' }}>
@@ -2784,30 +2823,39 @@ export const PollList: React.FC = () => {
                         }}
                       >
                         <span style={{ fontWeight: 700 }}>{opt.text}</span>
-                        <span style={{ fontWeight: 800, color: 'var(--brand-accent-teal)' }}>
-                          {pct}%
-                        </span>
+                        {hotPollRevealResults ? (
+                          <span style={{ fontWeight: 800, color: 'var(--brand-accent-teal)' }}>
+                            {pct}%
+                          </span>
+                        ) : null}
                       </div>
-                      <div
-                        style={{
-                          height: '9px',
-                          background: 'rgba(255,255,255,0.06)',
-                          borderRadius: '999px',
-                          overflow: 'hidden',
-                        }}
-                      >
+                      {hotPollRevealResults ? (
                         <div
                           style={{
-                            height: '100%',
-                            width: `${pct}%`,
-                            background: 'var(--brand-accent-teal)',
+                            height: '9px',
+                            background: 'rgba(255,255,255,0.06)',
                             borderRadius: '999px',
+                            overflow: 'hidden',
                           }}
-                        />
-                      </div>
+                        >
+                          <div
+                            style={{
+                              height: '100%',
+                              width: `${pct}%`,
+                              background: 'var(--brand-accent-teal)',
+                              borderRadius: '999px',
+                            }}
+                          />
+                        </div>
+                      ) : null}
                     </div>
                   );
                 })}
+                {!hotPollRevealResults ? (
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                    🔒 투표하면 결과가 보여요
+                  </span>
+                ) : null}
               </div>
             </button>
           )}
@@ -3525,8 +3573,11 @@ export const PollList: React.FC = () => {
               borderTop: '1px solid rgba(255, 255, 255, 0.06)',
             }}
           >
-            <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginRight: '2px' }}>
-              결정 신호
+            <span
+              style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginRight: '2px' }}
+              title="개수는 지금 페이지(최대 20개) 기준이에요"
+            >
+              결정 신호 (이 페이지 기준)
             </span>
             {signalCounts.map((option) => (
               <button

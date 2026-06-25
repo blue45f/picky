@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   ChevronDown,
   Code2,
+  Copy,
   Eye,
   FileText,
   ImageIcon,
@@ -26,8 +27,13 @@ import { usePollStore } from '../store/usePollStore';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { SnsPreviewCard } from '../components/SnsPreviewCard';
 import { ParticipantPreviewPanel } from '../components/ParticipantPreviewPanel';
-import { buildShareablePollSnapshot } from '../lib/pollShare';
-import { POLL_CATEGORIES, type PollResultsVisibility, type PollVisibility } from '@picky/shared';
+import { buildShareablePollSnapshot, copyText } from '../lib/pollShare';
+import {
+  POLL_CATEGORIES,
+  type Poll,
+  type PollResultsVisibility,
+  type PollVisibility,
+} from '@picky/shared';
 
 interface PresetOption {
   text: string;
@@ -2999,6 +3005,12 @@ function PollSettingsSection({
   accessCode,
   setAccessCode,
 }: PollSettingsSectionProps) {
+  // 비공개일 때만, 입력이 있는데 4~20자 범위를 벗어나면 인라인 경고를 띄운다(빈 입력은 안내만 유지).
+  const trimmedAccessCodeLength = accessCode.trim().length;
+  const isAccessCodeInvalid =
+    visibility === 'private' &&
+    trimmedAccessCodeLength > 0 &&
+    (trimmedAccessCodeLength < 4 || trimmedAccessCodeLength > 20);
   return (
     <section
       style={{
@@ -3183,10 +3195,23 @@ function PollSettingsSection({
               }}
               placeholder="참여자에게 따로 알려줄 코드를 정해주세요"
               maxLength={20}
+              minLength={4}
               className="form-input"
               aria-label="비공개 투표 접근 코드"
+              aria-invalid={isAccessCodeInvalid}
               style={{ fontSize: '0.82rem' }}
             />
+            <small
+              style={{
+                color: isAccessCodeInvalid ? 'var(--brand-accent-coral)' : 'var(--text-muted)',
+                fontSize: '0.66rem',
+                lineHeight: 1.4,
+              }}
+            >
+              {isAccessCodeInvalid
+                ? '접근 코드는 4~20자로 입력해 주세요. 코드를 아는 사람만 참여할 수 있어요.'
+                : '이 코드를 아는 사람만 참여할 수 있어요. 생성 후 공유 화면에서 다시 확인할 수 있어요.'}
+            </small>
           </label>
         ) : null}
       </div>
@@ -3457,6 +3482,13 @@ export const CreatePoll: React.FC = () => {
   const [draggingOptionIndex, setDraggingOptionIndex] = useState<number | null>(null);
   const [isAttachmentDragging, setIsAttachmentDragging] = useState(false);
   const [attachments, setAttachments] = useState<AttachmentInput[]>(cachedDraft?.attachments || []);
+  // 비공개 투표 생성 직후 — 작성자가 방금 정한 접근 코드를 공유 전에 확인/복사하도록 보여준다.
+  // (서버는 접근 코드를 돌려주지 않으므로 화면을 떠나기 전에 노출해야 한다.)
+  const [createdPrivatePoll, setCreatedPrivatePoll] = useState<{
+    poll: Poll;
+    accessCode: string;
+  } | null>(null);
+  const [accessCodeCopied, setAccessCodeCopied] = useState(false);
 
   const normalizedQuestion = question.trim();
   const normalizedDescription = description.trim();
@@ -3628,6 +3660,11 @@ export const CreatePoll: React.FC = () => {
     setDraftSavedAt(null);
   };
 
+  // 비공개 투표는 접근 코드(4~20자)가 있어야 참여가 가능하므로 제출 전에 길이를 검증한다.
+  const trimmedAccessCodeLength = accessCode.trim().length;
+  const isPrivateAccessCodeValid =
+    visibility !== 'private' || (trimmedAccessCodeLength >= 4 && trimmedAccessCodeLength <= 20);
+
   const canSubmit =
     normalizedQuestion.length >= 2 &&
     normalizedQuestion.length <= 100 &&
@@ -3636,6 +3673,7 @@ export const CreatePoll: React.FC = () => {
     normalizedDescription.length <= 500 &&
     !isEndsAtInvalid &&
     attachments.length <= MAX_ATTACHMENTS &&
+    isPrivateAccessCodeValid &&
     !isLoading;
 
   const qualityItems = useMemo(
@@ -4118,6 +4156,15 @@ export const CreatePoll: React.FC = () => {
       clearDraftStorage();
       setCachedDraft(null);
       setDraftSavedAt(null);
+
+      // 비공개 투표는 작성자가 방금 정한 접근 코드를 공유 전에 다시 확인/복사해야 하므로,
+      // 곧장 이동하지 않고 인라인 성공 화면에서 코드를 노출한다.
+      if (visibility === 'private' && trimmedAccessCode) {
+        setAccessCodeCopied(false);
+        setCreatedPrivatePoll({ poll: result, accessCode: trimmedAccessCode });
+        return;
+      }
+
       const snapshot = buildShareablePollSnapshot(result);
       if (snapshot) {
         navigate(`/poll/${result.id}?showShare=true&snapshot=${snapshot}`);
@@ -4126,6 +4173,32 @@ export const CreatePoll: React.FC = () => {
 
       navigate(`/poll/${result.id}?showShare=true`);
     }
+  };
+
+  const handleCopyAccessCode = async () => {
+    if (!createdPrivatePoll) {
+      return;
+    }
+    try {
+      await copyText(createdPrivatePoll.accessCode);
+      setAccessCodeCopied(true);
+    } catch {
+      setAccessCodeCopied(false);
+    }
+  };
+
+  const handleGoToCreatedPoll = () => {
+    if (!createdPrivatePoll) {
+      return;
+    }
+    const { poll } = createdPrivatePoll;
+    setCreatedPrivatePoll(null);
+    const snapshot = buildShareablePollSnapshot(poll);
+    if (snapshot) {
+      navigate(`/poll/${poll.id}?showShare=true&snapshot=${snapshot}`);
+      return;
+    }
+    navigate(`/poll/${poll.id}?showShare=true`);
   };
 
   const resolveAttachmentDropzoneLabel = () => {
@@ -4138,6 +4211,114 @@ export const CreatePoll: React.FC = () => {
     return 'PDF/TXT/CSV/JSON 파일 업로드';
   };
   const attachmentDropzoneLabel = resolveAttachmentDropzoneLabel();
+
+  if (createdPrivatePoll) {
+    return (
+      <div
+        className="animate-slide-up"
+        style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', maxWidth: '560px' }}
+      >
+        <div className="content-card" style={{ display: 'grid', gap: '1.1rem', padding: '1.6rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+            <CheckCircle2 size={22} style={{ color: 'var(--brand-accent-teal)' }} />
+            <h1
+              style={{
+                margin: 0,
+                fontSize: '1.15rem',
+                fontWeight: 900,
+                color: 'var(--text-primary)',
+              }}
+            >
+              비공개 고민이 만들어졌어요 🔒
+            </h1>
+          </div>
+          <p
+            style={{
+              margin: 0,
+              fontSize: '0.85rem',
+              color: 'var(--text-secondary)',
+              lineHeight: 1.6,
+            }}
+          >
+            아래 <strong>접근 코드</strong>를 아는 사람만 참여할 수 있어요. 링크와 함께 코드를 꼭
+            전달해 주세요. 코드는 다시 표시되지 않으니 지금 복사해 두는 게 좋아요.
+          </p>
+
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '0.75rem',
+              flexWrap: 'wrap',
+              padding: '0.85rem 1rem',
+              borderRadius: 'var(--radius-sm)',
+              border: '1px solid rgba(45, 212, 191, 0.42)',
+              background: 'rgba(45, 212, 191, 0.08)',
+            }}
+          >
+            <div style={{ display: 'grid', gap: '0.2rem', minWidth: 0 }}>
+              <span
+                style={{ fontSize: '0.68rem', fontWeight: 800, color: 'var(--text-secondary)' }}
+              >
+                접근 코드
+              </span>
+              <strong
+                style={{
+                  fontSize: '1.15rem',
+                  fontWeight: 900,
+                  letterSpacing: '0.12em',
+                  color: 'var(--brand-accent-teal)',
+                  wordBreak: 'break-all',
+                }}
+              >
+                {createdPrivatePoll.accessCode}
+              </strong>
+            </div>
+            <button
+              type="button"
+              onClick={handleCopyAccessCode}
+              className="btn-primary"
+              aria-label="접근 코드 복사"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+            >
+              <Copy size={15} />
+              {accessCodeCopied ? '복사됨' : '복사'}
+            </button>
+          </div>
+          {accessCodeCopied ? (
+            <p
+              role="status"
+              style={{ margin: 0, fontSize: '0.72rem', color: 'var(--brand-accent-teal)' }}
+            >
+              접근 코드를 복사했어요. 참여자에게 링크와 함께 전달해 주세요.
+            </p>
+          ) : null}
+
+          <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={handleGoToCreatedPoll}
+              className="btn-primary"
+              aria-label="공유 화면으로 이동"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+            >
+              <Share2 size={15} />
+              공유하러 가기
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/')}
+              className="btn-secondary"
+              aria-label="고민 목록으로 이동"
+            >
+              목록으로
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
