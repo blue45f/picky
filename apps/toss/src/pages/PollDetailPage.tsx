@@ -16,7 +16,14 @@ import {
 } from '../lib/pollShare';
 import { isPollClosed, leadingOption, optionsByVotes } from '../lib/poll';
 import { getVotedOptionId, rememberVote } from '../lib/votes';
-import { buildTossShareLink, hapticFeedback, isInToss, requestAppReview } from '../lib/toss';
+import {
+  buildTossShareLink,
+  fetchConsentedProfile,
+  hapticFeedback,
+  isConsentedProfileEnabled,
+  isInToss,
+  requestAppReview,
+} from '../lib/toss';
 import { theme } from '../theme';
 import { useCountdown } from '../components/Countdown';
 import { useToast } from '../components/Toast';
@@ -53,6 +60,9 @@ export function PollDetailPage() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [codeInput, setCodeInput] = useState('');
   const [codeError, setCodeError] = useState<string | null>(null);
+  // 옵트인 '토스 프로필 불러오기' 상태(키 없거나 토스 밖이면 버튼 자체가 안 떠요).
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileNotice, setProfileNotice] = useState<string | null>(null);
   // 토스 안에선 토스앱으로 열리는 공유 링크(getTossShareLink). 토스 밖이면 null → 웹 URL 사용.
   const [tossShareLink, setTossShareLink] = useState<string | null>(null);
 
@@ -151,6 +161,29 @@ export function PollDetailPage() {
       maybeRequestReview();
     } else {
       hapticFeedback('error');
+    }
+  };
+
+  // 옵트인: 사용자가 버튼을 눌렀을 때만 토스 동의 프로필을 가져와 닉네임을 채워줘요.
+  // 거부/취소/미지원은 모두 null → 인라인 안내만, 절대 흐름을 막지 않아요.
+  const handleLoadProfile = async () => {
+    if (profileLoading) return;
+    setProfileNotice(null);
+    setProfileLoading(true);
+    hapticFeedback('tap');
+    try {
+      const profile = await fetchConsentedProfile();
+      if (profile?.name) {
+        setVoterName(profile.name);
+        setDisplayName(profile.name);
+        hapticFeedback('success');
+        showToast('토스 프로필로 이름을 채웠어요 🥑');
+      } else {
+        hapticFeedback('tickWeak');
+        setProfileNotice('프로필을 불러오지 못했어요. 이름은 직접 입력해도 괜찮아요 🙂');
+      }
+    } finally {
+      setProfileLoading(false);
     }
   };
 
@@ -300,6 +333,9 @@ export function PollDetailPage() {
       setVoterName={setVoterName}
       comment={comment}
       setComment={setComment}
+      onLoadProfile={isConsentedProfileEnabled() ? handleLoadProfile : undefined}
+      profileLoading={profileLoading}
+      profileNotice={profileNotice}
       leader={leader}
       displayOptions={displayOptions}
       winnerId={winnerId}

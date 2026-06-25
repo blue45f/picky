@@ -6,6 +6,7 @@ import {
   appLogin,
   generateHapticFeedback,
   getAnonymousKey,
+  getConsentedUserData,
   getOperationalEnvironment,
   getSchemeUri,
   getTossShareLink,
@@ -75,6 +76,48 @@ export async function tossAppLogin(): Promise<{
   try {
     const result = await appLogin();
     return result ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** 동의 기반 프로필 연동 키(콘솔에서 등록한 `cud_*`). 빈 문자열이면 기능 비활성. */
+export const consentedProfileKey = (): string =>
+  (import.meta.env.VITE_TOSS_CUD_PROFILE_KEY ?? '').trim();
+
+/** 옵트인 프로필 불러오기 기능이 켜져 있는지(키 존재 + 토스 환경). */
+export const isConsentedProfileEnabled = (): boolean =>
+  isInToss() && consentedProfileKey().length > 0;
+
+/**
+ * 토스 동의 기반 사용자 정보(이름/이메일)를 옵트인으로 가져와요.
+ * - 토스 밖이거나(`isInToss()` false) 키가 비어 있으면 즉시 null(기능 비활성).
+ * - 사용자가 동의 약관에서 거부/취소(USER_DECLINED·CANCELED)하거나 미설정(TERMS_NOT_SET),
+ *   구버전(undefined) 등 모든 실패는 try/catch로 흡수해 null을 반환해요(차단·강제 없음).
+ * - 호출 전 사용자가 명시적으로 버튼을 눌렀을 때만 실행하세요(약관 웹뷰가 떠요).
+ */
+export async function fetchConsentedProfile(): Promise<{
+  name?: string;
+  email?: string;
+} | null> {
+  if (!isInToss()) {
+    return null;
+  }
+  const key = consentedProfileKey();
+  if (!key) {
+    return null;
+  }
+  try {
+    const data = await getConsentedUserData({ consentedUserDataKey: key });
+    if (!data) {
+      return null;
+    }
+    const name = data.USER_NAME?.trim();
+    const email = data.USER_EMAIL?.trim();
+    if (!name && !email) {
+      return null;
+    }
+    return { name: name || undefined, email: email || undefined };
   } catch {
     return null;
   }

@@ -23,6 +23,12 @@ interface PollDetailViewProps {
   setVoterName: (name: string) => void;
   comment: string;
   setComment: (comment: string) => void;
+  /** 옵트인 '토스 프로필 불러오기'. 미전달(키 없음/토스 밖)이면 버튼 미노출. */
+  onLoadProfile?: () => void;
+  /** 프로필 불러오는 중 로딩 표시. */
+  profileLoading?: boolean;
+  /** 실패/거부 시 인라인 안내(차단하지 않음). */
+  profileNotice?: string | null;
   leader: PollOption | null;
   displayOptions: PollOption[];
   winnerId: number | null;
@@ -590,6 +596,47 @@ function VoteCelebration() {
   );
 }
 
+function ConsentedProfileButton(
+  props: Readonly<{ loading: boolean; notice: string | null | undefined; onClick: () => void }>,
+) {
+  const { loading, notice, onClick } = props;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <button
+        type="button"
+        className="pressable"
+        onClick={onClick}
+        disabled={loading}
+        aria-busy={loading}
+        style={{
+          alignSelf: 'flex-start',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 6,
+          minHeight: 40,
+          padding: '8px 14px',
+          borderRadius: theme.radiusPill,
+          border: `1px solid rgba(19,194,163,0.28)`,
+          background: theme.accentSoft,
+          color: theme.accent,
+          fontSize: 13,
+          fontWeight: 700,
+          cursor: loading ? 'default' : 'pointer',
+          opacity: loading ? 0.7 : 1,
+        }}
+      >
+        <span aria-hidden>🪪</span>
+        {loading ? '불러오는 중…' : '토스 프로필로 이름 채우기'}
+      </button>
+      {notice ? (
+        <span role="status" style={{ fontSize: 12.5, color: theme.textMuted, lineHeight: 1.4 }}>
+          {notice}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 function CommentDraftFields(
   props: Readonly<{
     selectedOptionId: number | null;
@@ -597,14 +644,26 @@ function CommentDraftFields(
     setVoterName: (name: string) => void;
     comment: string;
     setComment: (comment: string) => void;
+    onLoadProfile?: () => void;
+    profileLoading?: boolean;
+    profileNotice?: string | null;
   }>,
 ) {
-  const { selectedOptionId, voterName, setVoterName, comment, setComment } = props;
+  const {
+    selectedOptionId,
+    voterName,
+    setVoterName,
+    comment,
+    setComment,
+    onLoadProfile,
+    profileLoading = false,
+    profileNotice,
+  } = props;
   return (
     <div
       className="disclosure-enter"
       style={{
-        maxHeight: selectedOptionId === null ? 0 : 260,
+        maxHeight: selectedOptionId === null ? 0 : 340,
         opacity: selectedOptionId === null ? 0 : 1,
         overflow: 'hidden',
         marginTop: selectedOptionId === null ? 0 : 24,
@@ -624,6 +683,13 @@ function CommentDraftFields(
         aria-label="닉네임"
         onChange={(e) => setVoterName(e.target.value)}
       />
+      {onLoadProfile ? (
+        <ConsentedProfileButton
+          loading={profileLoading}
+          notice={profileNotice}
+          onClick={onLoadProfile}
+        />
+      ) : null}
       <input
         style={inputStyle}
         value={comment}
@@ -967,6 +1033,9 @@ export function PollDetailView(props: Readonly<PollDetailViewProps>) {
     setVoterName,
     comment,
     setComment,
+    onLoadProfile,
+    profileLoading,
+    profileNotice,
     leader,
     displayOptions,
     winnerId,
@@ -1049,6 +1118,9 @@ export function PollDetailView(props: Readonly<PollDetailViewProps>) {
             setVoterName={setVoterName}
             comment={comment}
             setComment={setComment}
+            onLoadProfile={onLoadProfile}
+            profileLoading={profileLoading}
+            profileNotice={profileNotice}
           />
         )}
 
