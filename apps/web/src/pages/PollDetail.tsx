@@ -5167,6 +5167,7 @@ function PollTopNav(
   ) : (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
       <button
+        className="ghost-inline"
         onClick={() => navigate('/')}
         style={{
           background: 'none',

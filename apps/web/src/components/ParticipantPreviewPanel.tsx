@@ -198,7 +198,10 @@ export function ParticipantPreviewPanel({
             minWidth: '112px',
             border: '1px solid var(--bg-card-border)',
             borderRadius: 'var(--radius-sm)',
-            background: 'rgba(3, 14, 12, 0.35)',
+            /* 테마 인지 인셋 표면 토큰 — 하드코딩 다크 rgba 는 라이트 모드에서 진흙빛 중간톤이 돼
+               그 위 '참가 준비도'(text-muted) 가 2.98:1 로 AA 미달이었다. bg-input 으로 두면
+               다크/라이트 모두 ≥6.4:1 확보. */
+            background: 'var(--bg-input)',
             padding: '0.58rem 0.72rem',
             textAlign: 'right',
           }}

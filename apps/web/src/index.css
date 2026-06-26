@@ -27,6 +27,10 @@
   --brand-accent-gold: oklch(78% 0.14 85);
   --brand-accent-teal: oklch(72% 0.15 170);
   --brand-accent-coral: oklch(64% 0.18 25);
+  /* 흰 글자를 얹는 '채워진' 코랄 배지 전용 — 기본 코랄(64%)은 #fff 대비 3.66:1(AA 미달)이라
+     배지 배경만 한 단계 어둡게 둬 흰 라벨이 4.5:1(여기선 ≈5.1:1)을 넘게 한다. 텍스트 색
+     맥락의 코랄은 기존 토큰 그대로(코랄-on-다크는 이미 충족). */
+  --brand-accent-coral-strong: oklch(56% 0.19 25);
 
   /* Typography Ink */
   --text-primary: oklch(98% 0.005 205);
@@ -81,6 +85,8 @@
   --brand-accent-gold: oklch(55% 0.12 85);
   --brand-accent-teal: oklch(45% 0.13 170);
   --brand-accent-coral: oklch(55% 0.18 25);
+  /* 라이트 코랄(55%)은 이미 #fff 대비 ≈5.3:1 이라 그대로 강조 배지 배경으로 충분. */
+  --brand-accent-coral-strong: oklch(55% 0.18 25);
 
   /* Typography Ink — muted 를 더 진하게 해 밝은 배경에서 AA 대비 확보 */
   --text-primary: oklch(23% 0.018 205);
@@ -2064,7 +2070,10 @@ body.present-mode .page-shell {
   background: transparent;
   color: var(--text-secondary);
   cursor: pointer;
-  padding: 0;
+  /* 인라인 링크형 버튼(임시저장 복원/삭제·목록으로 등)이 16px 높이라 WCAG 2.5.8(24px) 미달이었다.
+     투명 패딩 + 상쇄 음수 마진으로 시각 위치/줄흐름은 그대로 두고 탭 영역만 ≥24px 로 키운다. */
+  padding: 5px 3px;
+  margin: -5px -3px;
 }
 
 .ghost-inline:hover {

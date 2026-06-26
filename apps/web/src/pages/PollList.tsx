@@ -2784,8 +2784,10 @@ export const PollList: React.FC = () => {
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span
                   style={{
-                    background: 'var(--brand-accent-coral)',
-                    color: '#fff',
+                    // 채워진 코랄 배지 + 흰 라벨은 기본 코랄(64%)에서 3.66:1로 AA 미달이라
+                    // 한 단계 어두운 coral-strong + 살짝 톤 입힌 near-white 로 ≥4.8:1 확보.
+                    background: 'var(--brand-accent-coral-strong)',
+                    color: 'oklch(98% 0.01 25)',
                     padding: '2px 8px',
                     borderRadius: '999px',
                     fontSize: '0.68rem',
