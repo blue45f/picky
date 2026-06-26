@@ -81,3 +81,61 @@ export function useCountUp<T extends HTMLElement = HTMLSpanElement>(
     revealed,
   };
 }
+
+export interface CountUpValueOptions {
+  /** 카운트업 시간(ms). 기본 900. */
+  duration?: number;
+}
+
+/**
+ * 값-전용 카운트업 훅 — ref 없이 **표시 숫자(number)만** 돌려주는 변형(web 통계 칩 등 재사용).
+ *
+ * useCountUp 과 달리 뷰포트 진입이 아니라 **값이 바뀔 때** 직전 값→target 으로 한 번 달린다
+ * (요약 숫자가 갱신될 때 톡 올라오는 용도). 따라서 관찰 대상 ref 가 필요 없다.
+ * - prefers-reduced-motion·SSR·헤드리스(rAF 부재)면 즉시 target 으로 점프(CLS·잡음 없음).
+ * - 첫 페인트(직전 값===target)에도 애니메이션 없이 그대로 둔다.
+ *
+ * web 의 로컬 useCountUp(target, duration) 과 동일 동작이라 그 자리를 단일 소스로 대체할 수 있다.
+ *
+ * @param target 목표 숫자.
+ * @returns 현재 표시 정수(number).
+ */
+export function useCountUpValue(target: number, options: CountUpValueOptions = {}): number {
+  const { duration = 900 } = options;
+  const [display, setDisplay] = useState(target);
+  const fromRef = useRef(target);
+  const frameRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const from = fromRef.current;
+    if (from === target || prefersReducedMotion() || typeof requestAnimationFrame === 'undefined') {
+      fromRef.current = target;
+      setDisplay(target);
+      return;
+    }
+
+    const start = performance.now();
+    const delta = target - from;
+
+    const tick = (now: number) => {
+      const progress = Math.min(1, (now - start) / duration);
+      setDisplay(Math.round(from + delta * easeOutExpo(progress)));
+      if (progress < 1) {
+        frameRef.current = requestAnimationFrame(tick);
+      } else {
+        fromRef.current = target;
+      }
+    };
+
+    frameRef.current = requestAnimationFrame(tick);
+
+    return () => {
+      if (frameRef.current !== null) {
+        cancelAnimationFrame(frameRef.current);
+      }
+      fromRef.current = target;
+    };
+  }, [target, duration]);
+
+  return display;
+}

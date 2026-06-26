@@ -3,6 +3,7 @@ import type { Poll } from './index';
 import { SORT_OPTIONS } from './index';
 import {
   RESULTS_VISIBILITY_LABELS,
+  RESULTS_VISIBILITY_OPTIONS,
   canRevealResults,
   isPollClosed,
   leadingOption,
@@ -115,6 +116,24 @@ describe('normalizeResultsVisibility / RESULTS_VISIBILITY_LABELS', () => {
   it('exposes a label set for both visibilities', () => {
     expect(RESULTS_VISIBILITY_LABELS.always.full).toBe('실시간 결과 공개');
     expect(RESULTS_VISIBILITY_LABELS.afterVote.full).toBe('투표 후 결과 공개');
+  });
+
+  it('carries a description on every label entry', () => {
+    expect(RESULTS_VISIBILITY_LABELS.afterVote.description).toBeTruthy();
+    expect(RESULTS_VISIBILITY_LABELS.always.description).toBeTruthy();
+  });
+});
+
+describe('RESULTS_VISIBILITY_OPTIONS', () => {
+  it('has both visibilities in order with label+description from the label set', () => {
+    expect(RESULTS_VISIBILITY_OPTIONS.map((option) => option.value)).toEqual([
+      'afterVote',
+      'always',
+    ]);
+    for (const option of RESULTS_VISIBILITY_OPTIONS) {
+      expect(option.label).toBe(RESULTS_VISIBILITY_LABELS[option.value].short);
+      expect(option.description).toBe(RESULTS_VISIBILITY_LABELS[option.value].description);
+    }
   });
 });
 

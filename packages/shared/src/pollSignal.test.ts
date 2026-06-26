@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Poll } from './index';
 import {
+  CLOSING_SOON_MS,
   SIGNAL_CHIP_LABELS,
   SIGNAL_OPTIONS,
   countPollsBySignal,
@@ -9,6 +10,8 @@ import {
   filterPollsBySignalForViewer,
   hottestActivePoll,
   isCloseRacePoll,
+  isClosingSoonPoll,
+  isDeadlineSoon,
   isFeedbackRichPoll,
   isFreshPoll,
   isResultDerivedSignal,
@@ -155,6 +158,36 @@ describe('pollEngagementScore / hottestActivePoll', () => {
     const first = makePoll({ id: 'first', totalVotes: 5 });
     const second = makePoll({ id: 'second', totalVotes: 5 });
     expect(hottestActivePoll([first, second])?.id).toBe('first');
+  });
+});
+
+describe('isDeadlineSoon / CLOSING_SOON_MS', () => {
+  afterEach(() => vi.useRealTimers());
+
+  it('exports the 24h closing threshold', () => {
+    expect(CLOSING_SOON_MS).toBe(24 * 60 * 60 * 1000);
+  });
+
+  it('is true only within the threshold and still in the future', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-20T00:00:00Z'));
+    expect(isDeadlineSoon(null)).toBe(false);
+    expect(isDeadlineSoon(undefined)).toBe(false);
+    expect(isDeadlineSoon('not-a-date')).toBe(false);
+    // 23h ahead → 임박.
+    expect(isDeadlineSoon('2026-06-20T23:00:00Z')).toBe(true);
+    // 25h ahead → 아직 멀음.
+    expect(isDeadlineSoon('2026-06-21T01:00:00Z')).toBe(false);
+    // 이미 지남(과거) → false.
+    expect(isDeadlineSoon('2026-06-19T23:00:00Z')).toBe(false);
+  });
+
+  it('agrees with isClosingSoonPoll on the same threshold', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-20T00:00:00Z'));
+    const endsAt = '2026-06-20T12:00:00Z';
+    expect(isDeadlineSoon(endsAt)).toBe(true);
+    expect(isClosingSoonPoll(makePoll({ endsAt }))).toBe(true);
   });
 });
 

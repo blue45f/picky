@@ -37,6 +37,7 @@ import {
   isPollVisibility,
   POLL_CATEGORIES,
   POLL_LIMITS,
+  RESULTS_VISIBILITY_OPTIONS,
   toDateTimeLocalValue,
   VISIBILITY_OPTIONS,
   type Poll,
@@ -244,22 +245,8 @@ interface PollDraft {
   savedAt: string;
 }
 
-const RESULT_VISIBILITY_OPTIONS: Array<{
-  value: PollResultsVisibility;
-  label: string;
-  description: string;
-}> = [
-  {
-    value: 'afterVote',
-    label: '투표 후 공개',
-    description: '참여자는 선택을 마친 뒤 결과를 봅니다.',
-  },
-  {
-    value: 'always',
-    label: '항상 공개',
-    description: '공유 전부터 실시간 흐름을 보여줍니다.',
-  },
-];
+// 결과 공개 셀렉터 옵션(value+label+description)은 @picky/shared RESULTS_VISIBILITY_OPTIONS 단일 소스를 쓴다.
+// (web 작성/수정·PollDetail·토스가 동일 라벨/설명을 공유하도록 통일.)
 
 const isResultsVisibility = (value: unknown): value is PollResultsVisibility => {
   return value === 'afterVote' || value === 'always';
@@ -3049,7 +3036,7 @@ function PollSettingsSection({
             결과 공개
           </span>
           <div className="result-mode-grid">
-            {RESULT_VISIBILITY_OPTIONS.map((option) => {
+            {RESULTS_VISIBILITY_OPTIONS.map((option) => {
               const active = resultsVisibility === option.value;
               return (
                 <button

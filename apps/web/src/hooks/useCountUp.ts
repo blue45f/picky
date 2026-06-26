@@ -1,56 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
-
-const prefersReducedMotion = () =>
-  'window' in globalThis &&
-  typeof globalThis.matchMedia === 'function' &&
-  globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-// ease-out-expo — matches the design system's confident deceleration curve.
-const easeOutExpo = (t: number) => (t === 1 ? 1 : 1 - Math.pow(2, -10 * t));
+// 카운트업 모션은 packages/client(lib/motion)로 단일화했어요(웹↔토스 동일 이징·prefers-reduced-motion).
+// 페이지 소비처는 useCountUp(target, duration)→number 시그니처를 유지하도록 값-전용 변형을 감싼다.
+import { useCountUpValue } from '../../../../packages/client/src/lib/motion';
 
 /**
- * Animates a number from its previous value to `target` over `duration` ms.
- * Returns the displayed integer. Respects reduced-motion (jumps to target) and
- * never animates on the very first paint of a zero value, so there's no CLS or
- * distracting count when there's nothing to count.
+ * 값이 바뀔 때 직전값→target 으로 한 번 카운트업하는 표시 숫자 훅.
+ * 코어 동작(easeOutExpo·reduced-motion·SSR 즉시 점프)은 client/motion useCountUpValue 단일 소스.
+ * 기존 web 시그니처(target, duration)를 보존해 호출부를 바꾸지 않는다.
  */
-export const useCountUp = (target: number, duration = 900): number => {
-  const [display, setDisplay] = useState(target);
-  const fromRef = useRef(target);
-  const frameRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    const from = fromRef.current;
-    if (from === target || prefersReducedMotion() || typeof requestAnimationFrame === 'undefined') {
-      fromRef.current = target;
-      setDisplay(target);
-      return;
-    }
-
-    const start = performance.now();
-    const delta = target - from;
-
-    const tick = (now: number) => {
-      const progress = Math.min(1, (now - start) / duration);
-      const value = Math.round(from + delta * easeOutExpo(progress));
-      setDisplay(value);
-
-      if (progress < 1) {
-        frameRef.current = requestAnimationFrame(tick);
-      } else {
-        fromRef.current = target;
-      }
-    };
-
-    frameRef.current = requestAnimationFrame(tick);
-
-    return () => {
-      if (frameRef.current !== null) {
-        cancelAnimationFrame(frameRef.current);
-      }
-      fromRef.current = target;
-    };
-  }, [target, duration]);
-
-  return display;
-};
+export const useCountUp = (target: number, duration = 900): number =>
+  useCountUpValue(target, { duration });

@@ -7,8 +7,11 @@ import react from '@vitejs/plugin-react';
 // 실제 앱인토스(.ait) 빌드에는 영향이 없어요(env 미설정 시 alias 비활성).
 const previewNoTds = process.env.PREVIEW_NO_TDS === '1';
 const tdsShim = fileURLToPath(new URL('./src/tds-shim.tsx', import.meta.url));
-// @picky/shared bare specifier를 소스로 직접 해소해요 — ait 빌드의 collect-package-version 플러그인이
-// workspace 패키지(@picky/shared) 경로 추출에 실패하는 걸 우회하고, typecheck=src/runtime=dist 스테일니스도 없애요.
+// 의도적 typecheck/런타임 백스톱 — 토스 소스는 전부 `../shared` 상대 어댑터로 @picky/shared 를
+// 소비하므로(bare specifier 실소비 0), 이 alias 는 누군가 bare `@picky/shared` 를 쓰더라도
+// tsconfig.app.json paths 와 동일한 타깃(packages/shared/src/index)으로 해소되도록 두는 안전망이에요.
+// 동시에 ait 빌드의 collect-package-version 플러그인이 workspace 패키지(@picky/shared) 경로 추출에
+// 실패하는 걸 우회하고, typecheck=src/runtime=dist 스테일니스도 없애요(둘 다 src 단일 타깃).
 const sharedSrc = fileURLToPath(new URL('../../packages/shared/src/index.ts', import.meta.url));
 
 // https://vite.dev/config/

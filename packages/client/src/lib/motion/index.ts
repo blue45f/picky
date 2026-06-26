@@ -11,11 +11,14 @@ export { useReducedMotion } from './useReducedMotion';
 export { useReveal } from './useReveal';
 export type { RevealOptions, RevealState } from './useReveal';
 
+export { useScrollReveal } from './useScrollReveal';
+export type { ScrollRevealOptions } from './useScrollReveal';
+
 export { Reveal } from './Reveal';
 export type { RevealProps } from './Reveal';
 
-export { useCountUp } from './useCountUp';
-export type { CountUpOptions, CountUpState } from './useCountUp';
+export { useCountUp, useCountUpValue } from './useCountUp';
+export type { CountUpOptions, CountUpState, CountUpValueOptions } from './useCountUp';
 
 export { CountUp } from './CountUp';
 export type { CountUpProps } from './CountUp';

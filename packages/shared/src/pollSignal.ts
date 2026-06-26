@@ -33,8 +33,31 @@ export const isResultDerivedSignal = (signal: PollSignal): boolean =>
   signal === 'closeRace' || signal === 'feedbackRich';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
-const CLOSING_SOON_MS = 24 * 60 * 60 * 1000;
+/**
+ * 마감 임박 기준(ms). 마감까지 남은 시간이 이 값 이하이면(아직 진행 중) "임박"으로 본다.
+ * web/toss 가 24h 임계값을 각자 인라인으로 재구현하던 드리프트를 막는 단일 소스(export).
+ */
+export const CLOSING_SOON_MS = 24 * 60 * 60 * 1000;
 const FRESH_MAX_DAYS = 3;
+
+/**
+ * 마감 임박 여부(raw ISO 문자열) — 마감 시각까지 남은 시간이 0 초과 ~ CLOSING_SOON_MS 이하면 true.
+ *
+ * Poll 객체가 아니라 endsAt 문자열만 받는다(목록 카드·토스 format 처럼 Poll 을 안 들고 있는 곳에서
+ * 토스 `isDeadlineSoon` 인라인 24h 재구현을 대체하기 위한 단일 소스). 마감 없음·무효·이미 마감은 false.
+ * (Poll 을 들고 있으면 `isClosingSoonPoll` 을 쓰면 된다 — 동일 임계값을 공유한다.)
+ */
+export const isDeadlineSoon = (endsAt: string | null | undefined): boolean => {
+  if (!endsAt) {
+    return false;
+  }
+  const endsAtTime = new Date(endsAt).getTime();
+  if (!Number.isFinite(endsAtTime)) {
+    return false;
+  }
+  const remainingMs = endsAtTime - Date.now();
+  return remainingMs > 0 && remainingMs <= CLOSING_SOON_MS;
+};
 
 /** 생성 후 경과 일수. 파싱 실패면 +Infinity(신규 아님). */
 export const getPollAgeDays = (createdAt: string): number => {

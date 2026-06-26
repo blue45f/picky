@@ -14,7 +14,12 @@ import {
 import { usePollStore } from '../store/usePollStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
-import { fromDateTimeLocalValue, toDateTimeLocalValue, VISIBILITY_OPTIONS } from '@picky/shared';
+import {
+  fromDateTimeLocalValue,
+  RESULTS_VISIBILITY_OPTIONS,
+  toDateTimeLocalValue,
+  VISIBILITY_OPTIONS,
+} from '@picky/shared';
 import type { Poll, PollResultsVisibility, PollVisibility, UpdatePollInput } from '@picky/shared';
 
 // datetime-local <-> ISO 변환은 @picky/shared format 단일 소스를 쓴다(web/toss 동일 규약).
@@ -27,23 +32,7 @@ const endsAtToLocalInput = (value?: string | null): string => {
   return Number.isFinite(date.getTime()) ? toDateTimeLocalValue(date) : '';
 };
 
-const RESULT_VISIBILITY_OPTIONS: Array<{
-  value: PollResultsVisibility;
-  label: string;
-  description: string;
-}> = [
-  {
-    value: 'afterVote',
-    label: '투표 후 공개',
-    description: '참여자는 선택을 마친 뒤 결과를 봅니다.',
-  },
-  {
-    value: 'always',
-    label: '항상 공개',
-    description: '공유 전부터 실시간 흐름을 보여줍니다.',
-  },
-];
-
+// 결과 공개 셀렉터 옵션은 @picky/shared RESULTS_VISIBILITY_OPTIONS 단일 소스를 쓴다(작성/수정·토스 정합).
 // 공개 범위 옵션은 @picky/shared VISIBILITY_OPTIONS 단일 소스를 쓴다(라벨/설명 동일).
 // 비공개 선택 시 접근 코드 입력을 노출한다.
 
@@ -697,7 +686,7 @@ export const EditPoll: React.FC = () => {
             결과 공개
           </span>
           <div className="result-mode-grid">
-            {RESULT_VISIBILITY_OPTIONS.map((option) => {
+            {RESULTS_VISIBILITY_OPTIONS.map((option) => {
               const active = resultsVisibility === option.value;
               return (
                 <button

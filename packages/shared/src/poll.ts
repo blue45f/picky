@@ -34,25 +34,44 @@ export const normalizeResultsVisibility = (
 
 /**
  * resultsVisibility 표시 라벨 — web/toss 두 앱이 동일 문구를 쓰도록 한 곳에서 통일.
- * - full : 설정/상세 헤더용 풀 라벨
- * - short: 작성 셀렉터/칩용 짧은 라벨(이모지 포함)
- * - hint : 왜 그렇게 보이는지 한 줄 안내
+ * - full        : 설정/상세 헤더용 풀 라벨
+ * - short       : 작성 셀렉터/칩용 짧은 라벨(이모지 포함)
+ * - hint        : 왜 그렇게 보이는지 한 줄 안내
+ * - description : 작성/수정 셀렉터 카드의 한 줄 설명(어떤 동작인지 — hint 보다 행동 중심)
  */
 export const RESULTS_VISIBILITY_LABELS: Record<
   PollResultsVisibility,
-  { full: string; short: string; hint: string }
+  { full: string; short: string; hint: string; description: string }
 > = {
   afterVote: {
     full: '투표 후 결과 공개',
     short: '투표하고 보기 🗳️',
     hint: '다른 의견에 영향을 덜 받도록 투표한 뒤에 결과가 열려요.',
+    description: '참여자는 선택을 마친 뒤 결과를 봐요.',
   },
   always: {
     full: '실시간 결과 공개',
     short: '항상 공개 👀',
     hint: '투표하지 않아도 실시간 집계 결과를 볼 수 있어요.',
+    description: '공유 전부터 실시간 흐름을 보여줘요.',
   },
 };
+
+/**
+ * 결과 공개 셀렉터 옵션 — web 작성/수정 화면(CreatePoll/EditPoll)의 로컬 재정의를 대체할 단일 소스.
+ * value+label+description 으로, 카드형 셀렉터(라벨 + 한 줄 설명)에 바로 쓸 수 있다.
+ * label 은 RESULTS_VISIBILITY_LABELS.short(이모지 포함)·description 은 그 description 을 그대로 끌어온다
+ * (라벨/설명을 한 곳에서 관리해 web/toss 드리프트를 막는다). 렌더 순서는 afterVote → always.
+ */
+export const RESULTS_VISIBILITY_OPTIONS: ReadonlyArray<{
+  value: PollResultsVisibility;
+  label: string;
+  description: string;
+}> = (['afterVote', 'always'] as const).map((value) => ({
+  value,
+  label: RESULTS_VISIBILITY_LABELS[value].short,
+  description: RESULTS_VISIBILITY_LABELS[value].description,
+}));
 
 /** afterVote 폴에서 아직 결과를 못 본 사람에게 보여줄 안내 문구. */
 export const RESULTS_LOCKED_HINT = '투표하면 결과가 보여요';
