@@ -1,3 +1,4 @@
+import { usePlatform } from '@heejun/platform-bridge';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Button } from '@toss/tds-mobile';
@@ -11,7 +12,7 @@ import {
   buildPollResultText,
   pollTossDeepLink,
   resolvePollShareUrl,
-  sharePoll,
+  resolveShareText,
   copyText,
 } from '../lib/pollShare';
 import { isPollClosed, leadingOption, optionsByVotes } from '../lib/poll';
@@ -64,6 +65,8 @@ export function PollDetailPage() {
   const { displayName, setDisplayName, userKey } = useIdentity();
   const myId = useAuthStore((state) => state.user?.id ?? null);
   const { showToast } = useToast();
+  // 네이티브 공유는 공통 패키지 @heejun/platform-bridge 로 단일화(토스 네이티브→웹공유→클립보드 폴백).
+  const platform = usePlatform();
 
   const [selectedOptionId, setSelectedOptionId] = useState<number | null>(null);
   const [comment, setComment] = useState('');
@@ -267,11 +270,13 @@ export function PollDetailPage() {
   const handleShare = async () => {
     if (!poll) return;
     hapticFeedback('tap');
-    const result = await sharePoll(poll, shareUrl);
-    // 토스 Analytics: 공유. 식별값 없이 공유 방식만(취소=null은 미로깅).
-    if (result) trackShare(result);
-    if (result === 'clipboard') showToast('링크를 클립보드에 담았어요 📋');
-    else if (result == null) showToast('공유를 취소했어요 🥺');
+    // 공유 문구는 @picky/shared(resolveShareText), URL은 토스 안=토스링크/밖=공개 웹(shareUrl).
+    // 브리지가 토스 네이티브 공유 → navigator.share → 클립보드 순으로 폴백한다.
+    const result = await platform.share({ text: resolveShareText(poll), url: shareUrl });
+    // 토스 Analytics: 공유. 식별값 없이 공유 방식만(취소/미지원은 미로깅).
+    if (result === 'shared' || result === 'copied') trackShare(result);
+    if (result === 'copied') showToast('링크를 클립보드에 담았어요 📋');
+    else if (result === 'dismissed') showToast('공유를 취소했어요 🥺');
   };
 
   const handleCopy = async () => {

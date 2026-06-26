@@ -14,6 +14,8 @@ picky(PickFlow) 웹 서비스를 [앱인토스](https://apps-in-toss.toss.im/) W
 
 ## 네이티브(토스) 인터랙션
 
+- 공유·클립보드·외부링크 등 공통 네이티브 능력은 공통 패키지 `@heejun/platform-bridge` 로 단일화해요
+  (web/toss 동일 계약 `usePlatform()`, 토스 구현은 `src/platform/tossBridge.ts` 에서 주입).
 - `lib/toss.ts` 브릿지 래퍼는 토스 밖(브라우저/개발)에서 모두 안전 폴백해요.
 - 선택/투표/오류에 `generateHapticFeedback` 햅틱, 첫 투표 후 `requestReview` 리뷰 요청 시트,
   공유는 토스 네이티브 → `navigator.share` → 클립보드 순 폴백.

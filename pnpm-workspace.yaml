@@ -27,6 +27,7 @@ minimumReleaseAgeExclude:
   - '@apps-in-toss/web-bridge@2.9.1'
   - '@apps-in-toss/web-config@2.9.1'
   - '@apps-in-toss/web-framework@2.9.1'
+  - '@heejun/platform-bridge@0.1.0'
   - '@vercel/blob@2.4.1'
 
 overrides:
