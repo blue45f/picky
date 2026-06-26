@@ -1617,6 +1617,9 @@ function ShareSection(
   }>,
 ) {
   const { shareUrl, showResults, onShare, onCopy, onCopyResult, children } = props;
+  // QR·SNS 미리보기·공유 문구는 기본 접힘 — 핵심 CTA(공유/복사)만 보여 세로 스크롤을 짧게 유지하고,
+  // 더 필요한 사람만 펼쳐 보게 해요(웹은 모달로 같은 옵션을 진행적으로 노출 → UX 정합).
+  const [showMore, setShowMore] = useState(false);
   return (
     <div
       style={{
@@ -1707,22 +1710,49 @@ function ShareSection(
         </button>
       )}
 
-      {/* QR 태그 포함 완전 통합 공유 영역 — 직관적으로 스캔/복사 강조 */}
-      <div style={{ marginTop: 6 }}>
-        <div
-          style={{
-            fontSize: 13,
-            color: theme.textMuted,
-            marginBottom: 6,
-            textAlign: 'center',
-            lineHeight: 1.5,
-          }}
-        >
-          {VOICE.scanHint}
-        </div>
-        {shareUrl ? <PollShareQrSection shareUrl={shareUrl} onCopyLink={onCopy} /> : null}
-      </div>
-      {children}
+      {/* 공유 옵션 더보기 — QR·SNS 미리보기·상황별 문구를 접어 둔 디스클로저(기본 접힘). */}
+      <button
+        type="button"
+        className="pressable"
+        aria-expanded={showMore}
+        onClick={() => setShowMore((prev) => !prev)}
+        style={{
+          minHeight: 44,
+          borderRadius: 14,
+          background: 'transparent',
+          color: theme.textMuted,
+          fontWeight: 700,
+          fontSize: 13,
+          border: `1px dashed ${theme.borderStrong}`,
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 6,
+        }}
+      >
+        {showMore ? 'QR·SNS 미리보기·공유 문구 접기 ▴' : 'QR·SNS 미리보기·공유 문구 더보기 ▾'}
+      </button>
+      {showMore ? (
+        <>
+          {/* QR 태그 포함 완전 통합 공유 영역 — 직관적으로 스캔/복사 강조 */}
+          <div style={{ marginTop: 6 }}>
+            <div
+              style={{
+                fontSize: 13,
+                color: theme.textMuted,
+                marginBottom: 6,
+                textAlign: 'center',
+                lineHeight: 1.5,
+              }}
+            >
+              {VOICE.scanHint}
+            </div>
+            {shareUrl ? <PollShareQrSection shareUrl={shareUrl} onCopyLink={onCopy} /> : null}
+          </div>
+          {children}
+        </>
+      ) : null}
     </div>
   );
 }

@@ -22,7 +22,7 @@ vi.mock('@toss/tds-mobile', async () => {
 // This test renders the FULL shipped PollDetailView with the fixture.
 // It asserts that the integrated share area (including the real PollShareQrSection) appears in the output.
 describe('PollDetailView full render (verif)', () => {
-  it('output from full view contains the integrated QR block (QR 태그, data uri img, share context)', () => {
+  it('output from full view shows share CTAs + the QR/SNS/templates disclosure toggle (collapsed by default)', () => {
     const html = renderToStaticMarkup(
       React.createElement(PollDetailView, {
         poll: fixturePoll,
@@ -59,9 +59,10 @@ describe('PollDetailView full render (verif)', () => {
       }),
     );
 
-    // Integrated share card from the real View (which includes PollShareQrSection)
-    expect(html).toContain('QR 태그');
-    expect(html).toMatch(/data:image\/svg\+xml/);
+    // Integrated share card from the real View — QR·SNS 미리보기·공유 문구는 세로 스크롤 압축을 위해
+    // 기본 접힘 디스클로저 뒤에 둬요. 초기 렌더엔 공유 CTA + 더보기 토글이 보여요.
+    expect(html).toContain('친구에게 물어보기'); // 항상 보이는 핵심 공유 CTA
+    expect(html).toContain('QR·SNS 미리보기·공유 문구 더보기'); // QR/미리보기/템플릿 디스클로저 토글
     expect(html).toContain(fixturePoll.question); // full context from the view
 
     // Stage 2 feature parity: rich decision tools (consumed from @picky/shared) are wired into the view.
@@ -70,7 +71,6 @@ describe('PollDetailView full render (verif)', () => {
     expect(html).toContain('결정 메모'); // DecisionMemoSheet
     expect(html).toContain('의견 토픽 클라우드'); // OpinionTopicCloud
     expect(html).toContain('결과 이미지로 저장'); // ResultImageExport
-    expect(html).toContain('상황별 공유 문구'); // ShareTemplates
 
     // AC1: question prominent hero (large size/weight first)
     expect(html).toMatch(/font-size:26|fontSize:\s*26|font-weight:900|fontWeight:\s*900/);
@@ -78,7 +78,8 @@ describe('PollDetailView full render (verif)', () => {
     // AC2/3: compact top meta, voting options appear before heavy secondary (share/QR)
     expect(html).toMatch(/명 참여/); // compact meta
     const firstOptPos = html.indexOf('>강남 고기집');
-    const sharePos = html.indexOf('QR 태그 스캔');
+    // 공유 섹션(접힘 디스클로저 포함)은 투표 옵션 뒤에 와야 한다 — 핵심 액션(투표) 우선.
+    const sharePos = html.indexOf('QR·SNS 미리보기·공유 문구 더보기');
     expect(qPos).toBeGreaterThan(-1);
     if (firstOptPos > -1 && sharePos > -1) {
       expect(firstOptPos).toBeLessThan(sharePos); // options before heavy share section
