@@ -2633,7 +2633,7 @@ function ShareCopyPresets(
             whiteSpace: 'nowrap',
           }}
         >
-          3개 채널
+          {shareCopyPresets.length}개 채널
         </span>
       </div>
 
