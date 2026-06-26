@@ -350,6 +350,36 @@ export function PollDetailPage() {
     return false;
   };
 
+  // 독립 한마디(투표 후 결과 화면에서 새 한마디) — parentId 없이 최상위 한마디로 등록.
+  // 투표 시 한마디(handleVote)와 동일한 식별/비번 규약을 따른다(voterKey + 선택 관리 비번).
+  const handleAddComment = async (text: string, password?: string) => {
+    if (!poll) return;
+    const trimmedPassword = (password ?? '').trim();
+    if (trimmedPassword.length > 0 && trimmedPassword.length < COMMENT_PASSWORD_MIN) {
+      hapticFeedback('error');
+      showToast(`🔒 비번은 ${COMMENT_PASSWORD_MIN}자 이상으로 정해 주세요`);
+      return;
+    }
+    const result = await addComment(
+      poll.id,
+      {
+        comment: text,
+        voterName: voterName.trim() || null,
+        voterKey: userKey ?? null,
+        password: trimmedPassword.length >= COMMENT_PASSWORD_MIN ? trimmedPassword : null,
+      },
+      activeCode,
+    );
+    if (result) {
+      trackComment(false);
+      hapticFeedback('success');
+      showToast('한마디를 남겼어요 💬');
+    } else {
+      hapticFeedback('error');
+      showToast('한마디 등록에 실패했어요 😢');
+    }
+  };
+
   const handleAddReply = async (parentId: number, text: string, password?: string) => {
     if (!poll) return;
     // 선택적 관리 비번: 입력했는데 최소 길이 미만이면 막고 안내만 — 빈 값은 그대로 통과(프릭션 0).
@@ -516,6 +546,7 @@ export function PollDetailPage() {
       onDeleteComment={handleDeleteComment}
       onEditComment={handleEditComment}
       onAddReply={handleAddReply}
+      onAddComment={handleAddComment}
       remaining={remaining}
       shareUrl={shareUrl}
       onShare={handleShare}

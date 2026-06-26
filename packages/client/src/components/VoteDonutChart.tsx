@@ -5,6 +5,24 @@ import type { CSSProperties, ReactNode } from 'react';
  * 선택지 색 팔레트(OPTION_COLORS)와 중앙 라벨 스타일·빈 상태는 **prop으로 주입**해
  * 각 앱이 자기 디자인 토큰(웹 CSS 변수 / 토스 theme)을 쓰도록 했어요.
  */
+/**
+ * 선택지별 차트 색 기본 팔레트(OKLCH, 테마 독립) — web/toss 두 앱이 공유해요.
+ * 코어 차트는 `colors` prop 으로 팔레트를 주입받으므로, 두 앱 래퍼가 같은 값을
+ * 재선언하지 않도록 여기서 단일 소스로 노출해요(선택지 색이 두 플랫폼에서 일관).
+ */
+export const DEFAULT_OPTION_COLORS = [
+  'oklch(62% 0.18 260)', // Indigo
+  'oklch(78% 0.14 85)', // Gold
+  'oklch(72% 0.15 170)', // Teal
+  'oklch(64% 0.18 25)', // Coral
+  'oklch(60% 0.15 320)', // Purple
+  'oklch(70% 0.12 130)', // Lime
+  'oklch(65% 0.15 210)', // Cyan
+  'oklch(75% 0.11 60)', // Orange
+  'oklch(58% 0.16 290)', // Magenta
+  'oklch(68% 0.14 100)', // Olive
+] as const;
+
 export interface VoteDonutChartOption {
   id: number;
   text: string;

@@ -17,8 +17,12 @@ export * from './decisionMemo';
 export * from './pollReport';
 export * from './snsPreview';
 export * from './pollNarrative';
+export * from './opinionTopics';
 
-// 공유 텍스트·오리진 정규화 코어(앱별 URL resolver 는 각 앱 lib/pollShare.ts 에 둠).
+// 한마디(댓글) 정렬·필터 보기 모드 — web/toss 동일 정렬·필터·빈 상태.
+export * from './pollComments';
+
+// 공유 텍스트·오리진 정규화 코어 + 상황별 공유 문구 프리셋(앱별 URL resolver 는 각 앱 lib/pollShare.ts).
 export * from './pollShare';
 
 export const PollResultsVisibilitySchema = z.enum(['afterVote', 'always']);

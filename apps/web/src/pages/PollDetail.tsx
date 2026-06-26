@@ -48,7 +48,7 @@ import { LiveFacilitationConsole } from '../components/LiveFacilitationConsole';
 import { OpinionTopicCloud } from '../components/OpinionTopicCloud';
 import { ActionItemPlanner } from '../components/ActionItemPlanner';
 import { StakeholderReportBuilder } from '../components/StakeholderReportBuilder';
-import type { Poll, PollResultsVisibility } from '@picky/shared';
+import type { Poll, PollResultsVisibility, CommentViewMode, CommentFilter } from '@picky/shared';
 import {
   MASCOT,
   VOICE,
@@ -59,6 +59,9 @@ import {
   optionsByVotes,
   buildConsensusNarrative as buildConsensusNarrative_shared,
   buildDecisionMemo,
+  buildCommentViews as buildCommentViewsShared,
+  buildSharePresets,
+  COMMENT_VIEW_OPTIONS,
   COMMENT_PASSWORD_MAX,
   COMMENT_PASSWORD_MIN,
   RESULTS_VISIBILITY_LABELS as SHARED_RESULTS_VISIBILITY_LABELS,
@@ -104,7 +107,7 @@ const RESULTS_VISIBILITY_LABELS: Record<PollResultsVisibility, string> = {
 };
 
 type ResultSummaryMode = 'brief' | 'detailed';
-type CommentViewMode = 'latest' | 'byOption' | 'highlights';
+// CommentViewMode/COMMENT_VIEW_OPTIONS 는 @picky/shared 에서 가져와요(웹↔토스 동일 정렬 옵션).
 // ResultImageTheme/ResultImageContentKey/ResultImageContentOptions/DEFAULT_RESULT_IMAGE_CONTENT
 // 는 packages/client(resultImageCanvas)에서 가져와요(웹↔토스 동일 소스).
 type OperationChecklistAction = 'share' | 'copyLink' | 'resultImage' | 'present';
@@ -113,12 +116,6 @@ type InviteMessageTone = 'default' | 'deadline' | 'reason';
 const RESULT_SUMMARY_OPTIONS: Array<{ value: ResultSummaryMode; label: string }> = [
   { value: 'brief', label: '짧게' },
   { value: 'detailed', label: '자세히' },
-];
-
-const COMMENT_VIEW_OPTIONS: Array<{ value: CommentViewMode; label: string }> = [
-  { value: 'latest', label: '최신순' },
-  { value: 'byOption', label: '선택지별' },
-  { value: 'highlights', label: '핵심 의견' },
 ];
 
 const RESULT_IMAGE_THEME_OPTIONS: Array<{
@@ -5447,60 +5444,18 @@ function buildOperationChecklist(
 function buildCommentViews(
   args: Readonly<{
     currentPoll: Poll;
-    commentFilter: 'all' | number;
+    commentFilter: CommentFilter;
     commentViewMode: CommentViewMode;
   }>,
 ) {
   const { currentPoll, commentFilter, commentViewMode } = args;
-  const commentFilterOptions = currentPoll.options.map((option) => ({
-    id: option.id,
-    label: option.text,
-    count: currentPoll.comments.filter(
-      (commentItem) =>
-        commentItem.selectedOptionId === option.id ||
-        commentItem.selectedOptionText === option.text,
-    ).length,
-  }));
-  const targetCommentOption =
-    commentFilter === 'all'
-      ? null
-      : currentPoll.options.find((option) => option.id === commentFilter);
-  const filteredComments =
-    commentFilter === 'all'
-      ? currentPoll.comments
-      : currentPoll.comments.filter(
-          (commentItem) =>
-            commentItem.selectedOptionId === commentFilter ||
-            commentItem.selectedOptionText === targetCommentOption?.text,
-        );
-  const displayedComments = [...filteredComments].sort((a, b) => {
-    if (commentViewMode === 'byOption') {
-      const optionCompare = (a.selectedOptionText || '').localeCompare(
-        b.selectedOptionText || '',
-        'ko-KR',
-      );
-      if (optionCompare !== 0) {
-        return optionCompare;
-      }
-    }
-
-    if (commentViewMode === 'highlights') {
-      const lengthCompare = b.comment.trim().length - a.comment.trim().length;
-      if (lengthCompare !== 0) {
-        return lengthCompare;
-      }
-    }
-
-    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  // 정렬·필터·필터옵션·빈 상태 문구는 @picky/shared(buildCommentViews)로 단일화했어요(웹↔토스 동일 로직).
+  const { commentFilterOptions, visibleComments, emptyCommentMessage } = buildCommentViewsShared({
+    poll: currentPoll,
+    commentFilter,
+    commentViewMode,
   });
-  const visibleComments =
-    commentViewMode === 'highlights' ? displayedComments.slice(0, 5) : displayedComments;
-  let emptyCommentMessage = '선택한 항목에 연결된 피드백이 없습니다.';
-  if (commentViewMode === 'highlights') {
-    emptyCommentMessage = '핵심 의견으로 보여줄 피드백이 없습니다.';
-  } else if (commentFilter === 'all') {
-    emptyCommentMessage = '아직 표시할 피드백이 없습니다.';
-  }
+  // 선택지별 한마디 요약(결과 요약 카드 전용 — 공유 모듈엔 없는 웹 부가 산출물)은 여기서 계산해요.
   const commentSummaryRows = currentPoll.options
     .map((option) => {
       const comments = currentPoll.comments
@@ -5798,32 +5753,22 @@ function buildPollViewModel(
   const kakaoShareDiagnostics = getKakaoShareDiagnostics(currentPoll);
   const kakaoShareReadinessItems = kakaoShareDiagnostics.items;
   const kakaoReadyCount = kakaoShareDiagnostics.readyCount;
-  const shareCopyPresets = [
-    {
-      id: 'kakao-room',
-      label: '카톡 단톡방',
-      title: '가볍게 투표 요청',
-      description: '친구나 팀 단톡방에 바로 붙여넣기 좋은 짧은 문구',
-      accent: 'var(--brand-accent-gold)',
-      text: `${resolveShareText(currentPoll)}\n\n30초만 골라주세요. 이유도 한 줄 남겨주면 결정에 바로 반영할게요.\n${shareUrl}`,
-    },
-    {
-      id: 'meeting',
-      label: '회의/수업',
-      title: '참여 코드 강조',
-      description: '발표 화면, 오프라인 모임, 수업에서 링크와 참여 안내를 같이 전달',
-      accent: 'var(--brand-accent-teal)',
-      text: `실시간 의견을 모으는 투표입니다.\n\n질문: ${currentPoll.question}\n참여 링크: ${shareUrl}\n결과는 투표 후 바로 확인해 주세요.`,
-    },
-    {
-      id: 'social',
-      label: 'SNS 게시',
-      title: '맥락 포함 공유',
-      description: '스토리, 커뮤니티, X 같은 공개 채널에 맞춘 설명형 문구',
-      accent: 'var(--brand-primary)',
-      text: `${currentPoll.question}\n\n선택지가 고민돼서 투표로 의견을 모으고 있어요. 가장 납득되는 선택에 투표하고 이유를 남겨주세요.\n${shareUrl}`,
-    },
-  ];
+  // 상황별 공유 문구는 @picky/shared(buildSharePresets)로 단일화했어요(웹↔토스 동일 4종·동일 문구).
+  // 카드 색(accent)만 웹 브랜드 토큰으로 입혀요(콘텐츠는 공유, 표현은 앱별).
+  const SHARE_PRESET_ACCENT: Record<string, string> = {
+    kakao: 'var(--brand-accent-gold)',
+    meeting: 'var(--brand-accent-teal)',
+    social: 'var(--brand-primary)',
+    reminder: 'var(--brand-accent-gold)',
+  };
+  const shareCopyPresets = buildSharePresets(currentPoll, shareUrl).map((preset) => ({
+    id: preset.id,
+    label: preset.label,
+    title: preset.title,
+    description: preset.hint,
+    accent: SHARE_PRESET_ACCENT[preset.id] ?? 'var(--brand-primary)',
+    text: preset.body,
+  }));
   const embedCodeModes = [
     {
       id: 'standard',

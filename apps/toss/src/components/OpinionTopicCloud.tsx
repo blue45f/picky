@@ -7,7 +7,7 @@
  */
 import { useMemo, useState } from 'react';
 import type { Poll } from '../shared';
-import { extractKeywords, optionsByVotes } from '../shared';
+import { buildOpinionTopics, buildOpinionTopicBriefing } from '../shared';
 import { theme, FONT } from '../theme';
 
 type OpinionTopicCloudProps = Readonly<{
@@ -22,48 +22,15 @@ export function OpinionTopicCloud({ poll, onCopyText }: OpinionTopicCloudProps) 
   const [copied, setCopied] = useState(false);
 
   const topic = useMemo(() => {
-    const comments = poll.comments || [];
-    const commentTexts = comments.map((item) => item.comment).filter(Boolean);
-    const topKeywords = extractKeywords(commentTexts, 16);
-    const maxCount = Math.max(1, ...topKeywords.map((stat) => stat.count));
-
-    const optionGroups = optionsByVotes(poll).map((option) => {
-      const optionTexts = comments
-        .filter((item) => item.selectedOptionId === option.id)
-        .map((item) => item.comment)
-        .filter(Boolean);
-      return {
-        optionId: option.id,
-        optionText: option.text,
-        voteCount: option.voteCount,
-        keywords: extractKeywords(optionTexts, 5),
-      };
-    });
-
-    const keywordLine =
-      topKeywords.length > 0
-        ? topKeywords.map((keyword) => `${keyword.word}(${keyword.count})`).join(', ')
-        : '반복 키워드 없음';
-    const optionLines = optionGroups
-      .map((group) => {
-        const words =
-          group.keywords.length > 0
-            ? group.keywords.map((keyword) => `${keyword.word}(${keyword.count})`).join(', ')
-            : '키워드 없음';
-        return `- ${group.optionText}: ${words}`;
-      })
-      .join('\n');
-    const summaryText = [
-      '[picky 의견 토픽 브리핑]',
-      `질문: ${poll.question}`,
-      `의견 수: ${comments.length}개`,
-      `전체 반복 키워드: ${keywordLine}`,
-      '',
-      '[선택지별 키워드]',
-      optionLines || '- 아직 선택지별 의견이 없습니다.',
-    ].join('\n');
-
-    return { commentCount: comments.length, topKeywords, maxCount, optionGroups, summaryText };
+    // 토픽 콘텐츠/브리핑은 @picky/shared 로 단일화했어요(웹과 동일 로직·동일 출력, 18키워드).
+    const topics = buildOpinionTopics(poll);
+    return {
+      commentCount: topics.commentCount,
+      topKeywords: topics.topKeywords,
+      maxCount: topics.maxCount,
+      optionGroups: topics.optionGroups,
+      summaryText: buildOpinionTopicBriefing(poll, topics),
+    };
   }, [poll]);
 
   const handleCopy = () => {

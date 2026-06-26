@@ -1,91 +1,25 @@
 import { useMemo, useState } from 'react';
 import { Check, Copy, MessageCircle, Sparkles, Tags, TrendingUp } from 'lucide-react';
 import type { Poll } from '@picky/shared';
-import { extractKeywords as extractKeywordStats } from '@picky/shared';
+import { buildOpinionTopics, buildOpinionTopicBriefing } from '@picky/shared';
 import { copyText } from '../lib/pollShare';
-
-type KeywordStat = {
-  word: string;
-  count: number;
-  weight: number;
-};
-
-type OptionKeywordGroup = {
-  optionId: number;
-  optionText: string;
-  voteCount: number;
-  keywords: KeywordStat[];
-};
 
 type OpinionTopicCloudProps = Readonly<{
   poll: Poll;
 }>;
 
-// 토크나이저/키워드 추출 코어는 @picky/shared 로 단일화했어요(토스 앱과 동일 로직).
-// 토픽 클라우드 폰트 크기용 weight(최대 빈도 대비 비율)만 여기서 덧붙여요.
-const extractKeywords = (texts: string[], limit: number): KeywordStat[] => {
-  const stats = extractKeywordStats(texts, limit);
-  const maxCount = Math.max(1, ...stats.map((stat) => stat.count));
-  return stats.map((stat) => ({ ...stat, weight: stat.count / maxCount }));
-};
-
-const buildSummaryText = (
-  poll: Poll,
-  topKeywords: KeywordStat[],
-  optionGroups: OptionKeywordGroup[],
-): string => {
-  const keywordLine =
-    topKeywords.length > 0
-      ? topKeywords.map((keyword) => `${keyword.word}(${keyword.count})`).join(', ')
-      : '반복 키워드 없음';
-  const optionLines = optionGroups
-    .map((group) => {
-      const words =
-        group.keywords.length > 0
-          ? group.keywords.map((keyword) => `${keyword.word}(${keyword.count})`).join(', ')
-          : '키워드 없음';
-      return `- ${group.optionText}: ${words}`;
-    })
-    .join('\n');
-
-  return [
-    `[picky 의견 토픽 브리핑]`,
-    `질문: ${poll.question}`,
-    `의견 수: ${poll.comments.length}개`,
-    `전체 반복 키워드: ${keywordLine}`,
-    '',
-    '[선택지별 키워드]',
-    optionLines || '- 아직 선택지별 의견이 없습니다.',
-  ].join('\n');
-};
-
+// 토픽 클라우드 콘텐츠/브리핑은 @picky/shared 로 단일화했어요(토스 앱과 동일 로직·동일 출력).
+// 폰트 크기용 weight(최대 빈도 대비 비율)만 렌더에서 maxCount 로 계산해요.
 export function OpinionTopicCloud({ poll }: OpinionTopicCloudProps) {
   const [copied, setCopied] = useState(false);
   const topicData = useMemo(() => {
-    const comments = poll.comments || [];
-    const commentTexts = comments.map((commentItem) => commentItem.comment).filter(Boolean);
-    const topKeywords = extractKeywords(commentTexts, 18);
-    const optionGroups = poll.options
-      .map((option) => {
-        const optionTexts = comments
-          .filter((commentItem) => commentItem.selectedOptionId === option.id)
-          .map((commentItem) => commentItem.comment)
-          .filter(Boolean);
-
-        return {
-          optionId: option.id,
-          optionText: option.text,
-          voteCount: option.voteCount,
-          keywords: extractKeywords(optionTexts, 5),
-        };
-      })
-      .sort((a, b) => b.voteCount - a.voteCount);
-
+    const topics = buildOpinionTopics(poll);
     return {
-      commentCount: comments.length,
-      optionGroups,
-      summaryText: buildSummaryText(poll, topKeywords, optionGroups),
-      topKeywords,
+      commentCount: topics.commentCount,
+      maxCount: topics.maxCount,
+      optionGroups: topics.optionGroups,
+      summaryText: buildOpinionTopicBriefing(poll, topics),
+      topKeywords: topics.topKeywords,
     };
   }, [poll]);
 
@@ -195,7 +129,8 @@ export function OpinionTopicCloud({ poll }: OpinionTopicCloudProps) {
             aria-label="의견 반복 키워드 클라우드"
           >
             {topicData.topKeywords.map((keyword, index) => {
-              const size = 0.76 + keyword.weight * 0.78;
+              const weight = keyword.count / topicData.maxCount;
+              const size = 0.76 + weight * 0.78;
               const colors = [
                 'var(--brand-accent-teal)',
                 'var(--brand-accent-gold)',
@@ -217,7 +152,7 @@ export function OpinionTopicCloud({ poll }: OpinionTopicCloudProps) {
                     fontSize: `${size}rem`,
                     fontWeight: 900,
                     lineHeight: 1,
-                    opacity: 0.78 + keyword.weight * 0.22,
+                    opacity: 0.78 + weight * 0.22,
                     transform: `rotate(${rotation})`,
                   }}
                 >

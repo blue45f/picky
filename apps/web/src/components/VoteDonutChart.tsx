@@ -1,19 +1,11 @@
 import React from 'react';
-import { VoteDonutChart as VoteDonutChartCore } from '../../../../packages/client/src/components/VoteDonutChart';
+import {
+  VoteDonutChart as VoteDonutChartCore,
+  DEFAULT_OPTION_COLORS,
+} from '../../../../packages/client/src/components/VoteDonutChart';
 
-// Option Colors for Charts (웹 디자인 토큰 색 — 코어 차트에 주입).
-export const OPTION_COLORS = [
-  'oklch(62% 0.18 260)', // Indigo
-  'oklch(78% 0.14 85)', // Gold
-  'oklch(72% 0.15 170)', // Teal
-  'oklch(64% 0.18 25)', // Coral
-  'oklch(60% 0.15 320)', // Purple
-  'oklch(70% 0.12 130)', // Lime
-  'oklch(65% 0.15 210)', // Cyan
-  'oklch(75% 0.11 60)', // Orange
-  'oklch(58% 0.16 290)', // Magenta
-  'oklch(68% 0.14 100)', // Olive
-];
+// Option Colors for Charts — 코어의 공유 팔레트를 그대로 사용(web/toss 단일 소스).
+export const OPTION_COLORS = DEFAULT_OPTION_COLORS;
 
 interface VoteDonutChartProps {
   options: { id: number; text: string; voteCount: number }[];

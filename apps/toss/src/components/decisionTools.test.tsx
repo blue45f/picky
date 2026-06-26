@@ -129,8 +129,8 @@ describe('OpinionTopicCloud (consumes extractKeywords)', () => {
   });
 });
 
-describe('ShareTemplates (consumes buildSnsPreviewContent)', () => {
-  it('renders kakao/meeting/reminder templates with the share url', () => {
+describe('ShareTemplates (consumes shared buildSharePresets)', () => {
+  it('renders the 4 canonical share presets (web parity)', () => {
     const html = renderToStaticMarkup(
       React.createElement(ShareTemplates, {
         poll: readyPoll(),
@@ -138,8 +138,9 @@ describe('ShareTemplates (consumes buildSnsPreviewContent)', () => {
         onCopyText: () => {},
       }),
     );
-    expect(html).toContain('카카오톡');
-    expect(html).toContain('회의');
+    expect(html).toContain('카톡 단톡방');
+    expect(html).toContain('회의·업무');
+    expect(html).toContain('SNS 게시');
     expect(html).toContain('리마인더');
     expect(html).toContain('상황별 공유 문구');
   });
