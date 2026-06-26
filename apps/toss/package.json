@@ -4,8 +4,8 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "granite dev",
-    "build": "ait build",
+    "dev": "vite --host localhost --port 5180",
+    "build": "vite build && ait build",
     "build:preview": "PREVIEW_NO_TDS=1 vite build",
     "deploy": "ait deploy",
     "typecheck": "tsc -b",
@@ -14,7 +14,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@apps-in-toss/web-framework": "^2.9.1",
+    "@apps-in-toss/web-framework": "^3.0.0-beta.b36d7b5",
     "@emotion/react": "^11.14.0",
     "@heejun/platform-bridge": "^0.1.0",
     "@toss/tds-mobile": "^2.5.0",
