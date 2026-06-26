@@ -1,7 +1,13 @@
 import { useState } from 'react';
 import { Button } from '@toss/tds-mobile';
 import type { Poll, PollComment, PollOption } from '../shared';
-import { MASCOT, VOICE, resolveCreatorLabel, COMMENT_PASSWORD_MAX } from '../shared';
+import {
+  MASCOT,
+  VOICE,
+  resolveCreatorLabel,
+  COMMENT_PASSWORD_MAX,
+  COMMENT_PASSWORD_MIN,
+} from '../shared';
 import { formatNumber } from '../lib/format';
 import { optionPercent } from '../lib/poll';
 import { theme, stickyActionBar, FONT } from '../theme';
@@ -62,8 +68,17 @@ interface PollDetailViewProps {
    */
   commentNeedsPassword?: (commentId: number) => boolean;
   confirmDelete: boolean;
-  onDelete: () => void;
-  /** 수정 화면 진입(소유자/어드민). 미전달 시 수정 버튼 미노출. */
+  /**
+   * 고민 삭제. 게스트(비회원) 폴은 작성 시 정한 관리 비번이 필요하므로 password 를 함께 받는다.
+   * 회원/어드민(직접 삭제)은 비번 없이 호출된다(password=undefined).
+   */
+  onDelete: (password?: string) => void;
+  /**
+   * 삭제에 관리 비번 입력이 필요한지(게스트 폴을 비번으로 관리하는 경우) 판정.
+   * true 면 두 번 탭 확정 대신 인라인 비번 확인 행으로 받아 onDelete(비번)로 넘긴다. 미전달 시 false(직접 삭제).
+   */
+  deleteNeedsPassword?: boolean;
+  /** 수정 화면 진입(소유자/어드민/게스트 비번). 미전달 시 수정 버튼 미노출. */
   onEdit?: () => void;
   /** 댓글 삭제(작성자 본인/소유자/어드민). password=다른 기기 관리용 선택 비번. 미전달 시 삭제 버튼 미노출. */
   onDeleteComment?: (commentId: number, password?: string) => void;
@@ -1281,14 +1296,15 @@ function PasswordDisclosure(
             style={inputStyle}
             value={value}
             maxLength={COMMENT_PASSWORD_MAX}
-            placeholder="관리 비번 (4~20자)"
+            placeholder={`관리 비번 (${COMMENT_PASSWORD_MIN}~${COMMENT_PASSWORD_MAX}자)`}
             aria-label="한마디 관리 비밀번호 (선택)"
             aria-describedby={helpId}
             autoComplete="new-password"
             onChange={(e) => setValue(e.target.value)}
           />
           <span id={helpId} style={{ fontSize: 12, color: theme.textFaint, lineHeight: 1.4 }}>
-            비번을 설정하면 다른 기기에서도 이 한마디를 수정/삭제할 수 있어요. (4~20자)
+            비번을 설정하면 다른 기기에서도 이 한마디를 수정/삭제할 수 있어요. (
+            {COMMENT_PASSWORD_MIN}~{COMMENT_PASSWORD_MAX}자)
           </span>
         </>
       ) : null}
@@ -1523,13 +1539,15 @@ function VoteActionBar(
   );
 }
 
-function DeleteAction(props: Readonly<{ confirmDelete: boolean; onDelete: () => void }>) {
+function DeleteAction(
+  props: Readonly<{ confirmDelete: boolean; onDelete: (password?: string) => void }>,
+) {
   const { confirmDelete, onDelete } = props;
   return (
     <button
       type="button"
       className="pressable"
-      onClick={onDelete}
+      onClick={() => onDelete()}
       style={{
         minHeight: 44,
         background: 'none',
@@ -1545,6 +1563,50 @@ function DeleteAction(props: Readonly<{ confirmDelete: boolean; onDelete: () => 
       }}
     >
       {confirmDelete ? VOICE.deleteConfirm : '지우기 🗑'}
+    </button>
+  );
+}
+
+/**
+ * 게스트(비회원) 폴 삭제 — 작성 시 정한 관리 비번이 있어야 삭제할 수 있다(다른 기기 포함).
+ * 토스 웹뷰에서 globalThis.prompt 가 불안정해, 댓글 삭제와 동일하게 카드 안 인라인 비번 행으로 받는다.
+ * '지우기' 탭 → 비번 입력 행 펼침 → 확인 시 onDelete(비번). 비번 검증·최종 권한은 서버가 강제한다.
+ */
+function GuestDeleteAction(props: Readonly<{ onDelete: (password?: string) => void }>) {
+  const { onDelete } = props;
+  const [open, setOpen] = useState(false);
+  if (open) {
+    return (
+      <InlinePasswordConfirm
+        label="고민 관리 비밀번호"
+        confirmLabel="삭제"
+        onConfirm={(password) => {
+          onDelete(password);
+          setOpen(false);
+        }}
+        onCancel={() => setOpen(false)}
+      />
+    );
+  }
+  return (
+    <button
+      type="button"
+      className="pressable"
+      onClick={() => setOpen(true)}
+      style={{
+        minHeight: 44,
+        background: 'none',
+        border: 'none',
+        color: theme.textFaint ?? theme.textMuted,
+        fontSize: 14,
+        fontWeight: 700,
+        cursor: 'pointer',
+        padding: '8px 12px',
+        borderRadius: theme.radiusSm,
+        transition: 'all 0.2s ease',
+      }}
+    >
+      지우기 🗑
     </button>
   );
 }
@@ -1579,18 +1641,24 @@ function HeaderActions(
   props: Readonly<{
     canManage: boolean;
     confirmDelete: boolean;
-    onDelete: () => void;
+    onDelete: (password?: string) => void;
+    /** 게스트 폴이라 삭제에 관리 비번이 필요한 경우(인라인 비번 행). */
+    deleteNeedsPassword?: boolean;
     onEdit?: () => void;
   }>,
 ) {
-  const { canManage, confirmDelete, onDelete, onEdit } = props;
+  const { canManage, confirmDelete, onDelete, deleteNeedsPassword, onEdit } = props;
   if (!canManage) {
     return null;
   }
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
       {onEdit ? <EditAction onEdit={onEdit} /> : null}
-      <DeleteAction confirmDelete={confirmDelete} onDelete={onDelete} />
+      {deleteNeedsPassword ? (
+        <GuestDeleteAction onDelete={onDelete} />
+      ) : (
+        <DeleteAction confirmDelete={confirmDelete} onDelete={onDelete} />
+      )}
     </div>
   );
 }
@@ -1601,12 +1669,22 @@ function DetailHeader(
     remaining: number | null;
     canManage: boolean;
     confirmDelete: boolean;
-    onDelete: () => void;
+    onDelete: (password?: string) => void;
+    deleteNeedsPassword?: boolean;
     onEdit?: () => void;
     onBack: () => void;
   }>,
 ) {
-  const { closed, remaining, canManage, confirmDelete, onDelete, onEdit, onBack } = props;
+  const {
+    closed,
+    remaining,
+    canManage,
+    confirmDelete,
+    onDelete,
+    deleteNeedsPassword,
+    onEdit,
+    onBack,
+  } = props;
   return (
     <AppBar
       onBack={onBack}
@@ -1621,6 +1699,7 @@ function DetailHeader(
           canManage={canManage}
           confirmDelete={confirmDelete}
           onDelete={onDelete}
+          deleteNeedsPassword={deleteNeedsPassword}
           onEdit={onEdit}
         />
       }
@@ -1737,6 +1816,7 @@ export function PollDetailView(props: Readonly<PollDetailViewProps>) {
     commentNeedsPassword,
     confirmDelete,
     onDelete,
+    deleteNeedsPassword,
     onEdit,
     onDeleteComment,
     onEditComment,
@@ -1781,6 +1861,7 @@ export function PollDetailView(props: Readonly<PollDetailViewProps>) {
         canManage={canManage}
         confirmDelete={confirmDelete}
         onDelete={onDelete}
+        deleteNeedsPassword={deleteNeedsPassword}
         onEdit={onEdit}
         onBack={onBack}
       />

@@ -145,7 +145,16 @@ export function PollDetailPage() {
   const leader = poll && showResults && poll.totalVotes > 0 ? leadingOption(poll) : null;
   const isOwner = Boolean(poll && myId && poll.creatorId === myId);
   const isAdmin = Boolean(useAuthStore.getState().user?.isAdmin);
-  const canManage = isOwner || isAdmin;
+  // 게스트(비회원) 폴 — 작성 회원이 따로 없으니(또는 guest- 접두 id) 작성 시 정한 관리 비번으로 관리한다.
+  // 웹에서 비회원으로 만든 고민이 토스에 공유돼 열리는 경우가 여기 해당한다(web과 동일 모델).
+  const isGuestPoll = Boolean(
+    poll && (poll.creatorIsGuest || poll.creatorId?.startsWith('guest-')),
+  );
+  // 회원 소유자/어드민이면 직접 관리, 게스트 폴이면 비번 입력 흐름으로 관리할 수 있게 버튼을 노출한다.
+  // 최종 권한(비번 일치)은 서버 assertCanManage 가 강제하므로 여기선 버튼·비번 프롬프트 노출만 결정한다.
+  const canManage = isOwner || isAdmin || isGuestPoll;
+  // 게스트 폴을 회원 소유자/어드민이 아닌 사람이 관리하려면 비번이 필요하다(인라인 비번 행).
+  const deleteNeedsPassword = isGuestPoll && !isOwner && !isAdmin;
   // 댓글별 관리(수정/삭제) 어포던스 — 본인(이 기기에서 내가 단 댓글)·폴 소유자/어드민이면 직접 관리,
   // 그 외라도 댓글에 관리 비번(hasPassword)이 걸려 있으면 비번 입력 흐름으로 관리할 수 있게 한다.
   // 서버가 최종 권한을 강제하므로 여기선 버튼 노출·비번 프롬프트 여부만 결정한다.
@@ -370,8 +379,29 @@ export function PollDetailPage() {
     }
   };
 
-  const handleDelete = async () => {
+  // password: 게스트 폴을 작성 시 정한 관리 비번으로 삭제할 때 전송(회원 소유자/어드민 직접 삭제는 undefined).
+  // 게스트 경로는 인라인 비번 입력이 이미 확인 역할을 하므로 두 번 탭 확정(confirmDelete) 없이 바로 삭제한다.
+  const handleDelete = async (password?: string) => {
     if (!poll) return;
+    const trimmedPassword = password?.trim();
+    if (deleteNeedsPassword) {
+      // 게스트 폴 — 비번이 없으면(인라인 행 우회 등) 안내만 하고 막는다. 최종 검증은 서버가 강제.
+      if (!trimmedPassword) {
+        hapticFeedback('error');
+        showToast('🔒 작성 시 정한 관리 비번을 입력해 주세요');
+        return;
+      }
+      const ok = await deletePoll(poll.id, trimmedPassword);
+      if (ok) {
+        hapticFeedback('success');
+        navigate('/', { replace: true });
+      } else {
+        hapticFeedback('error');
+        showToast('삭제하지 못했어요. 비번을 다시 확인해 주세요 😢');
+      }
+      return;
+    }
+    // 회원 소유자/어드민 — 기존 두 번 탭 확정 후 직접 삭제(비번 없음).
     if (!confirmDelete) {
       setConfirmDelete(true);
       hapticFeedback('tickWeak');
@@ -476,6 +506,7 @@ export function PollDetailPage() {
       commentNeedsPassword={commentNeedsPassword}
       confirmDelete={confirmDelete}
       onDelete={handleDelete}
+      deleteNeedsPassword={deleteNeedsPassword}
       onEdit={handleEdit}
       onDeleteComment={handleDeleteComment}
       onEditComment={handleEditComment}

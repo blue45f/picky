@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Button } from '@toss/tds-mobile';
 import {
+  COMMENT_PASSWORD_MAX,
+  COMMENT_PASSWORD_VERIFY_MIN,
   RESULTS_VISIBILITY_LABELS,
   UpdatePollSchema,
   VISIBILITY_OPTIONS,
@@ -463,7 +465,21 @@ export function EditPollPage() {
   const poll = currentPoll && currentPoll.id === id ? currentPoll : null;
   const isAdmin = Boolean(useAuthStore.getState().user?.isAdmin);
   const isOwner = Boolean(poll && myId && poll.creatorId === myId);
-  const canManage = isOwner || isAdmin;
+  // 게스트(비회원) 폴 — 작성 회원이 따로 없으니(또는 guest- 접두 id) 작성 시 정한 관리 비번으로 수정한다.
+  // 웹에서 비회원으로 만든 고민이 토스에 공유돼 수정되는 경우가 여기 해당한다(web과 동일 모델).
+  const isGuestPoll = Boolean(
+    poll && (poll.creatorIsGuest || poll.creatorId?.startsWith('guest-')),
+  );
+  // 회원 소유자/어드민이면 직접 수정, 게스트 폴이면 비번 게이트를 통과해 수정한다.
+  // 최종 권한(비번 일치)은 서버 assertCanManage 가 강제하므로 여기선 게이트·전송 비번 유무만 결정한다.
+  const canManage = isOwner || isAdmin || isGuestPoll;
+  // 게스트 폴을 회원 소유자/어드민이 아닌 사람이 수정하려면 관리 비번을 통과해야 한다.
+  const needsManagePassword = isGuestPoll && !isOwner && !isAdmin;
+  // 게스트 폴 수정 게이트에서 받은(통과한) 관리 비번 — updatePoll 바디로 함께 보내 서버 게이트를 통과한다.
+  const [managePassword, setManagePassword] = useState<string | null>(null);
+  // 게이트 입력값(통과 전 임시 보관)과 게이트 에러.
+  const [managePasswordInput, setManagePasswordInput] = useState('');
+  const [managePasswordError, setManagePasswordError] = useState<string | null>(null);
 
   // 비공개 폴 코드 게이트 — 코드로 재조회해 통과하면 activeCode 를 갱신해 위 effect 가 전체 폴을 다시 로드한다.
   const handleUnlockCode = async () => {
@@ -639,6 +655,8 @@ export function EditPollPage() {
       visibility,
       // 비공개이면서 새 코드를 입력했을 때만 코드를 전송(빈 칸이면 서버가 기존 코드 유지).
       ...(visibility === 'private' && trimmedAccessCode ? { accessCode: trimmedAccessCode } : {}),
+      // 게스트 폴 수정 — 게이트에서 통과한 관리 비번을 바디로 함께 보내 서버 게이트를 통과한다(회원/어드민은 미전송).
+      ...(needsManagePassword && managePassword ? { password: managePassword } : {}),
       options: optionPayload,
     };
 
@@ -660,10 +678,30 @@ export function EditPollPage() {
       navigate(`/poll/${id}${codeQuery}`, { replace: true });
     } else {
       hapticFeedback('error');
+      // 게스트 폴 — 비번 불일치(서버 403)면 통과 비번을 비워 게이트로 되돌리고 다시 입력받는다.
+      if (needsManagePassword) {
+        setManagePassword(null);
+        setManagePasswordInput('');
+        setManagePasswordError('비번이 맞지 않아요. 다시 입력해 주세요 🔒');
+      }
       setFormError(
         usePollStore.getState().error ?? '고민을 수정하지 못했어요. 잠시 후 다시 시도해 주세요 😢',
       );
     }
+  };
+
+  // 게스트 폴 수정 게이트 — 통과 전에는 관리 비번을 받고, 통과(managePassword 설정) 후 폼을 보여준다.
+  // 비번 일치 여부는 서버가 최종 강제하므로 여기선 길이만 확인하고 통과시킨다(틀리면 제출 시 게이트로 복귀).
+  const handleUnlockManage = () => {
+    const trimmed = managePasswordInput.trim();
+    if (trimmed.length < COMMENT_PASSWORD_VERIFY_MIN) {
+      setManagePasswordError(`비번은 ${COMMENT_PASSWORD_VERIFY_MIN}자 이상이에요`);
+      hapticFeedback('error');
+      return;
+    }
+    setManagePasswordError(null);
+    setManagePassword(trimmed);
+    hapticFeedback('success');
   };
 
   if (isLoading && !poll) {
@@ -747,6 +785,60 @@ export function EditPollPage() {
           onClick={() => void handleUnlockCode()}
         >
           코드 확인하고 수정하기 🔓
+        </Button>
+        <Button style={{ marginTop: 8 }} variant="weak" onClick={() => navigate(`/poll/${id}`)}>
+          고민으로 돌아가기 🔙
+        </Button>
+      </CenterMessage>
+    );
+  }
+
+  // 게스트(비회원) 폴 수정 게이트 — 회원 소유자/어드민이 아니면 작성 시 정한 관리 비번을 받는다.
+  // 통과(managePassword 설정) 후 폼을 보여주고, 제출 시 비번을 함께 보내 서버가 최종 검증한다.
+  if (needsManagePassword && !managePassword) {
+    return (
+      <CenterMessage>
+        <span style={{ fontSize: 48 }}>🔒</span>
+        <span style={{ fontSize: 17, fontWeight: 800, color: theme.text, marginTop: 12 }}>
+          비회원 고민을 수정하려면 관리 비번이 필요해요
+        </span>
+        <span style={{ fontSize: 13, color: theme.textFaint, marginTop: 6, maxWidth: 280 }}>
+          이 고민을 만들 때 정한 관리 비번을 입력하면 다른 기기서도 수정할 수 있어요.
+        </span>
+        <input
+          type="password"
+          value={managePasswordInput}
+          onChange={(e) => {
+            setManagePasswordError(null);
+            setManagePasswordInput(e.target.value);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') handleUnlockManage();
+          }}
+          placeholder="작성 시 정한 관리 비번"
+          maxLength={COMMENT_PASSWORD_MAX}
+          aria-label="고민 관리 비밀번호"
+          autoComplete="off"
+          style={{
+            marginTop: 18,
+            width: '100%',
+            maxWidth: 280,
+            padding: '14px 16px',
+            borderRadius: theme.radiusSm,
+            border: `1px solid ${theme.borderStrong}`,
+            background: theme.surface,
+            color: theme.text,
+            fontSize: 16,
+            textAlign: 'center',
+          }}
+        />
+        {managePasswordError ? (
+          <span role="alert" style={{ fontSize: 13, color: theme.danger, marginTop: 8 }}>
+            {managePasswordError}
+          </span>
+        ) : null}
+        <Button style={{ marginTop: 16 }} onClick={handleUnlockManage}>
+          비번 확인하고 수정하기 🔓
         </Button>
         <Button style={{ marginTop: 8 }} variant="weak" onClick={() => navigate(`/poll/${id}`)}>
           고민으로 돌아가기 🔙

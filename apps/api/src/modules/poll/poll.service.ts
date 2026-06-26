@@ -395,6 +395,14 @@ export class PollService {
   /**
    * 열람용 조회 — 비공개(private) 투표는 올바른 접근 코드가 있어야 전체를 반환한다.
    * 코드 미입력/오류 시 질문만 노출하고 선택지·결과·댓글은 가린다(requiresCode=true).
+   *
+   * [결과노출 계약 — 의도된 비대칭] resultsVisibility(afterVote/always)는 이 JSON 읽기경로에서
+   * '소프트'하게 다룬다: 비private 폴이면 미투표 뷰어에게도 option.voteCount·totalVotes(집계)를
+   * 그대로 실어 보내고, "투표 전엔 결과를 가린다"는 약속은 화면(web/toss client)에서 canRevealResults
+   * 게이트로 강제한다(화면 게이트 차원). 반면 OG/JSON-LD(컨트롤러)는 공유/크롤러 미투표 컨텍스트라
+   * canRevealResults로 득표를 '하드'하게 제거한다 — 검색결과·미리보기에서 결과가 새지 않게 하려는 의도다.
+   * 이 읽기경로에 하드 게이트를 두면 정상 투표 후 결과 갱신·집계 일관성을 깨므로 의도적으로 soft로 유지한다
+   * (private 폴의 게이트 데이터는 아래 접근 코드 redaction이 따로 막는다).
    */
   async getPollForViewer(id: string, code?: string | null): Promise<Poll> {
     const poll = await this.getPoll(id);
@@ -420,6 +428,8 @@ export class PollService {
       visibility: 'private',
       requiresCode: true,
       creatorId: poll.creatorId ?? null,
+      // 코드 통과 전/후 작성자 라벨(회원/게스트) 일관성 — redaction에서도 동일 필드를 노출(비파괴).
+      creatorIsGuest: poll.creatorIsGuest ?? false,
       categoryId: poll.categoryId ?? null,
     };
   }
@@ -758,6 +768,12 @@ export class PollService {
     // 한마디(댓글)는 카운트와 분리해 추가한다(카운트는 castVote가 이미 원자적으로 반영).
     // 투표 시 남긴 한마디도 작성자 식별값(회원 userId / 비회원 voterKey)을 저장해 본인 관리가 가능하게 한다.
     // 선택적 관리 비번을 함께 보냈으면 해시로만 저장해 어느 기기서든 본인 수정/삭제가 가능하게 한다.
+    //
+    // [멱등 계약] addComment 경로의 clientCommentId 멱등키·isDuplicateComment 시간창 dedup을 여기서는
+    // 별도로 적용하지 않는다 — 이 경로의 댓글은 castVote의 1인1표 게이트로 이미 멱등하기 때문이다:
+    // 같은 voterKey의 재시도/연타는 위에서 recorded=false → 409로 차단되어 appendComment에 도달하지 못한다
+    // (두 번째 동일 제출이 새 댓글을 만들 수 없음). 또 VoteSchema에는 clientCommentId 필드가 없어
+    // DB 멱등키를 도입하려면 shared 계약 변경이 필요한데(apps/api 스코프 밖), 이득 대비 비용이 크다.
     if (input.comment?.trim()) {
       await this.db.appendComment(id, {
         voterName: input.voterName?.trim() ? input.voterName.trim() : '익명',

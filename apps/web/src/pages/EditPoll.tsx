@@ -142,6 +142,12 @@ export const EditPoll: React.FC = () => {
   const [codeInput, setCodeInput] = useState('');
   const [codeError, setCodeError] = useState<string | null>(null);
 
+  // 게스트 폴 관리 비밀번호 게이트 — 입력값을 보관해 저장(updatePoll) 시 함께 전송한다.
+  // 비번 검증은 서버가 저장 후 응답(403/429)으로 알려주므로, 게이트는 비번을 받기만 하고 통과시킨다.
+  const [managePassword, setManagePassword] = useState('');
+  const [guestUnlocked, setGuestUnlocked] = useState(false);
+  const [managePwError, setManagePwError] = useState<string | null>(null);
+
   // 로드 — 폼 초기값으로 채운다. activeCode(코드) 가 바뀌면(게이트 통과) 다시 로드한다.
   useEffect(() => {
     if (!id) {
@@ -201,9 +207,25 @@ export const EditPoll: React.FC = () => {
     setActiveCode(trimmed);
   };
 
+  // 게스트 폴 비밀번호 게이트 통과 — 입력만 검증(길이)하고 편집 폼을 연다. 실제 비번 일치는 저장 시 서버가 확인한다.
+  const handleUnlockManage = () => {
+    const trimmed = managePassword.trim();
+    if (trimmed.length < 4) {
+      setManagePwError('관리 비밀번호는 4자 이상이에요.');
+      return;
+    }
+    setManagePwError(null);
+    setGuestUnlocked(true);
+  };
+
   const isOwner = !!(user?.id && loadedPoll?.creatorId === user.id);
   const isAdmin = !!user?.isAdmin;
-  const canManage = isOwner || isAdmin;
+  // 게스트 폴(creatorId 없음=비회원 작성)은 작성 시 정한 관리 비밀번호로 본인이 수정한다.
+  const isGuestPoll = !!(loadedPoll && (loadedPoll.creatorIsGuest || !loadedPoll.creatorId));
+  // 회원 소유자/어드민은 비번 없이, 게스트 폴이면 비밀번호 게이트를 거쳐 관리한다(서버가 최종 강제).
+  const canManage = isOwner || isAdmin || isGuestPoll;
+  // 게스트 폴인데 소유자/어드민이 아니면(비회원 본인) 수정 전에 관리 비밀번호 게이트를 통과해야 한다.
+  const manageNeedsPassword = isGuestPoll && !isOwner && !isAdmin;
   // 이미 표가 있으면 선택지 개수 변경 불가(글/이미지만 수정).
   const optionsLocked = !!loadedPoll && loadedPoll.totalVotes > 0;
 
@@ -283,6 +305,9 @@ export const EditPoll: React.FC = () => {
       }
     }
 
+    // 게스트 폴(비회원 본인)은 작성 시 정한 관리 비밀번호를 함께 보내 서버가 저장 해시와 대조한다.
+    // 회원 소유자/어드민은 JWT 로 본인 판정하므로 비번을 보내지 않는다(null).
+    const trimmedManagePassword = managePassword.trim();
     const patch: UpdatePollInput = {
       question: normalizedQuestion,
       description: description.trim() ? description.trim() : null,
@@ -291,6 +316,7 @@ export const EditPoll: React.FC = () => {
       visibility,
       // 비공개이면서 새 코드를 입력했을 때만 코드를 전송한다(빈 칸이면 서버가 기존 코드 유지).
       ...(visibility === 'private' && trimmedAccessCode ? { accessCode: trimmedAccessCode } : {}),
+      ...(manageNeedsPassword && trimmedManagePassword ? { password: trimmedManagePassword } : {}),
       options: normalizedOptions.map((option) => ({
         text: option.text,
         imageUrl: option.imageUrl,
@@ -305,6 +331,12 @@ export const EditPoll: React.FC = () => {
       const codeForReturn = visibility === 'private' ? trimmedAccessCode || activeCode : undefined;
       const codeQuery = codeForReturn ? `?code=${encodeURIComponent(codeForReturn)}` : '';
       navigate(`/poll/${encodeURIComponent(id)}${codeQuery}`);
+      return;
+    }
+    // 게스트 폴 저장 실패(비번 불일치 403·시도 초과 429 등)면 비밀번호 게이트로 돌려보내 다시 입력받는다.
+    // store error 메시지(아래 폼 상단)에 사유를 남기고, 비번 게이트를 다시 연다.
+    if (manageNeedsPassword) {
+      setGuestUnlocked(false);
     }
   };
 
@@ -442,6 +474,98 @@ export const EditPoll: React.FC = () => {
 
   if (!loadedPoll) {
     return null;
+  }
+
+  // 게스트 폴(비회원 작성)인데 아직 관리 비밀번호 게이트를 통과하지 않았으면, 비번을 먼저 받는다.
+  // 통과(guestUnlocked) 후에야 편집 폼을 연다. 실제 비번 일치는 저장(updatePoll) 시 서버가 확인한다.
+  if (manageNeedsPassword && !guestUnlocked) {
+    return (
+      <div
+        className="content-card animate-slide-up"
+        style={{
+          display: 'grid',
+          gap: '1rem',
+          padding: '1.6rem',
+          maxWidth: '440px',
+          justifyItems: 'center',
+          textAlign: 'center',
+        }}
+      >
+        <div aria-hidden="true" style={{ fontSize: '2.4rem' }}>
+          🔒
+        </div>
+        <div style={{ display: 'grid', gap: '6px' }}>
+          <h1
+            style={{
+              margin: 0,
+              fontSize: '1.05rem',
+              fontWeight: 800,
+              color: 'var(--text-primary)',
+            }}
+          >
+            비회원 고민을 수정하려면 관리 비밀번호가 필요해요
+          </h1>
+          <p
+            style={{
+              margin: 0,
+              fontSize: '0.82rem',
+              color: 'var(--text-secondary)',
+              lineHeight: 1.6,
+            }}
+          >
+            이 고민을 올릴 때 정한 관리 비밀번호를 입력하면 수정할 수 있어요. 비밀번호가 맞지 않으면
+            저장이 거절돼요.
+          </p>
+        </div>
+        <input
+          type="password"
+          value={managePassword}
+          onChange={(event) => {
+            setManagePwError(null);
+            clearError();
+            setManagePassword(event.target.value);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              handleUnlockManage();
+            }
+          }}
+          placeholder="관리 비밀번호"
+          maxLength={20}
+          aria-label="비회원 고민 관리 비밀번호"
+          className="form-input"
+          style={{ width: '100%', textAlign: 'center', fontSize: '0.95rem' }}
+        />
+        {managePwError || error ? (
+          <p
+            role="alert"
+            style={{ margin: 0, fontSize: '0.78rem', color: 'var(--brand-accent-coral)' }}
+          >
+            {managePwError || error}
+          </p>
+        ) : null}
+        <button
+          type="button"
+          onClick={handleUnlockManage}
+          className="btn-primary"
+          style={{ width: '100%', padding: '12px', fontSize: '0.9rem' }}
+        >
+          비밀번호 확인하고 수정하기 🔓
+        </button>
+        <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+          <Link
+            to={`/poll/${encodeURIComponent(id)}`}
+            className="btn-secondary"
+            style={{ textDecoration: 'none' }}
+          >
+            고민 상세로
+          </Link>
+          <Link to="/" className="btn-secondary" style={{ textDecoration: 'none' }}>
+            고민 목록으로
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   return (

@@ -7033,12 +7033,36 @@ export const PollDetail: React.FC = () => {
   // 작성자/운영자 관리 권한 — 수정/삭제 액션을 노출할지 결정한다.
   const isPollOwner = !!(user?.id && currentPoll?.creatorId === user.id);
   const isPollAdmin = !!user?.isAdmin;
-  const canManagePoll = isPollOwner || isPollAdmin;
+  // 게스트 폴(creatorId 없음=비회원 작성)은 작성 시 정한 관리 비밀번호로 누구나(본인) 수정·삭제한다.
+  // creatorIsGuest 또는 creatorId 부재로 판정한다(둘 중 하나라도 게스트면 게스트 폴).
+  const isGuestPoll = !!(currentPoll && (currentPoll.creatorIsGuest || !currentPoll.creatorId));
+  // 회원 소유자/어드민이면 비번 없이, 게스트 폴이면 관리 비밀번호 입력으로 관리한다(서버가 최종 강제).
+  // canManagePoll 은 "관리 액션바 노출" 게이트로만 쓴다(게스트 폴은 누가 봐도 노출 — 비번이 최종 게이트).
+  const canManagePoll = isPollOwner || isPollAdmin || isGuestPoll;
+  // 작성자 관점(소유 회원/어드민) — 결과 선공개·댓글 모더레이션 권한은 여기에만 준다.
+  // 게스트 폴을 단순 열람하는 사람에게까지 결과를 새거나 남의 한마디 모더레이션을 열어주면 안 되므로
+  // canManagePoll 과 분리한다(비번을 아는 비회원 본인은 수정/삭제 화면에서 검증된다).
+  const isPollAuthorView = isPollOwner || isPollAdmin;
+  // 게스트 폴인데 소유자/어드민이 아니면(비회원 본인) 관리(수정/삭제) 전에 비밀번호를 받아야 한다.
+  const manageNeedsPassword = isGuestPoll && !isPollOwner && !isPollAdmin;
+
+  // 게스트 폴 관리 비밀번호 입력 — 댓글 비번 프롬프트 패턴 재사용. 취소(null)·빈값이면 중단.
+  const promptManagePassword = (): string | null => {
+    const entered = globalThis.prompt(
+      '이 고민을 관리하려면 작성할 때 정한 관리 비밀번호를 입력하세요',
+    );
+    if (entered == null) {
+      return null;
+    }
+    const trimmed = entered.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  };
 
   const handleManageEdit = () => {
     if (id) {
       // 비공개 폴은 수정 화면이 코드 없이 폴을 받으면 선택지가 비어 온다(getPollForViewer redaction).
       // 여기서 이미 잠금 해제된 활성 코드(activeCode)를 ?code= 로 넘겨 정상 로드되게 한다.
+      // 게스트 폴 비번 게이트는 수정 화면(EditPoll)에서 직접 받으므로 여기선 이동만 한다.
       const codeQuery = activeCode ? `?code=${encodeURIComponent(activeCode)}` : '';
       navigate(`/poll/${encodeURIComponent(id)}/edit${codeQuery}`);
     }
@@ -7048,10 +7072,18 @@ export const PollDetail: React.FC = () => {
     if (!id) {
       return;
     }
-    if (!globalThis.confirm('이 고민을 삭제할까요? 되돌릴 수 없어요.')) {
+    // 게스트 폴(비회원 본인)은 비번 프롬프트가 곧 확인 역할을 한다 — 별도 confirm 없이 비번을 받는다.
+    let password: string | null = null;
+    if (manageNeedsPassword) {
+      password = promptManagePassword();
+      if (!password) {
+        return;
+      }
+    } else if (!globalThis.confirm('이 고민을 삭제할까요? 되돌릴 수 없어요.')) {
       return;
     }
-    const ok = await deletePoll(id);
+    // 비번 틀림(403)·시도 초과(429)는 store 가 error 메시지로 surface 한다(아래 PollMainCard error).
+    const ok = await deletePoll(id, password);
     if (ok) {
       navigate('/');
     }
@@ -8168,7 +8200,8 @@ export const PollDetail: React.FC = () => {
         handleCopyLinkClick={handleCopyLinkClick}
         // 작성자/어드민은 항상 결과를 보고, 그 외에는 공개 정책(마감/always/투표함)을 따른다.
         // afterVote 정책 폴을 진행 중 공유한 발표 화면에서 결과가 새지 않도록 막는 게이트.
-        resultsRevealed={canManagePoll || canViewResults}
+        // 게스트 폴 단순 열람자에게 결과가 새지 않도록 canManagePoll 이 아닌 작성자 관점만 본다.
+        resultsRevealed={isPollAuthorView || canViewResults}
       />
     );
   }
@@ -8193,7 +8226,7 @@ export const PollDetail: React.FC = () => {
         setShowShareModal={setShowShareModal}
       />
 
-      {/* 작성자/운영자 전용 관리 액션바 — 임베드/발표 모드에서는 숨긴다. */}
+      {/* 작성자/운영자/게스트(비번) 관리 액션바 — 임베드/발표 모드에서는 숨긴다. */}
       {canManagePoll && !isEmbedMode && !isPresentationMode ? (
         <div
           className="content-card"
@@ -8208,16 +8241,39 @@ export const PollDetail: React.FC = () => {
         >
           <span
             style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              fontSize: '0.78rem',
-              fontWeight: 700,
-              color: 'var(--text-secondary)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '2px',
+              minWidth: 0,
             }}
           >
-            <Settings size={14} style={{ color: 'var(--brand-accent-teal)' }} />
-            {isPollOwner ? '내 고민 관리' : '운영자 관리'}
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '0.78rem',
+                fontWeight: 700,
+                color: 'var(--text-secondary)',
+              }}
+            >
+              <Settings size={14} style={{ color: 'var(--brand-accent-teal)' }} />
+              {isPollOwner ? '내 고민 관리' : isPollAdmin ? '운영자 관리' : '내 고민 관리'}
+            </span>
+            {manageNeedsPassword ? (
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  fontSize: '0.7rem',
+                  color: 'var(--text-muted)',
+                }}
+              >
+                <Lock size={11} />
+                작성할 때 정한 관리 비밀번호를 입력하면 수정·삭제할 수 있어요.
+              </span>
+            ) : null}
           </span>
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
             <button
@@ -8227,7 +8283,7 @@ export const PollDetail: React.FC = () => {
               aria-label="이 고민 수정"
               style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
             >
-              <Pencil size={14} />
+              {manageNeedsPassword ? <Lock size={14} /> : <Pencil size={14} />}
               수정
             </button>
             <button
@@ -8243,7 +8299,7 @@ export const PollDetail: React.FC = () => {
                 borderColor: 'rgba(239, 68, 68, 0.32)',
               }}
             >
-              <Trash2 size={14} />
+              {manageNeedsPassword ? <Lock size={14} /> : <Trash2 size={14} />}
               삭제
             </button>
           </div>
@@ -8308,7 +8364,7 @@ export const PollDetail: React.FC = () => {
             commentFilterOptions={commentFilterOptions}
             visibleComments={visibleComments}
             emptyCommentMessage={emptyCommentMessage}
-            canManage={canManagePoll}
+            canManage={isPollAuthorView}
             resolveCommentAffordance={resolveCommentAffordance}
             pollClosed={pollClosed}
             onDeleteComment={handleDeleteComment}

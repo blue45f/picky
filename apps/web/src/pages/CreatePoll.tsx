@@ -3394,13 +3394,10 @@ function MobileSubmitBar({ canSubmit, isLoading }: MobileSubmitBarProps) {
 export const CreatePoll: React.FC = () => {
   useDocumentTitle('새 고민 작성');
   const { createPoll, isLoading, error, clearError } = usePollStore();
-  // 하이브리드 정체성 정책: 폴 작성은 실로그인(웹 회원/소셜) 필수. 비회원(게스트) 토큰은 작성 불가.
-  // 미로그인/게스트면 자동 게스트 토큰을 발급하지 않고 로그인/회원가입을 유도한다.
-  // (투표·댓글은 voterKey 기반이라 토큰 없이도 게스트 그대로 참여 — 이 게이트와 무관.)
   const user = useAuthStore((state) => state.user);
   // 하이브리드 정체성 정책(댓글과 동일 모델): 폴 작성은 누구나 가능하다.
-  // - 회원(실로그인)은 계정(creatorId)으로 식별돼 비번 없이 작성한다.
-  // - 비회원(게스트/익명)은 '관리 비밀번호'를 정하면 그 비번으로 어느 기기서든 본인 폴을 관리한다.
+  // - 회원(실로그인)은 계정(creatorId)으로 식별돼 비번 없이 작성·관리한다.
+  // - 비회원(게스트/익명)은 '관리 비밀번호'를 정하면 그 비번으로 어느 기기서든 본인 폴을 수정/삭제한다.
   // 따라서 폼은 모두에게 열고, 비회원에게만 관리 비번 입력을 노출한다(아래 needsManagePassword).
   const isGuestCreator = !user || Boolean(user.isGuest);
   const navigate = useNavigate();
