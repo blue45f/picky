@@ -22,6 +22,28 @@ import {
 
 const APPS_IN_TOSS_API_BASE = 'https://apps-in-toss-api.toss.im';
 
+/**
+ * env 변수에 담긴 PEM 본문을 정규화. 환경변수로 넣은 PEM은 줄바꿈이 흔히 "\n" 리터럴로
+ * 저장되므로 실제 개행으로 되돌린다. 빈 값이면 null.
+ */
+const normalizeMtlsPem = (value: string | undefined): string | null => {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed.replace(/\\n/g, '\n') : null;
+};
+
+/** 파일 경로에서 PEM을 읽어온다(폴백 경로). 없거나 읽기 실패 시 null. */
+const readMtlsPemFile = (path: string | undefined): string | null => {
+  const trimmed = path?.trim();
+  if (!trimmed) {
+    return null;
+  }
+  try {
+    return fs.readFileSync(trimmed, 'utf8');
+  } catch {
+    return null;
+  }
+};
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -245,16 +267,22 @@ export class AuthService {
   }
 
   private createMtlsAgent(): https.Agent {
-    const certPath = process.env.APPS_IN_TOSS_MTLS_CERT_PATH?.trim();
-    const keyPath = process.env.APPS_IN_TOSS_MTLS_KEY_PATH?.trim();
-    if (!certPath || !keyPath) {
+    // Vercel 서버리스엔 고정 경로 인증서 파일이 없어, PEM 본문(env)을 우선 지원하고 파일 경로는 폴백으로 둔다.
+    const cert =
+      normalizeMtlsPem(process.env.APPS_IN_TOSS_MTLS_CERT) ??
+      readMtlsPemFile(process.env.APPS_IN_TOSS_MTLS_CERT_PATH);
+    const key =
+      normalizeMtlsPem(process.env.APPS_IN_TOSS_MTLS_KEY) ??
+      readMtlsPemFile(process.env.APPS_IN_TOSS_MTLS_KEY_PATH);
+    if (!cert || !key) {
       throw new ServiceUnavailableException(
         '토스 로그인(서버 mTLS) 인증서가 설정되지 않았어요. ' +
-          '콘솔에서 mTLS 인증서를 발급해 APPS_IN_TOSS_MTLS_CERT_PATH/KEY_PATH 환경변수에 설정하거나, ' +
+          '콘솔에서 mTLS 인증서를 발급해 APPS_IN_TOSS_MTLS_CERT/KEY(PEM 본문) 또는 ' +
+          'APPS_IN_TOSS_MTLS_CERT_PATH/KEY_PATH(파일 경로) 환경변수에 설정하거나, ' +
           'getAnonymousKey 기반 식별 로그인을 사용해 주세요.',
       );
     }
-    return new https.Agent({ cert: fs.readFileSync(certPath), key: fs.readFileSync(keyPath) });
+    return new https.Agent({ cert, key });
   }
 
   private requestTossApi<T>(
