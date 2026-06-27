@@ -53,12 +53,22 @@ export function categoryMeta(id?: string | null): PollCategoryMeta | undefined {
   return POLL_CATEGORIES.find((category) => category.id === id);
 }
 
+/**
+ * 리포지셔닝 카피 — 피키는 "친구와 투표"가 아니라 **혼자 정하기 어려운 선택을 누구에게나
+ * 물어보고, 결과 해석·추천까지 받아 '결정'하는** 결정 도우미. (카카오 설문=집계만/아는 집단과 차별:
+ * 우리만 '결정'을 돕고, 그룹 없이 링크 1개로 익명 다수에게 묻는다.) web/toss 히어로·스토어 공통.
+ */
+export const TAGLINE = '혼자 정하기 어려운 선택, 누구에게나 물어보세요';
+export const TAGLINE_SUB = '링크 하나로 의견을 모으고, 결과 해석·추천까지 — 30초면 답이 와요 🥑';
+export const TAGLINE_SHORT = '선택, 혼자 하지 마세요 🥑';
+
 /** 두 앱이 공유하는 친근한 마이크로카피 — 말투를 한 곳에서 통일한다. */
 export const VOICE = {
   emptyPolls: '아직 고민이 없어요. 첫 고민을 올려볼까요? 🥑',
   loading: '고민을 가져오고 있어요… 🥑',
   voteSuccess: '투표 완료! 골라줘서 고마워요 🎉',
-  sharePrompt: '친구에게 물어보기',
+  // 리포지셔닝: '친구'(친구-한정)가 아니라 '누구에게나'(링크 받은 사람 누구나)로 공유 프레임을 넓힌다.
+  sharePrompt: '누구에게나 물어보기',
   deleteConfirm: '이 고민을 정말 지울까요? 🥺',
   scanHint: '카메라로 스캔하면 바로 참여할 수 있어요',
 } as const;

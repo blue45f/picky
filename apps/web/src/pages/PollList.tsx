@@ -2677,19 +2677,19 @@ export const PollList: React.FC = () => {
           </p>
 
           <h1 className="hero-title hero-shimmer hero-enter" style={{ ['--enter-i' as string]: 1 }}>
-            고민되는 선택, <span className="hero-accent">링크 하나</span>로 빠르게 물어보세요
+            혼자 정하기 어려운 선택, <span className="hero-accent">누구에게나</span> 물어보세요
           </h1>
 
           <p
             className="hero-lede hero-enter mobile-only"
             style={{ ['--enter-i' as string]: 2, marginBottom: '0.1rem' }}
           >
-            친구·동료에게 투표 링크를 보내고 답을 빠르게 모아요.
+            링크 하나면 누구에게나 물어보고, 결과 해석·추천까지 받아요.
           </p>
 
           <p className="hero-lede hero-enter desktop-only" style={{ ['--enter-i' as string]: 2 }}>
-            점심 메뉴부터 팀 회의 안건까지 — 선택지를 카드로 만들고 지인·동료에게 링크를 보내면 바로
-            의견이 모입니다. 결과는 실시간으로, 결정은 더 가볍게.
+            점심 메뉴부터 이직 고민까지 — 선택지를 카드로 만들어 링크 하나로 누구에게나 물어보세요.
+            단순 집계가 아니라 결과 해석·추천·메모로 ‘결정’까지 도와드려요.
           </p>
 
           <div

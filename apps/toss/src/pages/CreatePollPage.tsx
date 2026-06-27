@@ -937,7 +937,7 @@ function SubmitBar(
               disabled={!canSubmit || !canCreate || isLoading}
               onClick={onSubmit}
             >
-              친구들에게 물어보기! 🚀
+              누구에게나 물어보기! 🚀
             </Button>
           </>
         )}

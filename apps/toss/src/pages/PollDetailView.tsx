@@ -1668,7 +1668,7 @@ function ShareSection(
             cursor: 'pointer',
           }}
         >
-          🔗 친구에게 물어보기
+          🔗 누구에게나 물어보기
         </button>
         <button
           type="button"

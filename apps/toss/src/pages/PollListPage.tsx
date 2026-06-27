@@ -5,6 +5,7 @@ import type { Poll, PollListSort } from '../shared';
 import {
   MASCOT,
   BETA_NOTICE,
+  TAGLINE,
   SORT_OPTIONS,
   SIGNAL_OPTIONS,
   canRevealResults,
@@ -792,9 +793,7 @@ function ListHeader(props: Readonly<{ onTitleTap: (x: number, y: number) => void
         }
         subtitleBottom={
           <>
-            <Top.SubtitleParagraph size={15}>
-              QR 태그로 친구들과 바로 고민 투표 ⚡️
-            </Top.SubtitleParagraph>
+            <Top.SubtitleParagraph size={15}>{TAGLINE} 🥑</Top.SubtitleParagraph>
             <span
               style={{
                 display: 'inline-flex',

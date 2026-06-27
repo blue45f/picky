@@ -61,7 +61,7 @@ describe('PollDetailView full render (verif)', () => {
 
     // Integrated share card from the real View — QR·SNS 미리보기·공유 문구는 세로 스크롤 압축을 위해
     // 기본 접힘 디스클로저 뒤에 둬요. 초기 렌더엔 공유 CTA + 더보기 토글이 보여요.
-    expect(html).toContain('친구에게 물어보기'); // 항상 보이는 핵심 공유 CTA
+    expect(html).toContain('누구에게나 물어보기'); // 항상 보이는 핵심 공유 CTA(리포지셔닝: 친구→누구에게나)
     expect(html).toContain('QR·SNS 미리보기·공유 문구 더보기'); // QR/미리보기/템플릿 디스클로저 토글
     expect(html).toContain(fixturePoll.question); // full context from the view
 
