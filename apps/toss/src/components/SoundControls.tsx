@@ -9,6 +9,8 @@
 import { theme, FONT } from '../theme';
 import { useSoundSettings } from '../lib/sound';
 import { hapticFeedback } from '../lib/toss';
+import { useState } from 'react';
+import { requestPushAgreement } from '../lib/notifications';
 
 const toggleStyle = (active: boolean): React.CSSProperties => ({
   display: 'inline-flex',
@@ -31,6 +33,14 @@ export function SoundControls() {
   const { sfxEnabled, setSfxEnabled, bgmEnabled, setBgmEnabled, currentTrackName, nextTrack } =
     useSoundSettings();
 
+  const [pushAgreed, setPushAgreed] = useState(() => {
+    try {
+      return localStorage.getItem('picky_toss_push_agreed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
   const toggleSfx = () => {
     const next = !sfxEnabled;
     setSfxEnabled(next);
@@ -51,10 +61,32 @@ export function SoundControls() {
     hapticFeedback('tickWeak');
   };
 
+  const handlePushAgreement = async () => {
+    hapticFeedback('tickWeak');
+    const templateCode =
+      import.meta.env.VITE_TOSS_NOTIFICATION_TEMPLATE_CODE || 'ALERT_OTP_TEMPLATE';
+    const res = await requestPushAgreement(templateCode);
+    if (res === 'agree') {
+      setPushAgreed(true);
+      try {
+        localStorage.setItem('picky_toss_push_agreed', 'true');
+      } catch {
+        // ignore
+      }
+    } else if (res === 'reject') {
+      setPushAgreed(false);
+      try {
+        localStorage.setItem('picky_toss_push_agreed', 'false');
+      } catch {
+        // ignore
+      }
+    }
+  };
+
   return (
     <div
       role="group"
-      aria-label="사운드 설정"
+      aria-label="서비스 설정"
       data-no-sound
       style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}
     >
@@ -80,6 +112,18 @@ export function SoundControls() {
       >
         <span aria-hidden>{bgmEnabled ? '🎵' : '🎧'}</span>
         <span>배경음악</span>
+      </button>
+
+      <button
+        type="button"
+        className="pressable"
+        aria-pressed={pushAgreed}
+        aria-label={pushAgreed ? '알림 끄기' : '알림 받기'}
+        onClick={handlePushAgreement}
+        style={toggleStyle(pushAgreed)}
+      >
+        <span aria-hidden>{pushAgreed ? '🔔' : '🔕'}</span>
+        <span>알림 받기</span>
       </button>
 
       {bgmEnabled ? (

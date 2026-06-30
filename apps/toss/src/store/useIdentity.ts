@@ -20,6 +20,7 @@ interface IdentityState {
   displayName: string;
   initialized: boolean;
   init: () => Promise<void>;
+  login: () => Promise<boolean>;
   setDisplayName: (name: string) => void;
 }
 
@@ -51,6 +52,28 @@ export const useIdentity = create<IdentityState>((set, get) => ({
         }
       }
     }
+  },
+  login: async () => {
+    const userKey = await getStableUserKey();
+    let ok = false;
+    if (userKey) {
+      ok = await useAuthStore.getState().loginWithToss(userKey, get().displayName || undefined);
+    }
+    if (!ok) {
+      const result = await useAuthStore.getState().loginWithTossAccount();
+      ok = result.ok;
+    }
+    if (ok) {
+      const profile = useAuthStore.getState().user;
+      if (profile?.nickname) {
+        set({ displayName: profile.nickname });
+        const trimmed = profile.nickname.trim();
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem(NAME_KEY, trimmed);
+        }
+      }
+    }
+    return ok;
   },
   setDisplayName: (name: string) => {
     const trimmed = name.trim();

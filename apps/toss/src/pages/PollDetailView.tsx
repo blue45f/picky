@@ -23,6 +23,7 @@ import { ResultImageExport } from '../components/ResultImageExport';
 import { OpinionTopicCloud } from '../components/OpinionTopicCloud';
 import { ShareTemplates } from '../components/ShareTemplates';
 import { SnsPreviewCard } from '../components/SnsPreviewCard';
+import { UserAuthStatus } from '../components/UserAuthStatus';
 import { BannerAd } from '../components/BannerAd';
 import { CountUp, Reveal } from '../lib/motion';
 
@@ -1941,13 +1942,16 @@ function DetailHeader(
         </div>
       }
       right={
-        <HeaderActions
-          canManage={canManage}
-          confirmDelete={confirmDelete}
-          onDelete={onDelete}
-          deleteNeedsPassword={deleteNeedsPassword}
-          onEdit={onEdit}
-        />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <UserAuthStatus compact />
+          <HeaderActions
+            canManage={canManage}
+            confirmDelete={confirmDelete}
+            onDelete={onDelete}
+            deleteNeedsPassword={deleteNeedsPassword}
+            onEdit={onEdit}
+          />
+        </div>
       }
     />
   );

@@ -23,7 +23,7 @@ import { useIdentity } from '../store/useIdentity';
 import { theme, stickyActionBar, FONT } from '../theme';
 import { fromDateTimeLocalValue, toDateTimeLocalValue } from '../lib/format';
 import { fileToDownscaledDataUrl, isUsableImageUrl } from '../lib/image';
-import { getStableUserKey, hapticFeedback } from '../lib/toss';
+import { hapticFeedback } from '../lib/toss';
 import { trackCreatePoll } from '../lib/analytics';
 import { copyText } from '../lib/pollShare';
 import { evaluatePollReadiness } from '../lib/pollReadiness';
@@ -1126,34 +1126,21 @@ export function CreatePollPage() {
   // 토스는 진입 시 자동 SSO라 보통 회원으로 통과하지만, 게스트(isGuest)·식별 실패여도 비번을 받아 작성할 수 있다.
   // 서버는 OptionalAuthGuard 로 받아 회원=비번 무시, 게스트=비번 필수(6~20자, 없으면 400)로 처리한다.
   const user = useAuthStore((state) => state.user);
-  const setDisplayName = useIdentity((state) => state.setDisplayName);
-  const displayName = useIdentity((state) => state.displayName);
+  const login = useIdentity((state) => state.login);
   // 회원(실로그인): 토큰이 있고 isGuest 가 아니어야 함. 그 외(게스트·익명)는 비번 기반 게스트 작성 경로.
   const isMember = Boolean(user) && !user?.isGuest;
   const [retryingLogin, setRetryingLogin] = useState(false);
 
-  // 토스 SSO 식별 재시도 — useIdentity.init 은 1회 가드라, 여기선 같은 SSO 경로(loginWithToss)를
-  // 직접 다시 태워 토큰을 잡아요. 실패 시 토스 로그인(appLogin) 교환을 보조로 시도해요.
+  // 토스 SSO 식별 재시도 — useIdentity.init 은 1회 가드라, 여기선 같은 SSO 경로(login)를
+  // 직접 다시 태워 토큰을 잡아요. 내부에서 anonymousKey 및 OAuth 교환을 시도해요.
   const retryLogin = async () => {
     if (retryingLogin) {
       return;
     }
     setRetryingLogin(true);
     try {
-      const userKey = await getStableUserKey();
-      let ok = false;
-      if (userKey) {
-        ok = await useAuthStore.getState().loginWithToss(userKey, displayName || undefined);
-      }
-      if (!ok) {
-        const result = await useAuthStore.getState().loginWithTossAccount();
-        ok = result.ok;
-      }
+      const ok = await login();
       if (ok) {
-        const profile = useAuthStore.getState().user;
-        if (profile?.nickname && !displayName) {
-          setDisplayName(profile.nickname);
-        }
         hapticFeedback('success');
       } else {
         hapticFeedback('error');

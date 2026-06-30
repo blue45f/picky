@@ -13,6 +13,7 @@ import { installGlobalClickSounds } from './lib/sound';
 import { globalParticles } from './lib/particles';
 import { WelcomeSplash } from './components/WelcomeSplash';
 import { fixturePoll } from './verif/fixturePoll';
+import { useTossFullScreenAd } from './lib/ads';
 
 /** 딥링크(intoss://picky/poll/:id)로 진입했을 때 해당 화면으로 한 번 라우팅. */
 function SchemeEntryBridge() {
@@ -121,6 +122,41 @@ function GlobalParticleCanvas() {
   );
 }
 
+function InterstitialAdBridge() {
+  const location = useLocation();
+  const interstitial = useTossFullScreenAd('interstitial');
+  const navCountRef = useRef(0);
+  const lastAdTimeRef = useRef(0);
+  const lastPathnameRef = useRef(location.pathname);
+
+  useEffect(() => {
+    // Only check and show ad if the pathname actually changed (page transition)
+    if (location.pathname !== lastPathnameRef.current) {
+      lastPathnameRef.current = location.pathname;
+
+      // 첫 진입 시에는 광고 노출 제외
+      if (navCountRef.current === 0) {
+        navCountRef.current = 1;
+        return;
+      }
+
+      if (interstitial.configured && interstitial.supported) {
+        navCountRef.current += 1;
+        const now = Date.now();
+        const freqOk = navCountRef.current >= 3;
+        const timeOk = now - lastAdTimeRef.current >= 2 * 60 * 1000;
+
+        if (interstitial.ready && freqOk && timeOk && interstitial.show()) {
+          navCountRef.current = 1;
+          lastAdTimeRef.current = now;
+        }
+      }
+    }
+  }, [location.pathname, interstitial]);
+
+  return null;
+}
+
 export function App() {
   const init = useIdentity((state) => state.init);
 
@@ -139,6 +175,7 @@ export function App() {
   return (
     <BrowserRouter>
       <SchemeEntryBridge />
+      <InterstitialAdBridge />
       <GlobalParticleCanvas />
       <WelcomeSplash />
       <main style={{ background: '#05100e', minHeight: '100dvh', position: 'relative' }}>

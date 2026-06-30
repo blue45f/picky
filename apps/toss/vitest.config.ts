@@ -6,5 +6,6 @@ export default defineConfig({
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
     // allow globals for vi in some tests
     globals: false,
+    setupFiles: ['./vitest.setup.ts'],
   },
 });

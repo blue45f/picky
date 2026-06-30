@@ -28,6 +28,7 @@ import {
 } from '../lib/pollSignal';
 import { Chip, ProgressBar, SegmentedControl, Skeleton } from '../components/ui';
 import { SoundControls } from '../components/SoundControls';
+import { UserAuthStatus } from '../components/UserAuthStatus';
 import { BannerAd } from '../components/BannerAd';
 import { useCountdown } from '../components/Countdown';
 import { triggerParticleBurst } from '../lib/particles';
@@ -1163,8 +1164,16 @@ export function PollListPage() {
       <ListHeader onTitleTap={onTitleTap} />
 
       <div style={pageShell}>
-        {/* 사운드 설정(효과음·배경음악·다음 곡) — 헤더 바로 아래, 우측 정렬. */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+        {/* 로그인 상태 및 사운드 설정(효과음·배경음악·다음 곡) — 헤더 바로 아래. */}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 12,
+          }}
+        >
+          <UserAuthStatus />
           <SoundControls />
         </div>
 

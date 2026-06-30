@@ -30,7 +30,7 @@ export {
   type SoundStateListener,
 } from './settings';
 
-export { resumeAudio } from './context';
+export { resumeAudio, getAudioContext } from './context';
 
 export { BGM_TRACKS } from './tracks';
 

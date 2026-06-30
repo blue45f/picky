@@ -9,6 +9,8 @@ export {
   getCurrentTrackName,
   // 효과음 활성 여부의 명령형 게터(훅 아님) — 햅틱을 효과음 음소거에 연동할 때 사용해요.
   isSfxEnabled,
+  isBgmEnabled,
+  getAudioContext,
   type ClickVariant,
 } from '../../../../packages/client/src/lib/audio';
 

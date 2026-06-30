@@ -18,6 +18,7 @@ import { fromDateTimeLocalValue, toDateTimeLocalValue } from '../lib/format';
 import { fileToDownscaledDataUrl, isUsableImageUrl } from '../lib/image';
 import { hapticFeedback } from '../lib/toss';
 import { AppBar, Chip, PageLoader, SegmentedControl } from '../components/ui';
+import { UserAuthStatus } from '../components/UserAuthStatus';
 
 const MAX_OPTIONS = 10;
 const MIN_OPTIONS = 2;
@@ -849,7 +850,11 @@ export function EditPollPage() {
 
   return (
     <div style={{ minHeight: '100dvh' }}>
-      <AppBar title="고민 수정하기 ✏️" onBack={() => navigate(`/poll/${id}`)} />
+      <AppBar
+        title="고민 수정하기 ✏️"
+        onBack={() => navigate(`/poll/${id}`)}
+        right={<UserAuthStatus compact />}
+      />
 
       <div style={{ maxWidth: 520, margin: '0 auto', padding: '0 20px 140px' }}>
         <div style={labelRowStyle}>
