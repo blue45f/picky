@@ -18,6 +18,7 @@ interface IdentityState {
   userKey: string | null;
   /** 투표자/작성자 표시 이름. */
   displayName: string;
+  loginError: string | null;
   initialized: boolean;
   init: () => Promise<void>;
   login: () => Promise<boolean>;
@@ -28,6 +29,7 @@ export const useIdentity = create<IdentityState>((set, get) => ({
   env: 'web',
   userKey: null,
   displayName: loadName(),
+  loginError: null,
   initialized: false,
   init: async () => {
     if (get().initialized) {
@@ -54,14 +56,14 @@ export const useIdentity = create<IdentityState>((set, get) => ({
     }
   },
   login: async () => {
-    const userKey = await getStableUserKey();
-    let ok = false;
-    if (userKey) {
-      ok = await useAuthStore.getState().loginWithToss(userKey, get().displayName || undefined);
-    }
+    set({ loginError: null });
+    // 사용자가 명시적으로 누른 "토스로 로그인"은 반드시 appLogin 동의/인가 코드 흐름을 탄다.
+    // getAnonymousKey 기반 식별 세션은 init()에서 데이터 귀속용으로만 만들며, 토스 계정
+    // 로그인 성공으로 간주하지 않는다.
+    const result = await useAuthStore.getState().loginWithTossAccount();
+    const ok = result.ok;
     if (!ok) {
-      const result = await useAuthStore.getState().loginWithTossAccount();
-      ok = result.ok;
+      set({ loginError: result.message ?? '토스 로그인에 실패했어요.' });
     }
     if (ok) {
       const profile = useAuthStore.getState().user;

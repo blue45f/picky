@@ -26,7 +26,8 @@ import { getAudioContext, isBgmEnabled, bgmPlay, bgmPause } from './sound';
 // - feed:   카드 목록 사이에 끼우려고 콘솔에서 '배너(피드형)'로 만든 그룹
 //           (전용 그룹이 없으면 일반 배너 그룹으로 폴백 → 동일하게 동작)
 const TEST_BANNER_AD_GROUP_ID = 'ait-ad-test-banner-id';
-const TEST_FEED_AD_GROUP_ID = 'ait-ad-test-native-image-id';
+// 공식 WebView 배너 가이드는 현재 리스트형 테스트 ID 하나만 제공한다.
+const TEST_FEED_AD_GROUP_ID = TEST_BANNER_AD_GROUP_ID;
 
 /**
  * 배너 광고 배치 위치 라벨(슬롯 종류 X, 광고 타입 X).

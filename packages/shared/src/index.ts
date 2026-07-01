@@ -570,7 +570,15 @@ export const TossLoginSchema = z.object({
     .string({ required_error: '인가 코드가 필요합니다.' })
     .trim()
     .min(1, '인가 코드가 필요합니다.'),
-  referrer: z.string().trim().min(1).optional().nullable(),
+  referrer: z.enum(['DEFAULT', 'SANDBOX']).default('DEFAULT'),
 });
 
 export type TossLoginInput = z.infer<typeof TossLoginSchema>;
+
+/** 토스 앱에서 서비스 연결을 해제했을 때 수신하는 서버 콜백. */
+export const TossUnlinkSchema = z.object({
+  userKey: z.coerce.number().int().positive(),
+  referrer: z.enum(['UNLINK', 'WITHDRAWAL_TERMS', 'WITHDRAWAL_TOSS']),
+});
+
+export type TossUnlinkInput = z.infer<typeof TossUnlinkSchema>;

@@ -1,5 +1,6 @@
 import {
   Injectable,
+  BadGatewayException,
   BadRequestException,
   UnauthorizedException,
   ServiceUnavailableException,
@@ -18,9 +19,28 @@ import {
   AuthResult,
   TossIdentityInput,
   TossLoginInput,
+  TossUnlinkInput,
 } from '@picky/shared';
 
 const APPS_IN_TOSS_API_BASE = 'https://apps-in-toss-api.toss.im';
+const TOSS_API_TIMEOUT_MS = 12_000;
+
+type TossApiEnvelope<T> = {
+  resultType?: 'SUCCESS' | 'FAIL';
+  success?: T;
+  error?: string | { errorCode?: string; reason?: string };
+};
+
+const isInvalidGrant = (error: TossApiEnvelope<unknown>['error']): boolean => {
+  if (typeof error === 'string') {
+    return error.toLowerCase() === 'invalid_grant';
+  }
+  return Boolean(
+    error &&
+    (error.errorCode?.toLowerCase() === 'invalid_grant' ||
+      /\binvalid_grant\b/i.test(error.reason ?? '')),
+  );
+};
 
 /**
  * env 변수에 담긴 PEM 본문을 정규화. 환경변수로 넣은 PEM은 줄바꿈이 흔히 "\n" 리터럴로
@@ -219,22 +239,28 @@ export class AuthService {
   async loginWithTossAuthCode(input: TossLoginInput): Promise<AuthResult> {
     const agent = this.createMtlsAgent();
 
-    const tokenResponse = await this.requestTossApi<{
-      success?: { accessToken?: string };
-    }>('POST', '/api-partner/v1/apps-in-toss/user/oauth2/generate-token', agent, {
-      body: { authorizationCode: input.authorizationCode, referrer: input.referrer ?? 'DEFAULT' },
-    });
+    const tokenResponse = await this.requestTossApi<{ accessToken?: string }>(
+      'POST',
+      '/api-partner/v1/apps-in-toss/user/oauth2/generate-token',
+      agent,
+      {
+        body: { authorizationCode: input.authorizationCode, referrer: input.referrer ?? 'DEFAULT' },
+      },
+    );
 
     const tossAccessToken = tokenResponse?.success?.accessToken;
     if (!tossAccessToken) {
       throw new UnauthorizedException('토스 로그인 토큰 발급에 실패했어요.');
     }
 
-    const meResponse = await this.requestTossApi<{
-      success?: { userKey?: number };
-    }>('GET', '/api-partner/v1/apps-in-toss/user/oauth2/login-me', agent, {
-      bearer: tossAccessToken,
-    });
+    const meResponse = await this.requestTossApi<{ userKey?: number }>(
+      'GET',
+      '/api-partner/v1/apps-in-toss/user/oauth2/login-me',
+      agent,
+      {
+        bearer: tossAccessToken,
+      },
+    );
 
     const userKey = meResponse?.success?.userKey;
     if (userKey == null) {
@@ -266,6 +292,32 @@ export class AuthService {
     return { accessToken, user: this.toProfile(user) };
   }
 
+  /** 토스 연결 해제 콜백을 검증하고 앱 전용 계정을 멱등 삭제한다. */
+  async unlinkTossLogin(
+    input: TossUnlinkInput,
+    authorization: string | undefined,
+  ): Promise<{ ok: true }> {
+    const username = process.env.APPS_IN_TOSS_UNLINK_USERNAME?.trim();
+    const password = process.env.APPS_IN_TOSS_UNLINK_PASSWORD?.trim();
+    if (!username || !password) {
+      throw new ServiceUnavailableException('토스 로그인 연결 해제 콜백 인증이 설정되지 않았어요.');
+    }
+
+    const encoded = authorization?.startsWith('Basic ') ? authorization.slice(6).trim() : '';
+    const actual = Buffer.from(encoded, 'base64').toString('utf8');
+    const expectedBytes = Buffer.from(`${username}:${password}`);
+    const actualBytes = Buffer.from(actual);
+    if (
+      expectedBytes.length !== actualBytes.length ||
+      !crypto.timingSafeEqual(expectedBytes, actualBytes)
+    ) {
+      throw new UnauthorizedException('콜백 인증에 실패했어요.');
+    }
+
+    await this.db.deleteUser(`toss-user-${input.userKey}`);
+    return { ok: true };
+  }
+
   private createMtlsAgent(): https.Agent {
     // Vercel 서버리스엔 고정 경로 인증서 파일이 없어, PEM 본문(env)을 우선 지원하고 파일 경로는 폴백으로 둔다.
     const cert =
@@ -282,7 +334,13 @@ export class AuthService {
           'getAnonymousKey 기반 식별 로그인을 사용해 주세요.',
       );
     }
-    return new https.Agent({ cert, key });
+    try {
+      return new https.Agent({ cert, key, keepAlive: true });
+    } catch {
+      throw new ServiceUnavailableException(
+        '토스 로그인 mTLS 인증서 또는 개인키 형식이 올바르지 않아요.',
+      );
+    }
   }
 
   private requestTossApi<T>(
@@ -290,8 +348,8 @@ export class AuthService {
     path: string,
     agent: https.Agent,
     options: { body?: unknown; bearer?: string } = {},
-  ): Promise<T> {
-    return new Promise<T>((resolve, reject) => {
+  ): Promise<TossApiEnvelope<T>> {
+    return new Promise<TossApiEnvelope<T>>((resolve, reject) => {
       const url = new URL(`${APPS_IN_TOSS_API_BASE}${path}`);
       const payload = options.body == null ? undefined : JSON.stringify(options.body);
       const request = https.request(
@@ -311,15 +369,45 @@ export class AuthService {
             raw += chunk;
           });
           response.on('end', () => {
+            let parsed: TossApiEnvelope<T>;
             try {
-              resolve(raw ? (JSON.parse(raw) as T) : ({} as T));
+              parsed = raw ? (JSON.parse(raw) as TossApiEnvelope<T>) : {};
             } catch {
-              reject(new UnauthorizedException('토스 API 응답을 해석하지 못했어요.'));
+              reject(new BadGatewayException('토스 로그인 서버 응답을 해석하지 못했어요.'));
+              return;
             }
+
+            const status = response.statusCode ?? 500;
+            if (status >= 400 && status < 500) {
+              reject(
+                new UnauthorizedException('토스 로그인 인가 코드 또는 토큰이 유효하지 않아요.'),
+              );
+              return;
+            }
+            if (status < 200 || status >= 300) {
+              reject(new BadGatewayException('토스 로그인 서버가 요청을 처리하지 못했어요.'));
+              return;
+            }
+            if (parsed.resultType !== 'SUCCESS' || !parsed.success) {
+              reject(
+                isInvalidGrant(parsed.error)
+                  ? new UnauthorizedException(
+                      '토스 로그인 인가 코드가 만료되었거나 이미 사용됐어요.',
+                    )
+                  : new BadGatewayException('토스 로그인 서버가 실패 응답을 반환했어요.'),
+              );
+              return;
+            }
+            resolve(parsed);
           });
         },
       );
-      request.on('error', (error) => reject(error));
+      request.setTimeout(TOSS_API_TIMEOUT_MS, () => {
+        request.destroy(new Error('Toss login API timeout'));
+      });
+      request.on('error', () => {
+        reject(new ServiceUnavailableException('토스 로그인 서버에 연결하지 못했어요.'));
+      });
       if (payload) {
         request.write(payload);
       }

@@ -123,7 +123,7 @@ export function PollDetailPage() {
   useEffect(() => {
     let alive = true;
     if (id && isInToss()) {
-      buildTossShareLink(pollTossDeepLink(id))
+      buildTossShareLink(pollTossDeepLink(id), 'https://picky-olive.vercel.app/og-toss.png')
         .then((link) => {
           if (alive) setTossShareLink(link);
         })

@@ -11,6 +11,8 @@ interface ImportMetaEnv {
   readonly VITE_TOSS_AD_GROUP_ID?: string;
   /** 콘솔 '배너(피드형)' 광고 그룹 ID(피드형 배치, 별도 광고 타입 아님). 미설정 시 위 배너 ID로 폴백. */
   readonly VITE_TOSS_FEED_AD_GROUP_ID?: string;
+  readonly VITE_TOSS_INTERSTITIAL_AD_GROUP_ID?: string;
+  readonly VITE_TOSS_REWARDED_AD_GROUP_ID?: string;
 }
 
 interface ImportMeta {

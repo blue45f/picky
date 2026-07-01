@@ -1,4 +1,16 @@
-import { Controller, Post, Get, Delete, Body, UseGuards, Request, UsePipes } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Headers,
+  HttpCode,
+  HttpStatus,
+  Post,
+  Request,
+  UseGuards,
+  UsePipes,
+} from '@nestjs/common';
 import { ZodValidationPipe, createZodDto } from 'nestjs-zod';
 import {
   RegisterSchema,
@@ -6,6 +18,7 @@ import {
   GuestRegisterSchema,
   TossIdentitySchema,
   TossLoginSchema,
+  TossUnlinkSchema,
 } from '@picky/shared';
 import { AuthService } from './auth.service';
 import { AuthGuard } from './auth.guard';
@@ -15,6 +28,7 @@ class LoginDto extends createZodDto(LoginSchema) {}
 class GuestRegisterDto extends createZodDto(GuestRegisterSchema) {}
 class TossIdentityDto extends createZodDto(TossIdentitySchema) {}
 class TossLoginDto extends createZodDto(TossLoginSchema) {}
+class TossUnlinkDto extends createZodDto(TossUnlinkSchema) {}
 
 @Controller('auth')
 @UsePipes(ZodValidationPipe)
@@ -46,6 +60,15 @@ export class AuthController {
   @Post('toss/login')
   async loginWithTossAuthCode(@Body() dto: TossLoginDto) {
     return this.authService.loginWithTossAuthCode(dto);
+  }
+
+  @Post('toss/unlink')
+  @HttpCode(HttpStatus.OK)
+  async unlinkTossLogin(
+    @Headers('authorization') authorization: string | undefined,
+    @Body() dto: TossUnlinkDto,
+  ) {
+    return this.authService.unlinkTossLogin(dto, authorization);
   }
 
   @Get('me')

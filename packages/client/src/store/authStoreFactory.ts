@@ -413,11 +413,14 @@ export const createAuthStoreState =
       },
 
       loginWithTossAccount: async () => {
-        const result = await tossAppLogin?.();
-        if (!result) {
-          return { ok: false, message: '토스 로그인을 진행할 수 없어요.' };
-        }
         try {
+          if (!tossAppLogin) {
+            return { ok: false, message: '토스 앱에서 다시 시도해 주세요.' };
+          }
+          const result = await tossAppLogin();
+          if (!result?.authorizationCode) {
+            return { ok: false, message: '토스 로그인이 취소되었어요.' };
+          }
           const res = await requestApi('/auth/toss/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -432,7 +435,12 @@ export const createAuthStoreState =
           commitAuthSuccess(set, data);
           return { ok: true };
         } catch (err: any) {
-          return { ok: false, message: err?.message || '토스 로그인에 실패했어요.' };
+          return {
+            ok: false,
+            message:
+              err?.message ||
+              '토스 로그인 창을 열지 못했어요. 토스 앱을 업데이트한 뒤 다시 시도해 주세요.',
+          };
         }
       },
 

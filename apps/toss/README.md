@@ -61,11 +61,26 @@ VITE_API_BASE_URL=https://<prod-api> pnpm --filter @picky/toss build
   토큰 교환. 콘솔에서 mTLS 인증서를 발급해 API 서버 환경변수에 설정해야 동작해요:
 
   ```sh
+  # Vercel 등 서버리스: PEM 본문을 시크릿으로 등록(권장)
+  APPS_IN_TOSS_MTLS_CERT='-----BEGIN CERTIFICATE-----\n...'
+  APPS_IN_TOSS_MTLS_KEY='-----BEGIN PRIVATE KEY-----\n...'
+
+  # 파일시스템이 유지되는 서버: 경로 방식도 지원
   APPS_IN_TOSS_MTLS_CERT_PATH=/path/to/client-cert.pem
   APPS_IN_TOSS_MTLS_KEY_PATH=/path/to/client-key.pem
+
+  # 콘솔 연결 끊기 콜백 Basic Auth와 동일한 값
+  APPS_IN_TOSS_UNLINK_USERNAME=callback-user
+  APPS_IN_TOSS_UNLINK_PASSWORD=long-random-password
   ```
 
-  미설정 시 `/auth/toss/login`은 503과 안내 메시지를 반환해요(앱은 식별 로그인으로 계속 동작).
+  미설정 시 `/auth/toss/login`은 503과 안내 메시지를 반환해요. 콘솔의 연결 끊기 콜백은
+  `POST https://picky-olive.vercel.app/api/auth/toss/unlink`로 등록해요.
+
+## 토스 공유 OG
+
+- `getTossShareLink(intoss://picky/..., https://picky-olive.vercel.app/og-toss.png)`를 사용해요.
+- `og-toss.png`는 앱인토스 가이드 규격인 1200×600 PNG예요. 일반 웹 OG(1200×630)와 분리합니다.
 
 ## 참고
 

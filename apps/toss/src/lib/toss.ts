@@ -72,12 +72,8 @@ export async function tossAppLogin(): Promise<{
   authorizationCode: string;
   referrer: 'DEFAULT' | 'SANDBOX';
 } | null> {
-  try {
-    const result = await appLogin();
-    return result ?? null;
-  } catch {
-    return null;
-  }
+  const result = await appLogin();
+  return result ?? null;
 }
 
 /**

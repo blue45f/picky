@@ -12,6 +12,7 @@ export function UserAuthStatus({ compact = false }: Readonly<UserAuthStatusProps
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
   const login = useIdentity((state) => state.login);
+  const loginError = useIdentity((state) => state.loginError);
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
@@ -37,8 +38,11 @@ export function UserAuthStatus({ compact = false }: Readonly<UserAuthStatusProps
     logout();
   };
 
-  // If user is logged in and is a member (not guest)
-  if (user && !user.isGuest) {
+  // getAnonymousKey 식별 계정(toss-...)은 콘텐츠 귀속용 세션일 뿐 토스 로그인 계정이 아니다.
+  // appLogin → login-me로 확인된 계정만 toss-user-... 형식이므로 로그인 UI도 그때만 표시한다.
+  const isTossAccountUser = Boolean(user?.id.startsWith('toss-user-'));
+
+  if (user && isTossAccountUser) {
     if (compact) {
       return (
         <button
@@ -124,14 +128,21 @@ export function UserAuthStatus({ compact = false }: Readonly<UserAuthStatusProps
       };
 
   return (
-    <button
-      type="button"
-      className="pressable"
-      disabled={loading}
-      onClick={() => void handleLogin()}
-      style={buttonStyle}
-    >
-      {loading ? '로그인 중…' : '토스로 로그인 🚀'}
-    </button>
+    <div>
+      <button
+        type="button"
+        className="pressable"
+        disabled={loading}
+        onClick={() => void handleLogin()}
+        style={buttonStyle}
+      >
+        {loading ? '로그인 중…' : '토스로 로그인 🚀'}
+      </button>
+      {loginError ? (
+        <p role="alert" style={{ margin: '6px 0 0', color: theme.danger, fontSize: 11 }}>
+          {loginError}
+        </p>
+      ) : null}
+    </div>
   );
 }

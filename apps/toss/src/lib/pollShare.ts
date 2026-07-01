@@ -9,6 +9,7 @@ import { buildTossShareLink, shareMessage } from './toss';
 // 공유 링크가 외부(토스 밖)에서도 열려야 하므로, 공개 웹 오리진으로 폴백해요.
 // 미니앱 WebView 호스트(*.tossmini.com)나 localhost는 공유 대상이 아니에요.
 const DEFAULT_PUBLIC_ORIGIN = 'https://picky-olive.vercel.app';
+const TOSS_OG_IMAGE_URL = `${DEFAULT_PUBLIC_ORIGIN}/og-toss.png`;
 
 /** 외부에서도 열리는 공개 웹 공유 오리진 (picky-olive 등). */
 const getShareOrigin = (): string => {
@@ -53,7 +54,7 @@ export const sharePoll = async (
 ): Promise<'toss' | 'web-share' | 'clipboard' | null> => {
   const url =
     shareUrlOverride ||
-    (await buildTossShareLink(pollTossDeepLink(poll.id))) ||
+    (await buildTossShareLink(pollTossDeepLink(poll.id), TOSS_OG_IMAGE_URL)) ||
     resolvePollShareUrl(poll);
   const message = `${resolveShareText(poll)}\n${url}`;
   return shareMessage(message);
