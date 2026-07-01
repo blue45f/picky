@@ -10,7 +10,7 @@ picky(PickFlow) 웹 서비스를 [앱인토스](https://apps-in-toss.toss.im/) W
 
 - `/` 둘러보기(PollList) — 검색·상태 필터(전체/진행중/마감)·정렬(최신/인기/마감임박)·최근 본 고민·스켈레톤 로딩
 - `/create` 고민 작성 — 마감 시간 프리셋/직접 선택·글자수 카운터·결과 공개 시점
-- `/poll/:id` 투표·결과(득표순 정렬 + 승자 하이라이트)·실시간 마감 카운트다운·댓글·공유 (HashRouter)
+- `/poll/:id` 투표·결과(득표순 정렬 + 승자 하이라이트)·실시간 마감 카운트다운·댓글·공유 (BrowserRouter — 웹과 동일한 클린 경로)
 
 ## 네이티브(토스) 인터랙션
 
@@ -48,7 +48,7 @@ VITE_API_BASE_URL=https://<prod-api> pnpm --filter @picky/toss build
 검토 전 체크리스트(공식 비게임 가이드 기준):
 
 - ✅ iframe 미사용 / 핀치줌 비활성(`index.html` viewport) / TDS 사용 / 번들 ≤100MB
-- ⏳ 콘솔 `granite.config.ts`의 `brand.icon`을 업로드한 로고의 static URL로 교체
+- ⏳ 콘솔 `apps-in-toss.config.ts`의 `brand.icon`을 업로드한 로고의 static URL로 교체
 - ⏳ picky API CORS 허용 오리진에 `https://picky.apps.tossmini.com`(실서비스)와
   `https://picky.private-apps.tossmini.com`(QR 테스트) 추가 — 현재 API는 `origin: '*'`라 충족
 - ⏳ 실기기 샌드박스 테스트(`intoss://picky`) 후 토스앱 최종 테스트 → 검토 요청
@@ -84,5 +84,6 @@ VITE_API_BASE_URL=https://<prod-api> pnpm --filter @picky/toss build
 
 ## 참고
 
-- `src/shared.ts`는 `packages/shared`의 복사본이에요(ait 번들러가 `workspace:*`를 처리하지
-  못해 벤더링). `packages/shared/src/index.ts` 변경 시 함께 갱신하세요.
+- `src/shared.ts`는 `packages/shared/src/index.ts`를 상대 경로로 재수출하는 브릿지예요
+  (ait 번들러가 `workspace:*` 패키지명을 처리하지 못해 소스 직접 참조). 복사본이 아니므로
+  원본만 수정하면 돼요. `@picky/shared` 해석은 vite alias 가 담당해요(패키지 deps 추가 금지).

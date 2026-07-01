@@ -3,8 +3,9 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { PollDetailView } from '../pages/PollDetailView';
 import { fixturePoll } from './fixturePoll';
-import { writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 // Mock tds to avoid ThemeProvider requirement in isolated renderToStaticMarkup for verif.
 vi.mock('@toss/tds-mobile', async () => {
@@ -85,17 +86,15 @@ describe('PollDetailView full render (verif)', () => {
       expect(firstOptPos).toBeLessThan(sharePos); // options before heavy share section
     }
 
-    // capture static HTML to scratch for verification evidence (durable proof)
+    // capture static HTML for verification evidence — gitignored scratch dir only
+    // (워킹트리 루트에 쓰면 포맷 드리프트 노이즈로 계속 더티가 되므로 금지).
     try {
-      const scratchDir =
-        '/var/folders/xp/79glmmbj6970d74hvkgd4pg00000gp/T/grok-goal-98785c18098b/implementer';
+      // src/verif → apps/toss/.verif-out (gitignored)
+      const scratchDir = fileURLToPath(new URL('../../.verif-out', import.meta.url));
+      mkdirSync(scratchDir, { recursive: true });
       writeFileSync(join(scratchDir, 'poll-detail-view-rendered.html'), html);
     } catch {
-      try {
-        writeFileSync(join('.', 'poll-detail-view-rendered.html'), html);
-      } catch {
-        // ignore
-      }
+      // ignore — 증거 스냅샷 실패가 테스트를 깨면 안 됨
     }
   });
 

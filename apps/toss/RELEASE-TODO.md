@@ -47,7 +47,7 @@
 
 ### 3. 콘솔 앱 아이콘 URL (소소)
 
-`apps/toss/granite.config.ts`의 `brand.icon`이 현재 placeholder(`picky-olive.vercel.app/og-default.png`).
+`apps/toss/apps-in-toss.config.ts`의 `brand.icon`이 현재 placeholder(`picky-olive.vercel.app/og-default.png`).
 콘솔 `앱 정보`에 업로드한 로고 이미지를 우클릭 → 링크 복사 → 해당 URL로 교체 권장.
 
 ---
@@ -55,6 +55,7 @@
 ## 참고
 
 - 운영 도메인: `https://picky-olive.vercel.app` (웹 + API, 동일 오리진 `/api`)
-- 미니앱 코드: `apps/toss/` (Vite + React 18 + `@apps-in-toss/web-framework` + TDS)
-- 벤더링 주의: `apps/toss/src/shared.ts`는 `packages/shared`의 복사본(ait가 `workspace:*` 미지원). 원본 변경 시 동기화.
+- 미니앱 코드: `apps/toss/` (Vite + React 19 + `@apps-in-toss/web-framework` + TDS)
+- 참고: `apps/toss/src/shared.ts`는 `packages/shared` 소스를 상대 경로로 재수출하는 브릿지(ait가
+  `workspace:*` 미지원). 복사본이 아니므로 원본(`packages/shared/src/index.ts`)만 수정하면 됨.
 - 로컬 검증: `pnpm dev:api` + `pnpm dev:toss`(샌드박스), 또는 `pnpm --filter @picky/toss exec vite preview`
