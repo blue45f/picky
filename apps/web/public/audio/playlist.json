@@ -3,12 +3,16 @@
     {
       "src": "/audio/cuteness-of-jealousy.mp3",
       "title": "Cuteness of Jealousy",
-      "license": "Royalty-free"
+      "artist": "Suryanatta",
+      "license": "Pixabay Content License",
+      "creditUrl": "https://pixabay.com/music/pop-cuteness-of-jealousy-549574/"
     },
     {
       "src": "/audio/summer-adventures.mp3",
       "title": "Summer Adventures",
-      "license": "Royalty-free"
+      "artist": "u_1tlkhq87qk",
+      "license": "Pixabay Content License",
+      "creditUrl": "https://pixabay.com/music/pop-summer-adventures-231267/"
     }
   ]
 }
