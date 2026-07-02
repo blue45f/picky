@@ -14,14 +14,18 @@ afterEach(() => {
 });
 
 describe('Toss auth contracts', () => {
-  it('accepts only the documented appLogin referrers', () => {
+  it('keeps documented appLogin referrers and absorbs unknown ones as DEFAULT', () => {
     expect(TossLoginSchema.parse({ authorizationCode: 'one-time-code' }).referrer).toBe('DEFAULT');
     expect(
       TossLoginSchema.parse({ authorizationCode: 'one-time-code', referrer: 'SANDBOX' }).referrer,
     ).toBe('SANDBOX');
+    // SDK가 새 referrer 값을 추가해도 로그인이 400으로 깨지지 않도록 미지의 값은
+    // DEFAULT로 흡수한다(.catch) — scope에 user_key가 추가된 2026-01-02류 변화 대응.
     expect(
-      TossLoginSchema.safeParse({ authorizationCode: 'one-time-code', referrer: 'UNLINK' }).success,
-    ).toBe(false);
+      TossLoginSchema.parse({ authorizationCode: 'one-time-code', referrer: 'UNLINK' }).referrer,
+    ).toBe('DEFAULT');
+    // 인가 코드 자체가 없으면 여전히 거부한다(관용은 부가 필드에만).
+    expect(TossLoginSchema.safeParse({ referrer: 'SANDBOX' }).success).toBe(false);
   });
 
   it('validates the documented unlink callback payload', () => {
