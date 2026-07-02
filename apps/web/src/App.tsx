@@ -51,6 +51,20 @@ const RouteFallback: React.FC = () => (
 
 const FALLBACK_QUERY_KEY = '__fallback';
 
+/**
+ * 라우트 전환 모션 래퍼 — pathname 을 key 로 콘텐츠를 리마운트해 화면 전환마다
+ * 슬라이드+페이드+미세 스케일 진입(routeEnter)을 재생한다(토스 앱과 동일한 결).
+ * prefers-reduced-motion 은 CSS 가 비활성 처리한다.
+ */
+const RouteTransition: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const location = useLocation();
+  return (
+    <div key={location.pathname} className="route-transition">
+      {children}
+    </div>
+  );
+};
+
 const ShareRouteRedirect: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
@@ -123,26 +137,28 @@ export const App: React.FC = () => {
         <FallbackRouteBridge />
 
         <main id="main-content" tabIndex={-1} className="page-shell" style={{ flexGrow: 1 }}>
-          <Suspense fallback={<RouteFallback />}>
-            <Routes>
-              <Route path="/" element={<PollList />} />
-              <Route path="/create" element={<CreatePoll />} />
-              <Route path="/design" element={<DesignSystem />} />
-              <Route path="/sitemap" element={<SitemapPage />} />
-              <Route path="/poll/:id" element={<PollDetail />} />
-              <Route path="/poll/:id/edit" element={<EditPoll />} />
-              <Route path="/admin" element={<Admin />} />
-              <Route path="/support" element={<Support />} />
-              <Route path="/account" element={<Account />} />
-              <Route path="/share/:id" element={<ShareRouteRedirect />} />
-              <Route path="/embed/:id" element={<PollDetail />} />
-              <Route path="/present/:id" element={<PollDetail />} />
-              <Route path="/auth" element={<Navigate to="/auth/login" replace />} />
-              <Route path="/auth/:mode" element={<AuthPage />} />
-              <Route path="/legal/:doc" element={<LegalPage />} />
-              <Route path="*" element={<PollList />} />
-            </Routes>
-          </Suspense>
+          <RouteTransition>
+            <Suspense fallback={<RouteFallback />}>
+              <Routes>
+                <Route path="/" element={<PollList />} />
+                <Route path="/create" element={<CreatePoll />} />
+                <Route path="/design" element={<DesignSystem />} />
+                <Route path="/sitemap" element={<SitemapPage />} />
+                <Route path="/poll/:id" element={<PollDetail />} />
+                <Route path="/poll/:id/edit" element={<EditPoll />} />
+                <Route path="/admin" element={<Admin />} />
+                <Route path="/support" element={<Support />} />
+                <Route path="/account" element={<Account />} />
+                <Route path="/share/:id" element={<ShareRouteRedirect />} />
+                <Route path="/embed/:id" element={<PollDetail />} />
+                <Route path="/present/:id" element={<PollDetail />} />
+                <Route path="/auth" element={<Navigate to="/auth/login" replace />} />
+                <Route path="/auth/:mode" element={<AuthPage />} />
+                <Route path="/legal/:doc" element={<LegalPage />} />
+                <Route path="*" element={<PollList />} />
+              </Routes>
+            </Suspense>
+          </RouteTransition>
         </main>
 
         <footer

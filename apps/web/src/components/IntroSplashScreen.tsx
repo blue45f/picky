@@ -255,7 +255,8 @@ export const IntroSplashScreen: React.FC = () => {
         </div>
 
         <h1 className="pf-splash-title">피키</h1>
-        <p className="pf-splash-subtitle">친구들과 나누는 재미있는 고민 투표 🔥</p>
+        {/* 리포지셔닝 카피 — '친구와 투표'가 아니라 '누구에게나 물어보고 결정까지'. */}
+        <p className="pf-splash-subtitle">누구에게나 물어보고, 결정까지 한 번에 🔥</p>
 
         <div className="pf-splash-tag">QR 태그로 즉시 참여 · 한 표로 결정 ⚡️</div>
       </div>

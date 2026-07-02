@@ -3361,8 +3361,10 @@ function MobileSubmitBar({ canSubmit, isLoading }: MobileSubmitBarProps) {
   return (
     <>
       {/* 모바일 전용 고정 제출 바 — 긴 폼에서도 1차 액션을 항상 손 닿는 곳에.
-          form 속성으로 위 폼과 연결되어 별도 핸들러 없이 동일하게 제출된다. */}
-      <div className="mobile-only" aria-hidden="true" style={{ height: '78px' }} />
+          form 속성으로 위 폼과 연결되어 별도 핸들러 없이 동일하게 제출된다.
+          스페이서는 페이지 '맨 끝'에서 고정 바 높이만큼 자리를 잡아야 하므로 order 를
+          최댓값으로 둔다 — 없으면 flex order 상 헤더 바로 뒤에 끼어 ~100px 공백이 생긴다(QA). */}
+      <div className="mobile-only" aria-hidden="true" style={{ height: '78px', order: 99 }} />
       <div className="sticky-action-bar mobile-only">
         <button
           type="submit"

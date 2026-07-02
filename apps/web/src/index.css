@@ -993,6 +993,8 @@ body.present-mode .page-shell {
   letter-spacing: -0.02em;
   color: var(--text-primary);
   text-wrap: balance;
+  /* 한국어 단어 중간 줄바꿈 방지(360px 등 좁은 폭) — 어절 단위로만 줄바꿈. */
+  word-break: keep-all;
 }
 
 /* Hero brand-shimmer — a long teal→gold→teal ramp clipped to the headline
@@ -1073,11 +1075,13 @@ body.present-mode .page-shell {
   white-space: nowrap;
 }
 
-/* When the title shimmers, the accent word inherits the clipped transparent
-   fill so the whole headline reads as one continuous light-wash (the colored
-   underline still renders — it's a sibling pseudo-element, not glyph fill). */
+/* 강조 단어는 시머 클리핑에서 제외하고 솔리드 브랜드 색으로 채운다.
+   (position:relative 자식은 Chromium에서 부모 background-clip:text 페인트와
+   분리돼 글자가 통째로 투명해진다 — 실측에서 '누구에게나'가 렌더되지 않던
+   원인. 투톤 헤드라인이 강조 의도에도 부합해 의도적으로 분리 채색.) */
 .hero-shimmer .hero-accent {
-  color: inherit;
+  color: var(--brand-primary-light);
+  -webkit-text-fill-color: var(--brand-primary-light);
 }
 
 /* Animated underline sweep beneath the accent words */
@@ -1124,6 +1128,8 @@ body.present-mode .page-shell {
   font-size: 0.92rem;
   font-weight: 800;
   border-radius: var(--radius-md);
+  /* 좁은 폭에서 라벨이 단어 중간에 꺾이지 않게 — 버튼 자체가 줄바꿈되는 편이 낫다(QA). */
+  white-space: nowrap;
 }
 
 .hero-cta svg:last-child {
@@ -1186,6 +1192,7 @@ body.present-mode .page-shell {
   gap: 7px;
   padding: 12px 16px;
   font-size: 0.86rem;
+  white-space: nowrap;
   font-weight: 700;
 }
 
@@ -2166,6 +2173,17 @@ body.present-mode .page-shell {
   .press-tile:active {
     transform: none;
   }
+
+  /* 라우트 전환·도넛 draw-in·모달 스프링 — 모션 없이 즉시 최종 상태로 표시. */
+  .route-transition,
+  .pf-donut-seg,
+  .pf-donut-center,
+  .modal-overlay,
+  .modal-content,
+  .modal-overlay.is-closing,
+  .modal-overlay.is-closing .modal-content {
+    animation: none !important;
+  }
 }
 
 /* Animations */
@@ -2307,6 +2325,8 @@ body.present-mode .page-shell {
   padding: 1rem;
   overflow-y: auto;
   overscroll-behavior: contain;
+  /* 펼침 모션 — 백드롭 블러가 서서히 차오르며 페이드인. */
+  animation: modalOverlayIn 0.28s var(--ease-out-quart) both;
 }
 
 .modal-content {
@@ -2322,6 +2342,62 @@ body.present-mode .page-shell {
   overflow-y: auto;
   padding: 24px;
   opacity: 1;
+  /* 콘텐츠 스프링 팝 — 살짝 아래에서 떠오르며 1.01 오버슛 후 안착. */
+  animation: modalContentIn 0.34s var(--ease-out-quint) both;
+}
+
+@keyframes modalOverlayIn {
+  from {
+    opacity: 0;
+    backdrop-filter: blur(0px);
+    -webkit-backdrop-filter: blur(0px);
+  }
+  to {
+    opacity: 1;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+  }
+}
+@keyframes modalContentIn {
+  0% {
+    opacity: 0;
+    transform: translateY(18px) scale(0.96);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(-2px) scale(1.01);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* 닫힘 모션 — 오버레이에 .is-closing 을 붙이면 역방향으로 사라진다
+   (useAnimatedClose 훅이 언마운트를 애니메이션 길이만큼 지연). */
+.modal-overlay.is-closing {
+  animation: modalOverlayOut 0.22s var(--ease-out-quart) both;
+}
+.modal-overlay.is-closing .modal-content {
+  animation: modalContentOut 0.22s var(--ease-out-quart) both;
+}
+@keyframes modalOverlayOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+@keyframes modalContentOut {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+  }
 }
 
 /* 모바일 전용 고정 제출 바 — 길어진 작성 폼에서 1차 액션(등록)을 항상 손 닿는 곳에 둔다.
@@ -2348,13 +2424,15 @@ body.present-mode .page-shell {
   position: sticky;
   top: 0;
   z-index: 60;
+  /* 스크롤 콘텐츠가 얇은 블러 뒤로 비쳐 헤더 가독성이 떨어지던 문제(QA) —
+     불투명도를 크게 올리고 블러를 강화해 텍스트/아이콘 대비를 항상 유지한다. */
   background: linear-gradient(
     180deg,
-    color-mix(in oklab, var(--bg-main) 76%, transparent) 14%,
-    color-mix(in oklab, var(--bg-main) 56%, transparent) 100%
+    color-mix(in oklab, var(--bg-main) 94%, transparent) 14%,
+    color-mix(in oklab, var(--bg-main) 86%, transparent) 100%
   );
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(18px) saturate(1.15);
+  -webkit-backdrop-filter: blur(18px) saturate(1.15);
   border-bottom: 1px solid var(--bg-card-border);
 }
 
@@ -2885,4 +2963,56 @@ body.present-mode .page-shell {
   --brand-accent-gold: #f2cf52;
   --brand-accent-coral: #ff8a8f;
   --bg-card-border: rgba(255, 255, 255, 0.12);
+}
+
+/* ───────────────────────────────────────────────
+   라우트 전환 모션 — App 이 pathname 을 key 로 콘텐츠를 래핑해 화면 전환마다
+   슬라이드+페이드+미세 스케일 진입을 재생한다(토스 앱과 동일한 결).
+   from-state 는 키프레임 안에만 있어 CSS 미로드/reduced-motion 에서도
+   콘텐츠가 사라지지 않는다(가시성 불변, 위 reduce 블록에서 비활성).
+   ─────────────────────────────────────────────── */
+.route-transition {
+  animation: routeEnter 0.38s var(--ease-out-quint) both;
+}
+@keyframes routeEnter {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.988);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ───────────────────────────────────────────────
+   도넛 차트 draw-in — 공유 VoteDonutChart(.pf-donut-seg)의 세그먼트가
+   시계 방향으로 차례로 그려지고(인라인 animation-delay 로 스태거),
+   중앙 합계 라벨은 살짝 팝. 키프레임에 from 만 둬서 최종값(인라인
+   stroke-dasharray)으로 자연 수렴 — 세그먼트별 값이 달라도 안전하다.
+   ─────────────────────────────────────────────── */
+.pf-donut-seg {
+  animation: pfDonutDraw 0.9s var(--ease-out-quint) both;
+}
+@keyframes pfDonutDraw {
+  from {
+    stroke-dasharray: 0 290;
+    opacity: 0.4;
+  }
+}
+.pf-donut-center {
+  animation: pfDonutCenterPop 0.55s var(--ease-out-expo) 0.35s both;
+}
+@keyframes pfDonutCenterPop {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.9);
+  }
+  60% {
+    transform: translateY(-2px) scale(1.04);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }

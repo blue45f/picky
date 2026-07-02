@@ -86,6 +86,7 @@ import {
 } from '../lib/pollShare';
 import type { KakaoShareDiagnostics, KakaoShareReadinessItem } from '../lib/pollShare';
 import { buildQrSvgDataUri } from '../lib/qrCode';
+import { triggerParticleBurst } from '../lib/particles';
 import { rememberRecentPoll } from '../lib/pollHistory';
 import { CountdownChip, useCountdown } from '../components/Countdown';
 
@@ -7091,7 +7092,7 @@ export const PollDetail: React.FC = () => {
     if (currentPoll && isPollClosed(currentPoll)) {
       return;
     }
-    await addComment(
+    const result = await addComment(
       id,
       {
         comment: text,
@@ -7104,6 +7105,14 @@ export const PollDetail: React.FC = () => {
       // 비공개 투표면 활성 접근 코드를 함께 보내 서버 게이트를 통과한다(공개 폴은 undefined).
       activeCode,
     );
+    if (result) {
+      // 답글 등록 성공 — 작고 경쾌한 파티클(토스 인앱과 동일한 결의 커뮤니티 축하 연출).
+      triggerParticleBurst(globalThis.innerWidth / 2, globalThis.innerHeight * 0.72, {
+        count: 16,
+        charSet: ['💬', '✨', '💚'],
+        speedMultiplier: 1,
+      });
+    }
   };
 
   // 비공개 투표 잠금 해제 — 코드로 재조회하면 성공 시 서버가 requiresCode=false 로 응답해 게이트가 풀린다.
@@ -7501,6 +7510,22 @@ export const PollDetail: React.FC = () => {
         // 시각적 축하 연출(마스코트 팝 + 컨페티). 모션을 줄인 환경에선 CSS가 정적으로 처리한다.
         setShowVoteCelebration(true);
         globalThis.setTimeout(() => setShowVoteCelebration(false), 1800);
+        // 전역 파티클 샤워 — 제출 순간 크게 한 번, 잠시 뒤 좌우 잔불꽃(토스 인앱과 동일한 결).
+        triggerParticleBurst(globalThis.innerWidth / 2, globalThis.innerHeight * 0.62, {
+          count: 40,
+          charSet: ['🥑', '✨', '🎉', '💚', '💛', '🌟'],
+          speedMultiplier: 1.35,
+        });
+        globalThis.setTimeout(() => {
+          triggerParticleBurst(globalThis.innerWidth * 0.3, globalThis.innerHeight * 0.5, {
+            count: 18,
+            speedMultiplier: 1.1,
+          });
+          triggerParticleBurst(globalThis.innerWidth * 0.7, globalThis.innerHeight * 0.5, {
+            count: 18,
+            speedMultiplier: 1.1,
+          });
+        }, 240);
       }
     } finally {
       setIsSubmittingVote(false);

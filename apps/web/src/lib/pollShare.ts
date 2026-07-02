@@ -2,7 +2,9 @@ import type { Poll } from '@picky/shared';
 // 공유 텍스트·오리진 정규화 코어는 @picky/shared 단일 소스. URL resolver(아래)는 web 전용으로 유지.
 import { canRevealResults, normalizeOrigin, resolveShareText } from '@picky/shared';
 
-const DEFAULT_SHARE_TITLE = 'picky - 고민 투표 공유 플랫폼';
+// 탭/공유 타이틀 접미사 — useDocumentTitle(BASE '피키')와 동일한 결로 통일(QA: 타이틀 표기 혼재).
+const TITLE_SUFFIX = '피키';
+const DEFAULT_SHARE_TITLE = `${TITLE_SUFFIX} - 고민을 투표로 빠르게 결정`;
 const DEFAULT_SHARE_DESCRIPTION =
   '고민을 선택지 투표로 만들고 링크로 공유해 빠르게 의견을 모아보세요.';
 const KAKAO_SDK_WAIT_TIMEOUT_MS = 2200;
@@ -340,7 +342,7 @@ export const updatePollMetaTags = (poll: Poll | null | undefined) => {
     return;
   }
 
-  const title = poll ? `${poll.question} | picky` : DEFAULT_SHARE_TITLE;
+  const title = poll ? `${poll.question} | ${TITLE_SUFFIX}` : DEFAULT_SHARE_TITLE;
   const description = poll?.description || DEFAULT_SHARE_DESCRIPTION;
   const url = poll ? resolvePollShareUrl(poll) : globalThis.location.href;
   const imageUrl = resolvePollImageUrl(poll);
