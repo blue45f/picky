@@ -381,6 +381,67 @@ a {
 }
 
 /* ───────────────────────────────────────────────
+   라우트 전환 모션 — App 이 pathname 을 key 로 래핑해 화면 전환마다
+   새 콘텐츠가 슬라이드+페이드+미세 스케일로 안착(웹과 동일 결).
+   from-state 는 키프레임 안에만 있어 CSS 미로드/reduced-motion 에서도
+   콘텐츠가 사라지지 않아요(가시성 불변).
+   ─────────────────────────────────────────────── */
+.route-transition {
+  animation: pf-route-in 0.38s var(--ease-out-quint) both;
+}
+@keyframes pf-route-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.988);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ───────────────────────────────────────────────
+   접기/펼치기(collapse) 유틸 — 디스클로저·답글 폼처럼 콘텐츠를
+   유지한 채 높이를 부드럽게 여닫아요(grid-template-rows 0fr↔1fr).
+   닫힘도 애니메이션되며, 내용은 .collapse-inner 가 overflow 클립.
+   ─────────────────────────────────────────────── */
+.collapse-panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 0.45s var(--ease-out-quint),
+    opacity 0.32s ease;
+}
+.collapse-panel.is-open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+.collapse-panel > .collapse-inner {
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* ───────────────────────────────────────────────
+   도넛 차트 draw-in — 공유 VoteDonutChart(.pf-donut-seg)의 세그먼트가
+   투표 순간 시계 방향으로 차례로 그려지고(pf-donut-draw), 중앙 합계는
+   살짝 팝(pf-donut-center). 키프레임에 from 만 둬서 최종값(인라인
+   stroke-dasharray)으로 자연 수렴 — 세그먼트별 값이 달라도 안전해요.
+   ─────────────────────────────────────────────── */
+.pf-donut-seg {
+  animation: pf-donut-draw 0.9s var(--ease-out-quint) both;
+}
+@keyframes pf-donut-draw {
+  from {
+    stroke-dasharray: 0 290;
+    opacity: 0.4;
+  }
+}
+.pf-donut-center {
+  animation: pf-count-pop 0.55s var(--ease-out-expo) 0.35s both;
+}
+
+/* ───────────────────────────────────────────────
    공유 스크롤-진입 모션 — packages/client `lib/motion` 의 <Reveal>/useReveal 이
    배출하는 클래스 계약(`.reveal`/`.reveal-soft` + `.is-revealed`)을 토스 토큰으로
    소유. 웹 index.css 와 같은 결: 기본은 from-state(살짝 내려가 투명)이고,
@@ -573,5 +634,15 @@ a {
   /* 라이브 점은 확산 링을 멈추고 정적 점으로 유지. */
   .live-dot {
     animation: none;
+  }
+  /* 라우트 전환·도넛 draw-in — 모션 없이 즉시 최종 상태로 표시. */
+  .route-transition,
+  .pf-donut-seg,
+  .pf-donut-center {
+    animation: none;
+  }
+  /* 접기/펼치기 — 전환 없이 즉시 여닫음(열림 상태는 is-open 클래스가 결정). */
+  .collapse-panel {
+    transition: none;
   }
 }

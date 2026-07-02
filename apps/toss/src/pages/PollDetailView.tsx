@@ -709,6 +709,7 @@ function CommentCard(
 
   return (
     <div
+      className="rise"
       style={{
         background: isReply ? 'rgba(255,255,255,0.04)' : theme.surface,
         backdropFilter: 'blur(8px)',
@@ -1319,6 +1320,7 @@ function CommentsSection(
                 ))}
                 {replyEnabled && replyingTo === c.id ? (
                   <div
+                    className="rise"
                     style={{
                       display: 'flex',
                       flexDirection: 'column',
@@ -1736,8 +1738,10 @@ function ShareSection(
       >
         {showMore ? 'QR·SNS 미리보기·공유 문구 접기 ▴' : 'QR·SNS 미리보기·공유 문구 더보기 ▾'}
       </button>
-      {showMore ? (
-        <>
+      {/* 접기/펼치기 모션 — 콘텐츠를 유지한 채 높이를 부드럽게 여닫아요(닫힘도 애니메이션).
+          접힌 동안엔 inert/aria-hidden 으로 포커스·리더 접근을 차단해요. */}
+      <div className={`collapse-panel${showMore ? ' is-open' : ''}`}>
+        <div className="collapse-inner" aria-hidden={!showMore} inert={!showMore}>
           {/* QR 태그 포함 완전 통합 공유 영역 — 직관적으로 스캔/복사 강조 */}
           <div style={{ marginTop: 6 }}>
             <div
@@ -1754,8 +1758,8 @@ function ShareSection(
             {shareUrl ? <PollShareQrSection shareUrl={shareUrl} onCopyLink={onCopy} /> : null}
           </div>
           {children}
-        </>
-      ) : null}
+        </div>
+      </div>
     </div>
   );
 }

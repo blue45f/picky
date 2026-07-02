@@ -104,6 +104,9 @@ export function VoteDonutChart({
           return (
             <circle
               key={opt.id}
+              // 세그먼트 draw-in(그려지는) 모션 — 키프레임은 각 앱 CSS(pf-donut-draw)가 소유.
+              // CSS 미로드/reduced-motion/정적 렌더에선 인라인 최종값 그대로 보임(가시성 불변).
+              className="pf-donut-seg"
               cx="60"
               cy="60"
               r={RADIUS}
@@ -113,12 +116,17 @@ export function VoteDonutChart({
               strokeDasharray={strokeDasharray}
               strokeDashoffset={strokeDashoffset}
               strokeLinecap="round"
-              style={{ transition: 'stroke-dashoffset 0.8s cubic-bezier(0.16, 1, 0.3, 1)' }}
+              style={{
+                transition: 'stroke-dashoffset 0.8s cubic-bezier(0.16, 1, 0.3, 1)',
+                // 시계 방향 순서대로 그려지도록 세그먼트별 지연(첫 조각부터 차례로).
+                animationDelay: `${i * 110}ms`,
+              }}
             />
           );
         })}
       </svg>
       <div
+        className="pf-donut-center"
         style={{
           position: 'absolute',
           display: 'flex',

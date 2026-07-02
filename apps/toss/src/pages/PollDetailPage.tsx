@@ -373,6 +373,12 @@ export function PollDetailPage() {
     if (result) {
       trackComment(false);
       hapticFeedback('success');
+      // 한마디 등록 성공 — 작고 경쾌한 파티클로 축하(투표 연출보다 가볍게).
+      triggerParticleBurst(globalThis.innerWidth / 2, globalThis.innerHeight * 0.72, {
+        count: 22,
+        charSet: ['💬', '✨', '💚', '🥑'],
+        speedMultiplier: 1.1,
+      });
       showToast('한마디를 남겼어요 💬');
     } else {
       hapticFeedback('error');
@@ -407,6 +413,12 @@ export function PollDetailPage() {
       // 토스 Analytics: 한마디(답글). 식별값 없이 reply 여부만.
       trackComment(true);
       hapticFeedback('success');
+      // 답글 성공 — 한마디보다 더 잔잔한 마이크로 버스트.
+      triggerParticleBurst(globalThis.innerWidth / 2, globalThis.innerHeight * 0.72, {
+        count: 16,
+        charSet: ['💬', '✨', '💚'],
+        speedMultiplier: 1,
+      });
       showToast('답글을 남겼어요 💬');
     } else {
       hapticFeedback('error');
