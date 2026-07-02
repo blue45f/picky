@@ -17,12 +17,21 @@ import {
 } from '../lib/resultImage';
 import { theme, FONT } from '../theme';
 import { SegmentedControl } from './ui';
+import { hapticFeedback } from '../lib/toss';
+import { triggerParticleBurst } from '../lib/particles';
+import type { RewardedPerks } from '../lib/ads';
 
 type ResultImageExportProps = Readonly<{
   poll: Poll;
   shareUrl: string;
   /** 저장 성공/실패 알림(상위가 토스트·햅틱). */
   onNotify?: (ok: boolean) => void;
+  /**
+   * 보상형 광고 컨트롤러(화면 단위 공유, useRewardedPerks).
+   * 있으면 '프리미엄 골드' 템플릿을 광고 시청 완료로 영구 잠금 해제할 수 있어요.
+   * 미전달/미지원/미설정이면 잠금 UI 자체가 렌더되지 않아요(기본 3테마 그대로).
+   */
+  rewarded?: RewardedPerks;
 }>;
 
 const THEME_OPTIONS: ReadonlyArray<{ value: ResultImageTheme; label: string }> = [
@@ -30,6 +39,31 @@ const THEME_OPTIONS: ReadonlyArray<{ value: ResultImageTheme; label: string }> =
   { value: 'light', label: '라이트' },
   { value: 'presentation', label: '발표용' },
 ];
+
+/** 프리미엄 골드 템플릿(보상형 광고로 잠금 해제) — 기기 단위 영구 보관. */
+const PREMIUM_THEME_OPTION: { value: ResultImageTheme; label: string } = {
+  value: 'gold',
+  label: '골드 ✨',
+};
+const PREMIUM_UNLOCK_KEY = 'picky_premium_templates';
+
+const readPremiumUnlocked = (): boolean => {
+  if (typeof localStorage === 'undefined') return false;
+  try {
+    return localStorage.getItem(PREMIUM_UNLOCK_KEY) === '1';
+  } catch {
+    return false;
+  }
+};
+
+const writePremiumUnlocked = (): void => {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    localStorage.setItem(PREMIUM_UNLOCK_KEY, '1');
+  } catch {
+    // 무시(프라이빗 모드 등).
+  }
+};
 
 const CONTENT_OPTIONS: ReadonlyArray<{ value: ResultImageContentKey; label: string }> = [
   { value: 'comment', label: '대표 의견' },
@@ -52,9 +86,43 @@ const downloadDataUrl = (dataUrl: string, filename: string): boolean => {
   }
 };
 
-export function ResultImageExport({ poll, shareUrl, onNotify }: ResultImageExportProps) {
+export function ResultImageExport({ poll, shareUrl, onNotify, rewarded }: ResultImageExportProps) {
   const [imageTheme, setImageTheme] = useState<ResultImageTheme>('classic');
   const [content, setContent] = useState<ResultImageContentOptions>(DEFAULT_RESULT_IMAGE_CONTENT);
+  const [premiumUnlocked, setPremiumUnlocked] = useState(() => readPremiumUnlocked());
+  const [unlockShowing, setUnlockShowing] = useState(false);
+  const [justUnlocked, setJustUnlocked] = useState(false);
+
+  // 프리미엄 잠금 해제 CTA — 광고를 띄울 수 있는 환경에서, 아직 잠겨 있을 때만.
+  const premiumLockVisible = Boolean(rewarded?.available) && !premiumUnlocked;
+  const themeOptions = premiumUnlocked ? [...THEME_OPTIONS, PREMIUM_THEME_OPTION] : THEME_OPTIONS;
+
+  const handleUnlockPremium = () => {
+    if (!rewarded || !rewarded.ready || unlockShowing) return;
+    hapticFeedback('tap');
+    setUnlockShowing(true);
+    const shown = rewarded.showFor(() => {
+      // userEarnedReward 에서만 도달 — 프리미엄 템플릿을 영구 잠금 해제하고 골드로 전환.
+      writePremiumUnlocked();
+      setPremiumUnlocked(true);
+      setImageTheme('gold');
+      setJustUnlocked(true);
+      hapticFeedback('confetti');
+      triggerParticleBurst(globalThis.innerWidth / 2, globalThis.innerHeight / 2, {
+        count: 40,
+        charSet: ['✨', '🌟', '💛', '🏆', '🥑'],
+        speedMultiplier: 1.4,
+      });
+      globalThis.setTimeout(() => setJustUnlocked(false), 4000);
+      setUnlockShowing(false);
+    });
+    if (!shown) {
+      setUnlockShowing(false);
+    } else {
+      // dismissed(보상 없이 닫힘) 대비 — 광고 종료 후 버튼을 다시 활성화한다.
+      globalThis.setTimeout(() => setUnlockShowing(false), 1500);
+    }
+  };
 
   // 미리보기 data URL — 테마/콘텐츠 토글이 바뀔 때만 다시 그려요(순수 Canvas, DOM 1회).
   const previewUrl = useMemo(() => {
@@ -149,13 +217,49 @@ export function ResultImageExport({ poll, shareUrl, onNotify }: ResultImageExpor
         </div>
       )}
 
-      {/* 테마 선택 */}
+      {/* 테마 선택 — 프리미엄 골드는 잠금 해제 후에만 목록에 나타나요. */}
       <SegmentedControl
-        options={THEME_OPTIONS}
+        options={themeOptions}
         value={imageTheme}
         onChange={setImageTheme}
         ariaLabel="결과 이미지 테마"
       />
+
+      {justUnlocked ? (
+        <p
+          role="status"
+          style={{ margin: 0, fontSize: FONT.small, fontWeight: 700, color: theme.gold }}
+        >
+          프리미엄 골드 템플릿이 열렸어요! 이 기기에서 계속 쓸 수 있어요 ✨
+        </p>
+      ) : null}
+
+      {/* 프리미엄 템플릿 잠금 해제 — 보상형 광고 옵트인(시청 완료 시에만 지급). */}
+      {premiumLockVisible ? (
+        <button
+          type="button"
+          className="pressable sheen"
+          onClick={handleUnlockPremium}
+          disabled={!rewarded?.ready || unlockShowing}
+          style={{
+            minHeight: 44,
+            borderRadius: 14,
+            border: `1px dashed ${theme.gold}66`,
+            background:
+              rewarded?.ready && !unlockShowing ? theme.goldSoft : 'rgba(255,255,255,0.04)',
+            color: rewarded?.ready && !unlockShowing ? theme.gold : theme.textFaint,
+            fontSize: FONT.small,
+            fontWeight: 800,
+            cursor: rewarded?.ready && !unlockShowing ? 'pointer' : 'default',
+          }}
+        >
+          {unlockShowing
+            ? '광고 재생 중…'
+            : rewarded?.ready
+              ? '🔒 광고 보고 프리미엄 골드 템플릿 열기 ✨'
+              : '프리미엄 템플릿 광고 준비 중…'}
+        </button>
+      ) : null}
 
       {/* 콘텐츠 토글 칩 */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>

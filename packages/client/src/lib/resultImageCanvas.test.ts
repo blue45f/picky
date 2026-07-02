@@ -118,7 +118,7 @@ describe('buildPollResultImageDataUrl', () => {
     ).toThrow('이미지 생성을 지원하지 않는 브라우저입니다.');
   });
 
-  it('exposes all three themes', () => {
-    expect(Object.keys(RESULT_IMAGE_THEMES)).toEqual(['classic', 'light', 'presentation']);
+  it('exposes all four themes (incl. rewarded premium gold)', () => {
+    expect(Object.keys(RESULT_IMAGE_THEMES)).toEqual(['classic', 'light', 'presentation', 'gold']);
   });
 });

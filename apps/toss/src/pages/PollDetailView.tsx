@@ -25,6 +25,8 @@ import { ShareTemplates } from '../components/ShareTemplates';
 import { SnsPreviewCard } from '../components/SnsPreviewCard';
 import { UserAuthStatus } from '../components/UserAuthStatus';
 import { BannerAd } from '../components/BannerAd';
+import { CheerBoostCard } from '../components/CheerBoostCard';
+import { useRewardedPerks } from '../lib/ads';
 import { CountUp, Reveal } from '../lib/motion';
 
 interface PollDetailViewProps {
@@ -2087,6 +2089,10 @@ export function PollDetailView(props: Readonly<PollDetailViewProps>) {
   // 신규 canManage(소유자|어드민)가 없으면 기존 isOwner로 폴백해 호환을 지켜요.
   const canManage = canManageProp ?? isOwner;
 
+  // 보상형 광고 컨트롤러 — 같은 adGroupId 는 한 번에 하나만 사전 로드할 수 있어(공식 가이드)
+  // 화면 단위로 1회만 만들고, 응원 부스트·프리미엄 템플릿 두 퍼크가 나눠 써요.
+  const rewardedPerks = useRewardedPerks();
+
   if (!poll) {
     return <PollEmptyState />;
   }
@@ -2163,6 +2169,11 @@ export function PollDetailView(props: Readonly<PollDetailViewProps>) {
           />
         ) : null}
 
+        {/* 응원 부스트(보상형 광고 옵트인) — 결과를 읽는 단계에서만. 진입 직후/투표 전 노출 금지. */}
+        {showResults && (hasVoted || closed) ? (
+          <CheerBoostCard pollId={poll.id} rewarded={rewardedPerks} />
+        ) : null}
+
         {/* 결정 신뢰도 — 결과 공개 + 표 모임(R1) 시에만. 점수/상태/리스크는 @picky/shared 소비. */}
         {decisionToolsVisible ? (
           <DecisionConfidencePanel
@@ -2227,9 +2238,15 @@ export function PollDetailView(props: Readonly<PollDetailViewProps>) {
         */}
         {hasVoted || closed ? <BannerAd format="banner" /> : null}
 
-        {/* 결과 이미지 내보내기 — buildPollResultImageDataUrl(순수 Canvas) 소비. */}
+        {/* 결과 이미지 내보내기 — buildPollResultImageDataUrl(순수 Canvas) 소비.
+            보상형 컨트롤러를 넘기면 '프리미엄 골드' 템플릿 잠금 해제 CTA가 함께 떠요. */}
         {decisionToolsVisible ? (
-          <ResultImageExport poll={poll} shareUrl={shareUrl} onNotify={onResultImageSaved} />
+          <ResultImageExport
+            poll={poll}
+            shareUrl={shareUrl}
+            onNotify={onResultImageSaved}
+            rewarded={rewardedPerks}
+          />
         ) : null}
 
         <ShareSection

@@ -957,10 +957,11 @@ function ListBody(
         </Fragment>
       ))}
       {/*
-        목록 끝(마지막 카드 뒤) 배너 — 12개 이상일 때만(9번째 광고와 최소 3카드 간격 확보).
+        목록 끝(마지막 카드 뒤) 배너 — 14개 이상일 때만(9번째 피드형 광고와 최소 5카드 간격을
+        확보해, 같은 스크린에 두 구좌가 동시에 보이지 않게 함 — SSP '동일 포맷 2구좌' 금지 대응).
         스크롤 끝에 도달한 자연스러운 지점이라 핵심 흐름을 가리지 않아요.
       */}
-      {visiblePolls.length >= 12 ? <BannerAd format="banner" gap={6} /> : null}
+      {visiblePolls.length >= 14 ? <BannerAd format="banner" gap={6} /> : null}
     </>
   );
 }

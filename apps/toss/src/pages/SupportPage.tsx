@@ -4,6 +4,7 @@ import { Button } from '@toss/tds-mobile';
 import { theme, pageShell, FONT } from '../theme';
 import { hapticFeedback } from '../lib/toss';
 import { AppBar, SegmentedControl, Skeleton } from '../components/ui';
+import { BannerAd } from '../components/BannerAd';
 import {
   INQUIRY_CATEGORIES,
   listInquiries,
@@ -294,6 +295,12 @@ export function SupportPage() {
             </article>
           ))}
         </section>
+
+        {/*
+          고객센터 하단 배너 — 문의 폼·목록이 끝나는 자연스러운 지점(스크롤 말단)이라
+          핵심 액션(문의 보내기)을 가리지 않아요. 이 화면의 유일한 광고 구좌(정책: 화면당 1개).
+        */}
+        <BannerAd format="banner" gap={4} />
       </div>
     </div>
   );

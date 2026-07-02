@@ -26,8 +26,8 @@ import { getAudioContext, isBgmEnabled, bgmPlay, bgmPause } from './sound';
 // - feed:   카드 목록 사이에 끼우려고 콘솔에서 '배너(피드형)'로 만든 그룹
 //           (전용 그룹이 없으면 일반 배너 그룹으로 폴백 → 동일하게 동작)
 const TEST_BANNER_AD_GROUP_ID = 'ait-ad-test-banner-id';
-// 공식 WebView 배너 가이드는 현재 리스트형 테스트 ID 하나만 제공한다.
-const TEST_FEED_AD_GROUP_ID = TEST_BANNER_AD_GROUP_ID;
+// 공식 통합 광고 문서의 피드형(native-image) 테스트 ID.
+const TEST_FEED_AD_GROUP_ID = 'ait-ad-test-native-image-id';
 
 /**
  * 배너 광고 배치 위치 라벨(슬롯 종류 X, 광고 타입 X).
@@ -127,15 +127,19 @@ export function useTossBanner() {
 
 export type FullScreenAdFormat = 'interstitial' | 'rewarded';
 
-/** 전면/보상형 광고 그룹 ID를 가져와요. */
+/**
+ * 전면/보상형 광고 그룹 ID를 가져와요.
+ * 운영은 콘솔 발급값(env), 개발은 형식별 공식 테스트 ID, 운영 미설정은 null(미노출).
+ */
 export function getFullScreenAdGroupId(format: FullScreenAdFormat): string | null {
   const value =
     format === 'rewarded'
       ? import.meta.env.VITE_TOSS_REWARDED_AD_GROUP_ID
       : import.meta.env.VITE_TOSS_INTERSTITIAL_AD_GROUP_ID;
   if (value?.trim()) return value.trim();
-  // 공식 문서의 테스트 ID 사용
-  return import.meta.env.DEV ? 'ait.dev.43daa14da3ae487b' : null;
+  if (!import.meta.env.DEV) return null;
+  // 공식 문서의 형식별 테스트 ID(실제 광고 ID로 개발 테스트하면 정책 위반).
+  return format === 'rewarded' ? 'ait-ad-test-rewarded-id' : 'ait-ad-test-interstitial-id';
 }
 
 function isFullScreenAdSupported(): boolean {
@@ -304,4 +308,49 @@ export function useTossFullScreenAd(
     show,
     supported,
   };
+}
+
+export type RewardedAdReward = Readonly<{ unitType: string; unitAmount: number }>;
+
+export interface RewardedPerks {
+  /** 보상형 광고를 띄울 수 있는 환경인지(그룹 ID 설정 + SDK 지원). false면 UI를 숨겨요. */
+  available: boolean;
+  /** 사전 로드된 광고가 준비됐는지(load→'loaded' 완료). */
+  ready: boolean;
+  /**
+   * 보상형 광고를 띄우고, 시청 완료(userEarnedReward) 시에만 콜백을 호출해요.
+   * dismissed만으로는 절대 보상하지 않아요(공식 정책).
+   * @returns 표시 시작 여부
+   */
+  showFor: (onReward: (reward: RewardedAdReward) => void) => boolean;
+}
+
+/**
+ * 한 화면의 여러 보상형 퍼크(응원 부스트·프리미엄 템플릿 등)가 **하나의 사전 로드**를
+ * 공유하게 하는 컨트롤러 훅. 같은 adGroupId 로는 광고를 한 번에 하나만 미리 로드할 수
+ * 있으므로(공식 가이드), 화면당 이 훅을 1회만 쓰고 showFor 를 각 퍼크에 나눠줘요.
+ */
+export function useRewardedPerks(): RewardedPerks {
+  const pendingRewardRef = useRef<((reward: RewardedAdReward) => void) | null>(null);
+  const ad = useTossFullScreenAd('rewarded', {
+    onReward: (reward) => {
+      const handler = pendingRewardRef.current;
+      pendingRewardRef.current = null;
+      handler?.(reward);
+    },
+    onError: () => {
+      pendingRewardRef.current = null;
+    },
+  });
+
+  const showFor = (onReward: (reward: RewardedAdReward) => void): boolean => {
+    pendingRewardRef.current = onReward;
+    const shown = ad.show();
+    if (!shown) {
+      pendingRewardRef.current = null;
+    }
+    return shown;
+  };
+
+  return { available: ad.configured && ad.supported, ready: ad.ready, showFor };
 }

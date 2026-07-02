@@ -13,8 +13,8 @@ import type { Poll } from '../../../shared/src/index';
 const optionPercent = (voteCount: number, totalVotes: number): number =>
   totalVotes > 0 ? Math.round((voteCount / totalVotes) * 100) : 0;
 
-/** 결과 이미지 테마(다크/라이트/발표용). */
-export type ResultImageTheme = 'classic' | 'light' | 'presentation';
+/** 결과 이미지 테마(다크/라이트/발표용/프리미엄 골드). */
+export type ResultImageTheme = 'classic' | 'light' | 'presentation' | 'gold';
 
 /** 카드에 포함할 콘텐츠 토글(대표 의견/참여 코드/공유 링크). */
 export type ResultImageContentKey = 'comment' | 'joinCode' | 'shareUrl';
@@ -78,6 +78,21 @@ export const RESULT_IMAGE_THEMES: Record<ResultImageTheme, ResultImageThemeConfi
     line: 'rgba(255,255,255,0.16)',
     panel: 'rgba(255,255,255,0.1)',
     barTrack: 'rgba(255,255,255,0.16)',
+  },
+  // 프리미엄 골드 — 토스 앱에선 보상형 광고 시청으로 잠금 해제되는 스페셜 룩.
+  gold: {
+    bgStart: '#171004',
+    bgMid: '#2b1f08',
+    bgEnd: '#100a03',
+    primary: '#f4c560',
+    accent: '#2ee0bf',
+    coral: '#ff8a5c',
+    title: '#fff8e8',
+    text: '#ecd9ac',
+    muted: '#b39c6d',
+    line: 'rgba(244,197,96,0.18)',
+    panel: 'rgba(244,197,96,0.1)',
+    barTrack: 'rgba(244,197,96,0.18)',
   },
 };
 
