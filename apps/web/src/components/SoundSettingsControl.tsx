@@ -16,8 +16,22 @@ import { useSoundSettings } from '../../../../packages/client/src/store/useSound
  * 이 컨트롤 자체는 data-no-sound 라 전역 클릭 사운드가 울리지 않아요(토글이 곧 사운드라 중복 방지).
  */
 export const SoundSettingsControl: React.FC = () => {
-  const { sfxEnabled, setSfxEnabled, bgmEnabled, setBgmEnabled, currentTrackName, nextTrack } =
-    useSoundSettings();
+  const {
+    sfxEnabled,
+    setSfxEnabled,
+    bgmEnabled,
+    setBgmEnabled,
+    currentTrackName,
+    nextTrack,
+    bgmSource,
+    currentTrackCredit,
+  } = useSoundSettings();
+
+  // 호스티드 mp3 재생 중일 때 라이선스 크레딧 한 줄(아티스트 · 라이선스).
+  const creditText =
+    bgmSource === 'hosted' && currentTrackCredit
+      ? [currentTrackCredit.artist, currentTrackCredit.license].filter(Boolean).join(' · ')
+      : '';
 
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -140,7 +154,7 @@ export const SoundSettingsControl: React.FC = () => {
           <SoundToggleRow
             icon={<Music size={15} />}
             label="배경음악"
-            hint="잔잔한 생성형 BGM"
+            hint="잔잔한 BGM (호스티드/생성형)"
             checked={bgmEnabled}
             onChange={setBgmEnabled}
           />
@@ -183,6 +197,30 @@ export const SoundSettingsControl: React.FC = () => {
                 >
                   {currentTrackName || '트랙 준비 중…'}
                 </span>
+                {creditText ? (
+                  <span
+                    style={{
+                      fontSize: '0.62rem',
+                      color: 'var(--text-muted)',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {currentTrackCredit?.creditUrl ? (
+                      <a
+                        href={currentTrackCredit.creditUrl}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                        style={{ color: 'inherit' }}
+                      >
+                        {creditText}
+                      </a>
+                    ) : (
+                      creditText
+                    )}
+                  </span>
+                ) : null}
               </span>
               <button
                 type="button"

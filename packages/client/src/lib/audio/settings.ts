@@ -10,8 +10,11 @@
  * 모든 동작은 SSR/비브라우저에서 graceful no-op 입니다.
  */
 
+// 재생 경로는 hosted 파사드(hosted-first) — manifest 가 있으면 mp3, 없으면 합성 폴백.
 import {
   BGM_DEFAULT_VOLUME_VALUE,
+  currentBgmCredit,
+  currentBgmSource,
   currentBgmTrackName,
   isBgmPlaying,
   setBgmPlayingChangeListener,
@@ -20,7 +23,9 @@ import {
   skipToNextTrack,
   startBgm,
   stopBgm,
-} from './bgm';
+  type BgmSource,
+  type HostedTrackCredit,
+} from './hosted';
 
 const SFX_KEY = 'picky_sfx_enabled';
 const BGM_KEY = 'picky_bgm_enabled';
@@ -38,6 +43,10 @@ export interface SoundState {
   isBgmPlaying: boolean;
   /** 마스터 음소거(SFX+BGM 전체) 여부. */
   allMuted: boolean;
+  /** 현재 BGM 재생 주체 — 호스티드 mp3('hosted') 또는 합성('synth'). */
+  bgmSource: BgmSource;
+  /** 현재 트랙 크레딧(호스티드일 때만, 라이선스 표기용). */
+  currentTrackCredit: HostedTrackCredit | null;
 }
 
 export type SoundStateListener = (state: SoundState) => void;
@@ -129,6 +138,23 @@ const state: SoundState = {
   bgmVolume: initialBgmVolume,
   isBgmPlaying: isBgmPlaying(),
   allMuted: readStored(ALL_MUTED_KEY) ?? false,
+  bgmSource: currentBgmSource(),
+  currentTrackCredit: currentBgmCredit(),
+};
+
+/** 트랙명·재생 주체·크레딧을 엔진 현재값으로 동기화(변경 시 true). */
+const syncBgmMeta = (): boolean => {
+  const name = currentBgmTrackName();
+  const source = currentBgmSource();
+  const credit = currentBgmCredit();
+  const changed =
+    state.currentTrackName !== name ||
+    state.bgmSource !== source ||
+    JSON.stringify(state.currentTrackCredit) !== JSON.stringify(credit);
+  state.currentTrackName = name;
+  state.bgmSource = source;
+  state.currentTrackCredit = credit;
+  return changed;
 };
 
 const listeners = new Set<SoundStateListener>();
@@ -165,17 +191,17 @@ const ensureWired = (): void => {
   }
   wired = true;
 
-  // 엔진의 트랙명 변경을 상태에 반영.
-  setBgmTrackChangeListener((name) => {
-    if (state.currentTrackName !== name) {
-      state.currentTrackName = name;
+  // 엔진의 트랙명 변경을 상태에 반영(재생 주체/크레딧도 함께 동기화).
+  setBgmTrackChangeListener(() => {
+    if (syncBgmMeta()) {
       emit();
     }
   });
 
   // 엔진의 실제 재생 상태 변경을 상태에 반영(인디케이터용).
   setBgmPlayingChangeListener((isPlaying) => {
-    if (state.isBgmPlaying !== isPlaying) {
+    const metaChanged = syncBgmMeta();
+    if (state.isBgmPlaying !== isPlaying || metaChanged) {
       state.isBgmPlaying = isPlaying;
       emit();
     }
@@ -193,7 +219,7 @@ const ensureWired = (): void => {
         if (pausedByVisibility && state.bgmEnabled) {
           pausedByVisibility = false;
           startBgm();
-          state.currentTrackName = currentBgmTrackName();
+          syncBgmMeta();
           emit();
         }
         pausedByVisibility = false;
@@ -264,7 +290,7 @@ export const setBgmEnabled = (enabled: boolean): void => {
     pausedByVisibility = false;
     if (enabled) {
       startBgm();
-      state.currentTrackName = currentBgmTrackName();
+      syncBgmMeta();
     } else {
       stopBgm();
     }
@@ -279,7 +305,7 @@ export const setBgmEnabled = (enabled: boolean): void => {
 export const nextTrack = (): void => {
   ensureWired();
   skipToNextTrack();
-  state.currentTrackName = currentBgmTrackName();
+  syncBgmMeta();
   emit();
 };
 
@@ -345,7 +371,7 @@ export const setAllMuted = (muted: boolean): void => {
     }
     pausedByVisibility = false;
     startBgm();
-    state.currentTrackName = currentBgmTrackName();
+    syncBgmMeta();
   }
   emit();
 };
@@ -365,6 +391,8 @@ export const __resetSettingsForTests = (): void => {
   state.bgmVolume = readStoredNumber(BGM_VOLUME_KEY) ?? BGM_DEFAULT_VOLUME_VALUE;
   state.isBgmPlaying = isBgmPlaying();
   state.allMuted = readStored(ALL_MUTED_KEY) ?? false;
+  state.bgmSource = currentBgmSource();
+  state.currentTrackCredit = currentBgmCredit();
   engineSetBgmVolume(state.bgmVolume);
   cachedSnapshot = { ...state };
 };

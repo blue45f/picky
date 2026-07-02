@@ -36,6 +36,10 @@ export interface UseSoundSettings {
   /** 마스터 음소거(SFX+BGM 전체) 여부. */
   allMuted: boolean;
   setAllMuted: (muted: boolean) => void;
+  /** 현재 BGM 재생 주체 — 호스티드 mp3('hosted') 또는 합성('synth'). */
+  bgmSource: SoundState['bgmSource'];
+  /** 현재 트랙 크레딧(호스티드일 때만, 라이선스 표기용). */
+  currentTrackCredit: SoundState['currentTrackCredit'];
 }
 
 // useSyncExternalStore 는 서버 스냅샷이 안정적(매번 같은 참조)이어야 해요.
@@ -46,6 +50,8 @@ const SERVER_SNAPSHOT: SoundState = {
   bgmVolume: 0.5,
   isBgmPlaying: false,
   allMuted: false,
+  bgmSource: 'synth',
+  currentTrackCredit: null,
 };
 
 const getServerSnapshot = (): SoundState => SERVER_SNAPSHOT;
@@ -88,5 +94,7 @@ export const useSoundSettings = (): UseSoundSettings => {
     isBgmPlaying: state.isBgmPlaying,
     allMuted: state.allMuted,
     setAllMuted,
+    bgmSource: state.bgmSource,
+    currentTrackCredit: state.currentTrackCredit,
   };
 };

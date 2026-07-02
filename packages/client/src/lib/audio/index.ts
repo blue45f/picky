@@ -1,9 +1,13 @@
 /**
- * 통합 오디오 엔진 — web/토스 두 앱이 공유하는 단일 소스(음원 파일 0, 전부 WebAudio 합성).
+ * 통합 오디오 엔진 — web/토스 두 앱이 공유하는 단일 소스.
+ *
+ * BGM 은 2계층: 호스티드 mp3(public /audio/playlist.json, 가사 트랙 대비)가 있으면 우선,
+ * 없으면 기존 WebAudio 합성 5트랙으로 폴백해요(파일 없음 상태에서 완전 무해).
  *
  * 공개 표면:
  *  - 효과음:   playClick, installGlobalClickSounds
  *  - BGM:      bgmPlay, bgmPause, bgmNext, getCurrentTrackName
+ *  - 호스티드:  configureHostedAudio(base URL 주입), loadHostedPlaylist(프리페치)
  *  - 볼륨/음소거: setBgmVolume, getBgmVolume, setAllMuted, isAllMuted
  *  - 상태/구독: getSoundState, onSoundStateChange, setSfxEnabled, setBgmEnabled,
  *              isSfxEnabled, isBgmEnabled
@@ -33,6 +37,14 @@ export {
 export { resumeAudio, getAudioContext } from './context';
 
 export { BGM_TRACKS } from './tracks';
+
+export {
+  configureHostedAudio,
+  loadHostedPlaylist,
+  type BgmSource,
+  type HostedTrack,
+  type HostedTrackCredit,
+} from './hosted';
 
 import { setBgmEnabled, nextTrack, getCurrentTrackName } from './settings';
 

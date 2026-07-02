@@ -30,8 +30,22 @@ const toggleStyle = (active: boolean): React.CSSProperties => ({
 
 /** 헤더/설정 영역에 놓는 사운드 컨트롤 묶음. */
 export function SoundControls() {
-  const { sfxEnabled, setSfxEnabled, bgmEnabled, setBgmEnabled, currentTrackName, nextTrack } =
-    useSoundSettings();
+  const {
+    sfxEnabled,
+    setSfxEnabled,
+    bgmEnabled,
+    setBgmEnabled,
+    currentTrackName,
+    nextTrack,
+    bgmSource,
+    currentTrackCredit,
+  } = useSoundSettings();
+
+  // 호스티드 mp3 재생 중일 때 라이선스 크레딧 한 줄(아티스트 · 라이선스).
+  const creditText =
+    bgmSource === 'hosted' && currentTrackCredit
+      ? [currentTrackCredit.artist, currentTrackCredit.license].filter(Boolean).join(' · ')
+      : '';
 
   const [pushAgreed, setPushAgreed] = useState(() => {
     try {
@@ -154,6 +168,22 @@ export function SoundControls() {
             {currentTrackName || '다음 곡'}
           </span>
         </button>
+      ) : null}
+
+      {/* 호스티드 mp3 재생 중 라이선스 크레딧 — 표기 의무(라이선스) + 어떤 곡인지 안내. */}
+      {bgmEnabled && creditText ? (
+        <span
+          style={{
+            flexBasis: '100%',
+            fontSize: FONT.caption,
+            color: theme.textFaint,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          🎼 {currentTrackName} — {creditText}
+        </span>
       ) : null}
     </div>
   );
