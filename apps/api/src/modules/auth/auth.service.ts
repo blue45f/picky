@@ -253,16 +253,24 @@ export class AuthService {
       throw new UnauthorizedException('토스 로그인 토큰 발급에 실패했어요.');
     }
 
-    const meResponse = await this.requestTossApi<{ userKey?: number }>(
-      'GET',
-      '/api-partner/v1/apps-in-toss/user/oauth2/login-me',
-      agent,
-      {
-        bearer: tossAccessToken,
-      },
-    );
+    // login-me 응답은 성장하는 계약이다 — 2026-01-02부터 scope에 'user_key' 항목이
+    // 추가됐고 앞으로도 미지의 필드/scope 항목이 올 수 있다. userKey만 읽고 나머지는
+    // 전부 무시해 어떤 추가 항목에도 예외가 나지 않게 한다(scope 값 검증·분기 금지).
+    const meResponse = await this.requestTossApi<{
+      userKey?: number | string;
+      scope?: unknown;
+    }>('GET', '/api-partner/v1/apps-in-toss/user/oauth2/login-me', agent, {
+      bearer: tossAccessToken,
+    });
 
-    const userKey = meResponse?.success?.userKey;
+    // userKey가 숫자 대신 문자열로 와도 관대하게 수용(빈 문자열·비유한 숫자는 거부).
+    const rawUserKey = meResponse?.success?.userKey;
+    let userKey: number | string | null = null;
+    if (typeof rawUserKey === 'string') {
+      userKey = rawUserKey.trim() || null;
+    } else if (typeof rawUserKey === 'number' && Number.isFinite(rawUserKey)) {
+      userKey = rawUserKey;
+    }
     if (userKey == null) {
       throw new UnauthorizedException('토스 사용자 정보를 가져오지 못했어요.');
     }

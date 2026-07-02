@@ -421,10 +421,15 @@ export const createAuthStoreState =
           if (!result?.authorizationCode) {
             return { ok: false, message: '토스 로그인이 취소되었어요.' };
           }
+          // SDK 응답을 통째로 보내지 않고 서버 계약 필드만 골라 보낸다 —
+          // appLogin 결과에 scope 등 새 필드가 추가돼도 서버 검증이 흔들리지 않게.
           const res = await requestApi('/auth/toss/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(result),
+            body: JSON.stringify({
+              authorizationCode: result.authorizationCode,
+              referrer: result.referrer === 'SANDBOX' ? 'SANDBOX' : 'DEFAULT',
+            }),
           });
           const data = (await parseApiPayload(res)) as AuthResult;
           if (!res.ok || !isAuthResultPayload(data)) {

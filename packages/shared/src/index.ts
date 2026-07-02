@@ -570,7 +570,9 @@ export const TossLoginSchema = z.object({
     .string({ required_error: '인가 코드가 필요합니다.' })
     .trim()
     .min(1, '인가 코드가 필요합니다.'),
-  referrer: z.enum(['DEFAULT', 'SANDBOX']).default('DEFAULT'),
+  // SDK가 새 referrer 값을 추가해도 로그인이 400으로 깨지지 않게 미지의 값은 DEFAULT로
+  // 흡수한다(알려진 값은 그대로 통과). 미지의 추가 필드(scope 등)는 zod가 기본 strip.
+  referrer: z.enum(['DEFAULT', 'SANDBOX']).default('DEFAULT').catch('DEFAULT'),
 });
 
 export type TossLoginInput = z.infer<typeof TossLoginSchema>;
