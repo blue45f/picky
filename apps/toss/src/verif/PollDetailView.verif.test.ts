@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { MemoryRouter } from 'react-router-dom';
 import { PollDetailView } from '../pages/PollDetailView';
 import { fixturePoll } from './fixturePoll';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -24,40 +25,45 @@ vi.mock('@toss/tds-mobile', async () => {
 // It asserts that the integrated share area (including the real PollShareQrSection) appears in the output.
 describe('PollDetailView full render (verif)', () => {
   it('output from full view shows share CTAs + the QR/SNS/templates disclosure toggle (collapsed by default)', () => {
+    // 실제 앱에선 항상 BrowserRouter 아래 렌더링돼요(UserAuthStatus가 계정 화면으로 navigate).
     const html = renderToStaticMarkup(
-      React.createElement(PollDetailView, {
-        poll: fixturePoll,
-        isLoading: false,
-        closed: false,
-        showResults: true,
-        hasVoted: false,
-        votedOptionId: null,
-        selectedOptionId: null,
-        onSelect: () => {},
-        onVote: () => {},
-        voterName: '',
-        setVoterName: () => {},
-        comment: '',
-        setComment: () => {},
-        commentPassword: '',
-        setCommentPassword: () => {},
-        leader: null,
-        displayOptions: fixturePoll.options,
-        winnerId: null,
-        isOwner: false,
-        confirmDelete: false,
-        onDelete: () => {},
-        remaining: null,
-        shareUrl: 'https://picky-olive.vercel.app/poll/' + fixturePoll.id,
-        onShare: () => {},
-        onCopy: () => {},
-        onCopyResult: () => {},
-        onCopyText: () => {},
-        onResultImageSaved: () => {},
-        onBack: () => {},
-        totalVotes: fixturePoll.totalVotes,
-        comments: fixturePoll.comments,
-      }),
+      React.createElement(
+        MemoryRouter,
+        null,
+        React.createElement(PollDetailView, {
+          poll: fixturePoll,
+          isLoading: false,
+          closed: false,
+          showResults: true,
+          hasVoted: false,
+          votedOptionId: null,
+          selectedOptionId: null,
+          onSelect: () => {},
+          onVote: () => {},
+          voterName: '',
+          setVoterName: () => {},
+          comment: '',
+          setComment: () => {},
+          commentPassword: '',
+          setCommentPassword: () => {},
+          leader: null,
+          displayOptions: fixturePoll.options,
+          winnerId: null,
+          isOwner: false,
+          confirmDelete: false,
+          onDelete: () => {},
+          remaining: null,
+          shareUrl: 'https://picky-olive.vercel.app/poll/' + fixturePoll.id,
+          onShare: () => {},
+          onCopy: () => {},
+          onCopyResult: () => {},
+          onCopyText: () => {},
+          onResultImageSaved: () => {},
+          onBack: () => {},
+          totalVotes: fixturePoll.totalVotes,
+          comments: fixturePoll.comments,
+        }),
+      ),
     );
 
     // Integrated share card from the real View — QR·SNS 미리보기·공유 문구는 세로 스크롤 압축을 위해
@@ -103,39 +109,43 @@ describe('PollDetailView full render (verif)', () => {
   // so a viewer can't infer the opinion/vote distribution before participating.
   it('hides comment bodies + selected-option chip until results are unlocked', () => {
     const html = renderToStaticMarkup(
-      React.createElement(PollDetailView, {
-        poll: fixturePoll,
-        isLoading: false,
-        closed: false,
-        // results gate CLOSED (e.g. resultsVisibility=afterVote and not voted)
-        showResults: false,
-        hasVoted: false,
-        votedOptionId: null,
-        selectedOptionId: null,
-        onSelect: () => {},
-        onVote: () => {},
-        voterName: '',
-        setVoterName: () => {},
-        comment: '',
-        setComment: () => {},
-        commentPassword: '',
-        setCommentPassword: () => {},
-        leader: null,
-        displayOptions: fixturePoll.options,
-        winnerId: null,
-        isOwner: false,
-        confirmDelete: false,
-        onDelete: () => {},
-        remaining: null,
-        shareUrl: 'https://picky-olive.vercel.app/poll/' + fixturePoll.id,
-        onShare: () => {},
-        onCopy: () => {},
-        onCopyText: () => {},
-        onResultImageSaved: () => {},
-        onBack: () => {},
-        totalVotes: fixturePoll.totalVotes,
-        comments: fixturePoll.comments,
-      }),
+      React.createElement(
+        MemoryRouter,
+        null,
+        React.createElement(PollDetailView, {
+          poll: fixturePoll,
+          isLoading: false,
+          closed: false,
+          // results gate CLOSED (e.g. resultsVisibility=afterVote and not voted)
+          showResults: false,
+          hasVoted: false,
+          votedOptionId: null,
+          selectedOptionId: null,
+          onSelect: () => {},
+          onVote: () => {},
+          voterName: '',
+          setVoterName: () => {},
+          comment: '',
+          setComment: () => {},
+          commentPassword: '',
+          setCommentPassword: () => {},
+          leader: null,
+          displayOptions: fixturePoll.options,
+          winnerId: null,
+          isOwner: false,
+          confirmDelete: false,
+          onDelete: () => {},
+          remaining: null,
+          shareUrl: 'https://picky-olive.vercel.app/poll/' + fixturePoll.id,
+          onShare: () => {},
+          onCopy: () => {},
+          onCopyText: () => {},
+          onResultImageSaved: () => {},
+          onBack: () => {},
+          totalVotes: fixturePoll.totalVotes,
+          comments: fixturePoll.comments,
+        }),
+      ),
     );
 
     // Comment bodies are gated behind the results lock.

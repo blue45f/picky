@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 import { useIdentity } from '../store/useIdentity';
 import { theme } from '../theme';
@@ -9,6 +10,7 @@ interface UserAuthStatusProps {
 }
 
 export function UserAuthStatus({ compact = false }: Readonly<UserAuthStatusProps>) {
+  const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
   const login = useIdentity((state) => state.login);
@@ -42,13 +44,19 @@ export function UserAuthStatus({ compact = false }: Readonly<UserAuthStatusProps
   // appLogin → login-me로 확인된 계정만 toss-user-... 형식이므로 로그인 UI도 그때만 표시한다.
   const isTossAccountUser = Boolean(user?.id.startsWith('toss-user-'));
 
+  const goToAccount = () => {
+    hapticFeedback('tickWeak');
+    navigate('/account');
+  };
+
   if (user && isTossAccountUser) {
     if (compact) {
       return (
         <button
           type="button"
-          onClick={handleLogout}
+          onClick={goToAccount}
           className="pressable"
+          aria-label={`${user.nickname}님 — 내 계정 관리`}
           style={{
             padding: '6px 10px',
             borderRadius: 12,
@@ -60,7 +68,7 @@ export function UserAuthStatus({ compact = false }: Readonly<UserAuthStatusProps
             cursor: 'pointer',
           }}
         >
-          {user.nickname} (로그아웃)
+          👤 {user.nickname}님
         </button>
       );
     }
@@ -77,9 +85,23 @@ export function UserAuthStatus({ compact = false }: Readonly<UserAuthStatusProps
           borderRadius: 14,
         }}
       >
-        <span style={{ fontSize: 13, fontWeight: 700, color: theme.text }}>
+        <button
+          type="button"
+          onClick={goToAccount}
+          className="pressable"
+          aria-label={`${user.nickname}님 — 내 계정 관리`}
+          style={{
+            border: 'none',
+            background: 'none',
+            padding: 0,
+            fontSize: 13,
+            fontWeight: 700,
+            color: theme.text,
+            cursor: 'pointer',
+          }}
+        >
           👤 {user.nickname}님
-        </span>
+        </button>
         <button
           type="button"
           onClick={handleLogout}

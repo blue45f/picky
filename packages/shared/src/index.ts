@@ -22,6 +22,9 @@ export * from './opinionTopics';
 // 한마디(댓글) 정렬·필터 보기 모드 — web/toss 동일 정렬·필터·빈 상태.
 export * from './pollComments';
 
+// 이용약관·개인정보처리방침·사업자 정보 — web/toss 동일 법적 고지 단일 소스.
+export * from './legal';
+
 // 공유 텍스트·오리진 정규화 코어 + 상황별 공유 문구 프리셋(앱별 URL resolver 는 각 앱 lib/pollShare.ts).
 export * from './pollShare';
 

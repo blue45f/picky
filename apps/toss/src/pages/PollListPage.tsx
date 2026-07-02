@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button, Top } from '@toss/tds-mobile';
 import type { Poll, PollListSort } from '../shared';
 import {
@@ -1252,6 +1252,24 @@ export function PollListPage() {
         >
           고객센터 · 문의하기
         </button>
+
+        {/* 웹 푸터와 동일한 법적 고지 진입점 — 약관/방침(사업자 정보 포함)으로 이동해요. */}
+        <p
+          style={{
+            margin: '4px 0 0',
+            display: 'flex',
+            gap: 14,
+            justifyContent: 'center',
+            fontSize: FONT.caption,
+          }}
+        >
+          <Link to="/legal/terms" style={{ color: theme.textFaint, fontWeight: 600 }}>
+            이용약관
+          </Link>
+          <Link to="/legal/privacy" style={{ color: theme.textFaint, fontWeight: 600 }}>
+            개인정보처리방침
+          </Link>
+        </p>
       </div>
 
       <div style={stickyActionBar}>

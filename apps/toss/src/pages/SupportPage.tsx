@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@toss/tds-mobile';
 import { theme, pageShell, FONT } from '../theme';
 import { hapticFeedback } from '../lib/toss';
@@ -295,6 +295,24 @@ export function SupportPage() {
             </article>
           ))}
         </section>
+
+        {/* 법적 고지 링크 — 웹 푸터와 동일한 이용약관·개인정보처리방침 진입점(사업자 정보 포함). */}
+        <p
+          style={{
+            margin: 0,
+            display: 'flex',
+            gap: 14,
+            justifyContent: 'center',
+            fontSize: FONT.small,
+          }}
+        >
+          <Link to="/legal/terms" style={{ color: theme.textMuted, fontWeight: 700 }}>
+            이용약관
+          </Link>
+          <Link to="/legal/privacy" style={{ color: theme.textMuted, fontWeight: 700 }}>
+            개인정보처리방침
+          </Link>
+        </p>
 
         {/*
           고객센터 하단 배너 — 문의 폼·목록이 끝나는 자연스러운 지점(스크롤 말단)이라
